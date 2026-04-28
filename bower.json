@@ -7,8 +7,6 @@
     "EaselJS": "release_v0.6.1",
     "jquery": "2.0.3",
     "jquery.cookie": "1.3.1",
-    "jquery-jsonrpcjs": "https://raw.github.com/datagraph/jquery-jsonrpc/6f6af4120d8417a55610b30d9ab108ef34772028/jquery.jsonrpc.js",
-    "jquery-message-queuing": "https://raw.githubusercontent.com/cowboy/jquery-message-queuing/514f091e0fad742ed3d96c909dc3217951e530b3/jquery.ba-jqmq.min.js",
     "jquery-migrate": "1.2.1",
     "jquery-mobile": "1.3.2",
     "json2": "https://raw.github.com/douglascrockford/JSON-js/e39db4b7e6249f04a195e7dd0840e610cc9e941e/json2.js",
