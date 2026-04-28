@@ -1,0 +1,54 @@
+CREDITS
+=======
+
+Original Data Dealer
+--------------------
+
+Data Dealer (datadealer.com) was created by Cuteacute Media OG.
+The original team behind the game and its source repositories
+(dd_js, dd_rules, dd_app, dd_auth, dd_cms) included:
+
+  - Ivan Averintsev
+  - Wolfie Christl
+  - Pascale Osterwalder
+  - Tobi Schäfer
+  - Ralf Traunsteiner
+
+Original copyright: Copyright (c) 2011-2014, Cuteacute Media OG.
+
+Upstream repositories used as the basis of this fork:
+
+  - https://github.com/datadealer/dd_js     (frontend)
+  - https://github.com/datadealer/dd_rules  (game data)
+  - https://github.com/datadealer/dd_app    (Python backend)
+
+Third-party fonts shipped under font/ retain their own notices and
+licenses (SIL Open Font License). See font/LICENSE/ for details:
+
+  - Bowlby One SC — Copyright (c) 2011 by vernon adams
+  - Skranji      — Copyright (c) 2012, Font Diner
+  - Source       — Copyright 2010, 2012 Adobe Systems Incorporated
+  - Voltaire     — Copyright (c) 2011 by Sorkin Type Co
+
+Modifications in this fork
+--------------------------
+
+This repository is a work-in-progress port of Data Dealer into a
+webxdc mini-app (see README.md, "About this fork"). Modifications are
+made by the Data Dealer webxdc contributors and include, among other
+things:
+
+  - Vendoring game data from dd_rules into data/ (see data/UPSTREAM.txt).
+  - Reorganising license documentation: the original LICENSE.txt is
+    retained for historical reference; LICENSE-CODE.txt and
+    LICENSE-ASSETS.txt now state the licensing of source code and
+    non-code material respectively.
+  - Forthcoming work (tracked in separate threads/PRs): porting dd_app
+    behaviour into in-browser JavaScript, replacing networked state
+    with window.webxdc.sendUpdate, and removing or stubbing
+    server-only integrations.
+
+Planning for the port was done with Claude (https://www.anthropic.com/claude).
+
+This file is licensed under CC BY-SA 3.0 AT, the same terms as the
+other non-code material in this repository (see LICENSE-ASSETS.txt).

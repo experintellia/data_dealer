@@ -1,3 +1,27 @@
+# Data Dealer (webxdc port) #
+
+## About this fork
+
+This repository is a work-in-progress port of the [Data Dealer](http://datadealer.com) browser game into a [webxdc](https://webxdc.org) mini-app — a self-contained, offline-capable application that runs inside a Delta Chat group. The aim is a full-game port (not a demo), fusing three of the original repositories:
+
+- [`datadealer/dd_js`](https://github.com/datadealer/dd_js) — the original frontend (this fork's starting point).
+- [`datadealer/dd_rules`](https://github.com/datadealer/dd_rules) — game data (rulesets, default game state). Vendored under [`data/`](./data/).
+- [`datadealer/dd_app`](https://github.com/datadealer/dd_app) — the original Python backend, to be ported into in-browser JavaScript so the game runs without a server.
+
+State that was previously synchronised through the backend will instead be exchanged between players using `window.webxdc.sendUpdate`, so each chat group becomes its own isolated game instance.
+
+> webxdc's per-chat sandbox model is almost a better fit for what Data Dealer was trying to be than what they actually built. Their planned multiplayer needed a server, social login, friend graphs — all of which evaporated when the company stopped paying hosting bills. webxdc gives you "every chat group is a game lobby" essentially for free, and there's no service to keep alive. The original architecture is the reason it died; webxdc's architecture is the reason a successor wouldn't.
+
+Planning for this port was done with [Claude](https://www.anthropic.com/claude).
+
+### Licensing & credits
+
+See [`LICENSE-CODE.txt`](./LICENSE-CODE.txt) (Artistic License 2.0, covering the dd_js fork and the ported dd_app code), [`LICENSE-ASSETS.txt`](./LICENSE-ASSETS.txt) (CC-BY-SA 3.0 Austria, covering dd_rules data, `img/`, `i18n/`, and fonts), and [`CREDITS.txt`](./CREDITS.txt) for the original team and modification notes.
+
+---
+
+The remainder of this README is the original `dd_js` documentation, retained for reference while the port is in progress. It does not yet describe the webxdc build.
+
 # dd_js #
 
 Application serving the frontend API for [Data Dealer](http://datadealer.com)
