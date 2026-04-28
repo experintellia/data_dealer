@@ -27,17 +27,6 @@ define(function(require) {
 
     // JSON-RPC URLs.
     jsonRpcUrl: baseUrl + '/app/api/',
-    jsonRpcAuthUrl: baseUrl + '/authapi/',
-
-    // Django authentication URLs.
-    signUpUrl: baseUrl + '/accounts/remote/sign_up/',
-    signInUrl: baseUrl + '/accounts/remote/sign_in/',
-    signOutUrl: baseUrl + '/accounts/remote/sign_out/',
-    setLangUrl: baseUrl + '/accounts/lang/',
-    accessDeniedUrl: baseUrl + '/accounts/remote/access_denied/',
-    resetPasswordUrl: baseUrl + '/accounts/remote/reset/',
-    resetPasswordFromKeyUrl: baseUrl + '/accounts/remote/reset/key/',
-    setEmailUrl: baseUrl + '/accounts/remote/set_email',
 
     // h2. Websocket settings
     wsUrl: 'https://' + domain + '/__sockjs__',
