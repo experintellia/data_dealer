@@ -13,8 +13,6 @@ require.config({
     'createjs-tween': '../components/TweenJS/lib/tweenjs-0.4.1.min',
     'createjs-sound': '../components/SoundJS/lib/soundjs-0.4.1.min',
     jquery: '../components/jquery/jquery',
-    'jquery-jsonrpc': '../components/jquery-jsonrpcjs/index',
-    'jquery-message-queuing': '../components/jquery-message-queuing/index',
     'jquery-migrate': '../components/jquery-migrate/jquery-migrate',
     'jquery-mobile': '../components/jquery-mobile/index',
     json2: '../components/json2/index',
@@ -43,14 +41,6 @@ require.config({
     'createjs-tween': {
       deps: ['createjs-easel'],
       exports: 'createjs.Tween'
-    },
-    'jquery-jsonrpc': {
-      deps: ['jquery'],
-      exports: 'jQuery.jsonRPC'
-    },
-    'jquery-message-queuing': {
-      deps: ['jquery'],
-      exports: 'jQuery.jqmq'
     },
     'jquery-migrate': ['jquery'],
     'jquery-mobile': ['jquery'],
