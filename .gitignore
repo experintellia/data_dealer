@@ -5,6 +5,7 @@
 setup_local.js
 /components/
 /dist/
-/docs/
+/docs/*
+!/docs/*.md
 /node_modules/
 npm-debug.log
