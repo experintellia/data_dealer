@@ -65,8 +65,10 @@ define(function(require) {
       return this;
     };
 
-    $(document).trigger('connect');
-    $(document).trigger('established');
+    setTimeout(function() {
+      $(document).trigger('connect');
+      $(document).trigger('established');
+    }, 0);
 
     return this;
   };
