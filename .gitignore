@@ -9,3 +9,4 @@ setup_local.js
 !/docs/*.md
 /node_modules/
 npm-debug.log
+/coverage/
