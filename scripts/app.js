@@ -156,11 +156,6 @@ define(function(require) {
       app.remote.addMethod('sellPowerup');
       app.remote.addMethod('setPerpCoordinates');
 
-      app.remote.addMethod('checkUsername', setup.jsonRpcAuthUrl);
-
-      // The authentication methods connect to a different URL.
-      //app.remote.addMethod('debug', setup.jsonRpcAuthUrl);
-
       // Get a token from the back-end and return the deferred remote call.
       $('#loadertext').text('Fetching token');
       return app.remote.getToken().then(function(data) {
