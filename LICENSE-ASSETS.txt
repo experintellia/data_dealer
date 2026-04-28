@@ -1,0 +1,39 @@
+Asset & data license — Creative Commons Attribution-ShareAlike 3.0 Austria
+==========================================================================
+
+This file applies to the non-code material in this repository, including:
+
+  - data/                  Game data vendored from datadealer/dd_rules
+                           (default_game.json, ruleset_3.de.json,
+                           ruleset_3.en.json). See data/UPSTREAM.txt for
+                           the source commit SHA.
+  - img/                   Sprite sheets and other game artwork inherited
+                           from dd_js.
+  - i18n/                  Translation catalogues inherited from dd_js.
+  - font/ (game fonts)     The CC-BY-SA portions only. The third-party
+                           webfonts shipped under font/ (Bowlby One SC,
+                           Skranji, Source, Voltaire) remain under the
+                           SIL Open Font License — see font/LICENSE/ for
+                           their original notices.
+
+These works are licensed under the Creative Commons
+Attribution-ShareAlike 3.0 Austria license (CC BY-SA 3.0 AT).
+
+  License deed:        https://creativecommons.org/licenses/by-sa/3.0/at/
+  Full legal code:     https://creativecommons.org/licenses/by-sa/3.0/at/legalcode
+
+Original authors (see CREDITS.txt for full credits):
+  Ivan Averintsev, Wolfie Christl, Pascale Osterwalder, Tobi Schäfer,
+  Ralf Traunsteiner.
+
+Under CC BY-SA 3.0 AT you are free to share and adapt these works for
+any purpose, including commercially, provided that you:
+
+  - give appropriate credit to the original authors,
+  - indicate if changes were made, and
+  - distribute your contributions under the same license as the
+    original.
+
+Modifications made in this fork (e.g. any reformatting of dd_rules data
+for the webxdc build, or adapted artwork) are also released under
+CC BY-SA 3.0 AT.
