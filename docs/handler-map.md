@@ -18,12 +18,12 @@ relative to the dd_app repo unless otherwise noted.
 | `ping` | `views.py:1479` | `()` | — | — | `"pong"` | none. **Not auth-gated** |
 | `loadGame` | `views.py:194` | `(token, extra_types=True)` | Mongo: `users` (by `_id`), `games` (full doc; `mongo.get_game` upserts new) | Mongo: `games` (insert on first call) | full game doc + `type_registry` + `levels` + `karmalauters` + `karmalizers` + `missions` + `is_new_game`; `game_values.ap_initial` & `ap_offset` recomputed | Celery: `logAction('newgame'\|'loadgame')` |
 | `resetGame` | `views.py:186` | `(token)` | Mongo: `users` | Mongo: `games` (drop) via `mongo.drop_game(oid, version)` | drop result | none |
-| `setPerpCoordinates` | `views.py:278` | `(token, updates)` where `updates=[[path,{x,y}], …]` | Mongo: `games` (per-update `update`) | Mongo: `games` (`$set nodes.$.instance_data.{x,y}` per update) | int (count of updated docs) | none |
+| `setPerpCoordinates` | `views.py:278` | `(token, updates)` where `updates=[[path,{x,y}], …]` | — (writes only) | Mongo: `games.update` per entry, `$set nodes.$.instance_data.{x,y}` matched by `nodes.full_path` + `game_query_base` | int (count of updated docs) | none |
 | `integrateCollected` | `views.py:320` | `(token, collect_id)` | Mongo: `games` (`db_queue.$`, `nodes`, `version`, `nodes_lock`, `game_values`, `mission_goals`, `active_missions`) | Mongo: `games.find_and_modify` ($pull `db_queue` by `collect_id`; $inc `xp_value`/`cash_value`/`karma_value`/`nodes_lock`; $set `nodes`, `profiles_value`, missions, ap snapshot; $push profile_sets) | `{result:{nodes,increment,dup}, game_values, [missions], [levelup]}` or `{error: 0\|1\|2}` | Celery: `logAction('integrate')`, optional `notifyLevelupItems` (countdown 2s), `logAction('missiondone'\|'levelup')` |
 | `collectPerp` | `views.py:505` | `(token, path)` | Mongo: `games` (`nodes.$`, `version`, `game_values`, `nodes_collect`, `nodes_lock`, `mission_goals`, `active_missions`) | Mongo: `games.find_and_modify` ($pull `nodes_collect`; $inc `xp_value`/`karma_value`/`cash_value`/`nodes_lock`/`nodes.$.instance_data.amount`; $set ap snapshot, missions; $push `db_queue`) | `{result, game_values, [missions], [levelup], [karma_incident]}` or `{error: 1\|2\|3}` | Celery: `logAction('collect')`, optional `notifyLevelupItems`, `logAction('missiondone'\|'levelup'\|'incident')`. RNG: `_handleKarmaIncident` (see below) |
 | `chargePerp` | `views.py:714` | `(token, path)` | Mongo: `games` (`nodes`, `version`, `nodes_lock`, `game_values`, `mission_goals`, `active_missions` — via `get_typedata_by_path` w/ `include_nodes=True`) | Mongo: `games.find_and_modify` ($set `nodes.$.instance_data.charge_start`/`last_upgrade_values`; $addToSet `nodes_charging`={path,result,charge_start,charge_end}; $inc `xp_value`/`cash_value`/`cash_spent`/`nodes_lock`; $set ap snapshot, missions) | `{game_values, duration, [missions], [levelup]}` or `{error: 1\|2}` | Celery: **`chargePerpReady` (eta=now+charge_time/debug_charge_accel)** writes the bucket-flip + emits `node_ready`; `logAction('charge')`; optional `notifyLevelupItems`, `logAction('missiondone'\|'levelup')`. RNG: `getVariatedAmount` (±5%) bakes into `charge_result` |
 | `buySlots` | `views.py:860` | `(token, perp_full_path, slot_type, slots)` | Mongo: `games` (`nodes.$`, `version`, `nodes_lock`, `game_values`, `active_missions`) | Mongo: `games.find_and_modify` ($set `nodes.$.instance_data.<slot_type>_slots`; $inc `cash_value`/`cash_spent`/`nodes_lock`/`xp_value`) | `{node, game_values, [levelup]}` or `{error: 0\|1\|2\|3\|4}` | Celery: optional `notifyLevelupItems`, `logAction('levelup')` |
-| `buyKarma` | `views.py:939` | `(token, karmalauter)` | Mongo: `games` (`version`, `nodes_lock`, `game_values`, `active_missions`) | Mongo: `games.find_and_modify` ($inc `xp_value`/`karma_value`/`cash_value`/`cash_spent`/`nodes_lock`) | `{game_values, [levelup]}` or `{error: 1\|2\|3\|4}` | Celery: optional `logAction('levelup')` (no `logAction('buykarma')` — gap) |
+| `buyKarma` | `views.py:939` | `(token, karmalauter)` | Mongo: `games` (`version`, `nodes_lock`, `game_values`, `active_missions`) | Mongo: `games.find_and_modify` ($inc `xp_value`/`karma_value`/`cash_value`/`cash_spent`/`nodes_lock`) | `{game_values, [levelup]}` or `{error: 1\|2\|3\|4}` | Celery: optional `logAction('levelup')`. Note: no per-action `logAction` is emitted (unlike `buyPerp`/`buyPowerup`) |
 | `buyPerp` | `views.py:1001` | `(token, parent_path, perp_gestalt)` | Mongo: `games` (`nodes`, `version`, `nodes_lock`, `game_values`, `mission_goals`, `active_missions`) | Mongo: `games.find_and_modify` ($push `nodes`/`db_queue`; $inc `xp_value`/`cash_value`/`cash_spent`/`karma_value`/`nodes_lock`/`profiles_max`; $set missions) | `{node, game_values, [missions], [levelup], [profile_set]}` or `{error: 1\|2\|3\|4}` | Celery: `logAction('buyperp')`, optional `notifyBuyperpItems` (countdown 2s, only for `project*`/`contact*`), `notifyLevelupItems`, `logAction('missiondone'\|'levelup')` |
 | `getProvidedPerps` | `views.py:1130` | `(token, perp_full_path)` | Mongo: `games` (`nodes`, `version`, `game_values`) | — | `{buyable: [gestalt, …]}` or `{error: 0}` | none |
 | `sellPowerup` | `views.py:1157` | `(token, perp_full_path, slot, powerup)` | Mongo: `games` (`nodes.$`, `version`, `nodes_lock`, `game_values`, `active_missions`) | Mongo: `games.find_and_modify` ($set `nodes.$.instance_data.{charge_cost,collect_amount,collect_risk,tokens,powerups}`; $inc `cash_value` (sell at 0.75×)/`xp_value`/`nodes_lock`) | `{node, game_values, [levelup]}` or `{error: 0..4}` | Celery: optional `notifyLevelupItems`, `logAction('levelup')` |
@@ -173,8 +173,8 @@ constraint at write time:
    `find_and_modify` query while `$inc`-ing it. Concurrent mutations from
    the same user race-fail with the canonical `BUBU` error code (3 or 4
    depending on handler).
-2. **Server-side AP `$where` clause.** `integrateCollected:457`,
-   `collectPerp:678`, `chargePerp:803` all attach a JS `$where` that
+2. **Server-side AP `$where` clause.** `integrateCollected` (`views.py:443`),
+   `collectPerp` (`views.py:684`), `chargePerp` (`views.py:807`) all attach a JS `$where` that
    recomputes the AP formula from `(ap_snapshot, ap_update, now, levelinfo)`
    server-side and rejects the write if AP < cost. Bypasses any
    client-supplied AP value.
@@ -195,16 +195,24 @@ exists in `dd_app` (no `pyramid_ratelimit`, no Redis token bucket, no
 nginx-level config in the repo). Rate-limiting is implicit via `nodes_lock`
 (only one in-flight mutation per user) and the AP / cash economy itself.
 
-### Port mirror plan (preview)
+### Mirror-or-skip notes for the port
 
-For the webxdc port, items 1–5 above are **moot**: there is one writer
-(the local engine), no concurrency, no untrusted client. Drop `nodes_lock`,
-drop the `$where` AP recheck, drop the cash-floor query — the engine is
-the single source of truth and computes AP on read via the same
-`calculateAP` formula. Keep the server-only RNG calls but reseed locally.
-The only deliberate-skip is `getRanking` (no cross-user state) and
-`logAction` (no analytics sink); both already covered as policy decisions
-in `docs/async-map.md`.
+Per the issue's "any RNG, anti-cheat, or rate-limiting we'll need to mirror
+(or deliberately skip)" requirement, the verdicts are:
+
+- Items 1, 2, 3 (`nodes_lock`, AP `$where`, cash-floor query): **skip** —
+  they exist to defend against an untrusted concurrent writer. In a webxdc
+  runtime the local engine is the only writer.
+- Item 4 (`collectPerp` two-state gate): **mirror** — it's a real gameplay
+  invariant (can't collect before charge finishes), not just a defense.
+  Becomes a `now >= charge_end` check in the lazy materializer (see
+  `docs/async-map.md §1`).
+- Item 5 (`game_query_base` user scoping): **N/A** — single-tenant.
+- RNG (3 sources above): **mirror** — gameplay flavor, fully reproducible
+  client-side.
+- Rate limiting: **N/A** — none exists server-side anyway.
+- `getRanking` and `logAction`: skipped (cross-user / analytics — see
+  `docs/async-map.md §4`).
 
 ---
 
