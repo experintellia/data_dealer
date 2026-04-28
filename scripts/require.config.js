@@ -23,7 +23,6 @@ require.config({
     'numeral-de': '../components/numeral/languages/de-de',
     preload: '../components/PreloadJS/lib/preloadjs-0.3.1.min',
     routie: '../components/routie/lib/routie',
-    sockjs: '../components/sockjs/sockjs',
     sprintf: '../components/sprintf/index',
     text: '../components/requirejs-text/text',
     tpl: '../components/requirejs-tpl-dawsontoth/index',
@@ -69,9 +68,6 @@ require.config({
     },
     'routie': {
       exports: 'routie'
-    },
-    'sockjs': {
-      exports: 'SockJS'
     },
     'sprintf': {
       exports: 'sprintf'

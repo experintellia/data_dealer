@@ -20,7 +20,6 @@
     "requirejs-text": "2.0.9",
     "requirejs-tpl-dawsontoth": "https://raw.github.com/dawsontoth/requirejs-tpl/374b6858672cbf32881c950ebe52650dee1b98b3/tpl.js",
     "routie": "0.3.2",
-    "sockjs": "0.3.4",
     "SoundJS": "release_v0.4.1",
     "sprintf": "https://raw.github.com/alexei/sprintf.js/192bc6069ceb0175a98fab67a848568aded77c88/src/sprintf.js",
     "TweenJS": "release_v0.4.1",
