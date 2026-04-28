@@ -30,6 +30,17 @@ licenses (SIL Open Font License). See font/LICENSE/ for details:
   - Source       — Copyright 2010, 2012 Adobe Systems Incorporated
   - Voltaire     — Copyright (c) 2011 by Sorkin Type Co
 
+webxdc Icon
+-----------
+
+icon.png is a 256×256 center-crop of img/dd_auth_header.jpg, which is part
+of the dd_js/img/ artwork released under Creative Commons
+Attribution-ShareAlike 3.0, Österreich (CC-BY-SA 3.0 AT):
+  https://creativecommons.org/licenses/by-sa/3.0/at/
+
+  Attribution: Ivan Averintsev, Wolfie Christl, Pascale Osterwalder,
+               Ralf Traunsteiner — Cuteacute Media OG (2011–2014)
+
 Modifications in this fork
 --------------------------
 
