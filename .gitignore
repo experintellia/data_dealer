@@ -2,6 +2,8 @@
 *.swp
 .DS_Store
 .Trashes
+# messenger injects this at runtime — never bundle it
+/webxdc.js
 /dist/
 /docs/*
 !/docs/*.md
