@@ -415,20 +415,14 @@ export function setPerpCoordinates(/* token, */ _, updates) {
 // buyKarma handler
 // ---------------------------------------------------------------------------
 
-function _getLevelNumber(levels, xp) {
+// Returns the matching level entry (or the last level for XP beyond the cap).
+function _findLevelByXP(levels, xp) {
   for (var i = 0; i < levels.length; i++) {
     if (xp >= levels[i].xp_min && xp <= levels[i].xp_max) {
-      return levels[i].number;
+      return levels[i];
     }
   }
-  return levels[levels.length - 1].number;
-}
-
-function _getLevel(levels, number) {
-  for (var i = 0; i < levels.length; i++) {
-    if (levels[i].number === number) return levels[i];
-  }
-  return null;
+  return levels[levels.length - 1];
 }
 
 /**
@@ -465,21 +459,18 @@ export function buyKarma(_token, karmalauterGestalt) {
   var newCashSpent = (gv.cash_spent || 0) + td.price;
 
   var oldLevelNum = gv.xp_level || 1;
-  var newLevelNum = _getLevelNumber(ruleset.levels, newXp);
-  var levelup = newLevelNum > oldLevelNum;
+  var newLevel = _findLevelByXP(ruleset.levels, newXp);
+  var levelup = newLevel.number > oldLevelNum;
 
   var newGv = Object.assign({}, gv, {
     xp_value: newXp,
     karma_value: newKarma,
     cash_value: newCash,
     cash_spent: newCashSpent,
-    xp_level: newLevelNum
+    xp_level: newLevel.number
   });
 
-  if (levelup) {
-    var newLevel = _getLevel(ruleset.levels, newLevelNum);
-    if (newLevel) newGv.ap_snapshot = newLevel.ap_max;
-  }
+  if (levelup) newGv.ap_snapshot = newLevel.ap_max;
 
   setState(Object.assign({}, state, { game_values: newGv }));
   _sendDelta(state.addr, 'buyKarma', [karmalauterGestalt], { game_values: newGv });
