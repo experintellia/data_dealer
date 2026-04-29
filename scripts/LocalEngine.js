@@ -7,6 +7,7 @@
 
 import { getState, setState } from './boot.js';
 import { materialize } from './materializer.js';
+import { now as clockNow } from './clock.js';
 import defaultRuleset from '../data/ruleset_3.de.json' with { type: 'json' };
 
 // ---------------------------------------------------------------------------
@@ -67,14 +68,18 @@ export function getSessionLocale() {
  */
 export function loadGame(/* token */) {
   var state = getState();
-  var now = Date.now();
+  var now = clockNow();
   var mat = materialize(state, now);
   setState(mat.state);
 
   var gameData = _buildLoadGameResponse(mat.state, now);
 
-  // Emit queued socket events AFTER the Deferred resolves so that
-  // app.socket.queue.start() (Game.js:2072) has already been called.
+  // Schedule socket event emission via queueMicrotask so it runs after the
+  // microtask that resolves the Deferred in Remote.js (result.then → d.resolve
+  // → .done() → app.socket.queue.start()).  In practice M1 (this microtask)
+  // fires BEFORE M2 (d.resolve), but that is safe: Socket.NEEDS_QUEUE handlers
+  // call jqmq.add() on the paused queue — items are buffered, not dropped —
+  // and are processed only after queue.start() (Game.js:2072).
   var events = mat.events;
   queueMicrotask(function () {
     for (var i = 0; i < events.length; i++) {

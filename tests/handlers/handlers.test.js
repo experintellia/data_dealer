@@ -4,6 +4,7 @@ import {
 } from '../../scripts/LocalEngine.js';
 import { setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
+import { setOverride, clearOverride } from '../../scripts/clock.js';
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 
@@ -208,14 +209,20 @@ describe('loadGame — replayed state', () => {
 
 // ── materialization on boot ───────────────────────────────────────────────────
 
+const FIXED_NOW = 1_700_000_000_000; // 2023-11-14 — stable reference epoch
+
 describe('materialization on boot', () => {
-  afterEach(() => setEmitter(null));
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => {
+    clearOverride();
+    setEmitter(null);
+  });
 
   it('emits a node_ready event for a charge that completed during the away window', async () => {
     const emitted = [];
     setEmitter(function(ev, pl) { emitted.push({ ev, pl }); });
 
-    const chargeEnd = Date.now() - 10000; // completed 10 s ago
+    const chargeEnd = FIXED_NOW - 10000; // completed 10 s before frozen "now"
     const s = mkState({
       nodes_charging: [{
         path: 'Imperium.City.contact001',
@@ -245,7 +252,7 @@ describe('materialization on boot', () => {
   it('moves the completed charge to nodes_collect in the persisted state', async () => {
     setEmitter(function() {});
 
-    const chargeEnd = Date.now() - 5000;
+    const chargeEnd = FIXED_NOW - 5000;
     const s = mkState({
       nodes_charging: [{
         path: 'Imperium.City.contact002',
