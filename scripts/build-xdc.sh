@@ -14,8 +14,9 @@ fi
 
 rm -f "$OUT"
 
-# Bundle dist/ (the built app) plus top-level metadata required by webxdc spec.
-zip -r "$OUT" "$DIST"/
+# webxdc spec requires index.html at the zip root, not inside dist/.
+# cd into dist/ so all paths in the archive are relative to the app root.
+(cd "$DIST" && zip -r "../$OUT" .)
 zip "$OUT" manifest.toml icon.png LICENSE.txt LICENSE-CODE.txt LICENSE-ASSETS.txt 2>/dev/null || true
 
 echo "Created $OUT ($(du -sh "$OUT" | cut -f1))"

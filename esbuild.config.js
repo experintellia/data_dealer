@@ -6,8 +6,7 @@
 
 import esbuild from 'esbuild';
 import {
-  copyFileSync, mkdirSync, readdirSync, statSync,
-  existsSync, readFileSync, writeFileSync,
+  copyFileSync, mkdirSync, readdirSync, statSync, existsSync,
 } from 'fs';
 import { join } from 'path';
 

@@ -63,8 +63,13 @@ vitest.config.js  Test runner config
    ```js
    export { default as state } from './state.js';
    ```
-3. `pnpm build` will bundle it into `dist/scripts/esm-bundle.js`.
-4. The AMD bridge in `esbuild.config.js` automatically calls
+3. `pnpm build` bundles it into `dist/scripts/esm-bundle.js`.
+4. Add a script tag in `index.html` **after** `vendor/requirejs.js`:
+   ```html
+   <script src="vendor/requirejs.js" data-main="scripts/require.config"></script>
+   <script src="scripts/esm-bundle.js"></script>  <!-- after requirejs -->
+   ```
+5. The AMD bridge in `esbuild.config.js` calls
    `define('state', [], () => stateModule)` so legacy requirejs code
    can `require('state')` without any changes.
 
@@ -80,8 +85,12 @@ The bridge works like this:
    `window.__DD = { moduleName: defaultExport, … }`.
 2. A footer appended by `esbuild.config.js` loops over `__DD` and calls
    `define(name, [], () => __DD[name])` for each key.
-3. `dist/index.html` loads `esm-bundle.js` **before** `requirejs.js`,
-   so the defines are registered before RequireJS processes any module.
+3. `dist/index.html` loads `esm-bundle.js` **after** `vendor/requirejs.js`
+   so that `window.define` is available when the bridge footer runs.
+
+**Load order is critical:** `esm-bundle.js` must come after `requirejs.js`
+in the HTML. The footer checks `typeof define === 'function'` — if requirejs
+hasn't run yet, the check fails silently and no modules are registered.
 
 This means AMD code can `require('LocalEngine')` and transparently
 receive the ESM default export — no changes to legacy source needed.

@@ -5,7 +5,7 @@ import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-const root = join(fileURLToPath(import.meta.url), '..', '..');
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('vendor files', () => {
   const required = [
