@@ -16,7 +16,7 @@ are relative to the dd_app repo.
 | `chargePerpReady` | `dd_app/tasks/tasks.py:70` | ✅ trivially-pure |
 | `notifyLevelupItems` | `dd_app/tasks/tasks.py:90` | ✅ trivially-pure |
 | `notifyBuyperpItems` | `dd_app/tasks/tasks.py:104` | ✅ trivially-pure |
-| `logAction` | `dd_app/tasks/tasks.py:117` | ❌ needs design (analytics sink) |
+| `logAction` | `dd_app/tasks/tasks.py:117` | ✅ drop — emit `console.log` in dev only |
 | `test` | `dd_app/tasks/tasks.py:65` | n/a — debug stub, drop |
 
 There are **no recurring/periodic tasks** (no `celerybeat`, no `crontab`
@@ -213,24 +213,20 @@ is purely UX timing.
 - No delay, no recurrence. Effectively a synchronous append from the user's
   perspective, just punted off the request thread.
 
-### Verdict — ❌ needs design
-Not a gameplay primitive — it is a **server-only analytics sink**. There is
-no equivalent in a webxdc runtime: there is no shared analytics DB, the app
-may be offline for days, and per-user data is the user's own. Options:
+### Verdict — ✅ drop (option 1 selected)
 
-1. **Drop entirely (recommended for v1).** The gameplay code already
-   tolerates `logdb` being absent (see `tasks.py:121` `except KeyError`).
-   Remove all 10 call sites; nothing user-visible changes.
-2. **Local ring buffer.** Append the same docs into an `action_log`
-   collection in the local game state, capped (e.g. last N=500 events) for
-   the player's own "history" UI. Pure, no clock dependency.
-3. **Opt-in upload.** If the maintainer wants aggregate metrics, buffer
-   locally and POST on a manual user action ("share stats"); never on a
-   timer. Out of scope unless explicitly requested.
+**Decision (closes #60):** Drop all 10 call sites. No local buffer, no
+upload. Nothing user-visible changes; gameplay already ran without `logdb`.
 
-This is the only task where a porting decision changes user-visible
-behaviour, hence the ❌ flag — but the decision is policy, not engineering
-risk. There is no shared/cross-user state to reconstruct.
+During development, each handler that previously called `logAction` should
+emit `console.log('[logAction]', action, kwargs)` so gameplay events remain
+inspectable in the dev console without any persistence overhead. These
+`console.log` calls may be removed or guarded behind a `DEBUG` flag once
+the port stabilises.
+
+Option 2 (local ring buffer / "history" UI) remains viable as a future
+enhancement — the data is reconstructible from `webxdc.sendUpdate` history
+anyway, so nothing is lost by deferring it.
 
 ---
 
