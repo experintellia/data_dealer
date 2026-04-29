@@ -2,8 +2,9 @@
 // ESM exports — consumed by Remote.js via the AMD bridge in esm-bundle.js.
 // No DOM globals in handler bodies; safe to import from Node for tests.
 //
-// Handlers implemented here: getToken, ping, getSessionLocale, loadGame (#12), resetGame (#20).
-// Remaining handlers (#13–#21) are stubs that return a rejected Promise.
+// Handlers implemented here: getToken, ping, getSessionLocale, loadGame (#12),
+// resetGame (#20), getRanking, setDisplayName, setPerpCoordinates (#13).
+// Remaining handlers are stubs that return a rejected Promise.
 
 import { getState, setState } from './boot.js';
 import { applyDelta } from './state.js';
@@ -201,13 +202,131 @@ export function getRanking(_token, type) {
 }
 
 // ---------------------------------------------------------------------------
+// Delta helpers
+// ---------------------------------------------------------------------------
+
+function _selfAddr() {
+  var state = getState();
+  return (state && state.addr) || '';
+}
+
+// Persist a delta to the webxdc update history (no-op when webxdc is absent,
+// e.g. in Node/vitest).  The reducer in state.js applies the same mutation on
+// replay so state survives a reload.
+function _sendDelta(op, args, result) {
+  // eslint-disable-next-line no-undef
+  if (typeof webxdc !== 'undefined') {
+    // eslint-disable-next-line no-undef
+    webxdc.sendUpdate({
+      payload: {
+        kind: 'delta',
+        addr: _selfAddr(),
+        op: op,
+        args: args,
+        result: result,
+        ts: clockNow()
+      }
+    }, '');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Validation helpers (mirrors dd_app helpers.validateDisplayName)
+// ---------------------------------------------------------------------------
+
+var DISPLAY_NAME_MAX = 30;
+// Printable Unicode except ASCII control chars (< 0x20) and DEL (0x7f).
+var DISPLAY_NAME_RE = /^[^\x00-\x1f\x7f]{1,30}$/;
+
+function validateDisplayName(name) {
+  if (typeof name !== 'string') return false;
+  var trimmed = name.trim();
+  if (trimmed.length === 0) return false;
+  return DISPLAY_NAME_RE.test(name) && name.length <= DISPLAY_NAME_MAX;
+}
+
+// ---------------------------------------------------------------------------
+// setDisplayName / setPerpCoordinates (#13)
+// ---------------------------------------------------------------------------
+
+/**
+ * setDisplayName(token, dname) → Promise<{result: {}|{error:0|1}}>
+ *
+ * Validates dname (length cap, charset), writes state.user.display_name, and
+ * emits a delta so the change survives a reload.
+ * Returns {} on success or {error: 0} on bad input / {error: 1} on internal fault.
+ */
+export function setDisplayName(/* token, */ _, dname) {
+  if (!validateDisplayName(dname)) {
+    return Promise.resolve({ result: { error: 0 } });
+  }
+
+  var state = getState();
+  if (!state) {
+    return Promise.resolve({ result: { error: 1 } });
+  }
+
+  var newState = Object.assign({}, state, { display_name: dname });
+  setState(newState);
+  _sendDelta('setDisplayName', [dname], {});
+
+  return Promise.resolve({ result: {} });
+}
+
+/**
+ * setPerpCoordinates(token, updates) → Promise<{result: 1}>
+ *
+ * updates = [[full_path, {x, y}], ...]
+ * Matches nodes by full_path and $sets instance_data.x / instance_data.y.
+ * Emits one delta covering all entries.  Always returns {result: 1} even when
+ * some paths are not found (matches original server behaviour: Game.js:981).
+ */
+export function setPerpCoordinates(/* token, */ _, updates) {
+  if (!Array.isArray(updates) || updates.length === 0) {
+    return Promise.resolve({ result: 1 });
+  }
+
+  var state = getState();
+  if (!state || !Array.isArray(state.nodes)) {
+    return Promise.resolve({ result: 1 });
+  }
+
+  // Build a lookup map: full_path → {x, y}
+  var coordMap = {};
+  for (var i = 0; i < updates.length; i++) {
+    var entry = updates[i];
+    if (!Array.isArray(entry) || entry.length < 2) continue;
+    var path = entry[0];
+    var pos  = entry[1];
+    if (typeof path !== 'string' || !pos || typeof pos !== 'object') continue;
+    coordMap[path] = pos;
+  }
+
+  var nodes = state.nodes.map(function (node) {
+    var pos = coordMap[node.full_path];
+    if (!pos) return node;
+    return Object.assign({}, node, {
+      instance_data: Object.assign({}, node.instance_data, {
+        x: pos.x,
+        y: pos.y
+      })
+    });
+  });
+
+  var newState = Object.assign({}, state, { nodes: nodes });
+  setState(newState);
+  _sendDelta('setPerpCoordinates', [updates], {});
+
+  return Promise.resolve({ result: 1 });
+}
+
+// ---------------------------------------------------------------------------
 // Stub handlers — Wave 4+ issues fill these in.
 // ---------------------------------------------------------------------------
 var _STUBS = [
   'buyPowerup', 'chargePerp', 'collectPerp', 'integrateCollected',
   'getPowerups', 'getProvidedPerps', 'buyKarma', 'buyPerp', 'buySlots',
-  'setDisplayName', 'sellPowerup',
-  'setPerpCoordinates', 'checkUsername'
+  'sellPowerup', 'checkUsername'
 ];
 
 var _stubHandlers = {};
@@ -228,6 +347,8 @@ var LocalEngine = Object.assign({
   loadGame: loadGame,
   getRanking: getRanking,
   resetGame: resetGame,
+  setDisplayName: setDisplayName,
+  setPerpCoordinates: setPerpCoordinates,
   setEmitter: setEmitter
 }, _stubHandlers);
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  getToken, ping, getSessionLocale, loadGame, getRanking, resetGame, setEmitter
+  getToken, ping, getSessionLocale, loadGame, getRanking, resetGame, setEmitter,
+  setDisplayName, setPerpCoordinates
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
@@ -381,5 +382,135 @@ describe('resetGame', () => {
     const { result } = await loadGame('tok');
     expect(result.is_new_game).toBe(true);
     expect(result.nodes).toHaveLength(0);
+  });
+});
+
+// ── setDisplayName ────────────────────────────────────────────────────────────
+
+describe('setDisplayName — happy path', () => {
+  beforeEach(() => setState(mkState()));
+
+  it('returns {} (no error field) on a valid name', async () => {
+    const data = await setDisplayName('tok', 'Alice');
+    expect(data).toEqual({ result: {} });
+    expect(data.result.error).toBeUndefined();
+  });
+
+  it('persists display_name in in-memory state', async () => {
+    await setDisplayName('tok', 'Alice');
+    expect(getState().display_name).toBe('Alice');
+  });
+
+  it('accepts names up to 30 characters', async () => {
+    const name30 = 'A'.repeat(30);
+    const data = await setDisplayName('tok', name30);
+    expect(data.result.error).toBeUndefined();
+    expect(getState().display_name).toBe(name30);
+  });
+});
+
+describe('setDisplayName — failure modes', () => {
+  beforeEach(() => setState(mkState()));
+
+  it('returns {error: 0} for an empty string', async () => {
+    const data = await setDisplayName('tok', '');
+    expect(data.result.error).toBe(0);
+  });
+
+  it('returns {error: 0} for a whitespace-only string', async () => {
+    const data = await setDisplayName('tok', '   ');
+    expect(data.result.error).toBe(0);
+  });
+
+  it('returns {error: 0} for a name exceeding 30 characters', async () => {
+    const data = await setDisplayName('tok', 'A'.repeat(31));
+    expect(data.result.error).toBe(0);
+  });
+
+  it('does not mutate state on invalid input', async () => {
+    const before = getState().display_name;
+    await setDisplayName('tok', '');
+    expect(getState().display_name).toBe(before);
+  });
+});
+
+// ── setPerpCoordinates ────────────────────────────────────────────────────────
+
+function mkStateWithNodes() {
+  return mkState({
+    nodes: [
+      {
+        game_id: 'n1', game_type: 'ContactPerp',
+        full_path: 'Imperium.City.Agent0',
+        full_type: 'ContactPerp:Agent0',
+        instance_data: { x: 0, y: 0 }
+      },
+      {
+        game_id: 'n2', game_type: 'ProjectPerp',
+        full_path: 'Imperium.City.Project1',
+        full_type: 'ProjectPerp:Project1',
+        instance_data: { x: 10, y: 20 }
+      }
+    ]
+  });
+}
+
+describe('setPerpCoordinates — happy path', () => {
+  beforeEach(() => setState(mkStateWithNodes()));
+
+  it('returns {result: 1}', async () => {
+    const data = await setPerpCoordinates('tok', [
+      ['Imperium.City.Agent0', { x: 5, y: 7 }]
+    ]);
+    expect(data).toEqual({ result: 1 });
+  });
+
+  it('updates x/y on matched node', async () => {
+    await setPerpCoordinates('tok', [
+      ['Imperium.City.Agent0', { x: 42, y: 99 }]
+    ]);
+    const node = getState().nodes.find(n => n.full_path === 'Imperium.City.Agent0');
+    expect(node.instance_data.x).toBe(42);
+    expect(node.instance_data.y).toBe(99);
+  });
+
+  it('updates multiple nodes in a single call', async () => {
+    await setPerpCoordinates('tok', [
+      ['Imperium.City.Agent0',   { x: 1, y: 2 }],
+      ['Imperium.City.Project1', { x: 3, y: 4 }]
+    ]);
+    const nodes = getState().nodes;
+    const a = nodes.find(n => n.full_path === 'Imperium.City.Agent0');
+    const p = nodes.find(n => n.full_path === 'Imperium.City.Project1');
+    expect(a.instance_data).toMatchObject({ x: 1, y: 2 });
+    expect(p.instance_data).toMatchObject({ x: 3, y: 4 });
+  });
+});
+
+describe('setPerpCoordinates — failure modes', () => {
+  beforeEach(() => setState(mkStateWithNodes()));
+
+  it('returns {result: 1} (not an error) for an empty updates array', async () => {
+    const data = await setPerpCoordinates('tok', []);
+    expect(data).toEqual({ result: 1 });
+  });
+
+  it('silently skips a malformed entry (non-array element)', async () => {
+    const data = await setPerpCoordinates('tok', [
+      'not-an-array',
+      ['Imperium.City.Agent0', { x: 7, y: 8 }]
+    ]);
+    expect(data).toEqual({ result: 1 });
+    const node = getState().nodes.find(n => n.full_path === 'Imperium.City.Agent0');
+    expect(node.instance_data.x).toBe(7);
+  });
+
+  it('leaves unmatched nodes unchanged', async () => {
+    await setPerpCoordinates('tok', [
+      ['Imperium.City.NoSuchNode', { x: 99, y: 99 }]
+    ]);
+    const node = getState().nodes.find(n => n.full_path === 'Imperium.City.Agent0');
+    expect(node.instance_data.x).toBe(0);
+    expect(node.instance_data.y).toBe(0);
   });
 });

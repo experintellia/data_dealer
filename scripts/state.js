@@ -109,7 +109,39 @@ reducers.reset = function resetReducer(state) {
   return freshState(state.addr);
 };
 
-// Stubs — return state unchanged until Wave 3 fills them in.
+reducers.setDisplayName = function setDisplayNameReducer(state, delta) {
+  var args = delta.args || [];
+  var dname = args[0];
+  if (typeof dname !== 'string' || dname.length === 0) return state;
+  return Object.assign({}, state, { display_name: dname });
+};
+
+reducers.setPerpCoordinates = function setPerpCoordinatesReducer(state, delta) {
+  var args = delta.args || [];
+  var updates = args[0];
+  if (!Array.isArray(updates) || !Array.isArray(state.nodes)) return state;
+
+  var coordMap = {};
+  for (var i = 0; i < updates.length; i++) {
+    var entry = updates[i];
+    if (Array.isArray(entry) && entry.length >= 2 &&
+        typeof entry[0] === 'string' && entry[1] && typeof entry[1] === 'object') {
+      coordMap[entry[0]] = entry[1];
+    }
+  }
+
+  var nodes = state.nodes.map(function (node) {
+    var pos = coordMap[node.full_path];
+    if (!pos) return node;
+    return Object.assign({}, node, {
+      instance_data: Object.assign({}, node.instance_data, { x: pos.x, y: pos.y })
+    });
+  });
+
+  return Object.assign({}, state, { nodes: nodes });
+};
+
+// Stubs — return state unchanged until Wave 4+ fills them in.
 OP_NAMES.forEach(function (op) {
   if (!reducers[op]) {
     reducers[op] = function stubReducer(state) {
