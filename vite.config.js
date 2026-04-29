@@ -35,7 +35,9 @@ if (typeof define === 'function' && define.amd) {
 const amdScripts = [
   'Game.js', 'Render.js', 'app.js', 'bootstrap.js', 'Remote.js', 'Socket.js',
   'RpcQueue.js', 'i18n.js', 'util.js', 'setup.js', 'setup_local.js', 'setup_beta_local.js',
-  'core.js', 'type_settings.js', 'LocalEngine.js', 'require.config.js',
+  'core.js', 'type_settings.js', 'require.config.js',
+  // LocalEngine.js is ESM — bundled into esm-bundle.js and registered via
+  // the AMD bridge footer; do NOT copy the raw file alongside AMD modules.
 ].map(f => ({ src: `scripts/${f}`, dest: '' }));
 
 export default defineConfig({
@@ -56,6 +58,10 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: 'scripts/esm-entry.js',
+      // Preserve entry exports so __DD in the AMD bridge footer can iterate
+      // them.  Vite defaults to false which strips all exports and renders
+      // the bridge a no-op.
+      preserveEntrySignatures: 'exports-only',
       output: {
         format: 'iife',
         name: '__DD',

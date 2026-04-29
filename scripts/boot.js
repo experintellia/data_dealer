@@ -60,3 +60,12 @@ export function boot(options) {
 export function getState() {
   return _currentState;
 }
+
+/**
+ * setState(newState) — replace the in-memory state.
+ * Called by LocalEngine after materializer runs to persist the advanced state.
+ * Also useful in tests to seed state before exercising handlers.
+ */
+export function setState(newState) {
+  _currentState = newState;
+}

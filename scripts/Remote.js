@@ -27,7 +27,16 @@ define(function(require) {
       remote[name] = function() {
         var fn = LocalEngine[name];
         if (typeof fn === 'function') {
-          return fn.apply(LocalEngine, arguments);
+          var result = fn.apply(LocalEngine, arguments);
+          // LocalEngine handlers return native Promises; wrap in jQuery
+          // Deferred so callers using .done()/.fail() (bootstrap.js, Game.js)
+          // keep working without modification.
+          if (result && typeof result.then === 'function' && typeof result.done !== 'function') {
+            var d = $.Deferred();
+            result.then(function(v) { d.resolve(v); }, function(e) { d.reject(e); });
+            return d.promise();
+          }
+          return result;
         }
         return $.Deferred().reject('NotImplemented: ' + name).promise();
       };

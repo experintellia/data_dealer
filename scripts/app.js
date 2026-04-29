@@ -155,6 +155,16 @@ define(function(require) {
       app.remote.addMethod('sellPowerup');
       app.remote.addMethod('setPerpCoordinates');
 
+      // Wire LocalEngine's event emitter to the in-process Socket bus so that
+      // node_ready / new_items events from loadGame materialisation reach the
+      // queued socket handlers registered in app.initSocket (lines 259–267).
+      var LocalEngine = require('LocalEngine');
+      if (typeof LocalEngine.setEmitter === 'function') {
+        LocalEngine.setEmitter(function(ev, pl) {
+          $(document).trigger(ev, [pl]);
+        });
+      }
+
       // Get a token from the back-end and return the deferred remote call.
       $('#loadertext').text('Fetching token');
       return app.remote.getToken().then(function(data) {
