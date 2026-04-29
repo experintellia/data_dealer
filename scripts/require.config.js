@@ -1,4 +1,4 @@
-// Define paths to and shims for components.
+// Define paths to vendored libs. All paths are relative to scripts/ (one level up = project root).
 require.config({
   config: {
     'tpl': {
@@ -8,25 +8,25 @@ require.config({
   //enforceDefine: true,
   paths: {
     baseUrl: '.',
-    'createjs-easel': '../components/EaselJS/lib/easeljs-0.6.1.min',
-    'createjs-preload': '../components/PreloadJS/lib/preloadjs-0.3.1.min',
-    'createjs-tween': '../components/TweenJS/lib/tweenjs-0.4.1.min',
-    'createjs-sound': '../components/SoundJS/lib/soundjs-0.4.1.min',
-    jquery: '../components/jquery/jquery',
-    'jquery-migrate': '../components/jquery-migrate/jquery-migrate',
-    'jquery-mobile': '../components/jquery-mobile/index',
-    json2: '../components/json2/index',
-    'native-console': '../components/native-console/native-console',
-    numeral: '../components/numeral/numeral',
-    'numeral-de': '../components/numeral/languages/de-de',
-    preload: '../components/PreloadJS/lib/preloadjs-0.3.1.min',
-    routie: '../components/routie/lib/routie',
-    sprintf: '../components/sprintf/index',
-    text: '../components/requirejs-text/text',
-    tpl: '../components/requirejs-tpl-dawsontoth/index',
-    underscore: '../components/underscore/underscore',
-    'zynga-animate': '../components/zynga-animate/index',
-    'zynga-scroller': '../components/zynga-scroller/index'
+    'createjs-easel': '../vendor/easeljs',
+    'createjs-preload': '../vendor/preloadjs',
+    'createjs-tween': '../vendor/tweenjs',
+    'createjs-sound': '../vendor/soundjs',
+    jquery: '../vendor/jquery',
+    'jquery-migrate': '../vendor/jquery-migrate',
+    'jquery-mobile': '../vendor/jquery-mobile',
+    json2: '../vendor/json2',
+    'native-console': '../vendor/native-console',
+    numeral: '../vendor/numeral',
+    'numeral-de': '../vendor/numeral-de',
+    preload: '../vendor/preloadjs',
+    routie: '../vendor/routie',
+    sprintf: '../vendor/sprintf',
+    text: '../vendor/text',
+    tpl: '../vendor/tpl',
+    underscore: '../vendor/underscore',
+    'zynga-animate': '../vendor/zynga-animate',
+    'zynga-scroller': '../vendor/zynga-scroller'
   },
   shim: {
     'createjs-easel': {

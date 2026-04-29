@@ -4,14 +4,17 @@
   "description": "Data Dealer — webxdc port",
   "type": "module",
   "scripts": {
+    "dev": "vite",
     "build": "node esbuild.config.js",
     "build-xdc": "node esbuild.config.js && bash scripts/build-xdc.sh",
-    "test": "vitest run",
-    "dev": "node esbuild.config.js --serve"
+    "preview": "vite preview --outDir dist",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.27.7",
+    "vite": "^8.0.10",
+    "vite-plugin-static-copy": "^4.1.0",
     "vitest": "^3.0.0"
   },
   "contributors": [
