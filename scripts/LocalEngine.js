@@ -9,6 +9,7 @@
 // Remaining handlers are stubs that return a rejected Promise.
 
 import { getState, setState } from './boot.js';
+import { applyDelta } from './state.js';
 import { materialize } from './materializer.js';
 import { now as clockNow } from './clock.js';
 import rulesetDe from '../data/ruleset_3.de.json' with { type: 'json' };
@@ -497,7 +498,7 @@ function _resolveNode(perpPath) {
   var ft = node.full_type || '';
   var colon = ft.indexOf(':');
   var perpGestalt = colon >= 0 ? ft.slice(colon + 1) : (node.gestalt || '');
-  var perpTypeDef = defaultRuleset.perps[perpGestalt];
+  var perpTypeDef = _getRuleset().perps[perpGestalt];
   if (!perpTypeDef) return null;
   return { state: state, nodeIdx: nodeIdx, node: node, perpTypeData: perpTypeDef.type_data };
 }
