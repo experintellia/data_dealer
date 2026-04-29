@@ -10,7 +10,7 @@
 ```bash
 pnpm install
 pnpm build    # produces dist/
-pnpm test     # runs vitest (zero tests until #45 / #10 / #11 land)
+pnpm test     # runs vitest
 ```
 
 To open the game locally:
@@ -28,11 +28,10 @@ No Bower, no Grunt, no RequireJS optimiser is involved anywhere.
 ## Dev server (live-reload)
 
 ```bash
-pnpm dev     # esbuild serve on http://localhost:8000
+pnpm dev     # Vite dev server on http://localhost:3000
 ```
 
-This serves `dist/` and rebuilds the ESM bundle on change.
-Legacy AMD files are served as static copies — no hot-reload for those yet.
+Legacy AMD files are served as static files — no hot-reload for those until #58.
 
 ## Building the webxdc archive
 
@@ -51,10 +50,49 @@ scripts/          AMD source (legacy, unchanged until #58)
   LocalEngine.js  stub RPC back-end; will be filled by Wave 2 issues
   esm-entry.js    ESM bundle entry — add imports here as #10/#11 land
 vendor/           Vendored runtime libs (committed; see below)
-tests/            Vitest test files (new ESM modules only)
-esbuild.config.js Build + dev-server script
+tests/
+  state/          state model unit tests  (seed tests land with #10)
+  materializer/   materializer unit tests (seed tests land with #11)
+  handlers/       one file per RPC handler (land alongside each Wave 3 PR)
+esbuild.config.js Production build script
+vite.config.js    Dev server config
 vitest.config.js  Test runner config
 ```
+
+## Tests
+
+Tests live in `tests/` and are run with [vitest](https://vitest.dev/) in a
+pure Node context — no browser, no jQuery, no RequireJS globals.
+
+```bash
+pnpm test            # single run
+pnpm test:coverage   # single run + coverage report in ./coverage/
+```
+
+Test files are named `<module>.test.js` and live in the subdirectory that
+matches the module under test (e.g. `tests/handlers/buyPowerup.test.js`).
+
+### Handler PR requirements (Wave 3, #12–#21)
+
+Every handler-port PR must ship with unit tests. Minimum per handler:
+
+| Case | What to test |
+|------|-------------|
+| Happy path | Normal input produces expected state delta |
+| Failure mode | At least one guard (insufficient cash, bad args, …) rejects/returns the expected error |
+
+Tests must import the handler as a plain ES module function — no browser
+globals, no jQuery, no RequireJS `define()` wrappers.
+
+### Module portability rule
+
+New modules (LocalEngine, state, materializer, handlers) **must be importable
+from Node** without a browser or AMD runtime. Concretely:
+
+- Do not use `define(function(require) { … })` in any module that will be tested.
+- Do not call `$`, `window`, `document`, or browser-only globals at module load time.
+- If a legacy module wraps itself in `define(...)`, extract core logic into a plain
+  ESM export and keep the AMD wrapper as a thin shim.
 
 ## Adding a new ESM module
 
@@ -67,7 +105,7 @@ vitest.config.js  Test runner config
 4. Add a script tag in `index.html` **after** `vendor/requirejs.js`:
    ```html
    <script src="vendor/requirejs.js" data-main="scripts/require.config"></script>
-   <script src="scripts/esm-bundle.js"></script>  <!-- after requirejs -->
+   <script src="scripts/esm-bundle.js"></script>  <!-- must be after requirejs -->
    ```
 5. The AMD bridge in `esbuild.config.js` calls
    `define('state', [], () => stateModule)` so legacy requirejs code
@@ -91,9 +129,6 @@ The bridge works like this:
 **Load order is critical:** `esm-bundle.js` must come after `requirejs.js`
 in the HTML. The footer checks `typeof define === 'function'` — if requirejs
 hasn't run yet, the check fails silently and no modules are registered.
-
-This means AMD code can `require('LocalEngine')` and transparently
-receive the ESM default export — no changes to legacy source needed.
 
 ## Vendor libs
 
@@ -123,6 +158,16 @@ are no longer on npm, a compatibility stub was written in-tree:
 
 If internet access is available, replace the stubs with their original
 pinned versions using the URLs documented in `scripts/vendor-install.js`.
+
+## CI
+
+`.github/workflows/test.yml` runs `pnpm install && pnpm test` on every push
+to `main`/`master` and on every pull request. Coverage is uploaded as a
+workflow artifact.
+
+To make the test check required, a repo admin should enable branch protection
+on `main`: **Settings → Branches → Add rule** → enable
+"Require status checks to pass before merging" → add the `Unit tests` job.
 
 ## Out of scope in this PR
 

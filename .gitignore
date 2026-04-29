@@ -10,3 +10,4 @@ setup_local.js
 npm-debug.log
 pnpm-debug.log
 .pnpm-store/
+/coverage/
