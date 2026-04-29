@@ -1,8 +1,228 @@
 import { describe, it, expect } from 'vitest';
+import { freshState, applyDelta, SCHEMA_VERSION } from '../../scripts/state.js';
 
-// Placeholder — real state tests land with #10 (state model).
-describe('state (placeholder)', () => {
-  it('test runner is operational in Node context', () => {
-    expect(true).toBe(true);
+// Required acceptance criteria from issue #10:
+//   A. Two divergent replay sequences with the same delta-set converge to identical state.
+//   B. Reset op wipes prior state.
+//   C. Schema-version mismatch handled gracefully.
+
+function replay(deltas, addr) {
+  return deltas.reduce((s, d) => applyDelta(s, d), freshState(addr));
+}
+
+function makeDelta(addr, op, ts) {
+  return { kind: 'delta', addr, op, args: [], result: {}, ts: ts || Date.now() };
+}
+
+describe('freshState', () => {
+  it('sets schema_version = SCHEMA_VERSION', () => {
+    expect(freshState('alice@example.com').schema_version).toBe(SCHEMA_VERSION);
+  });
+
+  it('stores selfAddr as state.addr', () => {
+    expect(freshState('alice@example.com').addr).toBe('alice@example.com');
+  });
+
+  it('seeds game_values from data/default_game.json', () => {
+    const s = freshState('alice@example.com');
+    expect(s.game_values.cash_value).toBe(300);
+    expect(s.game_values.karma_value).toBe(50);
+    expect(s.game_values.xp_level).toBe(1);
+    expect(s.game_values.ap_snapshot).toBe(6);
+    expect(s.game_values.profiles_max).toBe(1);
+  });
+
+  it('initialises all collection fields to empty arrays', () => {
+    const s = freshState('alice@example.com');
+    expect(s.nodes).toEqual([]);
+    expect(s.nodes_charging).toEqual([]);
+    expect(s.nodes_collect).toEqual([]);
+    expect(s.db_queue).toEqual([]);
+    expect(s.mission_goals).toEqual([]);
+    expect(s.active_missions).toEqual([]);
+  });
+
+  it('accepts a custom seed overriding game_values', () => {
+    const seed = { game_values: { cash_value: 9999, xp_level: 5 } };
+    const s = freshState('alice@example.com', seed);
+    expect(s.game_values.cash_value).toBe(9999);
+    expect(s.game_values.xp_level).toBe(5);
+  });
+
+  it('works with no arguments', () => {
+    const s = freshState();
+    expect(s.schema_version).toBe(SCHEMA_VERSION);
+    expect(s.addr).toBe('');
+  });
+});
+
+describe('applyDelta — convergence (acceptance criterion A)', () => {
+  const addr = 'alice@example.com';
+
+  it('reordering stub ops produces identical state', () => {
+    const d1 = makeDelta(addr, 'buyKarma', 1000);
+    const d2 = makeDelta(addr, 'chargePerp', 2000);
+    const d3 = makeDelta(addr, 'setPerpCoordinates', 3000);
+
+    const stateA = replay([d1, d2, d3], addr);
+    const stateB = replay([d2, d1, d3], addr);
+    const stateC = replay([d3, d2, d1], addr);
+
+    expect(stateA.nodes).toEqual(stateB.nodes);
+    expect(stateA.nodes).toEqual(stateC.nodes);
+    expect(stateA.game_values).toEqual(stateB.game_values);
+    expect(stateA.game_values).toEqual(stateC.game_values);
+    expect(stateA.active_missions).toEqual(stateB.active_missions);
+    expect(stateA.schema_version).toBe(stateB.schema_version);
+  });
+
+  it('same delta-set applied to two independent starting states converges', () => {
+    const deltas = [
+      makeDelta(addr, 'buyKarma', 1000),
+      makeDelta(addr, 'chargePerp', 2000),
+      makeDelta(addr, 'buyPerp', 3000),
+    ];
+
+    const instance1 = replay(deltas, addr);
+    const instance2 = replay(deltas, addr);
+
+    expect(instance1.nodes).toEqual(instance2.nodes);
+    expect(instance1.game_values).toEqual(instance2.game_values);
+    expect(instance1.active_missions).toEqual(instance2.active_missions);
+  });
+});
+
+describe('applyDelta — reset op (acceptance criterion B)', () => {
+  const addr = 'alice@example.com';
+
+  it('clears nodes and missions after reset', () => {
+    let s = freshState(addr);
+    s = {
+      ...s,
+      nodes: [{ game_type: 'ContactPerp', full_path: 'Imperium.Contact1' }],
+      active_missions: ['mission_x', 'mission_y'],
+      mission_goals: [{ goal_id: 'g1', amount: 10, current_amount: 5 }],
+    };
+
+    const after = applyDelta(s, makeDelta(addr, 'reset', 5000));
+
+    expect(after.nodes).toEqual([]);
+    expect(after.active_missions).toEqual([]);
+    expect(after.mission_goals).toEqual([]);
+  });
+
+  it('restores game_values to seed defaults after reset', () => {
+    let s = freshState(addr);
+    s = { ...s, game_values: { ...s.game_values, cash_value: 99999, xp_level: 10 } };
+
+    const after = applyDelta(s, makeDelta(addr, 'reset', 5000));
+
+    expect(after.game_values.cash_value).toBe(300);
+    expect(after.game_values.xp_level).toBe(1);
+  });
+
+  it('preserves addr after reset (identity must survive wipe)', () => {
+    const s = freshState(addr);
+    const after = applyDelta(s, makeDelta(addr, 'reset', 5000));
+    expect(after.addr).toBe(addr);
+  });
+
+  it('preserves schema_version after reset', () => {
+    const s = freshState(addr);
+    const after = applyDelta(s, makeDelta(addr, 'reset', 5000));
+    expect(after.schema_version).toBe(SCHEMA_VERSION);
+  });
+
+  it('multiple resets are idempotent', () => {
+    let s = freshState(addr);
+    const r1 = applyDelta(s, makeDelta(addr, 'reset', 1000));
+    const r2 = applyDelta(r1, makeDelta(addr, 'reset', 2000));
+    expect(r2.nodes).toEqual([]);
+    expect(r2.game_values.cash_value).toBe(r1.game_values.cash_value);
+  });
+});
+
+describe('applyDelta — schema-version mismatch (acceptance criterion C)', () => {
+  const addr = 'alice@example.com';
+
+  it('resets to valid fresh state when schema_version is a future value', () => {
+    const futureState = {
+      ...freshState(addr),
+      schema_version: 99,
+      nodes: [{ game_type: 'ContactPerp', full_path: 'Imperium.Contact1' }],
+      active_missions: ['m_stale'],
+    };
+
+    const result = applyDelta(futureState, makeDelta(addr, 'buyKarma', 1000));
+
+    expect(result.schema_version).toBe(SCHEMA_VERSION);
+    expect(result.nodes).toEqual([]);
+    expect(result.active_missions).toEqual([]);
+    expect(result.addr).toBe(addr);
+  });
+
+  it('resets to valid fresh state when schema_version is an older value', () => {
+    const oldState = { ...freshState(addr), schema_version: 0 };
+    const result = applyDelta(oldState, makeDelta(addr, 'buyPerp', 1000));
+    expect(result.schema_version).toBe(SCHEMA_VERSION);
+  });
+
+  it('does not crash on reset op when schema_version mismatches', () => {
+    const badState = { ...freshState(addr), schema_version: 999 };
+    expect(() => applyDelta(badState, makeDelta(addr, 'reset', 1000))).not.toThrow();
+  });
+});
+
+describe('applyDelta — other-peer filter', () => {
+  it('ignores deltas whose addr differs from state.addr', () => {
+    const s = freshState('alice@example.com');
+    const foreignDelta = makeDelta('bob@example.com', 'buyKarma', 1000);
+    const result = applyDelta(s, foreignDelta);
+    expect(result).toBe(s);
+  });
+
+  it('processes own-addr deltas normally', () => {
+    const addr = 'alice@example.com';
+    const s = freshState(addr);
+    const result = applyDelta(s, makeDelta(addr, 'reset', 1000));
+    expect(result).not.toBe(s);
+    expect(result.schema_version).toBe(SCHEMA_VERSION);
+  });
+});
+
+describe('applyDelta — malformed delta guard', () => {
+  it('returns state unchanged for null', () => {
+    const s = freshState('alice@example.com');
+    expect(applyDelta(s, null)).toBe(s);
+  });
+
+  it('returns state unchanged for wrong kind', () => {
+    const s = freshState('alice@example.com');
+    expect(applyDelta(s, { kind: 'snapshot', op: 'reset' })).toBe(s);
+  });
+
+  it('returns state unchanged for unknown op (after clock guard update)', () => {
+    const s = freshState('alice@example.com');
+    const result = applyDelta(s, { kind: 'delta', addr: s.addr, op: 'unknownOp9999', ts: 0 });
+    expect(result.schema_version).toBe(SCHEMA_VERSION);
+    expect(result.nodes).toEqual([]);
+  });
+});
+
+describe('applyDelta — clock-skew guard', () => {
+  it('last_seen_ts never decreases', () => {
+    const addr = 'alice@example.com';
+    const futureTs = Date.now() + 1_000_000;
+    const s = { ...freshState(addr), last_seen_ts: futureTs };
+    const result = applyDelta(s, makeDelta(addr, 'ping', 1));
+    expect(result.last_seen_ts).toBeGreaterThanOrEqual(futureTs);
+  });
+
+  it('last_seen_ts advances from 0 after first delta', () => {
+    const addr = 'alice@example.com';
+    const s = freshState(addr);
+    expect(s.last_seen_ts).toBe(0);
+    const result = applyDelta(s, makeDelta(addr, 'ping', Date.now()));
+    expect(result.last_seen_ts).toBeGreaterThan(0);
   });
 });
