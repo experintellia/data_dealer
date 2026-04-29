@@ -44,6 +44,15 @@ Method `userData` (`views.py:164`), `logout` (`views.py:1464`), and
 list. They're real RPC endpoints; flagged here for completeness but not
 detailed below.
 
+> **Phase 3 implementer note — `buyKarma` missions discrepancy:**
+> `docs/response-shapes.md` lists `missions: MissionsPayload` as part of the
+> `buyKarma` response. This is incorrect. `views.py:939-1000` shows that
+> `buyKarma` never instantiates `MissionHandler` and never includes a
+> `missions` key in its response — it only returns `{game_values, [levelup]}`.
+> `response-shapes.md` appears to have over-specified this by analogy with
+> `buyPerp`. The LocalEngine implementation must **not** return a missions
+> payload for `buyKarma`. Fix `response-shapes.md` before Phase 3 begins.
+
 ---
 
 ## Auth model — what becomes `webxdc.selfAddr`?
