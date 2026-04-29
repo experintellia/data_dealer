@@ -38,33 +38,21 @@ function _getRuleset() {
   return (locale === 'en') ? rulesetEn : rulesetDe;
 }
 
-var _nodesByPathRef = null;
-var _nodesByPathCache = null;
+var _nodeMapRef = null;
+var _nodeMapCache = null;
 
-function _getNodesByPath(nodes) {
-  if (nodes === _nodesByPathRef) return _nodesByPathCache;
-  _nodesByPathRef = nodes;
-  var map = {};
+function _getNodeMaps(nodes) {
+  if (nodes === _nodeMapRef) return _nodeMapCache;
+  _nodeMapRef = nodes;
+  var paths = {};
+  var gestalts = {};
   for (var i = 0; i < nodes.length; i++) {
-    map[nodes[i].full_path] = nodes[i];
-  }
-  _nodesByPathCache = map;
-  return map;
-}
-
-var _ownedGestaltsRef = null;
-var _ownedGestaltsCache = null;
-
-function _getOwnedGestalts(nodes) {
-  if (nodes === _ownedGestaltsRef) return _ownedGestaltsCache;
-  _ownedGestaltsRef = nodes;
-  var set = {};
-  for (var i = 0; i < nodes.length; i++) {
+    paths[nodes[i].full_path] = nodes[i];
     var g = nodes[i].gestalt || _gestaltFrom(nodes[i].full_type);
-    if (g) set[g] = true;
+    if (g) gestalts[g] = true;
   }
-  _ownedGestaltsCache = set;
-  return set;
+  _nodeMapCache = { paths: paths, gestalts: gestalts };
+  return _nodeMapCache;
 }
 
 function _gestaltFrom(fullType) {
@@ -237,17 +225,11 @@ function _buildLoadGameResponse(state, now) {
   };
 }
 
-/**
- * getProvidedPerps(token, gnodePath) → Promise<{result: {buyable: string[]}}>
- *
- * Walks state.nodes by full_path, finds the node's gestalt in the ruleset,
- * and returns the list of providable perp gestalts filtered by the player's
- * current level and owned prerequisites.
- */
 export function getProvidedPerps(_token, gnodePath) {
   var state = getState();
   var nodes = (state && state.nodes) || [];
-  var node = _getNodesByPath(nodes)[gnodePath];
+  var maps = _getNodeMaps(nodes);
+  var node = maps.paths[gnodePath];
   if (!node) return Promise.resolve({ result: { error: 0 } });
 
   var gestalt = node.gestalt || _gestaltFrom(node.full_type);
@@ -259,7 +241,7 @@ export function getProvidedPerps(_token, gnodePath) {
 
   var provided = (def.type_data && def.type_data.provided_perps) || [];
   var level = (state.game_values && state.game_values.xp_level) || 1;
-  var owned = _getOwnedGestalts(nodes);
+  var owned = maps.gestalts;
 
   var buyable = provided.filter(function (g) {
     return _isProvidable(g, ruleset, level, owned);
@@ -268,13 +250,6 @@ export function getProvidedPerps(_token, gnodePath) {
   return Promise.resolve({ result: { buyable: buyable } });
 }
 
-/**
- * getPowerups(token, projectGestalt, version) → Promise<{result: PowerupDef[]}>
- *
- * Returns all powerup definitions available for projectGestalt by merging
- * provided_ads / provided_upgrades / provided_teammembers from the ruleset with
- * the global powerup type_data.  version is ignored (read-only rules query).
- */
 export function getPowerups(_token, projectGestalt /*, version */) {
   var ruleset = _getRuleset();
   var def = ruleset.perps[projectGestalt];
