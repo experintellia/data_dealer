@@ -11,6 +11,12 @@ relative to the dd_app repo unless otherwise noted.
 
 ## TL;DR — handler table
 
+> **Storage used by dd_app**: MongoDB (gameplay), Redis (session store). There
+> is no Postgres in this repo — dd_app never opens a Postgres connection.
+> Postgres lives in the separate `dd_auth` Django service that handles user
+> accounts and mints `auth_uid`. The "DB reads/writes" columns below therefore
+> only ever show Mongo or Redis.
+
 | Method | File:line | Signature | DB reads | DB writes | Returns | Side effects |
 | --- | --- | --- | --- | --- | --- | --- |
 | `getToken` | `views.py:144` | `()` | Redis: Django session via cookie | — | session-cookie token string, or `HTTPForbidden` | none. **Not auth-gated** |
