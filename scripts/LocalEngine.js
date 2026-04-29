@@ -205,22 +205,17 @@ export function getRanking(_token, type) {
 // Delta helpers
 // ---------------------------------------------------------------------------
 
-function _selfAddr() {
-  var state = getState();
-  return (state && state.addr) || '';
-}
-
 // Persist a delta to the webxdc update history (no-op when webxdc is absent,
 // e.g. in Node/vitest).  The reducer in state.js applies the same mutation on
 // replay so state survives a reload.
-function _sendDelta(op, args, result) {
+function _sendDelta(addr, op, args, result) {
   // eslint-disable-next-line no-undef
   if (typeof webxdc !== 'undefined') {
     // eslint-disable-next-line no-undef
     webxdc.sendUpdate({
       payload: {
         kind: 'delta',
-        addr: _selfAddr(),
+        addr: addr,
         op: op,
         args: args,
         result: result,
@@ -234,15 +229,12 @@ function _sendDelta(op, args, result) {
 // Validation helpers (mirrors dd_app helpers.validateDisplayName)
 // ---------------------------------------------------------------------------
 
-var DISPLAY_NAME_MAX = 30;
-// Printable Unicode except ASCII control chars (< 0x20) and DEL (0x7f).
+// Printable Unicode, 1–30 chars; no ASCII control chars (< 0x20) or DEL (0x7f).
 var DISPLAY_NAME_RE = /^[^\x00-\x1f\x7f]{1,30}$/;
 
 function validateDisplayName(name) {
   if (typeof name !== 'string') return false;
-  var trimmed = name.trim();
-  if (trimmed.length === 0) return false;
-  return DISPLAY_NAME_RE.test(name) && name.length <= DISPLAY_NAME_MAX;
+  return name.trim().length > 0 && DISPLAY_NAME_RE.test(name);
 }
 
 // ---------------------------------------------------------------------------
@@ -268,7 +260,7 @@ export function setDisplayName(/* token, */ _, dname) {
 
   var newState = Object.assign({}, state, { display_name: dname });
   setState(newState);
-  _sendDelta('setDisplayName', [dname], {});
+  _sendDelta(state.addr, 'setDisplayName', [dname], {});
 
   return Promise.resolve({ result: {} });
 }
@@ -315,7 +307,7 @@ export function setPerpCoordinates(/* token, */ _, updates) {
 
   var newState = Object.assign({}, state, { nodes: nodes });
   setState(newState);
-  _sendDelta('setPerpCoordinates', [updates], {});
+  _sendDelta(state.addr, 'setPerpCoordinates', [updates], {});
 
   return Promise.resolve({ result: 1 });
 }

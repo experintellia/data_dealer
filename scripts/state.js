@@ -124,10 +124,11 @@ reducers.setPerpCoordinates = function setPerpCoordinatesReducer(state, delta) {
   var coordMap = {};
   for (var i = 0; i < updates.length; i++) {
     var entry = updates[i];
-    if (Array.isArray(entry) && entry.length >= 2 &&
-        typeof entry[0] === 'string' && entry[1] && typeof entry[1] === 'object') {
-      coordMap[entry[0]] = entry[1];
-    }
+    if (!Array.isArray(entry) || entry.length < 2) continue;
+    var path = entry[0];
+    var pos  = entry[1];
+    if (typeof path !== 'string' || !pos || typeof pos !== 'object') continue;
+    coordMap[path] = pos;
   }
 
   var nodes = state.nodes.map(function (node) {
