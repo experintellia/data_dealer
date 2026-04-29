@@ -1,5 +1,3 @@
-'use strict';
-
 // Boot sequence for the webxdc port of Data Dealer.
 // Implements the four-step engine startup described in issue #10:
 //
@@ -11,9 +9,9 @@
 // This module intentionally has no test coverage of its own: it talks to the
 // webxdc global and is exercised via manual testing or a webxdc simulator.
 // The underlying state logic (freshState / applyDelta) is fully unit-tested in
-// test/state.test.js.
+// tests/state/state.test.js.
 
-var stateModule = require('./state');
+import { freshState, applyDelta } from './state.js';
 
 var _currentState = null;
 
@@ -26,20 +24,20 @@ var _currentState = null;
  *   materializer — function(state) called once after replay quiesces (#11 hook)
  *   onReady      — function(state) called when the engine is ready
  */
-function boot(options) {
+export function boot(options) {
   options = options || {};
 
   var selfAddr = options.selfAddr != null
     ? options.selfAddr
     : (typeof webxdc !== 'undefined' ? webxdc.selfAddr : '');  // eslint-disable-line no-undef
 
-  _currentState = stateModule.freshState(selfAddr, options.defaultGame);
+  _currentState = freshState(selfAddr, options.defaultGame);
 
   // Replay full update history from serial 0.  Delta Chat core delivers all
   // historical updates synchronously before returning, so the code below the
   // setUpdateListener call runs after replay is complete.
   webxdc.setUpdateListener(function (update) {  // eslint-disable-line no-undef
-    _currentState = stateModule.applyDelta(_currentState, update.payload);
+    _currentState = applyDelta(_currentState, update.payload);
   }, 0);
 
   // Integration point for issue #11 (Thread N — materializer).
@@ -59,8 +57,6 @@ function boot(options) {
  * getState() → LocalState
  * Returns the current in-memory state after boot.  Always call boot() first.
  */
-function getState() {
+export function getState() {
   return _currentState;
 }
-
-module.exports = { boot: boot, getState: getState };

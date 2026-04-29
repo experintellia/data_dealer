@@ -1,5 +1,3 @@
-'use strict';
-
 // State model for the webxdc port of Data Dealer.
 // Source of truth is webxdc.sendUpdate history; this module builds in-memory
 // state by replaying deltas from serial 0 on every cold start.
@@ -7,18 +5,11 @@
 // LocalState mirrors the MongoDB `games` + `users` doc structure from
 // docs/handler-map.md. Wave 3 issues (#12–#21) fill in the reducer stubs.
 
-var SCHEMA_VERSION = 1;
+import defaultGameData from '../data/default_game.json';
 
-// Load the default seed at module level so freshState() works with no args.
-// In Node (tests) this resolves via require(); in a browser bundle the build
-// tool substitutes it.  Wrapped in try/catch so the module still loads in
-// environments where JSON require isn't available.
-var _defaultSeed;
-try {
-  _defaultSeed = require('../data/default_game.json');
-} catch (_) {
-  _defaultSeed = { game_values: {} };
-}
+export var SCHEMA_VERSION = 1;
+
+var _defaultSeed = defaultGameData || { game_values: {} };
 
 // Every handler op that can appear as delta.op.  Read-only handlers
 // (getToken, ping, etc.) never produce deltas but get stubs for completeness.
@@ -68,7 +59,7 @@ var OP_NAMES = [
  *   active_missions — currently-active mission gestalt IDs
  *   last_seen_ts    — monotonic clock (clock-skew guard)
  */
-function freshState(selfAddr, seed) {
+export function freshState(selfAddr, seed) {
   var src = (seed || _defaultSeed) || {};
   var gv = Object.assign(
     {
@@ -143,7 +134,7 @@ OP_NAMES.forEach(function (op) {
  *   4. Clock-skew guard → last_seen_ts = max(Date.now(), last_seen_ts)
  *   5. Dispatch to reducer[delta.op]; unknown op → return guarded state as-is
  */
-function applyDelta(state, delta) {
+export function applyDelta(state, delta) {
   if (!delta || typeof delta !== 'object' || delta.kind !== 'delta') {
     return state;
   }
@@ -169,13 +160,3 @@ function applyDelta(state, delta) {
   }
   return reducer(next, delta);
 }
-
-// ---------------------------------------------------------------------------
-// Exports (CommonJS — importable from Node, loadable by RequireJS CJS wrap)
-// ---------------------------------------------------------------------------
-
-module.exports = {
-  SCHEMA_VERSION: SCHEMA_VERSION,
-  freshState: freshState,
-  applyDelta: applyDelta,
-};
