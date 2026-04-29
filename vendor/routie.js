@@ -1,9 +1,11 @@
 // routie — minimal SPA hash-router compatible with joestrong/routie 0.3.2 API.
 // API used in this project: routie(map), routie(name), routie.removeAll()
 (function(root, factory) {
-  if (typeof define === 'function' && define.amd) { define([], factory); }
-  else if (typeof module !== 'undefined') { module.exports = factory(); }
-  else { root.routie = factory(); }
+  var r = factory();
+  // Always set global — bootstrap.js uses routie as a global, not a module param.
+  root.routie = r;
+  if (typeof define === 'function' && define.amd) { define([], function() { return r; }); }
+  else if (typeof module !== 'undefined') { module.exports = r; }
 }(this, function() {
   var routes = {};
 
