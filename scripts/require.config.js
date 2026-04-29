@@ -7,7 +7,6 @@ require.config({
   },
   //enforceDefine: true,
   paths: {
-    baseUrl: '.',
     'createjs-easel': '../vendor/easeljs',
     'createjs-preload': '../vendor/preloadjs',
     'createjs-tween': '../vendor/tweenjs',
@@ -74,3 +73,6 @@ require.config({
     }
   }
 });
+
+require(['bootstrap']);
+
