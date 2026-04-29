@@ -33,10 +33,8 @@
     <link rel="stylesheet" type="text/css" href="./css/dd.css">
     <link rel="stylesheet" type="text/css" href="./css/Render.css">
 
-    <!-- messenger injects webxdc.js at runtime; 404s in plain browser are harmless -->
+    <!-- dev: served by mockWebxdc() Vite plugin; prod: injected by the messenger -->
     <script src="webxdc.js"></script>
-    <!-- shim activates only when window.webxdc is absent (plain browser dev) -->
-    <script src="scripts/webxdc-shim.js"></script>
 
     <script src="vendor/requirejs.js" data-main="scripts/require.config"></script>
 

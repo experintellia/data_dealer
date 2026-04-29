@@ -1,7 +1,10 @@
-/* webxdc dev shim — loaded after webxdc.js, before require.js.
- * If the messenger already injected window.webxdc, this is a no-op.
- * Otherwise installs a localStorage-backed polyfill so the game boots
- * in a plain browser (file:// or python3 -m http.server) without Delta Chat.
+/* webxdc dev shim — NOT loaded by index.html (mockWebxdc() Vite plugin handles
+ * that now). Kept here as a starting point for a Node-compatible unit-test mock
+ * (drop the localStorage calls, export window.webxdc as a module).
+ *
+ * If you need a plain-file fallback (no Vite), load this before require.js:
+ * it no-ops when window.webxdc is already set, otherwise installs a
+ * localStorage-backed polyfill.
  */
 (function () {
   'use strict';
@@ -47,7 +50,7 @@
       _updates.forEach(function (u) {
         if (u.serial > after) { cb(u); }
       });
-      _listeners.push(cb);
+      _listeners = [cb]; // last registration wins — matches real webxdc contract
     }
   };
 }());

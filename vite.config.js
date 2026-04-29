@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
+import { mockWebxdc } from '@webxdc/vite-plugins';
 
 const amdBridgeFooter = `
 if (typeof define === 'function' && define.amd) {
@@ -42,6 +43,7 @@ export default defineConfig({
   },
 
   plugins: [
+    mockWebxdc(),
     viteStaticCopy({
       targets: [
         { src: 'index.html', dest: '' },
