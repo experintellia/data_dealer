@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  getToken, ping, getSessionLocale, loadGame, getRanking, setEmitter
+  getToken, ping, getSessionLocale, loadGame, getRanking, resetGame, setEmitter
 } from '../../scripts/LocalEngine.js';
-import { setState } from '../../scripts/boot.js';
+import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
 import { setOverride, clearOverride } from '../../scripts/clock.js';
 
@@ -331,5 +331,55 @@ describe('materialization on boot', () => {
     await Promise.resolve();
 
     expect(emitted).toHaveLength(0);
+  });
+});
+
+// ── resetGame ─────────────────────────────────────────────────────────────────
+
+describe('resetGame', () => {
+  it('resolves to a truthy result', async () => {
+    setState(mkState());
+    const data = await resetGame('tok');
+    expect(data).toHaveProperty('result');
+    expect(data.result).toBeTruthy();
+  });
+
+  it('wipes nodes after reset', async () => {
+    setState(mkState({
+      nodes: [{ game_id: 'n1', game_type: 'ContactPerp', full_path: 'Imperium.n1',
+                full_type: 'ContactPerp:contact001', instance_data: {} }]
+    }));
+    await resetGame('tok');
+    expect(getState().nodes).toEqual([]);
+  });
+
+  it('wipes active_missions after reset', async () => {
+    setState(mkState({ active_missions: ['m1', 'm2'] }));
+    await resetGame('tok');
+    expect(getState().active_missions).toEqual([]);
+  });
+
+  it('restores game_values to seed defaults after reset', async () => {
+    setState(mkState({ game_values: { cash_value: 99999, xp_level: 10 } }));
+    await resetGame('tok');
+    expect(getState().game_values.cash_value).toBe(300);
+    expect(getState().game_values.xp_level).toBe(1);
+  });
+
+  it('preserves addr (identity must survive reset)', async () => {
+    setState(mkState());
+    await resetGame('tok');
+    expect(getState().addr).toBe('test@local');
+  });
+
+  it('reset followed by loadGame reflects a new game', async () => {
+    setState(mkState({
+      nodes: [{ game_id: 'n1', game_type: 'ContactPerp', full_path: 'Imperium.n1',
+                full_type: 'ContactPerp:contact001', instance_data: {} }]
+    }));
+    await resetGame('tok');
+    const { result } = await loadGame('tok');
+    expect(result.is_new_game).toBe(true);
+    expect(result.nodes).toHaveLength(0);
   });
 });
