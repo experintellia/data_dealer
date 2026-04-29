@@ -32,17 +32,10 @@ function _emit(ev, pl) {
 // Ruleset selection — locale-memoised, node-index helpers
 // ---------------------------------------------------------------------------
 
-var _cachedLocale = null;
-var _cachedRuleset = null;
-
 function _getRuleset() {
   var state = getState();
   var locale = (state && state.locale) || 'de';
-  if (locale !== _cachedLocale) {
-    _cachedLocale = locale;
-    _cachedRuleset = (locale === 'en') ? rulesetEn : rulesetDe;
-  }
-  return _cachedRuleset;
+  return (locale === 'en') ? rulesetEn : rulesetDe;
 }
 
 var _nodesByPathRef = null;
