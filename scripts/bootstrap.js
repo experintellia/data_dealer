@@ -116,11 +116,6 @@ require([
   // -----------------------------------------------------------------------------------
   // ^- desperately slashing at the spaghetti, trying to kill it, but all to no avail.
 
-  // register some backend calls
-
-  remote.addMethod('logout',setup.jsonRpcUrl);
-  remote.addMethod('getToken',setup.jsonRpcUrl);
-
   // finally do it:
 
   // routie endpoint, so reassign route handlers
