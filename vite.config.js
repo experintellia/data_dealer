@@ -1,6 +1,29 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
-import { mockWebxdc } from '@webxdc/vite-plugins';
+
+// Serve the @webxdc/vite-plugins simulator with an explicit Content-Type so
+// strict-MIME environments (GitHub Codespaces reverse proxy) don't block it.
+function mockWebxdc() {
+  const src = readFileSync(
+    fileURLToPath(new URL('./node_modules/@webxdc/vite-plugins/src/webxdc.js', import.meta.url)),
+    'utf-8',
+  );
+  return {
+    name: 'webxdc-mock',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url === '/webxdc.js') {
+          res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+          res.end(src);
+        } else {
+          next();
+        }
+      });
+    },
+  };
+}
 
 const amdBridgeFooter = `
 if (typeof define === 'function' && define.amd) {
