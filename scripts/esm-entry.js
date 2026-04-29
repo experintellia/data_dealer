@@ -4,6 +4,7 @@
 // A footer in vite.config.js then calls define() for each export so that
 // legacy requirejs AMD modules can require() new ESM modules by name.
 
+export { default as webxdcIdentity } from './webxdc-identity.js';
 export const __placeholder = true;
 export * as state from './state.js';
 export { materialize } from './materializer.js';
