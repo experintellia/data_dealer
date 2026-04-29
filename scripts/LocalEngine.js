@@ -3,9 +3,11 @@
 // No DOM globals in handler bodies; safe to import from Node for tests.
 //
 // Handlers implemented here: getToken, ping, getSessionLocale, loadGame (#12),
+// Handlers implemented here: getToken, ping, getSessionLocale, loadGame (#12),
 // resetGame (#20), getRanking, setDisplayName, setPerpCoordinates (#13),
 //   getProvidedPerps, getPowerups (#14), buyKarma (#19),
-//   buyPowerup, sellPowerup, buySlots (#18), buyPerp (#15).
+//   buyPowerup, sellPowerup, buySlots (#18), buyPerp (#15),
+//   chargePerp (#16).
 // Remaining handlers are stubs that return a rejected Promise.
 
 import { getState, setState } from './boot.js';
@@ -72,6 +74,51 @@ function _isProvidable(gestalt, ruleset, playerLevel, ownedGestalts) {
     if (!ownedGestalts[reqs[i]]) return false;
   }
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Delta persistence — injected by production boot so webxdc.sendUpdate is
+// not imported here.  Tests override with setSendDelta to capture deltas.
+// ---------------------------------------------------------------------------
+var _sendDelta = null;
+
+export function setSendDelta(fn) {
+  _sendDelta = fn;
+}
+
+function _persistDelta(delta) {
+  if (_sendDelta) {
+    _sendDelta(delta);
+    return;
+  }
+  // eslint-disable-next-line no-undef
+  if (typeof webxdc !== 'undefined') webxdc.sendUpdate({ payload: delta }, '');
+}
+
+// ---------------------------------------------------------------------------
+// PRNG helpers — port of chargecollect.py::getVariatedAmount (±5% jitter).
+// Seed is derived from (ts, path) so replaying the same delta always produces
+// the same charge_result.
+// ---------------------------------------------------------------------------
+function _djb2(str) {
+  var h = 5381;
+  for (var i = 0; i < str.length; i++) {
+    h = (Math.imul(33, h) ^ str.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+function _seededRand(seed) {
+  var s = (seed >>> 0);
+  s = (Math.imul(1664525, s) + 1013904223) >>> 0;
+  return s / 0xFFFFFFFF;
+}
+
+function _getVariatedAmount(baseAmount, ts, path) {
+  var seed = ((ts & 0xFFFFFFFF) ^ _djb2(path)) >>> 0;
+  var rand = _seededRand(seed);        // uniform 0..1
+  var variation = rand * 0.1 - 0.05;  // map to −0.05…+0.05 (±5%)
+  return Math.round(baseAmount * (1 + variation));
 }
 
 // ---------------------------------------------------------------------------
@@ -981,10 +1028,116 @@ function _advanceBuyPerpMissions(state, gestalt) {
 }
 
 // ---------------------------------------------------------------------------
+// chargePerp — Phase 3 (#16)
+// ---------------------------------------------------------------------------
+
+/**
+ * chargePerp(token, path) → Promise<{result: ChargePerpPayload}>
+ *
+ * Validates economy (cash, AP), checks the perp is not already charging,
+ * pre-computes the reward with ±5% jitter, pushes a nodes_charging entry,
+ * persists a delta, and returns {game_values, duration, levelup, missions}.
+ *
+ * Error codes (views.py:714 via handler-map.md):
+ *   error: 1 — node not found / not chargeable / insufficient cash or AP
+ *   error: 2 — perp already charging
+ *
+ * No setTimeout anywhere in this path.  Wall-clock progress is a pure function
+ * of (state, now) via the materializer (docs/async-map.md §1).
+ */
+export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
+  var state   = getState();
+  var now     = clockNow();
+  var ruleset = _getRuleset();
+
+  var nodes   = state.nodes || [];
+  var nodeIdx = -1;
+  for (var i = 0; i < nodes.length; i++) {
+    if (nodes[i].full_path === path) { nodeIdx = i; break; }
+  }
+  if (nodeIdx < 0) return Promise.resolve({ result: { error: 1 } });
+
+  var node    = nodes[nodeIdx];
+  var gestalt = node.gestalt || _gestaltFrom(node.full_type);
+  var perpDef  = gestalt && (ruleset.perps[gestalt] || ruleset.tokens[gestalt]);
+  var typeData = perpDef && perpDef.type_data;
+  if (!typeData || typeof typeData.charge_time !== 'number') {
+    return Promise.resolve({ result: { error: 1 } });
+  }
+
+  var charging = state.nodes_charging || [];
+  for (var j = 0; j < charging.length; j++) {
+    if (charging[j].path === path) return Promise.resolve({ result: { error: 2 } });
+  }
+
+  var gv           = state.game_values || {};
+  var instanceData = node.instance_data || {};
+  // charge_cost: instance_data wins (powerup-modified), then type_data, then 0.
+  var chargeCost = typeof instanceData.charge_cost === 'number'
+    ? instanceData.charge_cost
+    : (typeof typeData.charge_cost === 'number' ? typeData.charge_cost : 0);
+
+  if ((gv.ap_snapshot || 0) < 1)           return Promise.resolve({ result: { error: 1 } });
+  if ((gv.cash_value  || 0) < chargeCost)  return Promise.resolve({ result: { error: 1 } });
+
+  var baseAmount = typeof instanceData.collect_amount === 'number'
+    ? instanceData.collect_amount
+    : (typeof typeData.collect_amount === 'number' ? typeData.collect_amount : 0);
+  var chargeResult = { amount: _getVariatedAmount(baseAmount, now, path) };
+
+  var durationMs  = typeData.charge_time;
+  var chargeEntry = {
+    path:         path,
+    result:       chargeResult,
+    charge_start: now,
+    charge_end:   now + durationMs,
+    game_id:      node.game_id   || path,
+    game_type:    node.game_type || '',
+  };
+
+  var xpInc = typeof typeData.xp_inc === 'number' ? typeData.xp_inc : 0;
+
+  // mirrors dd_app views.py:776: $set charge_start, $addToSet nodes_charging,
+  // $inc cash_value/cash_spent/xp_value, $dec ap_snapshot
+  var newNodes = nodes.map(function(n, idx) {
+    if (idx !== nodeIdx) return n;
+    return Object.assign({}, n, {
+      instance_data: Object.assign({}, n.instance_data, { charge_start: now })
+    });
+  });
+
+  var newGv = Object.assign({}, gv, {
+    cash_value:  (gv.cash_value  || 0) - chargeCost,
+    cash_spent:  (gv.cash_spent  || 0) + chargeCost,
+    xp_value:    (gv.xp_value   || 0) + xpInc,
+    ap_snapshot: Math.max(0, (gv.ap_snapshot || 0) - 1),
+  });
+
+  setState(Object.assign({}, state, {
+    nodes:          newNodes,
+    nodes_charging: charging.concat([chargeEntry]),
+    game_values:    newGv,
+  }));
+
+  _persistDelta({
+    kind:   'delta',
+    addr:   state.addr,
+    op:     'chargePerp',
+    args:   [path],
+    result: { chargeEntry: chargeEntry, nodeIdx: nodeIdx, cashDelta: chargeCost, xpInc: xpInc },
+    ts:     now,
+  });
+
+  return Promise.resolve({
+    result: { game_values: newGv, duration: durationMs, levelup: false, missions: {} },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Stub handlers — Wave 4+ issues fill these in.
 // ---------------------------------------------------------------------------
 var _STUBS = [
-  'chargePerp', 'collectPerp', 'integrateCollected', 'checkUsername'
+  'collectPerp', 'integrateCollected', 'checkUsername'
 ];
 
 var _stubHandlers = {};
@@ -999,22 +1152,24 @@ _STUBS.forEach(function (name) {
 // Includes setEmitter so app.js can wire the DOM event bus after jQuery loads.
 // ---------------------------------------------------------------------------
 var LocalEngine = Object.assign({
-  getToken:          getToken,
-  ping:              ping,
-  getSessionLocale:  getSessionLocale,
-  loadGame:          loadGame,
-  getRanking:        getRanking,
-  resetGame:         resetGame,
-  setDisplayName:    setDisplayName,
+  getToken:           getToken,
+  ping:               ping,
+  getSessionLocale:   getSessionLocale,
+  loadGame:           loadGame,
+  getRanking:         getRanking,
+  resetGame:          resetGame,
+  setDisplayName:     setDisplayName,
   setPerpCoordinates: setPerpCoordinates,
-  getProvidedPerps:  getProvidedPerps,
-  getPowerups:       getPowerups,
-  buyKarma:          buyKarma,
-  buyPowerup:        buyPowerup,
-  sellPowerup:       sellPowerup,
-  buySlots:          buySlots,
-  buyPerp:           buyPerp,
-  setEmitter:        setEmitter
+  getProvidedPerps:   getProvidedPerps,
+  getPowerups:        getPowerups,
+  buyKarma:           buyKarma,
+  buyPowerup:         buyPowerup,
+  sellPowerup:        sellPowerup,
+  buySlots:           buySlots,
+  buyPerp:            buyPerp,
+  chargePerp:         chargePerp,
+  setEmitter:         setEmitter,
+  setSendDelta:       setSendDelta,
 }, _stubHandlers);
 
 export default LocalEngine;

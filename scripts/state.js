@@ -236,6 +236,44 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
   });
 };
 
+reducers.chargePerp = function chargePerpReducer(state, delta) {
+  var r           = delta.result || {};
+  var chargeEntry = r.chargeEntry;
+  if (!chargeEntry || typeof r.nodeIdx !== 'number') return state;
+
+  var nodeIdx   = r.nodeIdx;
+  var cashDelta = typeof r.cashDelta === 'number' ? r.cashDelta : 0;
+  var xpInc     = typeof r.xpInc    === 'number' ? r.xpInc    : 0;
+
+  var nodes    = state.nodes || [];
+  var newNodes = nodes.map(function(n, i) {
+    if (i !== nodeIdx) return n;
+    return Object.assign({}, n, {
+      instance_data: Object.assign({}, n.instance_data, {
+        charge_start: chargeEntry.charge_start
+      })
+    });
+  });
+
+  var stillCharging = (state.nodes_charging || []).filter(function(c) {
+    return c.path !== chargeEntry.path;
+  });
+
+  var gv    = state.game_values || {};
+  var newGv = Object.assign({}, gv, {
+    cash_value:  (gv.cash_value  || 0) - cashDelta,
+    cash_spent:  (gv.cash_spent  || 0) + cashDelta,
+    xp_value:    (gv.xp_value   || 0) + xpInc,
+    ap_snapshot: Math.max(0, (gv.ap_snapshot || 0) - 1),
+  });
+
+  return Object.assign({}, state, {
+    nodes:          newNodes,
+    nodes_charging: stillCharging.concat([chargeEntry]),
+    game_values:    newGv,
+  });
+};
+
 // Stubs — return state unchanged until Wave 4+ fills them in.
 OP_NAMES.forEach(function (op) {
   if (!reducers[op]) {
