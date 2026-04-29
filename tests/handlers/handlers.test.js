@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  getToken, ping, getSessionLocale, loadGame, setEmitter
+  getToken, ping, getSessionLocale, loadGame, getRanking, setEmitter
 } from '../../scripts/LocalEngine.js';
 import { setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
@@ -11,6 +11,53 @@ import { setOverride, clearOverride } from '../../scripts/clock.js';
 function mkState(overrides) {
   return Object.assign(freshState('test@local'), overrides || {});
 }
+
+// ── getRanking ───────────────────────────────────────────────────────────────
+
+function mkRankingState() {
+  var base = mkState();
+  return Object.assign({}, base, {
+    display_name: 'TestUser',
+    game_values: Object.assign({}, base.game_values, {
+      xp_value: 77,
+      cash_value: 200,
+      profiles_value: 3,
+      cash_spent: 50
+    })
+  });
+}
+
+describe('getRanking', () => {
+  beforeEach(() => setState(mkRankingState()));
+
+  it('returns the single-row shape with user_rank 1', async () => {
+    const { result } = await getRanking('tok', 'xp');
+    expect(result).toHaveProperty('top');
+    expect(result).toHaveProperty('user_rank', 1);
+    expect(result.top).toHaveLength(1);
+    expect(result.top[0]).toMatchObject({ display_name: 'TestUser', self: true });
+  });
+
+  it('xp type returns game_values.xp_value', async () => {
+    const { result } = await getRanking('tok', 'xp');
+    expect(result.top[0].value).toBe(77);
+  });
+
+  it('cash type returns game_values.cash_value', async () => {
+    const { result } = await getRanking('tok', 'cash');
+    expect(result.top[0].value).toBe(200);
+  });
+
+  it('profiles type returns game_values.profiles_value', async () => {
+    const { result } = await getRanking('tok', 'profiles');
+    expect(result.top[0].value).toBe(3);
+  });
+
+  it('spent type returns game_values.cash_spent', async () => {
+    const { result } = await getRanking('tok', 'spent');
+    expect(result.top[0].value).toBe(50);
+  });
+});
 
 // ── getToken ─────────────────────────────────────────────────────────────────
 

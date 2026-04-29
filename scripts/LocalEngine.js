@@ -150,12 +150,35 @@ function _buildLoadGameResponse(state, now) {
 }
 
 // ---------------------------------------------------------------------------
+// getRanking
+// ---------------------------------------------------------------------------
+
+// TODO(#29): Replace with multi-peer aggregation in Phase 6.
+export function getRanking(_token, type) {
+  var state = getState();
+  var gv = (state && state.game_values) || {};
+  var fieldMap = {
+    cash:     gv.cash_value,
+    profiles: gv.profiles_value,
+    xp:       gv.xp_value,
+    spent:    gv.cash_spent
+  };
+  var value = fieldMap[type] !== undefined ? fieldMap[type] : 0;
+  return Promise.resolve({
+    result: {
+      top: [{ display_name: (state && state.display_name) || '', value: value, self: true }],
+      user_rank: 1
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Stub handlers — Wave 4+ issues fill these in.
 // ---------------------------------------------------------------------------
 var _STUBS = [
   'buyPowerup', 'chargePerp', 'collectPerp', 'integrateCollected',
   'getPowerups', 'getProvidedPerps', 'buyKarma', 'buyPerp', 'buySlots',
-  'setDisplayName', 'getRanking', 'resetGame', 'sellPowerup',
+  'setDisplayName', 'resetGame', 'sellPowerup',
   'setPerpCoordinates', 'checkUsername'
 ];
 
@@ -175,6 +198,7 @@ var LocalEngine = Object.assign({
   ping: ping,
   getSessionLocale: getSessionLocale,
   loadGame: loadGame,
+  getRanking: getRanking,
   setEmitter: setEmitter
 }, _stubHandlers);
 
