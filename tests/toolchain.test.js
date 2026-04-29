@@ -10,7 +10,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 describe('vendor files', () => {
   const required = [
     'requirejs.js', 'jquery.js', 'underscore.js', 'numeral.js',
-    'text.js', 'tpl.js', 'routie.js', 'json2.js', 'native-console.js',
+    'text.js', 'tpl.js', 'routie.js', 'native-console.js',
     'easeljs.js', 'tweenjs.js', 'preloadjs.js', 'soundjs.js',
     'sprintf.js', 'zynga-animate.js', 'zynga-scroller.js', 'jquery-mobile.js',
   ];

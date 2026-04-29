@@ -15,7 +15,6 @@ require.config({
     jquery: '../vendor/jquery',
     'jquery-migrate': '../vendor/jquery-migrate',
     'jquery-mobile': '../vendor/jquery-mobile',
-    json2: '../vendor/json2',
     'native-console': '../vendor/native-console',
     numeral: '../vendor/numeral',
     'numeral-de': '../vendor/numeral-de',
@@ -44,9 +43,6 @@ require.config({
     },
     'jquery-migrate': ['jquery'],
     'jquery-mobile': ['jquery'],
-    'json2': {
-      exports: 'JSON'
-    },
     'native-console': {
       exports: 'console'
     },
