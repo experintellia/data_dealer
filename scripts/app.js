@@ -2,7 +2,6 @@ define(function(require) {
 
   var Application = function() {
 
-    require('json2');
     require('native-console');
 
     var _ = require('underscore');

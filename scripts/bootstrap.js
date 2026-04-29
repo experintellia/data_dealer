@@ -9,7 +9,6 @@ require([
   'routie',
   'setup',
   'app',
-  'json2',
   'native-console',
   'tpl!../views/loader.html',
   'tpl!../views/downtime.html'

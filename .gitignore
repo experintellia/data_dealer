@@ -2,10 +2,11 @@
 *.swp
 .DS_Store
 .Trashes
-setup_local.js
-/components/
 /dist/
 /docs/*
 !/docs/*.md
 /node_modules/
 npm-debug.log
+pnpm-debug.log
+.pnpm-store/
+/coverage/

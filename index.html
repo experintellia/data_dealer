@@ -24,21 +24,18 @@
     <meta property="og:url" content="https://beta.datadealer.com" />
     <meta property="og:type" content="website" />
 
-    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes">
     <!--<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />-->
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <!-- FIXME <link rel="apple-touch-icon" href="img/icon-profile_s1.png"/> -->
     <!-- <link rel="apple-touch-startup-image" href="img/agent-manni-logo.png"> -->
 
-    <!-- #grunt-begin-replace-header -->
     <link rel="stylesheet" type="text/css" href="./css/dd.css">
     <link rel="stylesheet" type="text/css" href="./css/Render.css">
 
-    <script src='components/requirejs/require.js' data-main='scripts/require.config'></script>
-    <script>require(['bootstrap']);</script>
-    <!-- #grunt-end-replace-header -->
+    <script src="vendor/requirejs.js" data-main="scripts/require.config"></script>
 
-    <title>Data Dealer Closed Beta (Build <!-- #grunt-build-id -->)</title>
+    <title>Data Dealer</title>
   </head>
   <body id='dd-control'>
     <!-- <a class="Button" href="#load" style="margin:30px auto; display:block; width:160px;">Load Game</a> -->
