@@ -2,7 +2,6 @@
 *.swp
 .DS_Store
 .Trashes
-setup_local.js
 /dist/
 /docs/*
 !/docs/*.md

@@ -10,7 +10,7 @@ if (typeof define === 'function' && define.amd) {
 
 const amdScripts = [
   'Game.js', 'Render.js', 'app.js', 'bootstrap.js', 'Remote.js', 'Socket.js',
-  'RpcQueue.js', 'i18n.js', 'util.js', 'setup.js', 'setup_beta_local.js',
+  'RpcQueue.js', 'i18n.js', 'util.js', 'setup.js', 'setup_local.js', 'setup_beta_local.js',
   'core.js', 'type_settings.js', 'LocalEngine.js', 'require.config.js',
 ].map(f => ({ src: `scripts/${f}`, dest: '' }));
 
