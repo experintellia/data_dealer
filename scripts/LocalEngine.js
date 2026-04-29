@@ -1135,10 +1135,6 @@ function _rng() {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
-// ---------------------------------------------------------------------------
-// Collect / integrate helpers
-// ---------------------------------------------------------------------------
-
 function _generateId() {
   // Timestamp base + two RNG words → collision-resistant string without deps.
   return Date.now().toString(36) +
@@ -1198,7 +1194,6 @@ export function collectPerp(_token, gperpPath) {
   var mat = materialize(state, now);
   var ms = mat.state;
 
-  // Find the collect entry (guards "not ready" path).
   var collectEntry = null;
   for (var i = 0; i < ms.nodes_collect.length; i++) {
     if (ms.nodes_collect[i].path === gperpPath) {
@@ -1211,7 +1206,6 @@ export function collectPerp(_token, gperpPath) {
     return Promise.resolve({ result: { error: 1 } });
   }
 
-  // Find the node definition for its game_type.
   var node = null;
   for (var j = 0; j < ms.nodes.length; j++) {
     if (ms.nodes[j].full_path === gperpPath) {
@@ -1232,10 +1226,7 @@ export function collectPerp(_token, gperpPath) {
   var xpGain = (typeData && typeof typeData.xp_inc === 'number') ? typeData.xp_inc : 1;
   var gameType = node.game_type;
 
-  // $pull from nodes_collect.
   var newCollect = ms.nodes_collect.filter(function (e) { return e.path !== gperpPath; });
-
-  // Start mutating game_values.
   var newGv = Object.assign({}, ms.game_values, {
     xp_value: (ms.game_values.xp_value || 0) + xpGain
   });
@@ -1282,7 +1273,6 @@ export function collectPerp(_token, gperpPath) {
     return Promise.resolve({ result: { error: 3 } });
   }
 
-  // Karma incident (seeded PRNG — dd_app views.py:483 _handleKarmaIncident).
   var incident = _handleKarmaIncident(newGv, ruleset);
   if (incident) {
     newGv = Object.assign({}, newGv, {
@@ -1291,7 +1281,6 @@ export function collectPerp(_token, gperpPath) {
     });
   }
 
-  // Levelup check.
   var oldLevel = (ms.game_values && ms.game_values.xp_level) || 1;
   var newLevel = _getLevelByXP(newGv.xp_value);
   var levelup  = newLevel > oldLevel;
@@ -1365,14 +1354,11 @@ export function integrateCollected(_token, collectId) {
   var ps = entry.profile_set || {};
   var profilesIncrement = ps.profiles_value || 0;
 
-  // Dup detection: track integrated collect_ids in state.integrated_ids set.
   var integratedIds = state.integrated_ids || {};
   var dup       = integratedIds[collectId] ? profilesIncrement : 0;
   var increment = integratedIds[collectId] ? 0 : profilesIncrement;
-  var newIntegratedIds = Object.assign({}, integratedIds);
-  newIntegratedIds[collectId] = true;
+  var newIntegratedIds = Object.assign({}, integratedIds, { [collectId]: true });
 
-  // $inc game_values.
   var xpGain    = ps.xp_gain    || 0;
   var karmaGain = ps.karma_gain || 0;
   var newGv = Object.assign({}, state.game_values, {
@@ -1382,7 +1368,6 @@ export function integrateCollected(_token, collectId) {
     profiles_value: (state.game_values.profiles_value || 0) + increment
   });
 
-  // $inc token node amounts from profile_set.tokens_map.
   var tokensMap = ps.tokens_map || {};
   var updatedNodes = [];
   var newNodes = (state.nodes || []).map(function (n) {
@@ -1401,7 +1386,6 @@ export function integrateCollected(_token, collectId) {
     return updated;
   });
 
-  // Levelup check.
   var oldLevel = (state.game_values && state.game_values.xp_level) || 1;
   var newLevel = _getLevelByXP(newGv.xp_value);
   var levelup  = newLevel > oldLevel;

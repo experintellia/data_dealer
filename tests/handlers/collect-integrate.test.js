@@ -2,7 +2,8 @@
  * Tests for collectPerp + integrateCollected handlers (issue #17).
  *
  * Schema for nodes_collect[i].result (written by chargePerp, consumed here):
- *   { xp_gain, profile_set?, origin?, cash_gain?, amount_gain? }
+ *   { amount: number } — Thread S chargePerp schema (PR #72).
+ *   XP gain is derived from ruleset type_data.xp_inc, not stored in result.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
@@ -62,11 +63,7 @@ function mkChargingEntry(path, result, gameType) {
 
 describe('full flow: ContactPerp charge → collect → integrate', () => {
   const PATH = 'Imperium.City.Agent0.contact001';
-  const COLLECT_RESULT = {
-    xp_gain:     2,
-    profile_set: { profiles_value: 5, tokens_map: {} },
-    origin:      PATH
-  };
+  const COLLECT_RESULT = { amount: 5 };
 
   beforeEach(() => setOverride(FIXED_NOW));
   afterEach(() => { clearOverride(); setEmitter(null); });
@@ -92,7 +89,7 @@ describe('full flow: ContactPerp charge → collect → integrate', () => {
 
     const data = await collectPerp('tok', PATH);
     expect(data.result.error).toBeUndefined();
-    expect(data.result.result.profile_set).toEqual(COLLECT_RESULT.profile_set);
+    expect(data.result.result.profile_set).toEqual({ profiles_value: 5, tokens_map: {} });
     expect(data.result.result.origin).toBe(PATH);
     expect(typeof data.result.result.collect_id).toBe('string');
     expect(data.result.result.collect_id.length).toBeGreaterThan(0);
@@ -150,7 +147,7 @@ describe('full flow: ContactPerp charge → collect → integrate', () => {
     const { getState: gs, setState: ss } = await import('../../scripts/boot.js');
     const cur = gs();
     ss(Object.assign({}, cur, {
-      db_queue: [{ origin: PATH, collect_id: collectId, profile_set: COLLECT_RESULT.profile_set, collect_dt: FIXED_NOW }]
+      db_queue: [{ origin: PATH, collect_id: collectId, profile_set: { profiles_value: 5, tokens_map: {} }, collect_dt: FIXED_NOW }]
     }));
 
     const { result: intRes2 } = await integrateCollected('tok', collectId);
@@ -166,8 +163,8 @@ describe('full flow: ContactPerp charge → collect → integrate', () => {
     setOverride(CHARGE_END + 1000);
 
     const { result } = await collectPerp('tok', PATH);
-    // base xp_value = 5, xp_gain = 2 → 7
-    expect(result.game_values.xp_value).toBe(7);
+    // base xp_value = 5, contact001 xp_inc = 1 → 6
+    expect(result.game_values.xp_value).toBe(6);
   });
 
   it('integrateCollected errors with 0 for unknown collect_id', async () => {
@@ -189,11 +186,11 @@ describe('collectPerp — ContactPerp', () => {
   it('returns profile_set, origin, and collect_id in result.result', async () => {
     setState(mkState({
       nodes:         [mkNode('ContactPerp', PATH)],
-      nodes_collect: [{ path: PATH, result: { xp_gain: 1, profile_set: PS, origin: PATH } }]
+      nodes_collect: [{ path: PATH, result: { amount: 3 } }]
     }));
 
     const { result } = await collectPerp('tok', PATH);
-    expect(result.result.profile_set).toEqual(PS);
+    expect(result.result.profile_set).toEqual({ profiles_value: 3, tokens_map: {} });
     expect(result.result.origin).toBe(PATH);
     expect(typeof result.result.collect_id).toBe('string');
   });
@@ -201,7 +198,7 @@ describe('collectPerp — ContactPerp', () => {
   it('does not return cash or token_upgraded_amount', async () => {
     setState(mkState({
       nodes:         [mkNode('ContactPerp', PATH)],
-      nodes_collect: [{ path: PATH, result: { xp_gain: 1, profile_set: PS, origin: PATH } }]
+      nodes_collect: [{ path: PATH, result: { amount: 3 } }]
     }));
 
     const { result } = await collectPerp('tok', PATH);
@@ -212,7 +209,7 @@ describe('collectPerp — ContactPerp', () => {
   it('response carries game_values, levelup, and missions', async () => {
     setState(mkState({
       nodes:         [mkNode('ContactPerp', PATH)],
-      nodes_collect: [{ path: PATH, result: { xp_gain: 1, profile_set: PS, origin: PATH } }]
+      nodes_collect: [{ path: PATH, result: { amount: 3 } }]
     }));
 
     const { result } = await collectPerp('tok', PATH);
@@ -234,7 +231,7 @@ describe('collectPerp — ProjectPerp', () => {
   it('returns profile_set, origin, and collect_id', async () => {
     setState(mkState({
       nodes:         [mkNode('ProjectPerp', PATH)],
-      nodes_collect: [{ path: PATH, result: { xp_gain: 3, profile_set: PS, origin: PATH } }]
+      nodes_collect: [{ path: PATH, result: { amount: 10 } }]
     }));
 
     const { result } = await collectPerp('tok', PATH);
@@ -246,7 +243,7 @@ describe('collectPerp — ProjectPerp', () => {
   it('pushes to db_queue with correct shape', async () => {
     setState(mkState({
       nodes:         [mkNode('ProjectPerp', PATH)],
-      nodes_collect: [{ path: PATH, result: { xp_gain: 3, profile_set: PS, origin: PATH } }]
+      nodes_collect: [{ path: PATH, result: { amount: 10 } }]
     }));
 
     const { result } = await collectPerp('tok', PATH);
@@ -272,7 +269,7 @@ describe('collectPerp — ClientPerp', () => {
   it('returns cash (new cash_value) in result.result', async () => {
     setState(mkState({
       nodes:         [mkNode('ClientPerp', PATH)],
-      nodes_collect: [{ path: PATH, result: { xp_gain: 1, cash_gain: 100 } }],
+      nodes_collect: [{ path: PATH, result: { amount: 100 } }],
       game_values:   mkGv({ cash_value: 300 })
     }));
 
@@ -284,7 +281,7 @@ describe('collectPerp — ClientPerp', () => {
   it('does not return profile_set or token_upgraded_amount', async () => {
     setState(mkState({
       nodes:         [mkNode('ClientPerp', PATH)],
-      nodes_collect: [{ path: PATH, result: { xp_gain: 1, cash_gain: 50 } }]
+      nodes_collect: [{ path: PATH, result: { amount: 50 } }]
     }));
 
     const { result } = await collectPerp('tok', PATH);
@@ -295,7 +292,7 @@ describe('collectPerp — ClientPerp', () => {
   it('does not push to db_queue', async () => {
     setState(mkState({
       nodes:         [mkNode('ClientPerp', PATH)],
-      nodes_collect: [{ path: PATH, result: { xp_gain: 1, cash_gain: 50 } }]
+      nodes_collect: [{ path: PATH, result: { amount: 50 } }]
     }));
 
     await collectPerp('tok', PATH);
@@ -315,7 +312,7 @@ describe('collectPerp — TokenPerp', () => {
   it('returns token_upgraded_amount (prevAmount + amount_gain)', async () => {
     setState(mkState({
       nodes:         [mkNode('TokenPerp', PATH, { amount: 3 })],
-      nodes_collect: [{ path: PATH, result: { xp_gain: 1, amount_gain: 2 } }]
+      nodes_collect: [{ path: PATH, result: { amount: 2 } }]
     }));
 
     const { result } = await collectPerp('tok', PATH);
@@ -325,7 +322,7 @@ describe('collectPerp — TokenPerp', () => {
   it('updates instance_data.amount in state.nodes', async () => {
     setState(mkState({
       nodes:         [mkNode('TokenPerp', PATH, { amount: 3 })],
-      nodes_collect: [{ path: PATH, result: { xp_gain: 1, amount_gain: 2 } }]
+      nodes_collect: [{ path: PATH, result: { amount: 2 } }]
     }));
 
     await collectPerp('tok', PATH);
@@ -337,7 +334,7 @@ describe('collectPerp — TokenPerp', () => {
   it('does not return profile_set or cash', async () => {
     setState(mkState({
       nodes:         [mkNode('TokenPerp', PATH, { amount: 0 })],
-      nodes_collect: [{ path: PATH, result: { xp_gain: 1, amount_gain: 4 } }]
+      nodes_collect: [{ path: PATH, result: { amount: 4 } }]
     }));
 
     const { result } = await collectPerp('tok', PATH);
@@ -363,7 +360,7 @@ describe('collectPerp — failure paths', () => {
     setState(mkState({
       nodes:          [mkNode('ContactPerp', PATH)],
       // charge_end is 10 min from FIXED_NOW
-      nodes_charging: [Object.assign(mkChargingEntry(PATH, { xp_gain: 1, profile_set: { profiles_value: 1, tokens_map: {} }, origin: PATH }, 'ContactPerp'),
+      nodes_charging: [Object.assign(mkChargingEntry(PATH, { amount: 1 }, 'ContactPerp'),
                        { charge_end: FIXED_NOW + 600_000 })]
     }));
 
@@ -375,7 +372,7 @@ describe('collectPerp — failure paths', () => {
     const PATH = 'Imperium.City.ghost001';
     setState(mkState({
       nodes:         [],   // no matching node
-      nodes_collect: [{ path: PATH, result: { xp_gain: 1 } }]
+      nodes_collect: [{ path: PATH, result: { amount: 0 } }]
     }));
     const data = await collectPerp('tok', PATH);
     expect(data.result.error).toBe(2);
@@ -393,7 +390,7 @@ describe('collectPerp — karma_incident', () => {
   it('karma_incident absent when karma_value >= 0', async () => {
     setState(mkState({
       nodes:         [mkNode('ClientPerp', PATH)],
-      nodes_collect: [{ path: PATH, result: { xp_gain: 1, cash_gain: 50 } }],
+      nodes_collect: [{ path: PATH, result: { amount: 50 } }],
       game_values:   mkGv({ karma_value: 50, xp_level: 5 })
     }));
     setPrngSeed(42);
@@ -406,7 +403,7 @@ describe('collectPerp — karma_incident', () => {
     // eligible at level=5: 4 karmalizers; seed=42 second RNG value picks karma014
     setState(mkState({
       nodes:         [mkNode('ClientPerp', PATH)],
-      nodes_collect: [{ path: PATH, result: { xp_gain: 1, cash_gain: 50 } }],
+      nodes_collect: [{ path: PATH, result: { amount: 50 } }],
       game_values:   mkGv({ karma_value: -80, xp_level: 5 })
     }));
     setPrngSeed(42);
@@ -418,7 +415,7 @@ describe('collectPerp — karma_incident', () => {
   it('karma_incident decreases karma_value within [-100, 100]', async () => {
     setState(mkState({
       nodes:         [mkNode('ClientPerp', PATH)],
-      nodes_collect: [{ path: PATH, result: { xp_gain: 1, cash_gain: 50 } }],
+      nodes_collect: [{ path: PATH, result: { amount: 50 } }],
       game_values:   mkGv({ karma_value: -80, xp_level: 5 })
     }));
     setPrngSeed(42);
@@ -432,7 +429,7 @@ describe('collectPerp — karma_incident', () => {
     // All karmalizers have required_level >= 5, so none eligible at level 1.
     setState(mkState({
       nodes:         [mkNode('ClientPerp', PATH)],
-      nodes_collect: [{ path: PATH, result: { xp_gain: 1, cash_gain: 50 } }],
+      nodes_collect: [{ path: PATH, result: { amount: 50 } }],
       game_values:   mkGv({ karma_value: -80, xp_level: 1 })
     }));
     setPrngSeed(42);
