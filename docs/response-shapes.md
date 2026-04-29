@@ -23,11 +23,10 @@ Conventions:
   shapes are documented once in the **Common payloads** section and referenced
   from each method.
 
-Cross-check note: thread B's `docs/handler-map.md` has not landed in this repo
-(no file on `master`, and this branch has only one commit ahead of `master`).
-Discrepancies cannot be flagged yet — once `handler-map.md` exists, diff each
-section's "Method name" + "Args" + listed fields against the handler entry. A
-follow-up cross-check audit is required before the LocalEngine port begins.
+Cross-check note: `docs/handler-map.md` (issue #2) has landed. All five open
+questions from the original audit are resolved; see the §Open questions section
+for the full reconciliation. The `buyKarma` missions discrepancy called out in
+handler-map.md is fixed in this document.
 
 ---
 
@@ -267,14 +266,19 @@ Expected response shape:
   result: {
     error?: number,               // present ⇒ "probably no cash"; treated as soft fail
     game_values: GameValues,
-    levelup: boolean,
-    missions: MissionsPayload
+    levelup: boolean
   }
 }
 ```
 
 If `result` is falsy or unparsable, the client calls `gnode.Error('The
 computer says NOOOO', data)`.
+
+Note: `missions` is NOT returned by `buyKarma`. Per `handler-map.md`
+(`views.py:939-1000`), `buyKarma` never instantiates `MissionHandler` and
+returns only `{game_values, [levelup]}`. The earlier draft of this document
+over-specified by analogy with `buyPerp`. LocalEngine MUST NOT include a
+missions payload for `buyKarma`.
 
 ### buyPerp
 
@@ -335,9 +339,12 @@ Expected response shape:
 }
 ```
 
-Note: `levelup` and `missions` are NOT read here (the call at Game.js:2502 is
-commented out). Only `setProfiles(game_values.profiles_value)` is invoked
-directly. LocalEngine may still include them for parity with other handlers.
+Note: `levelup` and `missions` are NOT read by the client (the call at
+Game.js:2502 is commented out); only `setProfiles(game_values.profiles_value)`
+is invoked directly. The server-side handler (`views.py:320`) DOES emit
+`[missions]` and `[levelup]` when mission/level thresholds are crossed — the
+client drops them on the floor. LocalEngine MUST still emit them for parity
+with the real server; see handler-map.md §integrateCollected.
 
 ### resetGame
 
@@ -393,8 +400,9 @@ Expected response shape (merged into `gnode.data` via `mergeData`):
       value: number
     }>,
     user_rank: number             // 0..1, multiplied by 100 for "%"
-    // Optional/merged: type_texts, type_texts_notinranking, type_titles
-    // — these usually originate from local type_data; backend MAY override.
+    // type_texts, type_texts_notinranking, type_titles are NOT server-provided.
+    // handler-map.md (views.py:1443) confirms the server returns only {top, user_rank}.
+    // All three fields originate from local type_data; LocalEngine must NOT emit them.
   }
 }
 ```
@@ -572,6 +580,12 @@ Note the merge target differs from `buyPowerup`: sell rewinds to
 `mergeData(groot.getTypeData(gnode.gestalt), node.instance_data)` (line 5005),
 so `instance_data` SHOULD reflect the post-sell state of the project node.
 
+Dead-weight note: `missions` is listed above because the consumed callback
+path passes through `updateGameValues`, but per `handler-map.md`
+(`views.py:1157`), `sellPowerup` never invokes `MissionHandler` and never
+emits `missions`. The field is always absent in real responses. LocalEngine
+can omit `missions` for this method.
+
 ### buySlots
 
 - Registered: scripts/app.js:149
@@ -594,6 +608,12 @@ Expected response shape:
 ```
 
 Failure handler (line 5052) also reads `data.error.message`.
+
+Dead-weight note: `missions` is listed above because the consumed callback
+path passes through `updateGameValues`, but per `handler-map.md`
+(`views.py:860`), `buySlots` never invokes `MissionHandler` and never emits
+`missions`. The field is always absent in real responses. LocalEngine can
+omit `missions` for this method.
 
 ---
 
@@ -632,32 +652,62 @@ Failure path also ignores `data`.
 ### checkUsername
 
 - Registered: scripts/app.js:159
-- No callsite in the audited files. Likely consumed only from a sign-up form
-  template or a removed flow. **Flag for handler-map cross-check.**
+- No callsite in the audited files.
+- **Resolved:** `handler-map.md` confirms `checkUsername` is NOT in `dd_app`
+  — it lives in the separate `dd_auth` Django service (the JS client routes it
+  to `setup.jsonRpcAuthUrl`). Drop this method entirely from the LocalEngine
+  port; `webxdc.selfAddr` is the identity, so username checking has no
+  equivalent.
 
 ### ping
 
 - Registered: scripts/app.js:154
-- No `.done()` callsite in the audited files; presumed used by RpcQueue or
-  Socket keepalive. **Flag for handler-map cross-check.**
+- No `.done()` callsite in the audited files.
+- **Resolved:** `handler-map.md` (`views.py:1479`) confirms `ping` is a real
+  endpoint that returns `"pong"` (not auth-gated). It is used by RpcQueue as a
+  keepalive, not a game-logic call. LocalEngine must implement it:
+
+```text
+{
+  result: "pong"
+}
+```
 
 ---
 
 ## Open questions / discrepancy candidates
 
-1. `setPerpCoordinates` returns `result: 1` but the Game.js:981 comment says
-   it "still fails to save for some reason". LocalEngine should mirror at
-   least the "always succeed" envelope, but the underlying handler may need
-   investigation in handler-map.
-2. `integrateCollected` does not feed `levelup`/`missions` into
-   `updateGameValues` (commented out at Game.js:2502). Confirm whether the
-   server-side handler emits them; if so, the client is dropping them on the
-   floor.
-3. `collectPerp` is overloaded across four perp types with mutually exclusive
-   payload subsets. handler-map should clarify whether the backend dispatches
-   on path/gestalt to choose which subset to emit.
-4. `getRanking` returns merged data; `type_texts` / `type_texts_notinranking`
-   may be either backend-provided or local type_data. Confirm with handler.
-5. `checkUsername` and `ping` have registrations but no consumed callsites in
-   `Game.js` / `app.js` / `bootstrap.js`. Confirm with handler-map whether
-   they are vestigial.
+All five original questions are resolved via `docs/handler-map.md`.
+
+1. **`setPerpCoordinates` — Resolved.** `handler-map.md` (`views.py:278`)
+   confirms the server persists every entry via Mongo `$set` per path and
+   returns an `int` count of updated docs. The Game.js:981 comment reflects an
+   earlier client-side concern, not a handler bug. The current response shape
+   (`result: 1 | true | any`) is correct; the client discards the value.
+   LocalEngine should return `{ result: 1 }`.
+
+2. **`integrateCollected` — Resolved.** `handler-map.md` (`views.py:320`)
+   confirms the server DOES emit `[missions]` and `[levelup]` when
+   mission/level thresholds are crossed. The client drops them (call at
+   Game.js:2502 is commented out). LocalEngine MUST still emit them for parity
+   with the real server. See updated note in the `integrateCollected` section
+   above.
+
+3. **`collectPerp` payload union — Resolved.** `handler-map.md` (`views.py:505`)
+   confirms the server dispatches on the node's `game_type` (ContactPerp /
+   ProjectPerp → `profile_set`; ClientPerp → `cash`; TokenPerp →
+   `token_upgraded_amount`). LocalEngine must branch on the calling perp's
+   `gameType`; see the `collectPerp` section above.
+
+4. **`getRanking` `type_texts` — Resolved.** `handler-map.md` (`views.py:1443`)
+   confirms the server returns only `{top:[{display_name, value, self}],
+   user_rank}`. `type_texts`, `type_texts_notinranking`, and `type_titles` are
+   NOT server-provided — they originate from local `type_data`. LocalEngine
+   MUST NOT emit them. See updated comment in the `getRanking` section above.
+
+5. **`checkUsername` and `ping` — Resolved.** `handler-map.md` confirms:
+   `ping` (`views.py:1479`) is a real endpoint returning `"pong"` (RpcQueue
+   keepalive, not auth-gated — LocalEngine must implement it). `checkUsername`
+   is NOT in `dd_app`; it belongs to the separate `dd_auth` Django service and
+   must be dropped from the LocalEngine port entirely. See updated sections
+   above.
