@@ -12,6 +12,7 @@ define(function(require) {
     var Render = require('Render').getRender();
     var RpcQueue = require('RpcQueue');
     var typeSettings = require('type_settings').getTypeSettings();
+    var webxdcIdentity = require('webxdcIdentity');
 
     //////////////////////////////////////////
     //
@@ -1000,7 +1001,7 @@ define(function(require) {
         var text = _._('user description');
         gnode.openGenericPopup({
           data: {
-            title: user.auth_fullname || user.auth_username,
+            title: user.display_name,
             description: text
           },
           template:'popup_user_data.html'
@@ -1908,6 +1909,14 @@ define(function(require) {
         "gameType": "GameRoot"
       };
       this.init(config);
+
+      // Seed display_name from webxdc on first boot. Calling setDisplayName here
+      // composes with Wave 3 #13 when the persistence handler lands.
+      if (webxdcIdentity.applyWebxdcIdentity(this.data.user)) {
+        app.remote.setDisplayName(app.token, this.data.user.display_name).fail(function() {
+          // NotImplemented until Wave 3 #13; in-memory state is already updated above.
+        });
+      }
 
       this.initGameValues();
 

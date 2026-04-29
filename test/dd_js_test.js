@@ -6,7 +6,7 @@
 /*global notDeepEqual:true, strictEqual:true, notStrictEqual:true, raises:true*/
 
 define(function(require) {
-  
+
   var setup = require('setup');
   var Game = require('Game');
   var Render = require('Render');
