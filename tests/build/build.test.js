@@ -19,7 +19,8 @@ describe('dist/ structure', () => {
     'scripts/require.config.js',
     'scripts/bootstrap.js',
     'scripts/app.js',
-    'scripts/LocalEngine.js',
+    // LocalEngine.js is now ESM — bundled into esm-bundle.js via the AMD
+    // bridge; it is NOT copied as a standalone AMD file any more.
     'scripts/esm-bundle.js',
     'vendor/requirejs.js',
     'vendor/jquery.js',
@@ -57,5 +58,12 @@ describe('dist/scripts/esm-bundle.js', () => {
     const { readFileSync } = await import('fs');
     const bundle = readFileSync(join(root, 'dist', 'scripts', 'esm-bundle.js'), 'utf8');
     expect(bundle).toContain('define.amd');
+  });
+
+  it('registers LocalEngine via the AMD bridge', async () => {
+    const { readFileSync } = await import('fs');
+    const bundle = readFileSync(join(root, 'dist', 'scripts', 'esm-bundle.js'), 'utf8');
+    // The bridge footer emits define("LocalEngine", ...) for the AMD loader.
+    expect(bundle).toContain('LocalEngine');
   });
 });

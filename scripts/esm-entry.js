@@ -10,3 +10,6 @@ export * as state from './state.js';
 export { materialize } from './materializer.js';
 export * as clock from './clock.js';
 import './devtools.js';
+// LocalEngine is exposed as an AMD module via the bridge so Remote.js can
+// require('LocalEngine').  The default export is the handler-method object.
+export { default as LocalEngine } from './LocalEngine.js';
