@@ -3,14 +3,16 @@
 // No DOM globals in handler bodies; safe to import from Node for tests.
 //
 // Handlers implemented here: getToken, ping, getSessionLocale, loadGame (#12),
-// resetGame (#20), getRanking, setDisplayName, setPerpCoordinates (#13).
+// resetGame (#20), getRanking, setDisplayName, setPerpCoordinates (#13),
+//   getProvidedPerps, getPowerups (#14).
 // Remaining handlers are stubs that return a rejected Promise.
 
 import { getState, setState } from './boot.js';
 import { applyDelta } from './state.js';
 import { materialize } from './materializer.js';
 import { now as clockNow } from './clock.js';
-import defaultRuleset from '../data/ruleset_3.de.json' with { type: 'json' };
+import rulesetDe from '../data/ruleset_3.de.json' with { type: 'json' };
+import rulesetEn from '../data/ruleset_3.en.json' with { type: 'json' };
 
 // ---------------------------------------------------------------------------
 // Event emitter — injected by production boot (app.js); no-op in tests.
@@ -24,6 +26,70 @@ export function setEmitter(fn) {
 
 function _emit(ev, pl) {
   if (_emitter) _emitter(ev, pl);
+}
+
+// ---------------------------------------------------------------------------
+// Ruleset selection — locale-memoised, node-index helpers
+// ---------------------------------------------------------------------------
+
+var _cachedLocale = null;
+var _cachedRuleset = null;
+
+function _getRuleset() {
+  var state = getState();
+  var locale = (state && state.locale) || 'de';
+  if (locale !== _cachedLocale) {
+    _cachedLocale = locale;
+    _cachedRuleset = (locale === 'en') ? rulesetEn : rulesetDe;
+  }
+  return _cachedRuleset;
+}
+
+var _nodesByPathRef = null;
+var _nodesByPathCache = null;
+
+function _getNodesByPath(nodes) {
+  if (nodes === _nodesByPathRef) return _nodesByPathCache;
+  _nodesByPathRef = nodes;
+  var map = {};
+  for (var i = 0; i < nodes.length; i++) {
+    map[nodes[i].full_path] = nodes[i];
+  }
+  _nodesByPathCache = map;
+  return map;
+}
+
+var _ownedGestaltsRef = null;
+var _ownedGestaltsCache = null;
+
+function _getOwnedGestalts(nodes) {
+  if (nodes === _ownedGestaltsRef) return _ownedGestaltsCache;
+  _ownedGestaltsRef = nodes;
+  var set = {};
+  for (var i = 0; i < nodes.length; i++) {
+    var g = nodes[i].gestalt || _gestaltFrom(nodes[i].full_type);
+    if (g) set[g] = true;
+  }
+  _ownedGestaltsCache = set;
+  return set;
+}
+
+function _gestaltFrom(fullType) {
+  if (!fullType) return null;
+  var idx = fullType.indexOf(':');
+  return idx >= 0 ? fullType.slice(idx + 1) : null;
+}
+
+function _isProvidable(gestalt, ruleset, playerLevel, ownedGestalts) {
+  var def = ruleset.perps[gestalt];
+  if (!def) return false;
+  var td = def.type_data || {};
+  if ((td.required_level || 0) > playerLevel) return false;
+  var reqs = td.required_providers || [];
+  for (var i = 0; i < reqs.length; i++) {
+    if (!ownedGestalts[reqs[i]]) return false;
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +190,7 @@ export function resetGame(/* token */) {
 // ---------------------------------------------------------------------------
 
 function _buildLoadGameResponse(state, now) {
-  var ruleset = defaultRuleset;
+  var ruleset = _getRuleset();
 
   // type_registry: merged dict of all perp/token/powerup type definitions.
   // Keys are gestalt names (or hash keys for StoryPerps without a gestalt).
@@ -176,6 +242,71 @@ function _buildLoadGameResponse(state, now) {
     mission_goals: state.mission_goals || [],
     active_missions: state.active_missions || []
   };
+}
+
+/**
+ * getProvidedPerps(token, gnodePath) → Promise<{result: {buyable: string[]}}>
+ *
+ * Walks state.nodes by full_path, finds the node's gestalt in the ruleset,
+ * and returns the list of providable perp gestalts filtered by the player's
+ * current level and owned prerequisites.
+ */
+export function getProvidedPerps(_token, gnodePath) {
+  var state = getState();
+  var nodes = (state && state.nodes) || [];
+  var node = _getNodesByPath(nodes)[gnodePath];
+  if (!node) return Promise.resolve({ result: { error: 0 } });
+
+  var gestalt = node.gestalt || _gestaltFrom(node.full_type);
+  if (!gestalt) return Promise.resolve({ result: { error: 0 } });
+
+  var ruleset = _getRuleset();
+  var def = ruleset.perps[gestalt];
+  if (!def) return Promise.resolve({ result: { error: 0 } });
+
+  var provided = (def.type_data && def.type_data.provided_perps) || [];
+  var level = (state.game_values && state.game_values.xp_level) || 1;
+  var owned = _getOwnedGestalts(nodes);
+
+  var buyable = provided.filter(function (g) {
+    return _isProvidable(g, ruleset, level, owned);
+  });
+
+  return Promise.resolve({ result: { buyable: buyable } });
+}
+
+/**
+ * getPowerups(token, projectGestalt, version) → Promise<{result: PowerupDef[]}>
+ *
+ * Returns all powerup definitions available for projectGestalt by merging
+ * provided_ads / provided_upgrades / provided_teammembers from the ruleset with
+ * the global powerup type_data.  version is ignored (read-only rules query).
+ */
+export function getPowerups(_token, projectGestalt /*, version */) {
+  var ruleset = _getRuleset();
+  var def = ruleset.perps[projectGestalt];
+  if (!def) return Promise.resolve({ result: [] });
+
+  var td = def.type_data || {};
+  var entries = [].concat(
+    td.provided_ads || [],
+    td.provided_upgrades || [],
+    td.provided_teammembers || []
+  );
+
+  var result = [];
+  for (var i = 0; i < entries.length; i++) {
+    var entry = entries[i];
+    var puDef = ruleset.powerups[entry.gestalt];
+    if (!puDef) continue;
+    result.push({
+      game_gestalt: entry.gestalt,
+      game_type: puDef.game_type,
+      type_data: Object.assign({ gestalt: entry.gestalt }, puDef.type_data, entry)
+    });
+  }
+
+  return Promise.resolve({ result: result });
 }
 
 // ---------------------------------------------------------------------------
@@ -317,7 +448,7 @@ export function setPerpCoordinates(/* token, */ _, updates) {
 // ---------------------------------------------------------------------------
 var _STUBS = [
   'buyPowerup', 'chargePerp', 'collectPerp', 'integrateCollected',
-  'getPowerups', 'getProvidedPerps', 'buyKarma', 'buyPerp', 'buySlots',
+  'buyKarma', 'buyPerp', 'buySlots',
   'sellPowerup', 'checkUsername'
 ];
 
@@ -341,6 +472,8 @@ var LocalEngine = Object.assign({
   resetGame: resetGame,
   setDisplayName: setDisplayName,
   setPerpCoordinates: setPerpCoordinates,
+  getProvidedPerps: getProvidedPerps,
+  getPowerups: getPowerups,
   setEmitter: setEmitter
 }, _stubHandlers);
 
