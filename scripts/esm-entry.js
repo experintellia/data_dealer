@@ -8,3 +8,5 @@ export { default as webxdcIdentity } from './webxdc-identity.js';
 export const __placeholder = true;
 export * as state from './state.js';
 export { materialize } from './materializer.js';
+export * as clock from './clock.js';
+import './devtools.js';

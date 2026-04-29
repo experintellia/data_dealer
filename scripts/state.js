@@ -6,6 +6,7 @@
 // docs/handler-map.md. Wave 3 issues (#12–#21) fill in the reducer stubs.
 
 import defaultGameData from '../data/default_game.json';
+import { now as clockNow } from './clock.js';
 
 export var SCHEMA_VERSION = 1;
 
@@ -149,8 +150,9 @@ export function applyDelta(state, delta) {
     return state;
   }
 
-  // Guard 4: monotonic clock — wrong system clock never rewinds progress
-  var now = Math.max(Date.now(), state.last_seen_ts);
+  // Guard 4: monotonic clock — wrong system clock (or stale test override)
+  // never rewinds stored progress; clockNow() is injectable from clock.js.
+  var now = Math.max(clockNow(), state.last_seen_ts);
   var next = Object.assign({}, state, { last_seen_ts: now });
 
   // Guard 5: dispatch
