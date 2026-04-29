@@ -6,3 +6,4 @@
 
 export const __placeholder = true;
 export * as state from './state.js';
+export { materialize } from './materializer.js';
