@@ -1,10 +1,8 @@
-/* webxdc dev shim — NOT loaded by index.html (mockWebxdc() Vite plugin handles
- * that now). Kept here as a starting point for a Node-compatible unit-test mock
- * (drop the localStorage calls, export window.webxdc as a module).
+/* Unit-test scaffold — NOT loaded by index.html.
+ * index.html uses the mockWebxdc() Vite plugin (@webxdc/vite-plugins) instead.
  *
- * If you need a plain-file fallback (no Vite), load this before require.js:
- * it no-ops when window.webxdc is already set, otherwise installs a
- * localStorage-backed polyfill.
+ * To turn this into a proper Node/vitest mock: drop the localStorage calls and
+ * export window.webxdc as a module so tests can import and reset it between runs.
  */
 (function () {
   'use strict';
