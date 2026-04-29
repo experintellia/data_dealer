@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   getToken, ping, getSessionLocale, loadGame, getRanking, resetGame, setEmitter,
-  setDisplayName, setPerpCoordinates
+  setDisplayName, setPerpCoordinates, buyKarma
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
@@ -252,6 +252,120 @@ describe('loadGame — replayed state', () => {
     const { result } = await loadGame('tok');
     expect(result.is_new_game).toBe(false);
     expect(result.nodes).toHaveLength(1);
+  });
+});
+
+// ── buyKarma ─────────────────────────────────────────────────────────────────
+
+// karma001: price=250, karma_points=5, required_level=5
+const KARMA_GESTALT = 'karma001';
+const KARMA_PRICE   = 250;
+const KARMA_POINTS  = 5;
+
+describe('buyKarma — happy path', () => {
+  beforeEach(() => {
+    setState(mkState({
+      game_values: {
+        xp_value: 1, xp_level: 1, cash_value: 1000, cash_spent: 0,
+        karma_value: 50, profiles_value: 0, profiles_max: 1,
+        ap_snapshot: 6, ap_update: null
+      }
+    }));
+  });
+
+  it('resolves to an object with a result property', async () => {
+    const data = await buyKarma('tok', KARMA_GESTALT);
+    expect(data).toHaveProperty('result');
+  });
+
+  it('result has game_values but no error', async () => {
+    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    expect(result.error).toBeUndefined();
+    expect(result.game_values).toBeDefined();
+  });
+
+  it('deducts the price from cash_value', async () => {
+    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    expect(result.game_values.cash_value).toBe(1000 - KARMA_PRICE);
+  });
+
+  it('adds the price to cash_spent', async () => {
+    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    expect(result.game_values.cash_spent).toBe(KARMA_PRICE);
+  });
+
+  it('increments karma_value by karma_points', async () => {
+    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    expect(result.game_values.karma_value).toBe(50 + KARMA_POINTS);
+  });
+
+  it('increments xp_value by karma_points', async () => {
+    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    expect(result.game_values.xp_value).toBe(1 + KARMA_POINTS);
+  });
+
+  it('does not include a missions field', async () => {
+    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    expect(result.missions).toBeUndefined();
+  });
+
+  it('persists game_values into state', async () => {
+    await buyKarma('tok', KARMA_GESTALT);
+    expect(getState().game_values.cash_value).toBe(1000 - KARMA_PRICE);
+    expect(getState().game_values.karma_value).toBe(50 + KARMA_POINTS);
+  });
+
+  it('clamps karma_value at 100 when already near the cap', async () => {
+    setState(mkState({
+      game_values: {
+        xp_value: 1, xp_level: 1, cash_value: 9999, cash_spent: 0,
+        karma_value: 98, profiles_value: 0, profiles_max: 1,
+        ap_snapshot: 6, ap_update: null
+      }
+    }));
+    // karma001 karma_points=5; 98+5=103 → clamped to 100
+    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    expect(result.game_values.karma_value).toBe(100);
+  });
+});
+
+describe('buyKarma — failure: insufficient cash', () => {
+  beforeEach(() => {
+    setState(mkState({
+      game_values: {
+        xp_value: 1, xp_level: 1, cash_value: 10, cash_spent: 0,
+        karma_value: 0, profiles_value: 0, profiles_max: 1,
+        ap_snapshot: 6, ap_update: null
+      }
+    }));
+  });
+
+  it('resolves with error when cash is below price', async () => {
+    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    expect(result.error).toBeDefined();
+  });
+
+  it('does not mutate state on cash failure', async () => {
+    const before = getState().game_values.cash_value;
+    await buyKarma('tok', KARMA_GESTALT);
+    expect(getState().game_values.cash_value).toBe(before);
+  });
+});
+
+describe('buyKarma — failure: unknown karmalauter', () => {
+  beforeEach(() => {
+    setState(mkState({
+      game_values: {
+        xp_value: 1, xp_level: 1, cash_value: 9999, cash_spent: 0,
+        karma_value: 0, profiles_value: 0, profiles_max: 1,
+        ap_snapshot: 6, ap_update: null
+      }
+    }));
+  });
+
+  it('resolves with error for an unknown gestalt', async () => {
+    const { result } = await buyKarma('tok', 'karma_does_not_exist');
+    expect(result.error).toBeDefined();
   });
 });
 

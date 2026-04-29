@@ -142,6 +142,14 @@ reducers.setPerpCoordinates = function setPerpCoordinatesReducer(state, delta) {
   return Object.assign({}, state, { nodes: nodes });
 };
 
+reducers.buyKarma = function buyKarmaReducer(state, delta) {
+  var gv = delta.result && delta.result.game_values;
+  if (!gv) return state;
+  return Object.assign({}, state, {
+    game_values: Object.assign({}, state.game_values, gv)
+  });
+};
+
 // Stubs — return state unchanged until Wave 4+ fills them in.
 OP_NAMES.forEach(function (op) {
   if (!reducers[op]) {
