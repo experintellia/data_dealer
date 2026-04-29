@@ -9,7 +9,6 @@
 // Remaining handlers are stubs that return a rejected Promise.
 
 import { getState, setState } from './boot.js';
-import { applyDelta } from './state.js';
 import { materialize } from './materializer.js';
 import { now as clockNow } from './clock.js';
 import rulesetDe from '../data/ruleset_3.de.json' with { type: 'json' };
@@ -485,21 +484,26 @@ export function buyKarma(_token, karmalauterGestalt) {
 // Purchase helpers — shared by buyPowerup / sellPowerup / buySlots
 // ---------------------------------------------------------------------------
 
-function _findNodeIndex(nodes, fullPath) {
-  for (var i = 0; i < nodes.length; i++) {
-    if (nodes[i].full_path === fullPath) return i;
+// Looks up a node by full_path and its ruleset type_data.  Returns
+// { state, nodeIdx, node, perpTypeData } or null when either is missing.
+function _resolveNode(perpPath) {
+  var state = getState();
+  var nodeIdx = -1;
+  for (var i = 0; i < state.nodes.length; i++) {
+    if (state.nodes[i].full_path === perpPath) { nodeIdx = i; break; }
   }
-  return -1;
-}
-
-function _gestaltFromNode(node) {
+  if (nodeIdx === -1) return null;
+  var node = state.nodes[nodeIdx];
   var ft = node.full_type || '';
-  var idx = ft.indexOf(':');
-  return idx >= 0 ? ft.slice(idx + 1) : (node.gestalt || '');
+  var colon = ft.indexOf(':');
+  var perpGestalt = colon >= 0 ? ft.slice(colon + 1) : (node.gestalt || '');
+  var perpTypeDef = defaultRuleset.perps[perpGestalt];
+  if (!perpTypeDef) return null;
+  return { state: state, nodeIdx: nodeIdx, node: node, perpTypeData: perpTypeDef.type_data };
 }
 
 // Searches provided_ads / provided_upgrades / provided_teammembers for a
-// powerup definition by gestalt.
+// powerup entry by gestalt.  O(P) where P = total provided entries.
 function _findPowerupDef(perpTypeData, powerupGestalt) {
   var lists = [
     perpTypeData.provided_ads,
@@ -517,16 +521,23 @@ function _findPowerupDef(perpTypeData, powerupGestalt) {
 
 // Recomputes charge_cost / collect_amount / collect_risk from the perp's
 // base type_data values plus the cumulative modifiers of all active powerups.
+// Pre-indexes provided_* lists into a map so the powerup loop is O(N) not O(N×P).
 function _computeModifiers(perpTypeData, powerups) {
+  var defByGestalt = {};
+  var provided = [perpTypeData.provided_ads, perpTypeData.provided_upgrades, perpTypeData.provided_teammembers];
+  for (var k = 0; k < provided.length; k++) {
+    var list = provided[k] || [];
+    for (var j = 0; j < list.length; j++) { defByGestalt[list[j].gestalt] = list[j]; }
+  }
   var chargeCost = perpTypeData.charge_cost || 0;
   var collectAmount = perpTypeData.collect_amount || 0;
   var collectRisk = perpTypeData.collect_risk || 0;
   for (var i = 0; i < powerups.length; i++) {
-    var puDef = _findPowerupDef(perpTypeData, powerups[i].gestalt);
+    var puDef = defByGestalt[powerups[i].gestalt];
     if (puDef) {
-      chargeCost     += puDef.charge_cost_modifier     || 0;
-      collectAmount  += puDef.collect_amount_modifier  || 0;
-      collectRisk    += puDef.collect_risk_modifier    || 0;
+      chargeCost    += puDef.charge_cost_modifier    || 0;
+      collectAmount += puDef.collect_amount_modifier || 0;
+      collectRisk   += puDef.collect_risk_modifier   || 0;
     }
   }
   return { charge_cost: chargeCost, collect_amount: collectAmount, collect_risk: collectRisk };
@@ -544,11 +555,9 @@ function _checkLevelup(currentLevel, newXp) {
   return _getLevelByXP(newXp) > currentLevel;
 }
 
-// Persists the state change:
-//   • In test / Node environments (no webxdc): apply delta directly via
-//     applyDelta and setState.
-//   • In production: webxdc.sendUpdate fires the registered setUpdateListener
-//     which calls applyDelta — do NOT also call setState to avoid double-apply.
+// webxdc.sendUpdate triggers setUpdateListener → applyDelta in boot.js, so we
+// must NOT also call setState — that would double-apply the change.
+// In Node/test environments there is no listener, so setState directly.
 function _persistDelta(computedNewState, addr, op, args, result) {
   var delta = {
     kind: 'delta',
@@ -578,27 +587,18 @@ function _persistDelta(computedNewState, addr, op, args, result) {
  * Returns: { node, game_values, levelup }
  */
 export function buyPowerup(token, perpPath, slot, gestalt) {
-  var state = getState();
-  var nodeIdx = _findNodeIndex(state.nodes, perpPath);
-  if (nodeIdx === -1) return Promise.resolve({ result: { error: 0 } });
+  var r = _resolveNode(perpPath);
+  if (!r) return Promise.resolve({ result: { error: 0 } });
+  var state = r.state, nodeIdx = r.nodeIdx, node = r.node, perpTypeData = r.perpTypeData;
 
-  var node = state.nodes[nodeIdx];
-  var perpGestalt = _gestaltFromNode(node);
-  var perpTypeDef = _getRuleset().perps[perpGestalt];
-  if (!perpTypeDef) return Promise.resolve({ result: { error: 0 } });
-
-  var perpTypeData = perpTypeDef.type_data;
   var puDef = _findPowerupDef(perpTypeData, gestalt);
   if (!puDef) return Promise.resolve({ result: { error: 0 } });
 
   var powerups = node.instance_data.powerups || [];
-
-  // Validate: slot must be empty
   for (var i = 0; i < powerups.length; i++) {
     if (powerups[i].slot === slot) return Promise.resolve({ result: { error: 1 } });
   }
 
-  // Validate: sufficient cash
   var price = puDef.price || 0;
   if (state.game_values.cash_value < price) return Promise.resolve({ result: { error: 3 } });
 
@@ -653,19 +653,11 @@ export function buyPowerup(token, perpPath, slot, gestalt) {
  * Returns: { node, game_values, levelup }
  */
 export function sellPowerup(token, perpPath, slot, gestalt) {
-  var state = getState();
-  var nodeIdx = _findNodeIndex(state.nodes, perpPath);
-  if (nodeIdx === -1) return Promise.resolve({ result: { error: 0 } });
+  var r = _resolveNode(perpPath);
+  if (!r) return Promise.resolve({ result: { error: 0 } });
+  var state = r.state, nodeIdx = r.nodeIdx, node = r.node, perpTypeData = r.perpTypeData;
 
-  var node = state.nodes[nodeIdx];
-  var perpGestalt = _gestaltFromNode(node);
-  var perpTypeDef = _getRuleset().perps[perpGestalt];
-  if (!perpTypeDef) return Promise.resolve({ result: { error: 0 } });
-
-  var perpTypeData = perpTypeDef.type_data;
   var powerups = node.instance_data.powerups || [];
-
-  // Validate: slot must be occupied
   var puEntry = null;
   for (var i = 0; i < powerups.length; i++) {
     if (powerups[i].slot === slot) { puEntry = powerups[i]; break; }
@@ -691,7 +683,7 @@ export function sellPowerup(token, perpPath, slot, gestalt) {
   var levelup = _checkLevelup(state.game_values.xp_level, newXp);
 
   var newGameValues = Object.assign({}, state.game_values, {
-    cash_value: (state.game_values.cash_value || 0) + refund,
+    cash_value: state.game_values.cash_value + refund,
     xp_value:   newXp
   });
   if (levelup) newGameValues.xp_level = _getLevelByXP(newXp);
@@ -726,16 +718,9 @@ export function sellPowerup(token, perpPath, slot, gestalt) {
  * Returns: { node, game_values, levelup }
  */
 export function buySlots(token, perpPath, slotType, num) {
-  var state = getState();
-  var nodeIdx = _findNodeIndex(state.nodes, perpPath);
-  if (nodeIdx === -1) return Promise.resolve({ result: { error: 0 } });
-
-  var node = state.nodes[nodeIdx];
-  var perpGestalt = _gestaltFromNode(node);
-  var perpTypeDef = _getRuleset().perps[perpGestalt];
-  if (!perpTypeDef) return Promise.resolve({ result: { error: 0 } });
-
-  var perpTypeData = perpTypeDef.type_data;
+  var r = _resolveNode(perpPath);
+  if (!r) return Promise.resolve({ result: { error: 0 } });
+  var state = r.state, nodeIdx = r.nodeIdx, node = r.node, perpTypeData = r.perpTypeData;
   var slotKey = slotType + '_slots';
   var maxKey  = 'max_' + slotType + '_slots';
 
