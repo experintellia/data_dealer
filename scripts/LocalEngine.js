@@ -4,7 +4,8 @@
 //
 // Handlers implemented here: getToken, ping, getSessionLocale, loadGame (#12),
 // resetGame (#20), getRanking, setDisplayName, setPerpCoordinates (#13),
-//   getProvidedPerps, getPowerups (#14), buyKarma (#19).
+//   getProvidedPerps, getPowerups (#14), buyKarma (#19),
+//   buyPowerup, sellPowerup, buySlots (#18).
 // Remaining handlers are stubs that return a rejected Promise.
 
 import { getState, setState } from './boot.js';
@@ -481,11 +482,315 @@ export function buyKarma(_token, karmalauterGestalt) {
 }
 
 // ---------------------------------------------------------------------------
+// Purchase helpers — shared by buyPowerup / sellPowerup / buySlots
+// ---------------------------------------------------------------------------
+
+function _findNodeIndex(nodes, fullPath) {
+  for (var i = 0; i < nodes.length; i++) {
+    if (nodes[i].full_path === fullPath) return i;
+  }
+  return -1;
+}
+
+function _gestaltFromNode(node) {
+  var ft = node.full_type || '';
+  var idx = ft.indexOf(':');
+  return idx >= 0 ? ft.slice(idx + 1) : (node.gestalt || '');
+}
+
+// Searches provided_ads / provided_upgrades / provided_teammembers for a
+// powerup definition by gestalt.
+function _findPowerupDef(perpTypeData, powerupGestalt) {
+  var lists = [
+    perpTypeData.provided_ads,
+    perpTypeData.provided_upgrades,
+    perpTypeData.provided_teammembers
+  ];
+  for (var i = 0; i < lists.length; i++) {
+    var list = lists[i] || [];
+    for (var j = 0; j < list.length; j++) {
+      if (list[j].gestalt === powerupGestalt) return list[j];
+    }
+  }
+  return null;
+}
+
+// Recomputes charge_cost / collect_amount / collect_risk from the perp's
+// base type_data values plus the cumulative modifiers of all active powerups.
+function _computeModifiers(perpTypeData, powerups) {
+  var chargeCost = perpTypeData.charge_cost || 0;
+  var collectAmount = perpTypeData.collect_amount || 0;
+  var collectRisk = perpTypeData.collect_risk || 0;
+  for (var i = 0; i < powerups.length; i++) {
+    var puDef = _findPowerupDef(perpTypeData, powerups[i].gestalt);
+    if (puDef) {
+      chargeCost     += puDef.charge_cost_modifier     || 0;
+      collectAmount  += puDef.collect_amount_modifier  || 0;
+      collectRisk    += puDef.collect_risk_modifier    || 0;
+    }
+  }
+  return { charge_cost: chargeCost, collect_amount: collectAmount, collect_risk: collectRisk };
+}
+
+function _getLevelByXP(xp) {
+  var levels = _getRuleset().levels;
+  for (var i = 0; i < levels.length; i++) {
+    if (xp >= levels[i].xp_min && xp <= levels[i].xp_max) return levels[i].number;
+  }
+  return levels[levels.length - 1].number;
+}
+
+function _checkLevelup(currentLevel, newXp) {
+  return _getLevelByXP(newXp) > currentLevel;
+}
+
+// Persists the state change:
+//   • In test / Node environments (no webxdc): apply delta directly via
+//     applyDelta and setState.
+//   • In production: webxdc.sendUpdate fires the registered setUpdateListener
+//     which calls applyDelta — do NOT also call setState to avoid double-apply.
+function _persistDelta(computedNewState, addr, op, args, result) {
+  var delta = {
+    kind: 'delta',
+    addr: addr,
+    op: op,
+    args: args,
+    result: result,
+    ts: clockNow()
+  };
+  // eslint-disable-next-line no-undef
+  if (typeof webxdc !== 'undefined') {
+    webxdc.sendUpdate({ payload: delta }, '');  // eslint-disable-line no-undef
+  } else {
+    setState(computedNewState);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// buyPowerup(token, perpPath, slot, gestalt)
+// ---------------------------------------------------------------------------
+
+/**
+ * buyPowerup — push a powerup into a slot on a project node.
+ *
+ * Validates: cash >= powerup price AND slot is empty.
+ * Errors: 0 = node/type not found, 1 = slot occupied, 3 = insufficient cash.
+ * Returns: { node, game_values, levelup }
+ */
+export function buyPowerup(token, perpPath, slot, gestalt) {
+  var state = getState();
+  var nodeIdx = _findNodeIndex(state.nodes, perpPath);
+  if (nodeIdx === -1) return Promise.resolve({ result: { error: 0 } });
+
+  var node = state.nodes[nodeIdx];
+  var perpGestalt = _gestaltFromNode(node);
+  var perpTypeDef = _getRuleset().perps[perpGestalt];
+  if (!perpTypeDef) return Promise.resolve({ result: { error: 0 } });
+
+  var perpTypeData = perpTypeDef.type_data;
+  var puDef = _findPowerupDef(perpTypeData, gestalt);
+  if (!puDef) return Promise.resolve({ result: { error: 0 } });
+
+  var powerups = node.instance_data.powerups || [];
+
+  // Validate: slot must be empty
+  for (var i = 0; i < powerups.length; i++) {
+    if (powerups[i].slot === slot) return Promise.resolve({ result: { error: 1 } });
+  }
+
+  // Validate: sufficient cash
+  var price = puDef.price || 0;
+  if (state.game_values.cash_value < price) return Promise.resolve({ result: { error: 3 } });
+
+  var newPowerups = powerups.concat([{ slot: slot, gestalt: gestalt, full_type: puDef.full_type }]);
+  var mods = _computeModifiers(perpTypeData, newPowerups);
+
+  var newInstanceData = Object.assign({}, node.instance_data, {
+    powerups:       newPowerups,
+    charge_cost:    mods.charge_cost,
+    collect_amount: mods.collect_amount,
+    collect_risk:   mods.collect_risk,
+    tokens:         perpTypeData.tokens || []
+  });
+
+  var newXp = state.game_values.xp_value + (perpTypeData.xp_inc || 1);
+  var levelup = _checkLevelup(state.game_values.xp_level, newXp);
+
+  var newGameValues = Object.assign({}, state.game_values, {
+    cash_value:  state.game_values.cash_value - price,
+    cash_spent:  (state.game_values.cash_spent  || 0) + price,
+    xp_value:    newXp,
+    karma_value: (state.game_values.karma_value || 0) + 1
+  });
+  if (levelup) newGameValues.xp_level = _getLevelByXP(newXp);
+
+  var newNodes = state.nodes.slice();
+  newNodes[nodeIdx] = Object.assign({}, node, { instance_data: newInstanceData });
+
+  var newState = Object.assign({}, state, { nodes: newNodes, game_values: newGameValues });
+
+  var responseNode = {
+    game_id: node.game_id, game_type: node.game_type,
+    full_path: node.full_path, instance_data: newInstanceData
+  };
+  var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
+
+  _persistDelta(newState, state.addr, 'buyPowerup',
+    [token, perpPath, slot, gestalt], result);
+
+  return Promise.resolve({ result: result });
+}
+
+// ---------------------------------------------------------------------------
+// sellPowerup(token, perpPath, slot, gestalt)
+// ---------------------------------------------------------------------------
+
+/**
+ * sellPowerup — remove a powerup from a slot, refunding 0.75× the price.
+ *
+ * Validates: slot is occupied.
+ * Errors: 0 = node/type not found, 1 = slot not occupied.
+ * Returns: { node, game_values, levelup }
+ */
+export function sellPowerup(token, perpPath, slot, gestalt) {
+  var state = getState();
+  var nodeIdx = _findNodeIndex(state.nodes, perpPath);
+  if (nodeIdx === -1) return Promise.resolve({ result: { error: 0 } });
+
+  var node = state.nodes[nodeIdx];
+  var perpGestalt = _gestaltFromNode(node);
+  var perpTypeDef = _getRuleset().perps[perpGestalt];
+  if (!perpTypeDef) return Promise.resolve({ result: { error: 0 } });
+
+  var perpTypeData = perpTypeDef.type_data;
+  var powerups = node.instance_data.powerups || [];
+
+  // Validate: slot must be occupied
+  var puEntry = null;
+  for (var i = 0; i < powerups.length; i++) {
+    if (powerups[i].slot === slot) { puEntry = powerups[i]; break; }
+  }
+  if (!puEntry) return Promise.resolve({ result: { error: 1 } });
+
+  var puDef = _findPowerupDef(perpTypeData, puEntry.gestalt);
+  var price = puDef ? (puDef.price || 0) : 0;
+  var refund = Math.floor(price * 0.75);
+
+  var newPowerups = powerups.filter(function (p) { return p.slot !== slot; });
+  var mods = _computeModifiers(perpTypeData, newPowerups);
+
+  var newInstanceData = Object.assign({}, node.instance_data, {
+    powerups:       newPowerups,
+    charge_cost:    mods.charge_cost,
+    collect_amount: mods.collect_amount,
+    collect_risk:   mods.collect_risk,
+    tokens:         perpTypeData.tokens || []
+  });
+
+  var newXp = state.game_values.xp_value + 1;
+  var levelup = _checkLevelup(state.game_values.xp_level, newXp);
+
+  var newGameValues = Object.assign({}, state.game_values, {
+    cash_value: (state.game_values.cash_value || 0) + refund,
+    xp_value:   newXp
+  });
+  if (levelup) newGameValues.xp_level = _getLevelByXP(newXp);
+
+  var newNodes = state.nodes.slice();
+  newNodes[nodeIdx] = Object.assign({}, node, { instance_data: newInstanceData });
+
+  var newState = Object.assign({}, state, { nodes: newNodes, game_values: newGameValues });
+
+  var responseNode = {
+    game_id: node.game_id, game_type: node.game_type,
+    full_path: node.full_path, instance_data: newInstanceData
+  };
+  var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
+
+  _persistDelta(newState, state.addr, 'sellPowerup',
+    [token, perpPath, slot, gestalt], result);
+
+  return Promise.resolve({ result: result });
+}
+
+// ---------------------------------------------------------------------------
+// buySlots(token, perpPath, slot_type, num)
+// ---------------------------------------------------------------------------
+
+/**
+ * buySlots — purchase additional powerup/ad/upgrade/teammember slots.
+ *
+ * Validates: cash >= total slot cost.
+ * Cost per slot: slot_cost + slot_cost_modifier * (current_slots + i).
+ * Errors: 0 = node/type not found, 2 = would exceed max slots, 3 = no cash.
+ * Returns: { node, game_values, levelup }
+ */
+export function buySlots(token, perpPath, slotType, num) {
+  var state = getState();
+  var nodeIdx = _findNodeIndex(state.nodes, perpPath);
+  if (nodeIdx === -1) return Promise.resolve({ result: { error: 0 } });
+
+  var node = state.nodes[nodeIdx];
+  var perpGestalt = _gestaltFromNode(node);
+  var perpTypeDef = _getRuleset().perps[perpGestalt];
+  if (!perpTypeDef) return Promise.resolve({ result: { error: 0 } });
+
+  var perpTypeData = perpTypeDef.type_data;
+  var slotKey = slotType + '_slots';
+  var maxKey  = 'max_' + slotType + '_slots';
+
+  var currentSlots = (node.instance_data[slotKey] !== undefined)
+    ? node.instance_data[slotKey]
+    : (perpTypeData[slotKey] || 0);
+  var maxSlots = perpTypeData[maxKey] != null ? perpTypeData[maxKey] : Infinity;
+
+  if (currentSlots + num > maxSlots) return Promise.resolve({ result: { error: 2 } });
+
+  var slotCost = perpTypeData.slot_cost || 0;
+  var slotCostModifier = perpTypeData.slot_cost_modifier || 0;
+  var totalCost = 0;
+  for (var i = 0; i < num; i++) {
+    totalCost += slotCost + slotCostModifier * (currentSlots + i);
+  }
+
+  if (state.game_values.cash_value < totalCost) return Promise.resolve({ result: { error: 3 } });
+
+  var newInstanceData = Object.assign({}, node.instance_data);
+  newInstanceData[slotKey] = currentSlots + num;
+
+  var newXp = state.game_values.xp_value + 1;
+  var levelup = _checkLevelup(state.game_values.xp_level, newXp);
+
+  var newGameValues = Object.assign({}, state.game_values, {
+    cash_value: state.game_values.cash_value - totalCost,
+    cash_spent: (state.game_values.cash_spent || 0) + totalCost,
+    xp_value:   newXp
+  });
+  if (levelup) newGameValues.xp_level = _getLevelByXP(newXp);
+
+  var newNodes = state.nodes.slice();
+  newNodes[nodeIdx] = Object.assign({}, node, { instance_data: newInstanceData });
+
+  var newState = Object.assign({}, state, { nodes: newNodes, game_values: newGameValues });
+
+  var responseNode = {
+    game_id: node.game_id, game_type: node.game_type,
+    full_path: node.full_path, instance_data: newInstanceData
+  };
+  var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
+
+  _persistDelta(newState, state.addr, 'buySlots',
+    [token, perpPath, slotType, num], result);
+
+  return Promise.resolve({ result: result });
+}
+
+// ---------------------------------------------------------------------------
 // Stub handlers — Wave 4+ issues fill these in.
 // ---------------------------------------------------------------------------
 var _STUBS = [
-  'buyPowerup', 'chargePerp', 'collectPerp', 'integrateCollected',
-  'buyPerp', 'buySlots', 'sellPowerup', 'checkUsername'
+  'chargePerp', 'collectPerp', 'integrateCollected',
+  'buyPerp', 'checkUsername'
 ];
 
 var _stubHandlers = {};
@@ -500,18 +805,21 @@ _STUBS.forEach(function (name) {
 // Includes setEmitter so app.js can wire the DOM event bus after jQuery loads.
 // ---------------------------------------------------------------------------
 var LocalEngine = Object.assign({
-  getToken: getToken,
-  ping: ping,
-  getSessionLocale: getSessionLocale,
-  loadGame: loadGame,
-  getRanking: getRanking,
-  resetGame: resetGame,
-  setDisplayName: setDisplayName,
+  getToken:          getToken,
+  ping:              ping,
+  getSessionLocale:  getSessionLocale,
+  loadGame:          loadGame,
+  getRanking:        getRanking,
+  resetGame:         resetGame,
+  setDisplayName:    setDisplayName,
   setPerpCoordinates: setPerpCoordinates,
-  getProvidedPerps: getProvidedPerps,
-  getPowerups: getPowerups,
-  buyKarma: buyKarma,
-  setEmitter: setEmitter
+  getProvidedPerps:  getProvidedPerps,
+  getPowerups:       getPowerups,
+  buyKarma:          buyKarma,
+  buyPowerup:        buyPowerup,
+  sellPowerup:       sellPowerup,
+  buySlots:          buySlots,
+  setEmitter:        setEmitter
 }, _stubHandlers);
 
 export default LocalEngine;
