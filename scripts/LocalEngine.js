@@ -4,7 +4,7 @@
 //
 // Handlers implemented here: getToken, ping, getSessionLocale, loadGame (#12),
 // resetGame (#20), getRanking, setDisplayName, setPerpCoordinates (#13),
-//   getProvidedPerps, getPowerups (#14).
+//   getProvidedPerps, getPowerups (#14), buyKarma (#19).
 // Remaining handlers are stubs that return a rejected Promise.
 
 import { getState, setState } from './boot.js';
@@ -412,12 +412,80 @@ export function setPerpCoordinates(/* token, */ _, updates) {
 }
 
 // ---------------------------------------------------------------------------
+// buyKarma handler
+// ---------------------------------------------------------------------------
+
+// Returns the matching level entry (or the last level for XP beyond the cap).
+function _findLevelByXP(levels, xp) {
+  for (var i = 0; i < levels.length; i++) {
+    if (xp >= levels[i].xp_min && xp <= levels[i].xp_max) {
+      return levels[i];
+    }
+  }
+  return levels[levels.length - 1];
+}
+
+/**
+ * buyKarma(token, karmalauterGestalt) → Promise<{result}>
+ *
+ * Looks up the karmalauter in the ruleset, validates cash, applies increments,
+ * and returns {game_values, [levelup]}.  No missions payload (handler-map.md).
+ */
+export function buyKarma(_token, karmalauterGestalt) {
+  var state = getState();
+  var ruleset = _getRuleset();
+
+  var karmalauter = null;
+  for (var i = 0; i < ruleset.karmalauters.length; i++) {
+    if (ruleset.karmalauters[i].type_data.gestalt === karmalauterGestalt) {
+      karmalauter = ruleset.karmalauters[i];
+      break;
+    }
+  }
+  if (!karmalauter) {
+    return Promise.resolve({ result: { error: 1 } });
+  }
+
+  var td = karmalauter.type_data;
+  var gv = state.game_values;
+
+  if (gv.cash_value < td.price) {
+    return Promise.resolve({ result: { error: 2 } });
+  }
+
+  var newXp = (gv.xp_value || 0) + td.karma_points;
+  var newKarma = Math.min(100, Math.max(-100, (gv.karma_value || 0) + td.karma_points));
+  var newCash = gv.cash_value - td.price;
+  var newCashSpent = (gv.cash_spent || 0) + td.price;
+
+  var oldLevelNum = gv.xp_level || 1;
+  var newLevel = _findLevelByXP(ruleset.levels, newXp);
+  var levelup = newLevel.number > oldLevelNum;
+
+  var newGv = Object.assign({}, gv, {
+    xp_value: newXp,
+    karma_value: newKarma,
+    cash_value: newCash,
+    cash_spent: newCashSpent,
+    xp_level: newLevel.number
+  });
+
+  if (levelup) newGv.ap_snapshot = newLevel.ap_max;
+
+  setState(Object.assign({}, state, { game_values: newGv }));
+  _sendDelta(state.addr, 'buyKarma', [karmalauterGestalt], { game_values: newGv });
+
+  var response = { game_values: newGv };
+  if (levelup) response.levelup = true;
+  return Promise.resolve({ result: response });
+}
+
+// ---------------------------------------------------------------------------
 // Stub handlers — Wave 4+ issues fill these in.
 // ---------------------------------------------------------------------------
 var _STUBS = [
   'buyPowerup', 'chargePerp', 'collectPerp', 'integrateCollected',
-  'buyKarma', 'buyPerp', 'buySlots',
-  'sellPowerup', 'checkUsername'
+  'buyPerp', 'buySlots', 'sellPowerup', 'checkUsername'
 ];
 
 var _stubHandlers = {};
@@ -442,6 +510,7 @@ var LocalEngine = Object.assign({
   setPerpCoordinates: setPerpCoordinates,
   getProvidedPerps: getProvidedPerps,
   getPowerups: getPowerups,
+  buyKarma: buyKarma,
   setEmitter: setEmitter
 }, _stubHandlers);
 
