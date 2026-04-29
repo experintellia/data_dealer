@@ -772,11 +772,281 @@ export function buySlots(token, perpPath, slotType, num) {
 }
 
 // ---------------------------------------------------------------------------
+// buyPerp — first non-trivial purchase handler (#15)
+// ---------------------------------------------------------------------------
+
+/**
+ * buyPerp(token, parentPath, gestalt) → Promise<{result: BuyPerpResult}>
+ *
+ * Port of dd_app views.py:1001.  Single-tenant — no concurrent-writer guards.
+ *
+ * Error codes (mirrors original):
+ *   1 — gestalt unknown / level too low / parent slot list excludes gestalt / dup
+ *   2 — insufficient cash
+ *   3 — ProxyPerp slot limit reached
+ *   4 — already purchased under this parent
+ */
+export function buyPerp(_token, parentPath, gestalt) {
+  var state = getState();
+  var ruleset = _getRuleset();
+
+  // ── 1. Look up perp definition ──────────────────────────────────────────
+  var allTypes = Object.assign({}, ruleset.perps, ruleset.tokens);
+  var perpDef = allTypes[gestalt];
+  if (!perpDef) {
+    return Promise.resolve({ result: { error: 1 } });
+  }
+  var typeData = perpDef.type_data || {};
+  var gameType = perpDef.game_type;
+
+  // ── 2. Level requirement ────────────────────────────────────────────────
+  var gv = state.game_values || {};
+  var currentLevel = gv.xp_level || 1;
+  var requiredLevel = typeData.required_level != null ? typeData.required_level : 1;
+  if (currentLevel < requiredLevel) {
+    return Promise.resolve({ result: { error: 1 } });
+  }
+
+  // ── 3. Parent resolution ────────────────────────────────────────────────
+  // Roots ("Imperium", "Database") are always valid.  Other paths are checked
+  // against state.nodes; if not found we still allow the call (single-tenant,
+  // client already guards this) so that pre-loaded seed nodes don't block buys.
+  var parentNode = null;
+  if (parentPath !== 'Imperium' && parentPath !== 'Database') {
+    var nodes = state.nodes || [];
+    for (var ni = 0; ni < nodes.length; ni++) {
+      if (nodes[ni].full_path === parentPath) { parentNode = nodes[ni]; break; }
+    }
+  }
+
+  // ── 4. provided_perps slot list ─────────────────────────────────────────
+  // Only validate when we can resolve the parent's type definition.
+  var parentGestalt = parentNode ? (parentNode.gestalt || '') : '';
+  var parentTypeDef = parentGestalt ? allTypes[parentGestalt] : null;
+  var parentTypeData = parentTypeDef ? (parentTypeDef.type_data || {}) : null;
+
+  if (parentTypeData && Array.isArray(parentTypeData.provided_perps)) {
+    if (parentTypeData.provided_perps.indexOf(gestalt) === -1) {
+      return Promise.resolve({ result: { error: 1 } });
+    }
+  }
+
+  // ── 5. ProxyPerp max_slots check (error 3) ─────────────────────────────
+  if (parentNode && parentNode.game_type === 'ProxyPerp') {
+    var maxSlots = (parentTypeData && parentTypeData.max_slots) || 0;
+    var childPrefix = parentPath + '.';
+    var childCount = 0;
+    var allNodes = state.nodes || [];
+    for (var ci = 0; ci < allNodes.length; ci++) {
+      if (allNodes[ci].full_path.indexOf(childPrefix) === 0) { childCount++; }
+    }
+    if (childCount >= maxSlots) {
+      return Promise.resolve({ result: { error: 3 } });
+    }
+  }
+
+  // ── 6. Cash check (error 2) ─────────────────────────────────────────────
+  var price = typeof typeData.price === 'number' ? typeData.price : 0;
+  if (gv.cash_value < price) {
+    return Promise.resolve({ result: { error: 2 } });
+  }
+
+  // ── 7. Duplicate check (error 4) ────────────────────────────────────────
+  var newFullPath = parentPath + '.' + gestalt;
+  var stateNodes = state.nodes || [];
+  for (var di = 0; di < stateNodes.length; di++) {
+    if (stateNodes[di].full_path === newFullPath) {
+      return Promise.resolve({ result: { error: 4 } });
+    }
+  }
+
+  // ── 8. Generate game_id (monotonic counter, deterministic for tests) ────
+  var nodeCounter = (state.node_counter || 0) + 1;
+  var gameId = 'node_' + nodeCounter;
+
+  // ── 9. Build new node ───────────────────────────────────────────────────
+  var newNode = {
+    game_id: gameId,
+    game_type: gameType,
+    full_type: gameType + ':' + gestalt,
+    gestalt: gestalt,
+    full_path: newFullPath,
+    instance_data: {}
+  };
+
+  // ── 10. Economy mutations ───────────────────────────────────────────────
+  var xpInc = typeof typeData.xp_inc === 'number' ? typeData.xp_inc : 0;
+  var profilesMaxInc = typeof typeData.profiles_max === 'number' ? typeData.profiles_max : 0;
+
+  var newGv = Object.assign({}, gv, {
+    cash_value: gv.cash_value - price,
+    cash_spent: (gv.cash_spent || 0) + price,
+    xp_value: (gv.xp_value || 0) + xpInc,
+    profiles_max: (gv.profiles_max || 0) + profilesMaxInc
+  });
+
+  // ── 11. Level-up check ──────────────────────────────────────────────────
+  var oldLevel = gv.xp_level || 1;
+  var newLevel = _getLevelByXP(newGv.xp_value);
+  var levelup = newLevel > oldLevel;
+  if (levelup) {
+    newGv = Object.assign({}, newGv, { xp_level: newLevel });
+    var levelInfo = ruleset.levels[newLevel - 1];
+    if (levelInfo) {
+      newGv = Object.assign({}, newGv, {
+        ap_inc_value: levelInfo.ap_inc_value,
+        ap_inc_interval: levelInfo.ap_inc_interval,
+        ap_max: levelInfo.ap_max
+      });
+    }
+  }
+
+  // ── 12. Mission progress (buy_perp workflow goals) ──────────────────────
+  var missionResult = _advanceBuyPerpMissions(state, gestalt);
+
+  // ── 13. profile_set for project*/contact*/city* gestalts ────────────────
+  // db_queue entry + response field, per issue #15 / response-shapes.md §buyPerp
+  var profileSetPayload = null;
+  var newDbQueue = (state.db_queue || []).slice();
+  var isProfileGestalt = (
+    gestalt.indexOf('project') === 0 ||
+    gestalt.indexOf('contact') === 0 ||
+    gestalt.indexOf('city') === 0
+  );
+  if (isProfileGestalt) {
+    var collectId = 'cq_' + nodeCounter;
+    var tokensMap = {};
+    var tokList = typeData.tokens || [];
+    for (var ti = 0; ti < tokList.length; ti++) {
+      tokensMap[tokList[ti].gestalt] = { amount: tokList[ti].amount };
+    }
+    var profilesValue = typeof typeData.profileset_size === 'number'
+      ? typeData.profileset_size
+      : (typeof typeData.collect_amount === 'number' ? typeData.collect_amount : 0);
+
+    var generatedProfileSet = { profiles_value: profilesValue, tokens_map: tokensMap };
+    profileSetPayload = {
+      profile_set: generatedProfileSet,
+      origin: newFullPath,
+      collect_id: collectId
+    };
+    newDbQueue = newDbQueue.concat([{
+      origin: newFullPath,
+      collect_id: collectId,
+      profile_set: generatedProfileSet
+    }]);
+  }
+
+  // ── 14. Persist new state ───────────────────────────────────────────────
+  var updatedNodes = (state.nodes || []).concat([newNode]);
+  var finalMissionGoals = missionResult.mission_goals || state.mission_goals;
+  var finalActiveMissions = missionResult.active_missions || state.active_missions;
+
+  var missionPayload = missionResult.missions || null;
+
+  var newState = Object.assign({}, state, {
+    nodes: updatedNodes,
+    db_queue: newDbQueue,
+    game_values: newGv,
+    mission_goals: finalMissionGoals,
+    active_missions: finalActiveMissions,
+    node_counter: nodeCounter
+  });
+  setState(newState);
+
+  // ── 15. Emit delta (replayed by state.js buyPerp reducer on cold start) ─
+  var now = clockNow();
+  var deltaResult = {
+    node: newNode,
+    game_values: newGv,
+    levelup: levelup,
+    missions: missionPayload
+  };
+  if (profileSetPayload) { deltaResult.profile_set = profileSetPayload; }
+
+  var delta = {
+    kind: 'delta',
+    addr: state.addr,
+    op: 'buyPerp',
+    args: [parentPath, gestalt],
+    result: deltaResult,
+    ts: now
+  };
+
+  // eslint-disable-next-line no-undef
+  if (typeof webxdc !== 'undefined') { webxdc.sendUpdate({ payload: delta }, ''); }
+
+  // ── 16. Return response ─────────────────────────────────────────────────
+  var response = {
+    node: newNode,
+    game_values: newGv,
+    levelup: levelup,
+    missions: missionPayload
+  };
+  if (profileSetPayload) { response.profile_set = profileSetPayload; }
+
+  return Promise.resolve({ result: response });
+}
+
+/**
+ * Advance any active mission goals that have workflow==='buy_perp' and
+ * target===gestalt.  Pure; does not mutate state.
+ */
+function _advanceBuyPerpMissions(state, gestalt) {
+  var activeMissions = state.active_missions || [];
+  var missionGoals = state.mission_goals || [];
+
+  if (!activeMissions.length || !missionGoals.length) {
+    return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
+  }
+
+  var changed = false;
+  var updatedGoals = missionGoals.map(function (goal) {
+    if (goal.workflow === 'buy_perp' && goal.target === gestalt && !goal.complete) {
+      changed = true;
+      return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
+    }
+    return goal;
+  });
+
+  if (!changed) {
+    return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
+  }
+
+  var updatedMissionIds = [];
+  var completedMissionIds = [];
+  activeMissions.forEach(function (mGestalt) {
+    var goals = updatedGoals.filter(function (g) { return g.mission === mGestalt; });
+    if (!goals.length) { return; }
+    updatedMissionIds.push(mGestalt);
+    if (goals.every(function (g) { return g.complete; })) {
+      completedMissionIds.push(mGestalt);
+    }
+  });
+
+  var newActiveMissions = activeMissions.filter(function (m) {
+    return completedMissionIds.indexOf(m) === -1;
+  });
+
+  return {
+    missions: {
+      complete_missions: completedMissionIds,
+      updated_missions: updatedMissionIds,
+      mission_data: {
+        active_missions: newActiveMissions,
+        mission_goals: updatedGoals
+      }
+    },
+    mission_goals: updatedGoals,
+    active_missions: newActiveMissions
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Stub handlers — Wave 4+ issues fill these in.
 // ---------------------------------------------------------------------------
 var _STUBS = [
-  'chargePerp', 'collectPerp', 'integrateCollected',
-  'buyPerp', 'checkUsername'
+  'chargePerp', 'collectPerp', 'integrateCollected', 'checkUsername'
 ];
 
 var _stubHandlers = {};
@@ -805,6 +1075,7 @@ var LocalEngine = Object.assign({
   buyPowerup:        buyPowerup,
   sellPowerup:       sellPowerup,
   buySlots:          buySlots,
+  buyPerp:           buyPerp,
   setEmitter:        setEmitter
 }, _stubHandlers);
 

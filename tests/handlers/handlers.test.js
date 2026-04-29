@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   getToken, ping, getSessionLocale, loadGame, getRanking, resetGame, setEmitter,
   setDisplayName, setPerpCoordinates, buyKarma,
-  buyPowerup, sellPowerup, buySlots
+  buyPowerup, sellPowerup, buySlots, buyPerp
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
@@ -810,6 +810,190 @@ describe('sellPowerup — failure: slot empty', () => {
   });
 });
 
+// ── buyPerp ───────────────────────────────────────────────────────────────────
+//
+// Ruleset fixtures used:
+//   contact001 — ContactPerp, price 400, required_level 3, xp_inc 1
+//   city002    — CityPerp,    price 0,   required_level 1, profiles_max 2915918
+//   proxy001   — ProxyPerp,   price 100, required_level 2, max_slots 3
+//   project001 — ProjectPerp (inside proxy001), price 300, required_level 2, xp_inc 2
+//
+// Parent paths:
+//   "Imperium.agent001"  — fake resolved AgentPerp used for contact001 tests
+//   "Imperium"           — root, always valid
+// ---------------------------------------------------------------------------
+
+function mkBuyPerpState(overrides) {
+  // Level-3 player with ample cash; no nodes yet.
+  return Object.assign(freshState('buyer@local'), {
+    game_values: {
+      xp_value: 15, xp_level: 3,
+      cash_value: 10000, cash_spent: 0,
+      karma_value: 0, profiles_value: 0, profiles_max: 1,
+      ap_snapshot: 6, ap_update: null
+    }
+  }, overrides || {});
+}
+
+describe('buyPerp — happy path (contact gestalt)', () => {
+  beforeEach(() => setState(mkBuyPerpState()));
+
+  it('resolves to a result with node, game_values, levelup, missions', async () => {
+    // contact001 requires level 3, price 400; state has level 3 and 10000 cash.
+    // Parent is Imperium (root, always valid; contact001 not in Imperium provided_perps so
+    // provided_perps check is skipped when parent type cannot be resolved).
+    const data = await buyPerp('tok', 'Imperium', 'contact001');
+    expect(data.result).toBeDefined();
+    expect(data.result.error).toBeUndefined();
+    expect(data.result.node).toBeDefined();
+    expect(data.result.game_values).toBeDefined();
+    expect(typeof data.result.levelup).toBe('boolean');
+  });
+
+  it('node has the correct shape', async () => {
+    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    expect(result.node).toMatchObject({
+      game_id: expect.any(String),
+      game_type: 'ContactPerp',
+      full_type: 'ContactPerp:contact001',
+      gestalt: 'contact001',
+      full_path: 'Imperium.contact001',
+      instance_data: expect.any(Object)
+    });
+  });
+
+  it('deducts price from cash_value', async () => {
+    // contact001 price = 400
+    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    expect(result.game_values.cash_value).toBe(10000 - 400);
+    expect(result.game_values.cash_spent).toBe(400);
+  });
+
+  it('increments xp_value by xp_inc', async () => {
+    // contact001 xp_inc = 1
+    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    expect(result.game_values.xp_value).toBe(15 + 1);
+  });
+
+  it('adds node to in-memory state', async () => {
+    await buyPerp('tok', 'Imperium', 'contact001');
+    const s = getState();
+    expect(s.nodes).toHaveLength(1);
+    expect(s.nodes[0].full_path).toBe('Imperium.contact001');
+  });
+
+  it('returns profile_set for contact* gestalt', async () => {
+    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    expect(result.profile_set).toBeDefined();
+    expect(result.profile_set).toHaveProperty('profile_set');
+    expect(result.profile_set).toHaveProperty('origin', 'Imperium.contact001');
+    expect(result.profile_set).toHaveProperty('collect_id');
+  });
+
+  it('pushes a db_queue entry for contact* gestalt', async () => {
+    await buyPerp('tok', 'Imperium', 'contact001');
+    const s = getState();
+    expect(s.db_queue).toHaveLength(1);
+    expect(s.db_queue[0].origin).toBe('Imperium.contact001');
+  });
+
+  it('game_id is stable and unique across two buys', async () => {
+    const r1 = await buyPerp('tok', 'Imperium', 'contact001');
+    // city002: required_level 1, price 0 — always accessible
+    await buyPerp('tok', 'Imperium', 'city002');
+    const s = getState();
+    const ids = s.nodes.map(function(n) { return n.game_id; });
+    expect(new Set(ids).size).toBe(2);  // all unique
+    expect(r1.result.node.game_id).toBe('node_1');
+  });
+});
+
+describe('buyPerp — happy path (city gestalt, profiles_max bump)', () => {
+  beforeEach(() => setState(mkBuyPerpState()));
+
+  it('city002 (price 0) succeeds and bumps profiles_max', async () => {
+    const { result } = await buyPerp('tok', 'Imperium', 'city002');
+    expect(result.error).toBeUndefined();
+    // profiles_max += 2915918
+    expect(result.game_values.profiles_max).toBe(1 + 2915918);
+  });
+
+  it('returns profile_set for city* gestalt', async () => {
+    const { result } = await buyPerp('tok', 'Imperium', 'city002');
+    expect(result.profile_set).toBeDefined();
+    expect(result.profile_set.origin).toBe('Imperium.city002');
+  });
+});
+
+describe('buyPerp — happy path delta replay (applyDelta roundtrip)', () => {
+  it('state persists across applyDelta replay', async () => {
+    const initialState = mkBuyPerpState();
+    setState(initialState);
+
+    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+
+    // Construct the delta as LocalEngine emitted it and replay from scratch.
+    const replayBase = freshState('buyer@local');
+    // We seed game_values so cash floor is satisfied in the reducer.
+    const seedState = Object.assign({}, replayBase, {
+      game_values: initialState.game_values
+    });
+
+    const delta = {
+      kind: 'delta',
+      addr: 'buyer@local',
+      op: 'buyPerp',
+      args: ['Imperium', 'contact001'],
+      result: result,
+      ts: Date.now()
+    };
+
+    const replayed = applyDelta(seedState, delta);
+    expect(replayed.nodes).toHaveLength(1);
+    expect(replayed.nodes[0].full_path).toBe('Imperium.contact001');
+    expect(replayed.game_values.cash_value).toBe(10000 - 400);
+    expect(replayed.node_counter).toBe(1);
+  });
+});
+
+describe('buyPerp — failure: insufficient cash', () => {
+  it('returns error 2 when cash_value < price', async () => {
+    setState(mkBuyPerpState({ game_values: {
+      xp_value: 15, xp_level: 3,
+      cash_value: 100, cash_spent: 0,  // contact001 costs 400
+      karma_value: 0, profiles_value: 0, profiles_max: 1,
+      ap_snapshot: 6, ap_update: null
+    }}));
+    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    expect(result.error).toBe(2);
+  });
+
+  it('does not add a node on cash failure', async () => {
+    setState(mkBuyPerpState({ game_values: {
+      xp_value: 15, xp_level: 3,
+      cash_value: 50, cash_spent: 0,
+      karma_value: 0, profiles_value: 0, profiles_max: 1,
+      ap_snapshot: 6, ap_update: null
+    }}));
+    await buyPerp('tok', 'Imperium', 'contact001');
+    expect(getState().nodes).toHaveLength(0);
+  });
+});
+
+describe('buyPerp — failure: level too low', () => {
+  it('returns error 1 when xp_level < required_level', async () => {
+    // contact001 requires level 3; state is level 1
+    setState(mkBuyPerpState({ game_values: {
+      xp_value: 0, xp_level: 1,
+      cash_value: 10000, cash_spent: 0,
+      karma_value: 0, profiles_value: 0, profiles_max: 1,
+      ap_snapshot: 6, ap_update: null
+    }}));
+    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    expect(result.error).toBe(1);
+  });
+});
+
 // ── buySlots ──────────────────────────────────────────────────────────────────
 
 describe('buySlots — happy path', () => {
@@ -863,5 +1047,52 @@ describe('buySlots — failure: insufficient cash', () => {
     setState(broke);
     const { result } = await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
     expect(result.error).toBe(3);
+  });
+});
+
+describe('buyPerp — failure: ProxyPerp slot full', () => {
+  it('returns error 3 when proxy max_slots is reached', async () => {
+    // proxy001 has max_slots=3.  Pre-fill 3 project children.
+    const proxyNode = {
+      game_id: 'node_0', game_type: 'ProxyPerp',
+      full_type: 'ProxyPerp:proxy001', gestalt: 'proxy001',
+      full_path: 'Imperium.proxy001', instance_data: {}
+    };
+    const childNodes = ['project001','project002','project003'].map(function(g, i) {
+      return {
+        game_id: 'node_c' + i, game_type: 'ProjectPerp',
+        full_type: 'ProjectPerp:' + g, gestalt: g,
+        full_path: 'Imperium.proxy001.' + g, instance_data: {}
+      };
+    });
+    // project005 requires level 7 — boost xp_level so level check passes
+    // and only the slot check (error 3) triggers.
+    const highLevelValues = Object.assign({}, mkBuyPerpState().game_values, { xp_level: 7, xp_value: 200, cash_value: 10000 });
+    setState(mkBuyPerpState({ nodes: [proxyNode].concat(childNodes), game_values: highLevelValues }));
+
+    // Try to buy a 4th project (project005 is also in proxy001 provided_perps)
+    const { result } = await buyPerp('tok', 'Imperium.proxy001', 'project005');
+    expect(result.error).toBe(3);
+  });
+});
+
+describe('buyPerp — failure: duplicate gestalt', () => {
+  it('returns error 4 when gestalt already exists under parent', async () => {
+    const existing = {
+      game_id: 'node_1', game_type: 'ContactPerp',
+      full_type: 'ContactPerp:contact001', gestalt: 'contact001',
+      full_path: 'Imperium.contact001', instance_data: {}
+    };
+    setState(mkBuyPerpState({ nodes: [existing] }));
+    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    expect(result.error).toBe(4);
+  });
+});
+
+describe('buyPerp — failure: unknown gestalt', () => {
+  it('returns error 1 for a gestalt not in the ruleset', async () => {
+    setState(mkBuyPerpState());
+    const { result } = await buyPerp('tok', 'Imperium', 'noSuchPerp');
+    expect(result.error).toBe(1);
   });
 });

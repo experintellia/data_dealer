@@ -91,6 +91,7 @@ export function freshState(selfAddr, seed) {
     mission_goals: [],
     active_missions: [],
     last_seen_ts: 0,
+    node_counter: 0,
   };
 }
 
@@ -172,6 +173,68 @@ function _nodeGvReducer(state, delta) {
 reducers.buyPowerup  = _nodeGvReducer;
 reducers.sellPowerup = _nodeGvReducer;
 reducers.buySlots    = _nodeGvReducer;
+
+// 'buyPerp' replays the state mutations committed by the LocalEngine handler.
+// The delta result carries the full post-mutation values so replay is exact.
+reducers.buyPerp = function buyPerpReducer(state, delta) {
+  if (!delta || !delta.result || !delta.result.node) {
+    return state;
+  }
+
+  var r = delta.result;
+  var newNode = r.node;
+
+  // Guard against double-apply on replay.
+  var nodes = (state.nodes || []).slice();
+  var alreadyPresent = false;
+  for (var i = 0; i < nodes.length; i++) {
+    if (nodes[i].full_path === newNode.full_path) { alreadyPresent = true; break; }
+  }
+  if (!alreadyPresent) {
+    nodes = nodes.concat([newNode]);
+  }
+
+  var dbQueue = (state.db_queue || []).slice();
+  if (r.profile_set) {
+    var ps = r.profile_set;
+    var inQueue = false;
+    for (var j = 0; j < dbQueue.length; j++) {
+      if (dbQueue[j].collect_id === ps.collect_id) { inQueue = true; break; }
+    }
+    if (!inQueue) {
+      dbQueue = dbQueue.concat([{
+        origin: ps.origin,
+        collect_id: ps.collect_id,
+        profile_set: ps.profile_set
+      }]);
+    }
+  }
+
+  var missionGoals = state.mission_goals;
+  var activeMissions = state.active_missions;
+  if (r.missions && r.missions.mission_data) {
+    if (r.missions.mission_data.mission_goals) {
+      missionGoals = r.missions.mission_data.mission_goals;
+    }
+    if (r.missions.mission_data.active_missions) {
+      activeMissions = r.missions.mission_data.active_missions;
+    }
+  }
+
+  // Keep node_counter monotonic.
+  var counter = state.node_counter || 0;
+  var idNum = parseInt(String(newNode.game_id).replace('node_', ''), 10);
+  if (!isNaN(idNum) && idNum > counter) { counter = idNum; }
+
+  return Object.assign({}, state, {
+    nodes: nodes,
+    db_queue: dbQueue,
+    game_values: r.game_values || state.game_values,
+    mission_goals: missionGoals,
+    active_missions: activeMissions,
+    node_counter: counter
+  });
+};
 
 // Stubs — return state unchanged until Wave 4+ fills them in.
 OP_NAMES.forEach(function (op) {
