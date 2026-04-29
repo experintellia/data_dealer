@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   getToken, ping, getSessionLocale, loadGame, getRanking, resetGame, setEmitter,
-  setDisplayName, setPerpCoordinates, buyKarma
+  setDisplayName, setPerpCoordinates, buyKarma,
+  buyPowerup, sellPowerup, buySlots
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
@@ -626,5 +627,241 @@ describe('setPerpCoordinates — failure modes', () => {
     const node = getState().nodes.find(n => n.full_path === 'Imperium.City.Agent0');
     expect(node.instance_data.x).toBe(0);
     expect(node.instance_data.y).toBe(0);
+  });
+});
+
+// ── purchase-op fixtures ──────────────────────────────────────────────────────
+
+// A minimal ProjectPerp node using the real project001 ruleset entry.
+// Starts with empty powerups and default ad_slots from type_data (3).
+var PROJECT_NODE = {
+  game_id:       'proj001',
+  game_type:     'ProjectPerp',
+  full_path:     'Imperium.CityVienna.proj001',
+  full_type:     'ProjectPerp:project001',
+  gestalt:       'project001',
+  instance_data: {
+    x: 100, y: 100,
+    powerups: []
+  }
+};
+
+// State with enough cash for any normal purchase (default seed: 300).
+function mkProjectState(overrides) {
+  var base = freshState('test@local');
+  return Object.assign({}, base, { nodes: [PROJECT_NODE] }, overrides || {});
+}
+
+// ── buyPowerup ────────────────────────────────────────────────────────────────
+
+describe('buyPowerup — happy path', () => {
+  beforeEach(() => setState(mkProjectState()));
+
+  it('returns node, game_values, and levelup', async () => {
+    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result).not.toHaveProperty('error');
+    expect(result).toHaveProperty('node');
+    expect(result).toHaveProperty('game_values');
+    expect(typeof result.levelup).toBe('boolean');
+  });
+
+  it('pushes the powerup into instance_data.powerups', async () => {
+    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const powerups = result.node.instance_data.powerups;
+    expect(powerups).toHaveLength(1);
+    expect(powerups[0]).toMatchObject({ slot: 0, gestalt: 'ad002', full_type: 'AdPowerup:ad002' });
+  });
+
+  it('deducts the powerup price from cash_value', async () => {
+    // ad002 price = 90 (from project001 provided_ads)
+    const before = getState().game_values.cash_value;
+    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.game_values.cash_value).toBe(before - 90);
+  });
+
+  it('increments cash_spent by the powerup price', async () => {
+    const before = getState().game_values.cash_spent;
+    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.game_values.cash_spent).toBe(before + 90);
+  });
+
+  it('increments xp_value', async () => {
+    const before = getState().game_values.xp_value;
+    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.game_values.xp_value).toBeGreaterThan(before);
+  });
+
+  it('increments karma_value by 1', async () => {
+    const before = getState().game_values.karma_value;
+    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.game_values.karma_value).toBe(before + 1);
+  });
+
+  it('applies charge_cost_modifier to charge_cost', async () => {
+    // project001 base charge_cost=190, ad002 modifier=35 → 225
+    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.node.instance_data.charge_cost).toBe(225);
+  });
+
+  it('applies collect_amount_modifier', async () => {
+    // base 3600 + 160 = 3760
+    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.node.instance_data.collect_amount).toBe(3760);
+  });
+
+  it('persists updated state', async () => {
+    await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const s = getState();
+    expect(s.nodes[0].instance_data.powerups).toHaveLength(1);
+    expect(s.game_values.cash_value).toBe(300 - 90);
+  });
+});
+
+describe('buyPowerup — failure: slot occupied', () => {
+  it('returns error:1 when the requested slot already holds a powerup', async () => {
+    const occupiedNode = Object.assign({}, PROJECT_NODE, {
+      instance_data: { powerups: [{ slot: 0, gestalt: 'ad002', full_type: 'AdPowerup:ad002' }] }
+    });
+    setState(Object.assign({}, freshState('test@local'), { nodes: [occupiedNode] }));
+    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad003');
+    expect(result.error).toBe(1);
+  });
+});
+
+describe('buyPowerup — failure: insufficient cash', () => {
+  it('returns error:3 when cash_value < powerup price', async () => {
+    const broke = mkProjectState({
+      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 5 })
+    });
+    setState(broke);
+    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.error).toBe(3);
+  });
+});
+
+// ── sellPowerup ───────────────────────────────────────────────────────────────
+
+// State with ad002 already occupying slot 0.
+function mkStateWithPowerup() {
+  var nodeWithPu = Object.assign({}, PROJECT_NODE, {
+    instance_data: {
+      x: 100, y: 100,
+      powerups: [{ slot: 0, gestalt: 'ad002', full_type: 'AdPowerup:ad002' }],
+      charge_cost:    225,  // after ad002 modifiers
+      collect_amount: 3760,
+      collect_risk:   2
+    }
+  });
+  return Object.assign({}, freshState('test@local'), { nodes: [nodeWithPu] });
+}
+
+describe('sellPowerup — happy path', () => {
+  beforeEach(() => setState(mkStateWithPowerup()));
+
+  it('returns node, game_values, and levelup', async () => {
+    const { result } = await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result).not.toHaveProperty('error');
+    expect(result).toHaveProperty('node');
+    expect(result).toHaveProperty('game_values');
+    expect(typeof result.levelup).toBe('boolean');
+  });
+
+  it('removes the powerup from instance_data.powerups', async () => {
+    const { result } = await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.node.instance_data.powerups).toHaveLength(0);
+  });
+
+  it('refunds 75% of the powerup price (floor)', async () => {
+    // ad002 price=90, refund=floor(90*0.75)=67
+    const before = getState().game_values.cash_value;
+    const { result } = await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.game_values.cash_value).toBe(before + 67);
+  });
+
+  it('increments xp_value', async () => {
+    const before = getState().game_values.xp_value;
+    const { result } = await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.game_values.xp_value).toBeGreaterThan(before);
+  });
+
+  it('resets charge_cost to base value after powerup removed', async () => {
+    // project001 base charge_cost = 190
+    const { result } = await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.node.instance_data.charge_cost).toBe(190);
+  });
+
+  it('resets collect_amount to base value', async () => {
+    const { result } = await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.node.instance_data.collect_amount).toBe(3600);
+  });
+
+  it('persists updated state', async () => {
+    await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const s = getState();
+    expect(s.nodes[0].instance_data.powerups).toHaveLength(0);
+  });
+});
+
+describe('sellPowerup — failure: slot empty', () => {
+  it('returns error:1 when the slot has no powerup', async () => {
+    setState(mkProjectState());
+    const { result } = await sellPowerup('tok', PROJECT_NODE.full_path, 99, 'ad002');
+    expect(result.error).toBe(1);
+  });
+});
+
+// ── buySlots ──────────────────────────────────────────────────────────────────
+
+describe('buySlots — happy path', () => {
+  beforeEach(() => setState(mkProjectState()));
+
+  it('returns node, game_values, and levelup', async () => {
+    const { result } = await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    expect(result).not.toHaveProperty('error');
+    expect(result).toHaveProperty('node');
+    expect(result).toHaveProperty('game_values');
+    expect(typeof result.levelup).toBe('boolean');
+  });
+
+  it('increments the ad_slots count by num', async () => {
+    // base ad_slots from type_data = 3; buy 1 → 4
+    const { result } = await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    expect(result.node.instance_data.ad_slots).toBe(4);
+  });
+
+  it('deducts the correct cost from cash_value', async () => {
+    // cost = slot_cost + slot_cost_modifier * currentSlots = 10 + 1*3 = 13
+    const before = getState().game_values.cash_value;
+    const { result } = await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    expect(result.game_values.cash_value).toBe(before - 13);
+  });
+
+  it('increments cash_spent by the slot cost', async () => {
+    const before = getState().game_values.cash_spent;
+    const { result } = await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    expect(result.game_values.cash_spent).toBe(before + 13);
+  });
+
+  it('increments xp_value', async () => {
+    const before = getState().game_values.xp_value;
+    const { result } = await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    expect(result.game_values.xp_value).toBeGreaterThan(before);
+  });
+
+  it('persists updated state', async () => {
+    await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    const s = getState();
+    expect(s.nodes[0].instance_data.ad_slots).toBe(4);
+  });
+});
+
+describe('buySlots — failure: insufficient cash', () => {
+  it('returns error:3 when cash_value < slot cost', async () => {
+    const broke = mkProjectState({
+      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 0 })
+    });
+    setState(broke);
+    const { result } = await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    expect(result.error).toBe(3);
   });
 });

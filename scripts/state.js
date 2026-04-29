@@ -150,6 +150,29 @@ reducers.buyKarma = function buyKarmaReducer(state, delta) {
   });
 };
 
+// Shared reducer for buyPowerup / sellPowerup / buySlots.
+// The delta result carries {node: {full_path, instance_data}, game_values}.
+// The reducer patches the matching node's instance_data and merges game_values.
+function _nodeGvReducer(state, delta) {
+  var res = (delta && delta.result) || {};
+  if (!res.node || !res.node.full_path) return state;
+
+  var fullPath = res.node.full_path;
+  var newNodes = state.nodes.map(function (n) {
+    if (n.full_path !== fullPath) return n;
+    return Object.assign({}, n, { instance_data: res.node.instance_data });
+  });
+
+  return Object.assign({}, state, {
+    nodes:       newNodes,
+    game_values: Object.assign({}, state.game_values, res.game_values || {})
+  });
+}
+
+reducers.buyPowerup  = _nodeGvReducer;
+reducers.sellPowerup = _nodeGvReducer;
+reducers.buySlots    = _nodeGvReducer;
+
 // Stubs — return state unchanged until Wave 4+ fills them in.
 OP_NAMES.forEach(function (op) {
   if (!reducers[op]) {
