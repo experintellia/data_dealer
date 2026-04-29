@@ -10,7 +10,9 @@ define(['text', 'underscore'], function(text, _) {
       var url = req.toUrl(name);
       var tplConfig = (config.config && config.config.tpl) || {};
       text.get(url, function(templateText) {
-        var compiled = _.template(templateText, tplConfig);
+        // Underscore 1.5.x API: _.template(text, data, settings)
+        // Pass null as data so the template is compiled, not immediately rendered.
+        var compiled = _.template(templateText, null, tplConfig);
         buildMap[name] = compiled;
         onLoad(compiled);
       }, function(err) {
