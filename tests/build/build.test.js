@@ -10,8 +10,8 @@ import { fileURLToPath } from 'url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 beforeAll(() => {
-  execSync('node esbuild.config.js', { cwd: root, stdio: 'pipe' });
-}, 30_000);
+  execSync('pnpm build', { cwd: root, stdio: 'pipe' });
+}, 60_000);
 
 describe('dist/ structure', () => {
   const required = [
