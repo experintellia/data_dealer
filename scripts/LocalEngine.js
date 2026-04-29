@@ -2,10 +2,11 @@
 // ESM exports — consumed by Remote.js via the AMD bridge in esm-bundle.js.
 // No DOM globals in handler bodies; safe to import from Node for tests.
 //
-// Handlers implemented here: getToken, ping, getSessionLocale, loadGame (#12).
+// Handlers implemented here: getToken, ping, getSessionLocale, loadGame (#12), resetGame (#20).
 // Remaining handlers (#13–#21) are stubs that return a rejected Promise.
 
 import { getState, setState } from './boot.js';
+import { applyDelta } from './state.js';
 import { materialize } from './materializer.js';
 import { now as clockNow } from './clock.js';
 import defaultRuleset from '../data/ruleset_3.de.json' with { type: 'json' };
@@ -88,6 +89,33 @@ export function loadGame(/* token */) {
   });
 
   return Promise.resolve({ result: gameData });
+}
+
+/**
+ * resetGame(token) → Promise<{result: true}>
+ *
+ * Emits a 'reset' delta that wipes all game state while preserving the
+ * player's identity (addr).  Game.js calls location.reload() after this
+ * resolves, so the payload is ignored — any 200-truthy value suffices.
+ *
+ * Cold-start replay note: webxdc update history is append-only, so prior
+ * deltas remain in the log.  applyDelta's 'reset' reducer turns them into a
+ * no-op prefix.  Compaction is deferred to Phase 7 (#35).
+ */
+export function resetGame(/* token */) {
+  var state = getState();
+  var delta = { kind: 'delta', op: 'reset', addr: state.addr, ts: clockNow() };
+
+  // Apply locally so in-memory state is consistent before the page reload.
+  setState(applyDelta(state, delta));
+
+  // Broadcast to webxdc update history for durable replay on cold start.
+  // eslint-disable-next-line no-undef
+  if (typeof webxdc !== 'undefined') {
+    webxdc.sendUpdate({ payload: delta }, ''); // eslint-disable-line no-undef
+  }
+
+  return Promise.resolve({ result: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +206,7 @@ export function getRanking(_token, type) {
 var _STUBS = [
   'buyPowerup', 'chargePerp', 'collectPerp', 'integrateCollected',
   'getPowerups', 'getProvidedPerps', 'buyKarma', 'buyPerp', 'buySlots',
-  'setDisplayName', 'resetGame', 'sellPowerup',
+  'setDisplayName', 'sellPowerup',
   'setPerpCoordinates', 'checkUsername'
 ];
 
@@ -199,6 +227,7 @@ var LocalEngine = Object.assign({
   getSessionLocale: getSessionLocale,
   loadGame: loadGame,
   getRanking: getRanking,
+  resetGame: resetGame,
   setEmitter: setEmitter
 }, _stubHandlers);
 

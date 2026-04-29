@@ -209,6 +209,44 @@ describe('applyDelta — malformed delta guard', () => {
   });
 });
 
+describe('applyDelta — reset replay semantics (issue #20)', () => {
+  const addr = 'alice@example.com';
+
+  it('reset + ops produces same game state as a fresh start + same ops', () => {
+    // Pre-reset ops (stubs): their effect on state is wiped by reset.
+    const preOps = [
+      makeDelta(addr, 'buyKarma', 1000),
+      makeDelta(addr, 'chargePerp', 2000),
+    ];
+    const postOp = makeDelta(addr, 'buyPerp', 4000);
+
+    const viaReset = replay([...preOps, makeDelta(addr, 'reset', 3000), postOp], addr);
+    const viaFresh  = replay([postOp], addr);
+
+    // Game-meaningful fields must be identical; last_seen_ts may differ.
+    expect(viaReset.nodes).toEqual(viaFresh.nodes);
+    expect(viaReset.game_values).toEqual(viaFresh.game_values);
+    expect(viaReset.active_missions).toEqual(viaFresh.active_missions);
+    expect(viaReset.addr).toBe(viaFresh.addr);
+  });
+
+  it('replay-through-reset discards prior history', () => {
+    // Any ops before the reset delta must not survive into post-reset state.
+    const withHistory = replay([
+      makeDelta(addr, 'buyKarma', 1000),
+      makeDelta(addr, 'collectPerp', 2000),
+      makeDelta(addr, 'reset', 3000),
+    ], addr);
+
+    expect(withHistory.nodes).toEqual([]);
+    expect(withHistory.mission_goals).toEqual([]);
+    expect(withHistory.active_missions).toEqual([]);
+    // game_values restored to seed defaults
+    expect(withHistory.game_values.cash_value).toBe(300);
+    expect(withHistory.game_values.xp_level).toBe(1);
+  });
+});
+
 describe('applyDelta — clock-skew guard', () => {
   it('last_seen_ts never decreases', () => {
     const addr = 'alice@example.com';
