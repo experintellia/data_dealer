@@ -355,7 +355,7 @@ export function getRanking(_token, type) {
 // Persist a delta to the webxdc update history (no-op when webxdc is absent,
 // e.g. in Node/vitest).  The reducer in state.js applies the same mutation on
 // replay so state survives a reload.
-function _sendDelta(addr, op, args, result) {
+function _emitDelta(addr, op, args, result) {
   // eslint-disable-next-line no-undef
   if (typeof webxdc !== 'undefined') {
     // eslint-disable-next-line no-undef
@@ -407,7 +407,7 @@ export function setDisplayName(/* token, */ _, dname) {
 
   var newState = Object.assign({}, state, { display_name: dname });
   setState(newState);
-  _sendDelta(state.addr, 'setDisplayName', [dname], {});
+  _emitDelta(state.addr, 'setDisplayName', [dname], {});
 
   return Promise.resolve({ result: {} });
 }
@@ -454,7 +454,7 @@ export function setPerpCoordinates(/* token, */ _, updates) {
 
   var newState = Object.assign({}, state, { nodes: nodes });
   setState(newState);
-  _sendDelta(state.addr, 'setPerpCoordinates', [updates], {});
+  _emitDelta(state.addr, 'setPerpCoordinates', [updates], {});
 
   return Promise.resolve({ result: 1 });
 }
@@ -521,7 +521,7 @@ export function buyKarma(_token, karmalauterGestalt) {
   if (levelup) newGv.ap_snapshot = newLevel.ap_max;
 
   setState(Object.assign({}, state, { game_values: newGv }));
-  _sendDelta(state.addr, 'buyKarma', [karmalauterGestalt], { game_values: newGv });
+  _emitDelta(state.addr, 'buyKarma', [karmalauterGestalt], { game_values: newGv });
 
   var response = { game_values: newGv };
   if (levelup) response.levelup = true;
@@ -606,7 +606,7 @@ function _checkLevelup(currentLevel, newXp) {
 // webxdc.sendUpdate triggers setUpdateListener → applyDelta in boot.js, so we
 // must NOT also call setState — that would double-apply the change.
 // In Node/test environments there is no listener, so setState directly.
-function _persistDelta(computedNewState, addr, op, args, result) {
+function _commitDelta(computedNewState, addr, op, args, result) {
   var delta = {
     kind: 'delta',
     addr: addr,
@@ -683,7 +683,7 @@ export function buyPowerup(token, perpPath, slot, gestalt) {
   };
   var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
 
-  _persistDelta(newState, state.addr, 'buyPowerup',
+  _commitDelta(newState, state.addr, 'buyPowerup',
     [token, perpPath, slot, gestalt], result);
 
   return Promise.resolve({ result: result });
@@ -747,7 +747,7 @@ export function sellPowerup(token, perpPath, slot, gestalt) {
   };
   var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
 
-  _persistDelta(newState, state.addr, 'sellPowerup',
+  _commitDelta(newState, state.addr, 'sellPowerup',
     [token, perpPath, slot, gestalt], result);
 
   return Promise.resolve({ result: result });
@@ -812,7 +812,7 @@ export function buySlots(token, perpPath, slotType, num) {
   };
   var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
 
-  _persistDelta(newState, state.addr, 'buySlots',
+  _commitDelta(newState, state.addr, 'buySlots',
     [token, perpPath, slotType, num], result);
 
   return Promise.resolve({ result: result });
@@ -1031,20 +1031,6 @@ function _advanceBuyPerpMissions(state, gestalt) {
 // chargePerp — Phase 3 (#16)
 // ---------------------------------------------------------------------------
 
-/**
- * chargePerp(token, path) → Promise<{result: ChargePerpPayload}>
- *
- * Validates economy (cash, AP), checks the perp is not already charging,
- * pre-computes the reward with ±5% jitter, pushes a nodes_charging entry,
- * persists a delta, and returns {game_values, duration, levelup, missions}.
- *
- * Error codes (views.py:714 via handler-map.md):
- *   error: 1 — node not found / not chargeable / insufficient cash or AP
- *   error: 2 — perp already charging
- *
- * No setTimeout anywhere in this path.  Wall-clock progress is a pure function
- * of (state, now) via the materializer (docs/async-map.md §1).
- */
 export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
   var state   = getState();
   var now     = clockNow();

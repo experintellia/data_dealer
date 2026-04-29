@@ -4,7 +4,7 @@ import {
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
-import { setOverride, clearOverride, advance } from '../../scripts/clock.js';
+import { setOverride, clearOverride } from '../../scripts/clock.js';
 import { materialize } from '../../scripts/materializer.js';
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
@@ -33,21 +33,23 @@ function mkNode(instanceOverrides) {
   };
 }
 
+var BASE_GV = {
+  cash_value:      500,
+  cash_spent:      0,
+  xp_value:        0,
+  ap_snapshot:     3,
+  ap_update:       0,
+  ap_inc_value:    1,
+  ap_inc_interval: 120_000,
+  ap_max:          6,
+};
+
 function mkState(overrides) {
+  overrides = overrides || {};
   var base = freshState('test@local');
-  return Object.assign({}, base, {
-    nodes: [mkNode()],
-    game_values: Object.assign({}, base.game_values, {
-      cash_value:      500,
-      cash_spent:      0,
-      xp_value:        0,
-      ap_snapshot:     3,
-      ap_update:       0,
-      ap_inc_value:    1,
-      ap_inc_interval: 120_000,
-      ap_max:          6,
-    }),
-  }, overrides || {});
+  // Deep-merge game_values so partial overrides don't drop AP regen fields.
+  var gv = Object.assign({}, base.game_values, BASE_GV, overrides.game_values || {});
+  return Object.assign({}, base, { nodes: [mkNode()] }, overrides, { game_values: gv });
 }
 
 // Reset injectable hooks after each test.
@@ -232,16 +234,14 @@ describe('chargePerp — delta replay', () => {
 // ── materialization integration ───────────────────────────────────────────────
 
 describe('chargePerp — materialization integration', () => {
-  it('materializer detects a completed charge and emits node_ready', async () => {
+  beforeEach(() => {
     setOverride(FIXED_NOW);
     setState(mkState());
+  });
 
+  it('materializer detects a completed charge and emits node_ready', async () => {
     await chargePerp('tok', NODE_PATH);
     const s = getState();
-    const entry = s.nodes_charging[0];
-
-    // Advance clock past charge_end.
-    advance(CHARGE_TIME + 1);
 
     const mat = materialize(s, FIXED_NOW + CHARGE_TIME + 1);
     expect(mat.events).toHaveLength(1);
@@ -250,21 +250,15 @@ describe('chargePerp — materialization integration', () => {
   });
 
   it('node_ready event carries the pre-computed charge result', async () => {
-    setOverride(FIXED_NOW);
-    setState(mkState());
-
     await chargePerp('tok', NODE_PATH);
-    const s         = getState();
-    const expected  = s.nodes_charging[0].result;
+    const s        = getState();
+    const expected = s.nodes_charging[0].result;
 
     const mat = materialize(s, FIXED_NOW + CHARGE_TIME + 1);
     expect(mat.events[0].pl.result).toEqual(expected);
   });
 
   it('after materialization the entry moves to nodes_collect', async () => {
-    setOverride(FIXED_NOW);
-    setState(mkState());
-
     await chargePerp('tok', NODE_PATH);
     const s = getState();
 
@@ -275,9 +269,6 @@ describe('chargePerp — materialization integration', () => {
   });
 
   it('materializer emits no event before charge_end', async () => {
-    setOverride(FIXED_NOW);
-    setState(mkState());
-
     await chargePerp('tok', NODE_PATH);
     const s = getState();
 
@@ -287,9 +278,6 @@ describe('chargePerp — materialization integration', () => {
   });
 
   it('charge + advance O(1) triggers ready cycle without setTimeout', async () => {
-    setOverride(FIXED_NOW);
-    setState(mkState());
-
     await chargePerp('tok', NODE_PATH);
     const s = getState();
 
