@@ -154,6 +154,8 @@ define(function(require) {
       app.remote.addMethod('ping');
       app.remote.addMethod('sellPowerup');
       app.remote.addMethod('setPerpCoordinates');
+      app.remote.addMethod('dismissMissionBriefing');
+      app.remote.addMethod('markTokenSeen');
 
       // Wire LocalEngine's event emitter to the in-process Socket bus so that
       // node_ready / new_items events from loadGame materialisation reach the

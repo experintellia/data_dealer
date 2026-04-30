@@ -34,6 +34,8 @@ var OP_NAMES = [
   'ping',
   'checkUsername',
   'setLocale',
+  'dismissMissionBriefing',
+  'markTokenSeen',
 ];
 
 /**
@@ -104,6 +106,8 @@ export function freshState(selfAddr, seed) {
     last_seen_ts: 0,
     node_counter: 0,
     integrated_ids: {},
+    mission_briefings_seen: {},
+    tokens_seen: {},
   };
 }
 
@@ -405,6 +409,26 @@ reducers.integrateCollected = function integrateCollectedReducer(state, delta) {
     game_values:    newGv,
     nodes:          newNodes
   });
+};
+
+reducers.markTokenSeen = function markTokenSeenReducer(state, delta) {
+  var args = delta.args || [];
+  var gestalt = args[0];
+  if (typeof gestalt !== 'string' || !gestalt) return state;
+  var seen = Object.assign({}, state.tokens_seen || {});
+  if (seen[gestalt]) return state;
+  seen[gestalt] = true;
+  return Object.assign({}, state, { tokens_seen: seen });
+};
+
+reducers.dismissMissionBriefing = function dismissMissionBriefingReducer(state, delta) {
+  var args = delta.args || [];
+  var gestalt = args[0];
+  if (typeof gestalt !== 'string' || !gestalt) return state;
+  var seen = Object.assign({}, state.mission_briefings_seen || {});
+  if (seen[gestalt]) return state;
+  seen[gestalt] = true;
+  return Object.assign({}, state, { mission_briefings_seen: seen });
 };
 
 // Stubs — return state unchanged until Wave 4+ fills them in.

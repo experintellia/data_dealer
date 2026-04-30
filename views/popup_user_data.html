@@ -3,7 +3,6 @@
   var states = D.states || {};
   var button = data.button || _._('Close');
   var game = _.game();
-  var user = game.data.user;
 %>
 <div class="PopupBody User">
   <div class="PopupHeader">
@@ -12,7 +11,7 @@
     <div class="PopupTitle"><%= data.title %></div>
     <div class="PopupText"><%= data.description %></div>
     <div class="PopupMenu">
-      <div class="PopupMenuButton active" data-tab="settings"><% print(_._('user Account')); %></div>
+      <div class="PopupMenuButton active" data-tab="settings">About</div>
       <% if (game.setup.userdebug) { %>
       <div class="PopupMenuButton" data-tab="debug"><% print(_._('userdebug tab')); %></div>
       <% } %>
@@ -23,17 +22,34 @@
       <div class="SubpopContainer">
       </div>
       <div class="PopupContentText">
-        <div class="PopupTitle"><% print(_._('user Dein Account')); %></div>
-        <div class="PopupList">
-        <%
-            print(_.renderView('form_displayname.html', {
-              D: D
-            }));
-        %>
+        <div class="PopupTitle">About this fork</div>
+        <div class="PopupParagraph">
+          This is a webxdc port of the original Data Dealer browser game,
+          repackaged so it can run inside a Delta Chat group with no server.
+          Source, issues and contributions:
+          <a href="https://github.com/experintellia/data_dealer" class="mln" target="_blank" rel="noopener">github.com/experintellia/data_dealer</a>.
+        </div>
+        <div class="PopupParagraph">
+          Your display name is set through your Delta Chat profile &mdash; change it
+          there and the game picks it up automatically.
         </div>
       </div>
       <div class="PopupContentText">
-        <div class="PopupParagraph"><% print(_._('user text below'));  %></div>
+        <div class="PopupTitle">The original game</div>
+        <div class="PopupParagraph">
+          Data Dealer was created in Vienna by Cuteacute Media OG between 2011
+          and 2014 (Ivan Averintsev, Wolfie Christl, Pascale Osterwalder,
+          Tobi Sch&auml;fer, Ralf Traunsteiner). It was a satirical browser game
+          about the personal-data trade, released as a public beta on
+          datadealer.com and open-sourced as
+          <a href="https://github.com/datadealer/dd_js" class="mln" target="_blank" rel="noopener">dd_js</a>,
+          <a href="https://github.com/datadealer/dd_rules" class="mln" target="_blank" rel="noopener">dd_rules</a> and
+          <a href="https://github.com/datadealer/dd_app" class="mln" target="_blank" rel="noopener">dd_app</a>.
+        </div>
+        <div class="PopupParagraph">
+          Background info and the original FAQ:
+          <a href="https://datadealer.com/beta" class="mln" target="_blank" rel="noopener">datadealer.com/beta</a>.
+        </div>
       </div>
       <div class="PopupButtons">
         <div class="Button" data-button-id="MainButton"><%= button %></div>

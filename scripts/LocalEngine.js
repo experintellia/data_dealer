@@ -276,7 +276,9 @@ function _buildLoadGameResponse(state, now, isNewGame) {
     locale_persisted: !!state.locale,
     missions: ruleset.missions,
     mission_goals: state.mission_goals || [],
-    active_missions: state.active_missions || []
+    active_missions: state.active_missions || [],
+    mission_briefings_seen: state.mission_briefings_seen || {},
+    tokens_seen: state.tokens_seen || {}
   };
 }
 
@@ -1429,6 +1431,41 @@ export function integrateCollected(_token, collectId) {
 }
 
 // ---------------------------------------------------------------------------
+// dismissMissionBriefing(token, gestalt) — record that the player has closed
+// the briefing popup for a given mission so we don't re-open it on reload.
+// ---------------------------------------------------------------------------
+
+export function markTokenSeen(_token, gestalt) {
+  if (typeof gestalt !== 'string' || !gestalt) {
+    return Promise.resolve({ result: { error: 0 } });
+  }
+  var state = getState();
+  var seen = state.tokens_seen || {};
+  if (seen[gestalt]) {
+    return Promise.resolve({ result: { ok: true } });
+  }
+  var newSeen = Object.assign({}, seen, { [gestalt]: true });
+  var newState = Object.assign({}, state, { tokens_seen: newSeen });
+  _commitDelta(newState, state.addr, 'markTokenSeen', [gestalt], { gestalt: gestalt });
+  return Promise.resolve({ result: { ok: true } });
+}
+
+export function dismissMissionBriefing(_token, gestalt) {
+  if (typeof gestalt !== 'string' || !gestalt) {
+    return Promise.resolve({ result: { error: 0 } });
+  }
+  var state = getState();
+  var seen = state.mission_briefings_seen || {};
+  if (seen[gestalt]) {
+    return Promise.resolve({ result: { ok: true } });
+  }
+  var newSeen = Object.assign({}, seen, { [gestalt]: true });
+  var newState = Object.assign({}, state, { mission_briefings_seen: newSeen });
+  _commitDelta(newState, state.addr, 'dismissMissionBriefing', [gestalt], { gestalt: gestalt });
+  return Promise.resolve({ result: { ok: true } });
+}
+
+// ---------------------------------------------------------------------------
 // Stub handlers — Wave 4+ issues fill these in.
 // ---------------------------------------------------------------------------
 var _STUBS = [
@@ -1465,6 +1502,8 @@ var LocalEngine = Object.assign({
   chargePerp:         chargePerp,
   collectPerp:        collectPerp,
   integrateCollected: integrateCollected,
+  dismissMissionBriefing: dismissMissionBriefing,
+  markTokenSeen:      markTokenSeen,
   setEmitter:         setEmitter,
   setSendDelta:       setSendDelta,
   setPrngSeed:        setPrngSeed,

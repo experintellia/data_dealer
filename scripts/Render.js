@@ -3983,7 +3983,7 @@ define(function(require) {
       var node = this;
       var zoomTo = (node.zoomScale+0.25 > 1) ? 1 : node.zoomScale+0.25;
       node.scroller.options.animating=true;
-      node.scroller.zoomTo(node.zoomScale+0.25, true);
+      node.scroller.zoomTo(zoomTo, true);
       node.scroller.options.animating=false;
     };
 
@@ -4703,6 +4703,13 @@ define(function(require) {
         token.parents('.PopupTab').addClass('hasPopup');
         container.addClass('open');
         container.find('.Subpop[data-subpop-id='+subpopid+']').addClass('open');
+        // subpop-id is "token<gestalt>"; surface the gestalt so the game side
+        // can persist the seen-flag and clear the NEW badge across reloads.
+        var gestalt = (subpopid && subpopid.indexOf('token') === 0) ? subpopid.slice(5) : '';
+        if (gestalt) {
+          token.find('.new').remove();
+          node.trigger('popup_token_seen', [gestalt]);
+        }
       });
 
       node.jdomelem.on('click touchend','.SubpopClose, .Button[data-button-id=OKButton]',function(e){

@@ -1033,12 +1033,10 @@ define(function(require) {
 
       gnode.on('user_data',function(e) {
         e.stopPropagation();
-        var user = gnode.data.user;
-        var text = _._('user description');
         gnode.openGenericPopup({
           data: {
-            title: user.display_name,
-            description: text
+            title: 'About',
+            description: 'Data Dealer &mdash; webxdc port'
           },
           template:'popup_user_data.html'
         });
@@ -1188,23 +1186,24 @@ define(function(require) {
         gnode.cueNotification(n);
       }
       if (data.mission_active) {
-        var mission = groot.Missions.getMission(data.mission_active);
-        n = mergeData({},mission.data);
-        n.game_type = "MissionNew";
-        n.states = mission.states;
-        n.mission_decorator = _._('New Mission!');
-        n.mission = mission;
-        n.config = {
-          template: 'popup_mission.html',
-          extendClass: 'Mission'
-        };
-        /*
-        n.scriptedEvents = [];
-        n.scriptedEvents.push(function(){
-          groot.renderNode.FXLevelUpBling(data.levelup);
-        });
-        */
-        gnode.cueNotification(n);
+        // Only show the briefing if the player hasn't already dismissed it.
+        // The seen-flag is persisted via the dismissMissionBriefing op so it
+        // survives webxdc replay across reloads.
+        var seenBriefings = (groot.raw_data && groot.raw_data.mission_briefings_seen) || {};
+        if (!seenBriefings[data.mission_active]) {
+          var mission = groot.Missions.getMission(data.mission_active);
+          n = mergeData({},mission.data);
+          n.game_type = "MissionNew";
+          n.states = mission.states;
+          n.mission_decorator = _._('New Mission!');
+          n.mission = mission;
+          n.mission_active_gestalt = data.mission_active;
+          n.config = {
+            template: 'popup_mission.html',
+            extendClass: 'Mission'
+          };
+          gnode.cueNotification(n);
+        }
       }
       if (data.levelup) {
         var n = {};
@@ -1654,6 +1653,15 @@ define(function(require) {
       }, config.delay || 0);
       
       popup.callback = function(){
+        if (notification.mission_active_gestalt) {
+          // Mark this mission's briefing as seen so it doesn't reopen on reload.
+          var gestalt = notification.mission_active_gestalt;
+          groot.raw_data.mission_briefings_seen = groot.raw_data.mission_briefings_seen || {};
+          groot.raw_data.mission_briefings_seen[gestalt] = true;
+          if (app.remote && app.remote.dismissMissionBriefing) {
+            app.remote.dismissMissionBriefing(app.token, gestalt);
+          }
+        }
         groot.uncueNotification(notification);
         delete groot.notificationPopup;
         if (groot.NotificationQueue.length) {
@@ -1676,6 +1684,7 @@ define(function(require) {
     GameRoot.prototype.resetZoom = function() {
       var vm = this.activeView && this.activeView.renderNode;
       if (!vm || !vm.scroller || typeof vm.scroller.zoomTo !== 'function') return;
+      if (typeof vm.updateScroller === 'function') vm.updateScroller();
       vm.scroller.options.animating = true;
       vm.scroller.zoomTo(1, true);
       this._centerActiveView(true);
@@ -1694,21 +1703,17 @@ define(function(require) {
       var vm = view && view.renderNode;
       if (!vm || !vm.scroller || !vm.parentNode) return;
 
-      // Design home = where the legacy 960×600 stage would have centred:
-      // scroll-offset (-data.x, -data.y) plus half the legacy stage size.
-      var d = (view.data || {});
-      var rootData = (this.data || {});
-      var designStageW = rootData.width  || 960;
-      var designStageH = rootData.height || 600;
-      var homeX = -(d.x || 0) + designStageW / 2;
-      var homeY = -(d.y || 0) + designStageH / 2;
-
+      // Centre on the middle of the ViewMap. The legacy "design home" math
+      // (-data.x + designStageW/2) resolved to the design-stage centre, not
+      // the content area, so on Imperium it parked the camera in the empty
+      // top-left quadrant. Centring on vm.width/2 always shows the seeded
+      // content (e.g. database001 at 1024,800 in a 2920×2200 ViewMap).
       var vw = vm.parentNode.width;
       var vh = vm.parentNode.height;
       var maxX = Math.max(0, vm.width  - vw);
       var maxY = Math.max(0, vm.height - vh);
-      var sx = Math.max(0, Math.min(maxX, homeX - vw / 2));
-      var sy = Math.max(0, Math.min(maxY, homeY - vh / 2));
+      var sx = Math.max(0, Math.min(maxX, vm.width  / 2 - vw / 2));
+      var sy = Math.max(0, Math.min(maxY, vm.height / 2 - vh / 2));
       vm.scroller.scrollTo(sx, sy, !!animate);
     };
 
@@ -1716,11 +1721,15 @@ define(function(require) {
     // load and on window resize so the game fills the available space by
     // default rather than sitting in a 960×600 letterbox.
     GameRoot.prototype.fitToWindow = function() {
-      var width = $(window).width();
-      var height = $(window).height();
-      this.setSize(width - 32, height - 64);
-      // After resizing, snap the active ViewMap back to its home point so
-      // the seed neighbourhood stays visually centred.
+      this.setSize($(window).width() - 32, $(window).height() - 64);
+      // Refresh the scroller's viewport dimensions so the new stage size is
+      // reflected in clamping/zoom math. Without this, scrollTo and the
+      // +/- zoom buttons clamp against the previous viewport.
+      var view = this.activeView || (this.getImperium && this.getImperium());
+      var vm = view && view.renderNode;
+      if (vm && typeof vm.updateScroller === 'function') {
+        vm.updateScroller();
+      }
       this._centerActiveView(false);
     };
 
@@ -2101,7 +2110,8 @@ define(function(require) {
         var timerconf = {
           serverTime: game.raw_data.server_time.$date,
           duration: gnode.data.charge_time,
-          serverStart: gnode.data.charge_start.$date
+          // chargeEntry.charge_start is a plain epoch-ms number — no $date wrapper.
+          serverStart: v.charge_start
         };
         gnode.setAttrs({_loadTimer: timerconf});
       });
@@ -2226,10 +2236,11 @@ define(function(require) {
           t.database_absoluteAmount = groot.DBTokensAbsolute[token.gestalt] || 0;
         }
         if (gnode.markNew) {
-          if (!groot.DBTokens.hasOwnProperty(token.gestalt)) {
+          var seenMap = (groot.raw_data && groot.raw_data.tokens_seen) || {};
+          if (!groot.DBTokens.hasOwnProperty(token.gestalt) && !seenMap[token.gestalt]) {
             t.new = true;
           }
-        } 
+        }
         if (gnode.lockAmountZero && token.amount === 0) {
           t.locked = true;
         }
@@ -2293,8 +2304,9 @@ define(function(require) {
     ProfileSet.prototype.updateNewMarker = function(){
       var ps = this;
       var groot = this.GameRoot;
+      var seenMap = (groot.raw_data && groot.raw_data.tokens_seen) || {};
       _.each(ps.tokens_set,function(token){
-        if (!groot.DBTokens.hasOwnProperty(token.gestalt)) {
+        if (!groot.DBTokens.hasOwnProperty(token.gestalt) && !seenMap[token.gestalt]) {
           token.new = true;
         } else {
           token.new = false;
@@ -3005,6 +3017,17 @@ define(function(require) {
       popup.on('button_click.PowerupSellButton',function(e,bgestalt,bslot) {
          e.stopPropagation();
          gnode.SellPowerup(bgestalt,bslot);
+      });
+
+      popup.on('popup_token_seen',function(e,gestalt) {
+        e.stopPropagation();
+        if (!gestalt) { return; }
+        groot.raw_data.tokens_seen = groot.raw_data.tokens_seen || {};
+        if (groot.raw_data.tokens_seen[gestalt]) { return; }
+        groot.raw_data.tokens_seen[gestalt] = true;
+        if (app.remote && app.remote.markTokenSeen) {
+          app.remote.markTokenSeen(app.token, gestalt);
+        }
       });
 
       popup.on('button_click.PerpBuyButton',function(e,bgestalt) {
@@ -4157,27 +4180,28 @@ define(function(require) {
         var type_data = groot.getTypeData(p);
         perp.data = type_data;
         perp.gestalt = p;
+        // Already-owned perps shouldn't appear in the buy dialog at all —
+        // backend `provided_perps` is a static list per-provider, so the
+        // UI is the only place that knows about ownership.
+        if (groot.IPerps.hasOwnProperty(perp.gestalt)) {
+          return;
+        }
         perp.locked = _.find(gnode.data.buyablePerps,function(v){ return perp.gestalt === v }) === undefined;
-        if (perp.locked && perp.data.required_level && !perp.data.required_providers && perp.data.required_level <= groot.xp_level.number && !groot.IPerps.hasOwnProperty(perp.gestalt)) {
+        if (perp.locked && perp.data.required_level && !perp.data.required_providers && perp.data.required_level <= groot.xp_level.number) {
           perp.locked = false;
         }
-        // FIXME: When Project only check for project in city
-        if ( perp.locked && groot.IPerps.hasOwnProperty(perp.gestalt) ) {
-          perp.bought = true;
-        } else {
-          if (perp.locked) {
-            if (perp.data.required_providers && perp.data.required_providers.length) {
-              perp.data.requiredProviders = [];
-              _.each(perp.data.required_providers,function(v,k){
-                var tdata = groot.getTypeData(v);
-                if (tdata && tdata.title) {
-                  perp.data.requiredProviders.push(tdata.title);
-                }
-              });
-            }
+        if (perp.locked) {
+          if (perp.data.required_providers && perp.data.required_providers.length) {
+            perp.data.requiredProviders = [];
+            _.each(perp.data.required_providers,function(v,k){
+              var tdata = groot.getTypeData(v);
+              if (tdata && tdata.title) {
+                perp.data.requiredProviders.push(tdata.title);
+              }
+            });
           }
-          gnode.data.providedPerps.push(perp);
         }
+        gnode.data.providedPerps.push(perp);
       });
       var sorted = _.sortBy(gnode.data.providedPerps, function(v){ return v.data.required_level; });
       var grouped = _.groupBy(sorted,function(v){
