@@ -975,6 +975,31 @@ define(function(require) {
       stage.addChild(statusbar);
     };
 
+    function _showLangPicker(canDismiss) {
+      var $overlay = $(
+        '<div class="LangSelectOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;">' +
+          '<div class="LangPickerBox" style="background:#BFE7F5;border:3px solid #009FD9;border-radius:12px;padding:24px 32px;text-align:center;box-shadow:3px 3px 0px #009FD9,3px 3px 8px rgba(0,0,0,0.5);">' +
+            '<div style="font-family:Bowlby;color:#009FD9;font-size:20px;margin-bottom:16px;">Choose your language<br>Sprache wählen</div>' +
+            '<div style="display:flex;gap:16px;justify-content:center;">' +
+              '<div class="Button lang-pick" data-locale="en">EN</div>' +
+              '<div class="Button lang-pick" data-locale="de">DE</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+      $('body').append($overlay);
+      $overlay.on('click', '.lang-pick', function() {
+        var chosen = $(this).data('locale');
+        $overlay.find('.lang-pick').addClass('disabled');
+        app.remote.setLocale(chosen).done(function() { location.reload(); });
+      });
+      if (canDismiss) {
+        $overlay.on('click', function(e) {
+          if (!$(e.target).closest('.LangPickerBox').length) { $overlay.remove(); }
+        });
+      }
+    }
+
     GameRoot.prototype.initEventHandlers = function() {
       var gnode = this;
 
@@ -1003,12 +1028,7 @@ define(function(require) {
 
       gnode.on('toggle_locale',function(e) {
         e.stopPropagation();
-        var i18n = require('i18n');
-        var newLocale = i18n.getLocale() === 'de_AT' ? 'en' : 'de';
-        $('body').append('<div class="LangSwitchOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.4em;">Switching language…</div>');
-        app.remote.setLocale(newLocale).done(function() {
-          location.reload();
-        });
+        _showLangPicker(true);
       });
 
       gnode.on('user_data',function(e) {
@@ -2121,25 +2141,7 @@ define(function(require) {
       game.render();
       // On first game start with no explicit locale choice, ask the player.
       if (data.is_new_game && !data.locale_persisted) {
-        var $overlay = $(
-          '<div class="LangSelectOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;">' +
-            '<div style="background:#BFE7F5;border:3px solid #009FD9;border-radius:12px;padding:24px 32px;text-align:center;box-shadow:3px 3px 0px #009FD9,3px 3px 8px rgba(0,0,0,0.5);">' +
-              '<div style="font-family:Bowlby;color:#009FD9;font-size:20px;margin-bottom:16px;">Choose your language<br>Sprache wählen</div>' +
-              '<div style="display:flex;gap:16px;justify-content:center;">' +
-                '<div class="Button lang-pick" data-locale="en">EN</div>' +
-                '<div class="Button lang-pick" data-locale="de">DE</div>' +
-              '</div>' +
-            '</div>' +
-          '</div>'
-        );
-        $('body').append($overlay);
-        $overlay.on('click', '.lang-pick', function() {
-          var chosen = $(this).data('locale');
-          $overlay.find('.lang-pick').addClass('disabled');
-          app.remote.setLocale(chosen).done(function() {
-            location.reload();
-          });
-        });
+        _showLangPicker(false);
       }
 
       // fitToWindow handles centring; the legacy is_new_game scrollTo would
