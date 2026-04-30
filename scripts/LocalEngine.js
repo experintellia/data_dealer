@@ -158,8 +158,8 @@ export function getSessionLocale() {
  * setLocale(localeCode) → Promise<{result: string}>
  *
  * Persists the player's preferred locale shorthand ('de' or 'en') as a delta
- * so the choice survives a page reload.  The caller (popup_user_data button)
- * is responsible for calling location.reload() after this resolves.
+ * so the choice survives a page reload.  The caller is responsible for
+ * calling location.reload() after this resolves.
  * Invalid locale codes are silently ignored (result still echoes the code).
  */
 export function setLocale(localeCode) {
@@ -299,7 +299,7 @@ function _buildLoadGameResponse(state, now, isNewGame) {
     karmalizers: ruleset.karmalizers,
     server_time: { $date: now },
     is_new_game: typeof isNewGame === 'boolean' ? isNewGame : !state.node_counter,
-    locale_persisted: !!(state && state.locale),
+    locale_persisted: !!state.locale,
     missions: ruleset.missions,
     mission_goals: state.mission_goals || [],
     active_missions: state.active_missions || []
