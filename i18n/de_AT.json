@@ -253,38 +253,6 @@
     null,
     "Data Dealer Highscore<br />Investierte Kohle"
   ],
-  "topscore cash text %s": [
-    null,
-    "Du hast es noch nicht in die Highscore-Liste geschafft, hast aber aktuell mehr Cash als %s aller Data Dealer, yeah."
-  ],
-  "topscore profiles text %s": [
-    null,
-    "Du hast es noch nicht in die Highscore-Liste geschafft, hast aber mehr Profile gesammelt als %s aller Data Dealer, yeah."
-  ],
-  "topscore xp text %s": [
-    null,
-    "Du hast es noch nicht in die Highscore-Liste geschafft, hast aber mehr XP als %s aller Data Dealer, yeah."
-  ],
-  "topscore spent text %s": [
-    null,
-    "Du hast es noch nicht in die Highscore-Liste geschafft, hast aber mehr Cash verdient + investiert als %s aller Data Dealer!"
-  ],
-  "topscore cash inranking": [
-    null,
-    "Congrats, du hast so viel Cash, dass du es damit in die Highscore-Liste aller Data Dealer geschafft hast! Weiter so."
-  ],
-  "topscore profiles inranking": [
-    null,
-    "Congrats, du hast schon so viele Profile gesammelt, dass du in der Highscore-Liste aller Data Dealer bist! Weiter so."
-  ],
-  "topscore xp text inranking": [
-    null,
-    "Congrats, mit deinem aktuellen XP-Stand bist du momentan in der Highscore-Liste aller Data Dealer! Weiter so."
-  ],
-  "topscore spent text inranking": [
-    null,
-    "Congrats, du hast so viel Cash verdient + investiert, dass du damit aktuell in der Highscore-Liste gelandet bist! Weiter so."
-  ],
   "topscore Cash": [
     null,
     "Cash"

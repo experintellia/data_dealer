@@ -253,38 +253,6 @@
     null,
     "Data Dealer Highscore<br />Cash Invested"
   ],
-  "topscore cash text %s": [
-    null,
-    "You didn't make it to the top yet, but you've got more cash than %s of all other data dealers, yeah."
-  ],
-  "topscore profiles text %s": [
-    null,
-    "You didn't make it to the top yet, but you've collected more profiles than %s of all other players, yeah."
-  ],
-  "topscore xp text %s": [
-    null,
-    "You didn't make it to the top yet, but you've got more xp than %s of all other players, yeah."
-  ],
-  "topscore spent text %s": [
-    null,
-    "You didn't make it to the top yet, but you've earned & invested more cash than %s of all other players!"
-  ],
-  "topscore cash inranking": [
-    null,
-    "Congrats, you've hoarded loads of cash and you're amongst the top data dealers. Keep it up!"
-  ],
-  "topscore profiles inranking": [
-    null,
-    "Congrats, you've collected enough people's profiles to find yourself among the top data dealers! Right on."
-  ],
-  "topscore xp text inranking": [
-    null,
-    "Congrats, you're amongst the most experienced data dealers! Top notch, keep it up!"
-  ],
-  "topscore spent text inranking": [
-    null,
-    "Congrats, you've burned enough cash to call yourself a serious top investor. Keep the cash flow pumping!"
-  ],
   "topscore Cash": [
     null,
     "Cash"
