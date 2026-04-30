@@ -34,6 +34,7 @@ var OP_NAMES = [
   'getSessionLocale',
   'ping',
   'checkUsername',
+  'setLocale',
 ];
 
 /**
@@ -166,9 +167,13 @@ function _seedNodesFromTree(src) {
 var reducers = {};
 
 // 'reset' discards all prior state and reseeds from the default game.
-// Addr is preserved so replay identity is not lost.
+// Addr and locale are preserved so identity and language choice survive a wipe.
 reducers.reset = function resetReducer(state) {
-  return freshState(state.addr);
+  var fresh = freshState(state.addr);
+  if (state.locale) {
+    fresh = Object.assign({}, fresh, { locale: state.locale });
+  }
+  return fresh;
 };
 
 reducers.setDisplayName = function setDisplayNameReducer(state, delta) {
@@ -176,6 +181,14 @@ reducers.setDisplayName = function setDisplayNameReducer(state, delta) {
   var dname = args[0];
   if (typeof dname !== 'string' || dname.length === 0) return state;
   return Object.assign({}, state, { display_name: dname });
+};
+
+// 'setLocale' stores the player's preferred locale shorthand ('de' or 'en').
+// Preserved across resets so the language choice survives a game wipe.
+reducers.setLocale = function setLocaleReducer(state, delta) {
+  var locale = delta.locale;
+  if (locale !== 'de' && locale !== 'en') return state;
+  return Object.assign({}, state, { locale: locale });
 };
 
 reducers.setPerpCoordinates = function setPerpCoordinatesReducer(state, delta) {
