@@ -169,11 +169,7 @@ var reducers = {};
 // 'reset' discards all prior state and reseeds from the default game.
 // Addr and locale are preserved so identity and language choice survive a wipe.
 reducers.reset = function resetReducer(state) {
-  var fresh = freshState(state.addr);
-  if (state.locale) {
-    fresh = Object.assign({}, fresh, { locale: state.locale });
-  }
-  return fresh;
+  return Object.assign(freshState(state.addr), state.locale ? { locale: state.locale } : {});
 };
 
 reducers.setDisplayName = function setDisplayNameReducer(state, delta) {

@@ -2121,16 +2121,21 @@ define(function(require) {
       game.render();
       // On first game start with no explicit locale choice, ask the player.
       if (data.is_new_game && !data.locale_persisted) {
-        var $overlay = $('<div class="LangSelectOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:inherit;">' +
-          '<div style="font-size:1.3em;margin-bottom:1em;text-align:center;">Choose your language<br>Sprache wählen</div>' +
-          '<div style="display:flex;gap:1em;">' +
-          '<button class="lang-pick" data-locale="en" style="font-size:1.2em;padding:0.5em 1.5em;cursor:pointer;">EN</button>' +
-          '<button class="lang-pick" data-locale="de" style="font-size:1.2em;padding:0.5em 1.5em;cursor:pointer;">DE</button>' +
-          '</div></div>');
+        var $overlay = $(
+          '<div class="LangSelectOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;">' +
+            '<div style="background:#BFE7F5;border:3px solid #009FD9;border-radius:12px;padding:24px 32px;text-align:center;box-shadow:3px 3px 0px #009FD9,3px 3px 8px rgba(0,0,0,0.5);">' +
+              '<div style="font-family:Bowlby;color:#009FD9;font-size:20px;margin-bottom:16px;">Choose your language<br>Sprache wählen</div>' +
+              '<div style="display:flex;gap:16px;justify-content:center;">' +
+                '<div class="Button lang-pick" data-locale="en">EN</div>' +
+                '<div class="Button lang-pick" data-locale="de">DE</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>'
+        );
         $('body').append($overlay);
         $overlay.on('click', '.lang-pick', function() {
           var chosen = $(this).data('locale');
-          $overlay.find('.lang-pick').prop('disabled', true);
+          $overlay.find('.lang-pick').addClass('disabled');
           app.remote.setLocale(chosen).done(function() {
             location.reload();
           });

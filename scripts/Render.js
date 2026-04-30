@@ -4136,13 +4136,13 @@ define(function(require) {
     MainMenu.prototype.lock = function() {
       var node = this;
       node.jdomelem.addClass('locked');
-      node.jdomelem.find('.UserButton, .MainMenuButton, .LocaleButton').addClass('disabled');
+      node.jdomelem.find('.UserButton, .MainMenuButton').addClass('disabled');
     };
 
     MainMenu.prototype.unlock = function() {
       var node = this;
       node.jdomelem.removeClass('locked');
-      node.jdomelem.find('.UserButton, .MainMenuButton, .LocaleButton').removeClass('disabled');
+      node.jdomelem.find('.UserButton, .MainMenuButton').removeClass('disabled');
     };
 
     MainMenu.prototype.addButton = function(text,id,states) {
