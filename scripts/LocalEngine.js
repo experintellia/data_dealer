@@ -940,7 +940,12 @@ export function buyPerp(_token, parentPath, gestalt) {
       newGv = Object.assign({}, newGv, {
         ap_inc_value: levelInfo.ap_inc_value,
         ap_inc_interval: levelInfo.ap_inc_interval,
-        ap_max: levelInfo.ap_max
+        ap_max: levelInfo.ap_max,
+        // Refill AP on levelup so the player gets a fresh batch of actions —
+        // matches buyKarma/chargePerp behaviour. Without this, ap_snapshot
+        // stayed at the previous level's value while ap_max grew, so the AP
+        // bar visibly under-filled after a buyPerp-triggered level.
+        ap_snapshot: levelInfo.ap_max
       });
     }
   }
@@ -1358,7 +1363,14 @@ export function collectPerp(_token, gperpPath) {
   var oldLevel = (ms.game_values && ms.game_values.xp_level) || 1;
   var newLevel = _getLevelByXP(newGv.xp_value);
   var levelup  = newLevel > oldLevel;
-  if (levelup) newGv = Object.assign({}, newGv, { xp_level: newLevel });
+  if (levelup) {
+    var collectLevels = _getRuleset().levels;
+    var collectLevelInfo = collectLevels[newLevel - 1] || collectLevels[collectLevels.length - 1];
+    newGv = Object.assign({}, newGv, {
+      xp_level: newLevel,
+      ap_snapshot: collectLevelInfo.ap_max
+    });
+  }
 
   var newState = Object.assign({}, ms, {
     nodes:         newNodes,
@@ -1498,7 +1510,14 @@ export function integrateCollected(_token, collectId) {
   var oldLevel = (state.game_values && state.game_values.xp_level) || 1;
   var newLevel = _getLevelByXP(newGv.xp_value);
   var levelup  = newLevel > oldLevel;
-  if (levelup) newGv = Object.assign({}, newGv, { xp_level: newLevel });
+  if (levelup) {
+    var integrateLevels = _getRuleset().levels;
+    var integrateLevelInfo = integrateLevels[newLevel - 1] || integrateLevels[integrateLevels.length - 1];
+    newGv = Object.assign({}, newGv, {
+      xp_level: newLevel,
+      ap_snapshot: integrateLevelInfo.ap_max
+    });
+  }
 
   var newState = Object.assign({}, state, {
     db_queue:       newQueue,
