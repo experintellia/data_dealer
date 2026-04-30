@@ -388,3 +388,46 @@ describe('chargePerp — failure: non-chargeable node (no charge_time)', () => {
     expect(result.error).toBe(1);
   });
 });
+
+// ── level-up: chargePerp's xp_inc crosses the threshold ─────────────────────
+//
+// Level 1 (de + en): xp_min=0,  xp_max=10, ap_max=6
+// Level 2 (de + en): xp_min=11, xp_max=30, ap_max=8
+// chargePerp on contact035 awards xp_inc=1, so xp=10 → 11 crosses to lvl 2.
+
+describe('chargePerp — level-up refills AP and advances xp_level', () => {
+  beforeEach(() => {
+    setOverride(FIXED_NOW);
+    setState(mkState({
+      game_values: { xp_value: 10, xp_level: 1, ap_snapshot: 3, ap_max: 6 }
+    }));
+  });
+
+  it('returns levelup=true when xp_inc crosses the level threshold', async () => {
+    const { result } = await chargePerp('tok', NODE_PATH);
+    expect(result.levelup).toBe(true);
+  });
+
+  it('advances xp_level to the new level', async () => {
+    const { result } = await chargePerp('tok', NODE_PATH);
+    expect(result.game_values.xp_level).toBe(2);
+  });
+
+  it('refills ap_snapshot to the new level\'s ap_max (not -1 from charging)', async () => {
+    const { result } = await chargePerp('tok', NODE_PATH);
+    expect(result.game_values.ap_snapshot).toBe(8);
+  });
+});
+
+describe('chargePerp — no level-up keeps xp_level and decrements ap_snapshot', () => {
+  it('xp gain inside the same level reports levelup=false and AP-1', async () => {
+    setOverride(FIXED_NOW);
+    setState(mkState({
+      game_values: { xp_value: 5, xp_level: 1, ap_snapshot: 4, ap_max: 6 }
+    }));
+    const { result } = await chargePerp('tok', NODE_PATH);
+    expect(result.levelup).toBe(false);
+    expect(result.game_values.xp_level).toBe(1);
+    expect(result.game_values.ap_snapshot).toBe(3);
+  });
+});

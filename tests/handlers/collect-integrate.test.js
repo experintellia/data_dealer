@@ -542,3 +542,62 @@ describe('integrateCollected — token node updates', () => {
     expect(result.result.nodes).toHaveLength(0);
   });
 });
+
+// ── level-up refills AP across collect/integrate paths ──────────────────────
+//
+// Level 1 (de + en): xp_min=0,  xp_max=10, ap_max=6
+// Level 2 (de + en): xp_min=11, xp_max=30, ap_max=8
+
+describe('collectPerp — level-up refills ap_snapshot to the new ap_max', () => {
+  const PATH = 'Imperium.City.Agent0.contact001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('crossing the xp_max threshold returns levelup=true and ap_snapshot=8', async () => {
+    setState(mkState({
+      // xp_value=10 + xp_inc=1 (contact001) = 11 → level 2.
+      game_values: Object.assign({}, mkGv(), {
+        xp_value: 10, xp_level: 1, ap_snapshot: 0, ap_max: 6
+      }),
+      nodes: [{
+        game_id: 'node_contact001', game_type: 'ContactPerp',
+        full_type: 'ContactPerp:contact001', gestalt: 'contact001',
+        full_path: PATH, instance_data: {}
+      }],
+      nodes_collect: [{ path: PATH, result: { amount: 5 } }]
+    }));
+
+    const { result } = await collectPerp('tok', PATH);
+    expect(result.levelup).toBe(true);
+    expect(result.game_values.xp_level).toBe(2);
+    expect(result.game_values.ap_snapshot).toBe(8);
+  });
+});
+
+describe('integrateCollected — level-up refills ap_snapshot to the new ap_max', () => {
+  const COLLECT_ID = 'lvlup-integrate-001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('crossing xp_max via xp_gain returns levelup=true and full AP', async () => {
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), {
+        xp_value: 5, xp_level: 1, ap_snapshot: 1, ap_max: 6
+      }),
+      db_queue: [{
+        origin: 'Imperium.City.contact001',
+        collect_id: COLLECT_ID,
+        // xp_gain on the profile_set drives xp gain on integrate.
+        profile_set: { profiles_value: 4, tokens_map: {}, xp_gain: 10, karma_gain: 0 },
+        collect_dt: FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.levelup).toBe(true);
+    expect(result.game_values.xp_level).toBe(2);
+    expect(result.game_values.ap_snapshot).toBe(8);
+  });
+});

@@ -1045,6 +1045,38 @@ describe('buyPerp — failure: unknown gestalt', () => {
   });
 });
 
+// ── level-up: buyPerp's xp_inc crosses a threshold ─────────────────────────
+//
+// contact001 requires level 3 (xp_min=31, xp_max=54), xp_inc=1. Setting
+// xp_value=54, xp_level=3 means the next 1-XP buy lands the player at
+// xp=55 = level 4 (xp_min=55, xp_max=80, ap_max=14).
+
+describe('buyPerp — level-up refills ap_snapshot', () => {
+  beforeEach(() => {
+    setState(Object.assign(mkBuyPerpState(), {
+      game_values: {
+        xp_value: 54, xp_level: 3,
+        cash_value: 10000, cash_spent: 0,
+        karma_value: 0, profiles_value: 0, profiles_max: 1,
+        ap_snapshot: 1, ap_update: null
+      }
+    }));
+  });
+
+  it('returns levelup=true', async () => {
+    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    expect(result.error).toBeUndefined();
+    expect(result.levelup).toBe(true);
+  });
+
+  it('advances xp_level and refills AP to the new level\'s ap_max', async () => {
+    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    expect(result.game_values.xp_level).toBe(4);
+    expect(result.game_values.ap_snapshot).toBe(14);
+    expect(result.game_values.ap_max).toBe(14);
+  });
+});
+
 // ── setLocale ────────────────────────────────────────────────────────────────
 
 describe('setLocale', () => {
