@@ -1827,6 +1827,11 @@ define(function(require) {
       this.profiles_value = gv.profiles_value;
       this.profiles_max = gv.profiles_max;
       this.cash_value = gv.cash_value;
+      // cash_max was never initialised in the legacy code, so the cash-bar
+      // barsize divided by undefined → NaN. Pin to a sane large default so
+      // the bar fills meaningfully without overflowing once the player
+      // accumulates cash from client collections.
+      this.cash_max = gv.cash_max || 10000;
       this.karma_value = gv.karma_value;
       this.karma_max = 100;
       this.xp_value = gv.xp_value;

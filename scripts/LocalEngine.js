@@ -1118,6 +1118,22 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
     ap_snapshot: Math.max(0, (gv.ap_snapshot || 0) - 1),
   });
 
+  // Advance xp_level if the new XP crossed a threshold. The legacy port
+  // omitted this for chargePerp specifically (collectPerp / integrateCollected
+  // / buyKarma all do compute it), so the player's XP could drift past
+  // xp_level.xp_max — visible as a status-bar overflow on screen.
+  var oldLevelNum = gv.xp_level || 1;
+  var newLevelNum = _getLevelByXP(newGv.xp_value);
+  var levelup = newLevelNum > oldLevelNum;
+  if (levelup) {
+    var levels = _getRuleset().levels;
+    var newLevelInfo = levels[newLevelNum - 1] || levels[levels.length - 1];
+    newGv = Object.assign({}, newGv, {
+      xp_level: newLevelNum,
+      ap_snapshot: newLevelInfo.ap_max,
+    });
+  }
+
   setState(Object.assign({}, state, {
     nodes:          newNodes,
     nodes_charging: charging.concat([chargeEntry]),
@@ -1140,7 +1156,7 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
   _scheduleChargeReady(chargeEntry.charge_end);
 
   return Promise.resolve({
-    result: { game_values: newGv, duration: durationMs, levelup: false, missions: {} },
+    result: { game_values: newGv, duration: durationMs, levelup: levelup, missions: {} },
   });
 }
 
@@ -1452,23 +1468,21 @@ export function integrateCollected(_token, collectId) {
   // First-time integration of a token type: append a new TokenPerp node
   // under Database.<gestalt>. Without this, DBTokens stays empty, the
   // Database tab stays blank, and integrate_profiles missions never tick.
+  // Seed without x/y so the UI's setRandomPosition (Render.js:2393) places
+  // the new tile with collision avoidance around (1024,800), then
+  // saveCoordsQueue persists the resolved position. Pre-seeding x/y
+  // bypassed that and made every new token stack at a single hashed point.
   Object.keys(tokensMap).forEach(function (gestalt) {
     if (seenGestalts[gestalt]) return;
     if (!ruleset.tokens || !ruleset.tokens[gestalt]) return;
     var tok = tokensMap[gestalt];
-    // Deterministic spread around the Database centre so multiple new
-    // tokens on the same integrate don't all stack on top of each other
-    // at (0,0). Hash is gestalt-keyed so replay produces identical layout.
-    var hash = _djb2(gestalt);
-    var dx = (hash         % 1200) - 600;
-    var dy = ((hash >>> 8) %  800) - 400;
     var newNode = {
       game_id:    gestalt,
       gestalt:    gestalt,
       game_type:  'TokenPerp',
       full_type:  'TokenPerp:' + gestalt,
       full_path:  'Database.' + gestalt,
-      instance_data: { amount: tok.amount || 0, x: 1024 + dx, y: 800 + dy }
+      instance_data: { amount: tok.amount || 0 }
     };
     newNodes = newNodes.concat([newNode]);
     updatedNodes.push({
