@@ -79,19 +79,28 @@ export function freshState(selfAddr, seed) {
     src.game_values || {}
   );
 
+  // Seed starting equipment + active missions inline so the baseline state
+  // produced by freshState (and therefore by the 'reset' reducer and by
+  // every cold-start replay) already contains the trunk-mission state.
+  // This MUST happen at the freshState level: lazy seeding inside loadGame
+  // doesn't survive replay, so a buyPerp delta committed after a reset
+  // would re-add itself on cold start *without* its seeded parent and
+  // crash GameRoot.loadGame's parent lookup.
+  var seededNodes = _seedNodesFromTree(src);
+
   return {
     schema_version: SCHEMA_VERSION,
     addr: selfAddr || '',
     display_name: '',
     game_version: null,
     version: null,
-    nodes: [],
+    nodes: seededNodes,
     nodes_charging: [],
     nodes_collect: [],
     db_queue: [],
     game_values: gv,
     mission_goals: [],
-    active_missions: [],
+    active_missions: (src.active_missions || []).slice(),
     last_seen_ts: 0,
     node_counter: 0,
     integrated_ids: {},
@@ -99,35 +108,15 @@ export function freshState(selfAddr, seed) {
 }
 
 /**
- * seedNewGame(state, seed?) → state
- *
- * Materialises the starting equipment (Imperium/Database tree from
- * data/default_game.json) into nodes[] and activates the trunk mission.
- * Idempotent on a non-empty state — only applied when nodes, mission_goals
- * and active_missions are all empty.  This mirrors what the original
- * Python backend's `mongo.get_game` did the first time it inserted a doc
- * for a new player; calling it lazily in loadGame keeps `is_new_game`
- * reporting correct on the very first call after reset.
+ * @deprecated Seed is now applied directly in freshState; this is kept as a
+ * no-op shim so callers (e.g. LocalEngine.loadGame) compile during the
+ * transition.  Remove once all call sites are gone.
  */
-export function seedNewGame(state, seed) {
-  var src = seed || _defaultSeed || {};
-
-  var hasNodes = state.nodes && state.nodes.length;
-  var hasMissions = state.active_missions && state.active_missions.length;
-  var hasGoals = state.mission_goals && state.mission_goals.length;
-  if (hasNodes || hasMissions || hasGoals) return state;
-
-  var seeded = _seedNodesFromTree(src);
-
-  return Object.assign({}, state, {
-    nodes: seeded.nodes,
-    active_missions: (src.active_missions || []).slice(),
-    node_counter: Math.max(state.node_counter || 0, seeded.counter),
-  });
+export function seedNewGame(state) {
+  return state;
 }
 
 function _seedNodesFromTree(src) {
-  var counter = 0;
   var out = [];
 
   function gestaltFromFullType(ft) {
@@ -143,7 +132,6 @@ function _seedNodesFromTree(src) {
     if (!child || !child.full_type) return;
     var gestalt = gestaltFromFullType(child.full_type);
     if (!gestalt) return;
-    counter += 1;
     var fullPath = parentPath + '.' + gestalt;
     out.push({
       // game_id MUST equal the path's last segment — Game.js:getByLastId looks
@@ -165,7 +153,7 @@ function _seedNodesFromTree(src) {
     for (var i = 0; i < node.children.length; i++) walk(root, node.children[i]);
   });
 
-  return { nodes: out, counter: counter };
+  return out;
 }
 
 // ---------------------------------------------------------------------------

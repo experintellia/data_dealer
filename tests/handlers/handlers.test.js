@@ -242,17 +242,15 @@ describe('loadGame — replayed state', () => {
     expect(result.version).toBeDefined();
   });
 
-  it('is_new_game is false when nodes array is non-empty', async () => {
-    var s = freshState('p@x');
-    // Manually add a fake node to simulate a returning player.
-    s = Object.assign({}, s, {
-      nodes: [{ game_id: 'n1', game_type: 'ContactPerp', full_path: 'Imperium.n1', full_type: 'ContactPerp:contact001', instance_data: {} }]
-    });
+  it('is_new_game is false once the player has bought something', async () => {
+    // node_counter > 0 marks a returning player — bumped only by buyPerp,
+    // never by the seed.  The freshState seed already populates s.nodes,
+    // so length-of-nodes alone can no longer distinguish new from returning.
+    var s = Object.assign({}, freshState('p@x'), { node_counter: 1 });
     setState(s);
 
     const { result } = await loadGame('tok');
     expect(result.is_new_game).toBe(false);
-    expect(result.nodes).toHaveLength(1);
   });
 });
 
@@ -460,19 +458,19 @@ describe('resetGame', () => {
     expect(data.result).toBeTruthy();
   });
 
-  it('wipes nodes after reset', async () => {
+  it('wipes player-bought nodes after reset (seed nodes are restored)', async () => {
     setState(mkState({
       nodes: [{ game_id: 'n1', game_type: 'ContactPerp', full_path: 'Imperium.n1',
                 full_type: 'ContactPerp:contact001', instance_data: {} }]
     }));
     await resetGame('tok');
-    expect(getState().nodes).toEqual([]);
+    expect(getState().nodes.map((n) => n.gestalt)).toEqual(['database001']);
   });
 
-  it('wipes active_missions after reset', async () => {
+  it('restores trunk mission after reset', async () => {
     setState(mkState({ active_missions: ['m1', 'm2'] }));
     await resetGame('tok');
-    expect(getState().active_missions).toEqual([]);
+    expect(getState().active_missions).toEqual(['mission001']);
   });
 
   it('restores game_values to seed defaults after reset', async () => {
@@ -881,8 +879,8 @@ describe('buyPerp — happy path (contact gestalt)', () => {
   it('adds node to in-memory state', async () => {
     await buyPerp('tok', 'Imperium', 'contact001');
     const s = getState();
-    expect(s.nodes).toHaveLength(1);
-    expect(s.nodes[0].full_path).toBe('Imperium.contact001');
+    // freshState already includes the seeded database001, so a buy adds a 2nd entry.
+    expect(s.nodes.find((n) => n.full_path === 'Imperium.contact001')).toBeTruthy();
   });
 
   it('returns profile_set for contact* gestalt', async () => {
@@ -906,7 +904,7 @@ describe('buyPerp — happy path (contact gestalt)', () => {
     await buyPerp('tok', 'Imperium', 'city002');
     const s = getState();
     const ids = s.nodes.map(function(n) { return n.game_id; });
-    expect(new Set(ids).size).toBe(2);  // all unique
+    expect(new Set(ids).size).toBe(ids.length);  // all unique (seed + 2 buys)
     expect(r1.result.node.game_id).toBe('contact001');
   });
 });
@@ -952,8 +950,8 @@ describe('buyPerp — happy path delta replay (applyDelta roundtrip)', () => {
     };
 
     const replayed = applyDelta(seedState, delta);
-    expect(replayed.nodes).toHaveLength(1);
-    expect(replayed.nodes[0].full_path).toBe('Imperium.contact001');
+    // freshState seed contributes database001; replay adds the bought contact001.
+    expect(replayed.nodes.find((n) => n.full_path === 'Imperium.contact001')).toBeTruthy();
     expect(replayed.game_values.cash_value).toBe(10000 - 400);
     expect(replayed.node_counter).toBe(1);
   });
@@ -979,7 +977,7 @@ describe('buyPerp — failure: insufficient cash', () => {
       ap_snapshot: 6, ap_update: null
     }}));
     await buyPerp('tok', 'Imperium', 'contact001');
-    expect(getState().nodes).toHaveLength(0);
+    expect(getState().nodes.find((n) => n.gestalt === 'contact001')).toBeUndefined();
   });
 });
 

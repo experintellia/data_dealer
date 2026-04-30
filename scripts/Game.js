@@ -1640,17 +1640,46 @@ define(function(require) {
     };
 
 
-    // The fullscreen button now resets the active ViewMap's zoom level —
-    // the game already fills the viewport on load (see fitToWindow below),
-    // so toggling between window-size and the legacy 960×600 frame served
-    // no purpose.  Falls back to a no-op if no ViewMap is active yet.
+    // The fullscreen button now resets zoom AND re-centers on the ViewMap's
+    // design home point — for Imperium that's where the seed places the
+    // Database (≈1024,800).  Falls back to a no-op if no ViewMap is active.
     GameRoot.prototype.resetZoom = function() {
       var vm = this.activeView && this.activeView.renderNode;
-      if (vm && vm.scroller && typeof vm.scroller.zoomTo === 'function') {
-        vm.scroller.options.animating = true;
-        vm.scroller.zoomTo(1, true);
-        vm.scroller.options.animating = false;
-      }
+      if (!vm || !vm.scroller || typeof vm.scroller.zoomTo !== 'function') return;
+      vm.scroller.options.animating = true;
+      vm.scroller.zoomTo(1, true);
+      this._centerActiveView(true);
+      vm.scroller.options.animating = false;
+    };
+
+    // Re-centers the active ViewMap so the design home point sits in the
+    // middle of the visible viewport — used both at startup and from the
+    // reset-zoom button so the player isn't staring at empty space when
+    // the window is wider than the legacy 960×600 frame.
+    GameRoot.prototype._centerActiveView = function(animate) {
+      // activeView is only set after a switch_view trigger; before the first
+      // tab click (i.e. on initial load) Imperium is shown by default, so
+      // fall back to it.
+      var view = this.activeView || (this.getImperium && this.getImperium());
+      var vm = view && view.renderNode;
+      if (!vm || !vm.scroller || !vm.parentNode) return;
+
+      // Design home = where the legacy 960×600 stage would have centred:
+      // scroll-offset (-data.x, -data.y) plus half the legacy stage size.
+      var d = (view.data || {});
+      var rootData = (this.data || {});
+      var designStageW = rootData.width  || 960;
+      var designStageH = rootData.height || 600;
+      var homeX = -(d.x || 0) + designStageW / 2;
+      var homeY = -(d.y || 0) + designStageH / 2;
+
+      var vw = vm.parentNode.width;
+      var vh = vm.parentNode.height;
+      var maxX = Math.max(0, vm.width  - vw);
+      var maxY = Math.max(0, vm.height - vh);
+      var sx = Math.max(0, Math.min(maxX, homeX - vw / 2));
+      var sy = Math.max(0, Math.min(maxY, homeY - vh / 2));
+      vm.scroller.scrollTo(sx, sy, !!animate);
     };
 
     // Size the renderable area to the current viewport.  Called on initial
@@ -1660,6 +1689,9 @@ define(function(require) {
       var width = $(window).width();
       var height = $(window).height();
       this.setSize(width - 32, height - 64);
+      // After resizing, snap the active ViewMap back to its home point so
+      // the seed neighbourhood stays visually centred.
+      this._centerActiveView(false);
     };
 
     GameRoot.prototype.setSize = function(width,height) {
@@ -3544,7 +3576,7 @@ define(function(require) {
         });
         mroot.updateMissionGoals(missions.mission_data.mission_goals);
       }
-      if (missions.mission_data, missions.mission_data.active_missions) {
+      if (missions.mission_data && missions.mission_data.active_missions) {
         _.each(missions.mission_data.active_missions, function(gestalt){
           var am = mroot.getMission(gestalt);
           mroot.getMission(gestalt).setState('active',true);
