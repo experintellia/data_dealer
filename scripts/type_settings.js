@@ -281,18 +281,6 @@ define(function(require) {
             "profiles": _._('topscore profiles headline'),
             "xp": _._('topscore xp headline'),
             "spent": _._('topscore spent headline')
-          },
-          "type_texts_notinranking": {
-            "cash": _._('topscore cash text %s'),
-            "profiles": _._('topscore profiles text %s'),
-            "xp": _._('topscore xp text %s'),
-            "spent": _._('topscore spent text %s')
-          },
-          "type_texts": {
-            "cash": _._('topscore cash inranking'),
-            "profiles": _._('topscore profiles inranking'),
-            "xp": _._('topscore xp text inranking'),
-            "spent": _._('topscore spent text inranking')
           }
         }
       },
