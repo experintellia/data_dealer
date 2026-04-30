@@ -299,6 +299,7 @@ function _buildLoadGameResponse(state, now, isNewGame) {
     karmalizers: ruleset.karmalizers,
     server_time: { $date: now },
     is_new_game: typeof isNewGame === 'boolean' ? isNewGame : !state.node_counter,
+    locale_persisted: !!(state && state.locale),
     missions: ruleset.missions,
     mission_goals: state.mission_goals || [],
     active_missions: state.active_missions || []

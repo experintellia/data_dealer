@@ -1001,17 +1001,24 @@ define(function(require) {
         gnode.activeView.setState('active',true);
       });
 
+      gnode.on('toggle_locale',function(e) {
+        e.stopPropagation();
+        var i18n = require('i18n');
+        var newLocale = i18n.getLocale() === 'de_AT' ? 'en' : 'de';
+        $('body').append('<div class="LangSwitchOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.4em;">Switching language…</div>');
+        app.remote.setLocale(newLocale).done(function() {
+          location.reload();
+        });
+      });
+
       gnode.on('user_data',function(e) {
         e.stopPropagation();
         var user = gnode.data.user;
         var text = _._('user description');
-        var i18n = require('i18n');
-        var currentLocale = i18n.getLocale() === 'en_US' ? 'en' : 'de';
         gnode.openGenericPopup({
           data: {
             title: user.display_name,
-            description: text,
-            currentLocale: currentLocale
+            description: text
           },
           template:'popup_user_data.html'
         });
@@ -2112,6 +2119,24 @@ define(function(require) {
       });
 
       game.render();
+      // On first game start with no explicit locale choice, ask the player.
+      if (data.is_new_game && !data.locale_persisted) {
+        var $overlay = $('<div class="LangSelectOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:inherit;">' +
+          '<div style="font-size:1.3em;margin-bottom:1em;text-align:center;">Choose your language<br>Sprache wählen</div>' +
+          '<div style="display:flex;gap:1em;">' +
+          '<button class="lang-pick" data-locale="en" style="font-size:1.2em;padding:0.5em 1.5em;cursor:pointer;">EN</button>' +
+          '<button class="lang-pick" data-locale="de" style="font-size:1.2em;padding:0.5em 1.5em;cursor:pointer;">DE</button>' +
+          '</div></div>');
+        $('body').append($overlay);
+        $overlay.on('click', '.lang-pick', function() {
+          var chosen = $(this).data('locale');
+          $overlay.find('.lang-pick').prop('disabled', true);
+          app.remote.setLocale(chosen).done(function() {
+            location.reload();
+          });
+        });
+      }
+
       // fitToWindow handles centring; the legacy is_new_game scrollTo would
       // be immediately overwritten so we no longer set it here.
       game.fitToWindow();
@@ -3023,19 +3048,6 @@ define(function(require) {
       popup.on('button_click.RefreshButton',function(e) {
         e.stopPropagation();
         gnode.GameRoot.refresh();
-      });
-
-      popup.jdomelem.on('click touchend', '.Button[data-button-id="SetLocaleButton"]', function(e) {
-        e.stopPropagation();
-        var newLocale = $(this).data('locale');
-        var i18n = require('i18n');
-        var currentLocale = i18n.getLocale() === 'en_US' ? 'en' : 'de';
-        if (newLocale === currentLocale) { return; }
-        // Show brief overlay feedback, persist delta, then reload.
-        $('body').append('<div class="LangSwitchOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.4em;">Switching language…</div>');
-        app.remote.setLocale(newLocale).done(function() {
-          location.reload();
-        });
       });
 
       popup.on('button_click.ResetButton',function(e) {

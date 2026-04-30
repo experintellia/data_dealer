@@ -4,6 +4,7 @@
 %>
   <div class="RenderSprite MainMenuLogo <%= logoclass %>"></div>
   <div class="UserActions">
+    <div id="LocaleToggle" class="LocaleButton"><%= setup.localeShort === 'de' ? 'DE' : 'EN' %></div>
     <div id="UserData" class="UserButton"><%= D.userdata.display_name %></div>
   </div>
   <div id="MainMenuButtons" class="MainMenuButtons">
