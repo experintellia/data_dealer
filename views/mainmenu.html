@@ -5,7 +5,6 @@
   <div class="RenderSprite MainMenuLogo <%= logoclass %>"></div>
   <div class="UserActions">
     <div id="UserData" class="UserButton"><%= D.userdata.display_name %></div>
-    <div id="Logout" class="UserButton"><% print(_._('Log Out')); %></div>
   </div>
   <div id="MainMenuButtons" class="MainMenuButtons">
     <% _.each(D.buttons, function(button) { %> <div class="MainMenuButton<% if (button.states.active) { print(' active') }; %>" data-button-id="<%= button.id %>"><%= button.label %></div> <% }); %>

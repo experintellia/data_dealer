@@ -4089,12 +4089,6 @@ define(function(require) {
         e.preventDefault();
         GameRoot.trigger('user_data');
       });
-      this.jdomelem.on('click touchend','#Logout',function(e){
-        e.stopPropagation();
-        e.preventDefault();
-        GameRoot.lock();
-        routie('sign_out');
-      });
       this.jdomelem.on('click touchend','.MainMenuButton:not(.disabled)',function(e){
         e.stopPropagation();
         e.preventDefault();
@@ -4116,7 +4110,7 @@ define(function(require) {
     MainMenu.prototype.lock = function() {
       var node = this;
       node.jdomelem.addClass('locked');
-      node.jdomelem.find('.UserButton:not(#Logout), .MainMenuButton').addClass('disabled');
+      node.jdomelem.find('.UserButton, .MainMenuButton').addClass('disabled');
     };
 
     MainMenu.prototype.unlock = function() {
