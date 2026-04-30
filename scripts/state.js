@@ -395,11 +395,25 @@ reducers.integrateCollected = function integrateCollectedReducer(state, delta) {
 
   var newNodes = state.nodes;
   if (r.nodes && r.nodes.length) {
+    var existingPaths = {};
     var updMap = {};
     r.nodes.forEach(function (u) { updMap[u.full_path] = u; });
     newNodes = state.nodes.map(function (n) {
+      existingPaths[n.full_path] = true;
       var u = updMap[n.full_path];
       return u ? Object.assign({}, n, { instance_data: u.instance_data }) : n;
+    });
+    // Append fresh TokenPerp nodes (first-time integration of a token type).
+    r.nodes.forEach(function (u) {
+      if (existingPaths[u.full_path]) return;
+      newNodes = newNodes.concat([{
+        game_id:       u.game_id,
+        gestalt:       u.gestalt,
+        game_type:     u.game_type,
+        full_type:     u.full_type,
+        full_path:     u.full_path,
+        instance_data: u.instance_data || {}
+      }]);
     });
   }
 

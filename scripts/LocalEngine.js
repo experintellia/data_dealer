@@ -1250,7 +1250,20 @@ export function collectPerp(_token, gperpPath) {
 
   if (gameType === 'ContactPerp' || gameType === 'ProjectPerp') {
     var collectId = _generateId();
-    var profileSet = { profiles_value: cr.amount || 0, tokens_map: {} };
+    // Profile-set token contributions come from the perp's contained_tokens —
+    // each entry's `amount` is the percentage of profiles that carry that
+    // token type. Without this, tokens_map stays empty, integrateCollected
+    // never creates TokenPerp nodes, DBTokensAbsolute never populates, and
+    // missions whose workflow is "integrate_profiles" never advance past 0.
+    var tokensMap = {};
+    var contained = (typeData && typeData.contained_tokens) || [];
+    for (var ct = 0; ct < contained.length; ct++) {
+      var ctEntry = contained[ct];
+      if (ctEntry && ctEntry.gestalt) {
+        tokensMap[ctEntry.gestalt] = { amount: ctEntry.amount || 0 };
+      }
+    }
+    var profileSet = { profiles_value: cr.amount || 0, tokens_map: tokensMap };
     dbEntry = {
       origin:      gperpPath,
       collect_id:  collectId,
@@ -1379,11 +1392,14 @@ export function integrateCollected(_token, collectId) {
     profiles_value: (state.game_values.profiles_value || 0) + increment
   });
 
+  var ruleset = _getRuleset();
   var tokensMap = ps.tokens_map || {};
   var updatedNodes = [];
+  var seenGestalts = {};
   var newNodes = (state.nodes || []).map(function (n) {
     var tok = tokensMap[n.gestalt];
     if (!tok) return n;
+    seenGestalts[n.gestalt] = true;
     var newAmount = ((n.instance_data && n.instance_data.amount) || 0) + (tok.amount || 0);
     var updated = Object.assign({}, n, {
       instance_data: Object.assign({}, n.instance_data, { amount: newAmount })
@@ -1391,10 +1407,38 @@ export function integrateCollected(_token, collectId) {
     updatedNodes.push({
       game_id:       updated.game_id,
       gestalt:       updated.gestalt,
+      game_type:     updated.game_type,
+      full_type:     updated.full_type,
       full_path:     updated.full_path,
       instance_data: updated.instance_data
     });
     return updated;
+  });
+
+  // First-time integration of a token type: append a new TokenPerp node
+  // under Database.<gestalt>. Without this, DBTokens stays empty, the
+  // Database tab stays blank, and integrate_profiles missions never tick.
+  Object.keys(tokensMap).forEach(function (gestalt) {
+    if (seenGestalts[gestalt]) return;
+    if (!ruleset.tokens || !ruleset.tokens[gestalt]) return;
+    var tok = tokensMap[gestalt];
+    var newNode = {
+      game_id:    gestalt,
+      gestalt:    gestalt,
+      game_type:  'TokenPerp',
+      full_type:  'TokenPerp:' + gestalt,
+      full_path:  'Database.' + gestalt,
+      instance_data: { amount: tok.amount || 0 }
+    };
+    newNodes = newNodes.concat([newNode]);
+    updatedNodes.push({
+      game_id:       newNode.game_id,
+      gestalt:       newNode.gestalt,
+      game_type:     newNode.game_type,
+      full_type:     newNode.full_type,
+      full_path:     newNode.full_path,
+      instance_data: newNode.instance_data
+    });
   });
 
   var oldLevel = (state.game_values && state.game_values.xp_level) || 1;

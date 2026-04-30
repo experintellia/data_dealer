@@ -32,9 +32,10 @@ define(function(require) {
         }
       };
     }
-    if (typeof Ticker.setFPS !== 'function') {
-      Ticker.setFPS = function(fps) { Ticker.framerate = fps; };
-    }
+    // Always override setFPS so we use the modern `framerate=` setter even
+    // when the legacy method still exists (it logs a deprecation warning
+    // on every call in current TweenJS builds).
+    Ticker.setFPS = function(fps) { Ticker.framerate = fps; };
 
     var app = require('app').getApplication();
     var setup = require('setup');

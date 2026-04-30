@@ -500,4 +500,45 @@ describe('integrateCollected — token node updates', () => {
     const { getState } = await import('../../scripts/boot.js');
     expect(getState().db_queue).toHaveLength(0);
   });
+
+  it('appends a new TokenPerp node the first time a token type is integrated', async () => {
+    // token008 is a real ruleset entry (mission002 targets it). State has no
+    // node for it yet — integrateCollected must seed one under Database/.
+    setState(mkState({
+      locale: 'en',
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 50, tokens_map: { token008: { amount: 25 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const newEntry = result.result.nodes.find(function (n) { return n.gestalt === 'token008'; });
+    expect(newEntry).toBeDefined();
+    expect(newEntry.game_type).toBe('TokenPerp');
+    expect(newEntry.full_path).toBe('Database.token008');
+    expect(newEntry.instance_data.amount).toBe(25);
+
+    const { getState } = await import('../../scripts/boot.js');
+    const persisted = getState().nodes.find(function (n) { return n.gestalt === 'token008'; });
+    expect(persisted).toBeDefined();
+    expect(persisted.full_path).toBe('Database.token008');
+  });
+
+  it('does not seed a node for a gestalt that is not in ruleset.tokens', async () => {
+    setState(mkState({
+      locale: 'en',
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 5, tokens_map: { not_a_real_token: { amount: 9 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.result.nodes).toHaveLength(0);
+  });
 });
