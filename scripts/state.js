@@ -79,8 +79,13 @@ export function freshState(selfAddr, seed) {
     src.game_values || {}
   );
 
-  // Seed must live in freshState so reset/replay regenerates it
-  // deterministically; lazy seeding inside loadGame doesn't survive replay.
+  // Seed starting equipment + active missions inline so the baseline state
+  // produced by freshState (and therefore by the 'reset' reducer and by
+  // every cold-start replay) already contains the trunk-mission state.
+  // This MUST happen at the freshState level: lazy seeding inside loadGame
+  // doesn't survive replay, so a buyPerp delta committed after a reset
+  // would re-add itself on cold start *without* its seeded parent and
+  // crash GameRoot.loadGame's parent lookup.
   var seededNodes = _seedNodesFromTree(src);
 
   return {
@@ -101,6 +106,16 @@ export function freshState(selfAddr, seed) {
     integrated_ids: {},
   };
 }
+
+/**
+ * @deprecated Seed is now applied directly in freshState; this is kept as a
+ * no-op shim so callers (e.g. LocalEngine.loadGame) compile during the
+ * transition.  Remove once all call sites are gone.
+ */
+export function seedNewGame(state) {
+  return state;
+}
+
 
 function _seedNodesFromTree(src) {
   var out = [];

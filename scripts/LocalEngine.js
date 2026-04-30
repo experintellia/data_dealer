@@ -10,7 +10,7 @@
 // Remaining handlers are stubs that return a rejected Promise.
 
 import { getState, setState } from './boot.js';
-import { applyDelta, seedNewGame } from './state.js';
+import { applyDelta } from './state.js';
 import { materialize } from './materializer.js';
 import { now as clockNow } from './clock.js';
 import rulesetDe from '../data/ruleset_3.de.json' with { type: 'json' };
@@ -166,18 +166,10 @@ export function loadGame(/* token */) {
   var state = getState();
   var now = clockNow();
 
-  // First call after a fresh start (or reset) seeds starting equipment and
-  // the trunk mission from data/default_game.json so the player isn't
-  // dropped into an empty Imperium with every mission flagged complete.
-  // Idempotent — no-op once any of nodes/active_missions/mission_goals
-  // are populated.  is_new_game is captured from the pre-seed state so
-  // GameRoot.loadGame still scrolls Imperium to the top on first boot.
-  var isNewGame = !(state.nodes && state.nodes.length);
-  var seeded = seedNewGame(state);
-  if (seeded !== state) {
-    state = seeded;
-    setState(state);
-  }
+  // freshState now ships the trunk-mission seed inline, so a player whose
+  // node_counter is still 0 has not yet bought anything — that's our
+  // "is_new_game" signal for GameRoot.loadGame's scroll-to-top heuristic.
+  var isNewGame = !state.node_counter;
 
   var mat = materialize(state, now);
   setState(mat.state);
@@ -279,9 +271,7 @@ function _buildLoadGameResponse(state, now, isNewGame) {
     karmalauters: ruleset.karmalauters,
     karmalizers: ruleset.karmalizers,
     server_time: { $date: now },
-    // node_counter is bumped only by buyPerp; never by the seed, never by
-    // materialize. Zero ⇒ player hasn't bought anything yet.
-    is_new_game: !state.node_counter,
+    is_new_game: typeof isNewGame === 'boolean' ? isNewGame : !state.node_counter,
     missions: ruleset.missions,
     mission_goals: state.mission_goals || [],
     active_missions: state.active_missions || []
