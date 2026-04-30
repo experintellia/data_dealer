@@ -59,6 +59,8 @@ var OP_NAMES = [
  *   mission_goals   — mission progress rows
  *   active_missions — currently-active mission gestalt IDs
  *   last_seen_ts    — monotonic clock (clock-skew guard)
+ *   node_counter    — monotonic node id counter for buyPerp
+ *   integrated_ids  — set of collect_ids already processed by integrateCollected
  */
 export function freshState(selfAddr, seed) {
   var src = (seed || _defaultSeed) || {};
@@ -92,6 +94,7 @@ export function freshState(selfAddr, seed) {
     active_missions: [],
     last_seen_ts: 0,
     node_counter: 0,
+    integrated_ids: {},
   };
 }
 
@@ -271,6 +274,77 @@ reducers.chargePerp = function chargePerpReducer(state, delta) {
     nodes:          newNodes,
     nodes_charging: stillCharging.concat([chargeEntry]),
     game_values:    newGv,
+  });
+};
+
+reducers.collectPerp = function collectPerpReducer(state, delta) {
+  if (!delta || !delta.result) return state;
+  var r = delta.result;
+  var path = delta.args && delta.args[0];
+
+  var newCollect = (state.nodes_collect || []).filter(function (e) {
+    return e.path !== path;
+  });
+
+  var newGv = r.game_values
+    ? Object.assign({}, state.game_values, r.game_values)
+    : state.game_values;
+
+  var newQueue = state.db_queue || [];
+  if (r.db_entry) {
+    var inQueue = newQueue.some(function (q) { return q.collect_id === r.db_entry.collect_id; });
+    if (!inQueue) newQueue = newQueue.concat([r.db_entry]);
+  }
+
+  var newNodes = state.nodes;
+  if (r.token_update) {
+    newNodes = state.nodes.map(function (n) {
+      if (n.full_path !== r.token_update.path) return n;
+      return Object.assign({}, n, {
+        instance_data: Object.assign({}, n.instance_data, { amount: r.token_update.amount })
+      });
+    });
+  }
+
+  return Object.assign({}, state, {
+    nodes_collect: newCollect,
+    game_values:   newGv,
+    db_queue:      newQueue,
+    nodes:         newNodes
+  });
+};
+
+reducers.integrateCollected = function integrateCollectedReducer(state, delta) {
+  if (!delta || !delta.result) return state;
+  var r = delta.result;
+  var collectId = delta.args && delta.args[0];
+
+  var newQueue = (state.db_queue || []).filter(function (q) {
+    return q.collect_id !== collectId;
+  });
+
+  var newIntegratedIds = Object.assign({}, state.integrated_ids || {});
+  if (collectId) newIntegratedIds[collectId] = true;
+
+  var newGv = r.game_values
+    ? Object.assign({}, state.game_values, r.game_values)
+    : state.game_values;
+
+  var newNodes = state.nodes;
+  if (r.nodes && r.nodes.length) {
+    var updMap = {};
+    r.nodes.forEach(function (u) { updMap[u.full_path] = u; });
+    newNodes = state.nodes.map(function (n) {
+      var u = updMap[n.full_path];
+      return u ? Object.assign({}, n, { instance_data: u.instance_data }) : n;
+    });
+  }
+
+  return Object.assign({}, state, {
+    db_queue:       newQueue,
+    integrated_ids: newIntegratedIds,
+    game_values:    newGv,
+    nodes:          newNodes
   });
 };
 

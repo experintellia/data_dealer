@@ -3,11 +3,10 @@
 // No DOM globals in handler bodies; safe to import from Node for tests.
 //
 // Handlers implemented here: getToken, ping, getSessionLocale, loadGame (#12),
-// Handlers implemented here: getToken, ping, getSessionLocale, loadGame (#12),
 // resetGame (#20), getRanking, setDisplayName, setPerpCoordinates (#13),
 //   getProvidedPerps, getPowerups (#14), buyKarma (#19),
 //   buyPowerup, sellPowerup, buySlots (#18), buyPerp (#15),
-//   chargePerp (#16).
+//   chargePerp (#16), collectPerp, integrateCollected (#17).
 // Remaining handlers are stubs that return a rejected Promise.
 
 import { getState, setState } from './boot.js';
@@ -1120,10 +1119,311 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
 }
 
 // ---------------------------------------------------------------------------
+// PRNG — Mulberry32, seeded for deterministic tests.
+// Call setPrngSeed(n) before any handler invocation that uses RNG.
+// ---------------------------------------------------------------------------
+var _prngSeed = 0xDEADBEEF;
+
+export function setPrngSeed(seed) {
+  _prngSeed = seed >>> 0;
+}
+
+function _rng() {
+  _prngSeed = (_prngSeed + 0x6D2B79F5) | 0;
+  var t = Math.imul(_prngSeed ^ (_prngSeed >>> 15), 1 | _prngSeed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+function _generateId() {
+  // Timestamp base + two RNG words → collision-resistant string without deps.
+  return Date.now().toString(36) +
+    Math.floor(_rng() * 0xFFFFFF).toString(36) +
+    Math.floor(_rng() * 0xFFFFFF).toString(36);
+}
+
+// Returns { gestalt, karma_delta } if a karma incident fires, else null.
+// factor = sqrt((-karma)/100) + 0.05  (dd_app views.py:483 WeightedRandomizer)
+function _handleKarmaIncident(gv, ruleset) {
+  var karma = (gv && gv.karma_value) || 0;
+  if (karma >= 0) return null;
+
+  var factor = Math.pow((-karma) / 100, 0.5) + 0.05;
+  if (_rng() >= factor) return null;
+
+  var level = (gv && gv.xp_level) || 1;
+  var eligible = (ruleset.karmalizers || []).filter(function (k) {
+    return level >= ((k.type_data && k.type_data.required_level) || 1);
+  });
+  if (!eligible.length) return null;
+
+  var k = eligible[Math.floor(_rng() * eligible.length)];
+  return {
+    gestalt:     (k.type_data && k.type_data.gestalt) || '',
+    karma_delta: (k.type_data && k.type_data.karma_points) || -1
+  };
+}
+
+// ---------------------------------------------------------------------------
+// collectPerp — #17
+// ---------------------------------------------------------------------------
+
+/**
+ * collectPerp(token, gperpPath) → Promise<{result}>
+ *
+ * Materialize first (moves ready charges → nodes_collect).  Branch on perp
+ * game_type to build the typed result payload.  $pull from nodes_collect,
+ * $inc xp_value (from ruleset type_data.xp_inc, NOT from the charge result).
+ * Optionally fire karma incident.  For ContactPerp/ProjectPerp: $push
+ * db_queue entry for integrateCollected.
+ *
+ * nodes_collect[i].result schema (written by chargePerp, Thread S PR #72):
+ *   { amount: number } — varied collect_amount from _getVariatedAmount.
+ *
+ * Error codes match dd_app:
+ *   1 — path not in nodes_collect (not ready / hasn't charged)
+ *   2 — node not found in state.nodes
+ *   3 — unknown game_type
+ */
+export function collectPerp(_token, gperpPath) {
+  var state = getState();
+  var now = clockNow();
+  var ruleset = _getRuleset();
+
+  // Materialise time-based progression before testing readiness.
+  var mat = materialize(state, now);
+  var ms = mat.state;
+
+  var collectEntry = null;
+  for (var i = 0; i < ms.nodes_collect.length; i++) {
+    if (ms.nodes_collect[i].path === gperpPath) {
+      collectEntry = ms.nodes_collect[i];
+      break;
+    }
+  }
+  if (!collectEntry) {
+    setState(ms);
+    return Promise.resolve({ result: { error: 1 } });
+  }
+
+  var node = null;
+  for (var j = 0; j < ms.nodes.length; j++) {
+    if (ms.nodes[j].full_path === gperpPath) {
+      node = ms.nodes[j];
+      break;
+    }
+  }
+  if (!node) {
+    setState(ms);
+    return Promise.resolve({ result: { error: 2 } });
+  }
+
+  var gestalt = node.gestalt || _gestaltFrom(node.full_type);
+  var perpDef = gestalt && (ruleset.perps[gestalt] || ruleset.tokens[gestalt]);
+  var typeData = perpDef && perpDef.type_data;
+
+  var cr = collectEntry.result || {};
+  var xpGain = (typeData && typeof typeData.xp_inc === 'number') ? typeData.xp_inc : 1;
+  var gameType = node.game_type;
+
+  var newCollect = ms.nodes_collect.filter(function (e) { return e.path !== gperpPath; });
+  var newGv = Object.assign({}, ms.game_values, {
+    xp_value: (ms.game_values.xp_value || 0) + xpGain
+  });
+
+  var innerResult;
+  var newNodes = ms.nodes;
+  var newQueue = ms.db_queue || [];
+  var dbEntry = null;
+  var tokenUpdate = null;
+
+  if (gameType === 'ContactPerp' || gameType === 'ProjectPerp') {
+    var collectId = _generateId();
+    var profileSet = { profiles_value: cr.amount || 0, tokens_map: {} };
+    dbEntry = {
+      origin:      gperpPath,
+      collect_id:  collectId,
+      profile_set: profileSet,
+      collect_dt:  now
+    };
+    newQueue = newQueue.concat([dbEntry]);
+    innerResult = { profile_set: profileSet, origin: gperpPath, collect_id: collectId };
+
+  } else if (gameType === 'ClientPerp') {
+    var cashGain = cr.amount || 0;
+    newGv = Object.assign({}, newGv, {
+      cash_value: (ms.game_values.cash_value || 0) + cashGain
+    });
+    innerResult = { cash: newGv.cash_value };
+
+  } else if (gameType === 'TokenPerp') {
+    var prevAmount = (node.instance_data && node.instance_data.amount) || 0;
+    var newAmount = prevAmount + (cr.amount || 0);
+    tokenUpdate = { path: gperpPath, amount: newAmount };
+    newNodes = ms.nodes.map(function (n) {
+      if (n.full_path !== gperpPath) return n;
+      return Object.assign({}, n, {
+        instance_data: Object.assign({}, n.instance_data, { amount: newAmount })
+      });
+    });
+    innerResult = { token_upgraded_amount: newAmount };
+
+  } else {
+    setState(ms);
+    return Promise.resolve({ result: { error: 3 } });
+  }
+
+  var incident = _handleKarmaIncident(newGv, ruleset);
+  if (incident) {
+    newGv = Object.assign({}, newGv, {
+      karma_value: Math.max(-100, Math.min(100,
+        (newGv.karma_value || 0) + incident.karma_delta))
+    });
+  }
+
+  var oldLevel = (ms.game_values && ms.game_values.xp_level) || 1;
+  var newLevel = _getLevelByXP(newGv.xp_value);
+  var levelup  = newLevel > oldLevel;
+  if (levelup) newGv = Object.assign({}, newGv, { xp_level: newLevel });
+
+  var newState = Object.assign({}, ms, {
+    nodes:         newNodes,
+    nodes_collect: newCollect,
+    db_queue:      newQueue,
+    game_values:   newGv,
+    last_seen_ts:  Math.max(now, ms.last_seen_ts || 0)
+  });
+
+  var deltaResult = { game_values: newGv, path: gperpPath };
+  if (dbEntry)     deltaResult.db_entry     = dbEntry;
+  if (tokenUpdate) deltaResult.token_update = tokenUpdate;
+  _commitDelta(newState, state.addr, 'collectPerp', [gperpPath], deltaResult);
+
+  var response = Object.assign(
+    { result: innerResult, game_values: newGv, levelup: levelup,
+      missions: { complete_missions: [], updated_missions: [] } },
+    incident ? { karma_incident: incident.gestalt } : {}
+  );
+
+  // Emit materializer events + optional levelup new_items after the caller's
+  // microtask resolves (mirrors dd_app's deferred Celery notifyLevelupItems).
+  var matEvents = mat.events;
+  var emitLevel = levelup ? newLevel : 0;
+  queueMicrotask(function () {
+    for (var ei = 0; ei < matEvents.length; ei++) {
+      _emit(matEvents[ei].ev, matEvents[ei].pl);
+    }
+    if (emitLevel) {
+      _emit('new_items', { perps: [], powerups: {}, trigger: 'levelup', level: emitLevel });
+    }
+  });
+
+  return Promise.resolve({ result: response });
+}
+
+// ---------------------------------------------------------------------------
+// integrateCollected — #17
+// ---------------------------------------------------------------------------
+
+/**
+ * integrateCollected(token, collectId) → Promise<{result}>
+ *
+ * $pull the db_queue entry by collect_id.  Apply integration rewards:
+ * $inc profiles_value (dup-safe), xp_value, karma_value.  Update token
+ * node amounts from profile_set.tokens_map.  Persists a delta carrying
+ * full game_values and the touched nodes so the reducer can replay it
+ * on cold start.
+ *
+ * Error codes:
+ *   0 — collect_id not in db_queue (already integrated or never collected)
+ */
+export function integrateCollected(_token, collectId) {
+  var state = getState();
+  var now = clockNow();
+
+  // $pull db_queue entry.
+  var entry = null;
+  var newQueue = (state.db_queue || []).filter(function (q) {
+    if (q.collect_id === collectId) { entry = q; return false; }
+    return true;
+  });
+  if (!entry) {
+    return Promise.resolve({ result: { error: 0 } });
+  }
+
+  var ps = entry.profile_set || {};
+  var profilesIncrement = ps.profiles_value || 0;
+
+  var integratedIds = state.integrated_ids || {};
+  var dup       = integratedIds[collectId] ? profilesIncrement : 0;
+  var increment = integratedIds[collectId] ? 0 : profilesIncrement;
+  var newIntegratedIds = Object.assign({}, integratedIds, { [collectId]: true });
+
+  var xpGain    = ps.xp_gain    || 0;
+  var karmaGain = ps.karma_gain || 0;
+  var newGv = Object.assign({}, state.game_values, {
+    xp_value:       (state.game_values.xp_value    || 0) + xpGain,
+    karma_value: Math.max(-100, Math.min(100,
+      (state.game_values.karma_value || 0) + karmaGain)),
+    profiles_value: (state.game_values.profiles_value || 0) + increment
+  });
+
+  var tokensMap = ps.tokens_map || {};
+  var updatedNodes = [];
+  var newNodes = (state.nodes || []).map(function (n) {
+    var tok = tokensMap[n.gestalt];
+    if (!tok) return n;
+    var newAmount = ((n.instance_data && n.instance_data.amount) || 0) + (tok.amount || 0);
+    var updated = Object.assign({}, n, {
+      instance_data: Object.assign({}, n.instance_data, { amount: newAmount })
+    });
+    updatedNodes.push({
+      game_id:       updated.game_id,
+      gestalt:       updated.gestalt,
+      full_path:     updated.full_path,
+      instance_data: updated.instance_data
+    });
+    return updated;
+  });
+
+  var oldLevel = (state.game_values && state.game_values.xp_level) || 1;
+  var newLevel = _getLevelByXP(newGv.xp_value);
+  var levelup  = newLevel > oldLevel;
+  if (levelup) newGv = Object.assign({}, newGv, { xp_level: newLevel });
+
+  var newState = Object.assign({}, state, {
+    db_queue:       newQueue,
+    nodes:          newNodes,
+    game_values:    newGv,
+    integrated_ids: newIntegratedIds,
+    last_seen_ts:   Math.max(now, state.last_seen_ts || 0)
+  });
+
+  // Persist delta for webxdc replay; result carries full state for the reducer.
+  _commitDelta(newState, state.addr, 'integrateCollected', [collectId],
+    { increment: increment, dup: dup, game_values: newGv, nodes: updatedNodes });
+
+  var response = {
+    result: { nodes: updatedNodes, increment: increment, dup: dup },
+    game_values: newGv,
+    levelup: levelup,
+    missions: { complete_missions: [], updated_missions: [] }
+  };
+
+  if (levelup) {
+    queueMicrotask(function () {
+      _emit('new_items', { perps: [], powerups: {}, trigger: 'levelup', level: newLevel });
+    });
+  }
+
+  return Promise.resolve({ result: response });
+}
+
+// ---------------------------------------------------------------------------
 // Stub handlers — Wave 4+ issues fill these in.
 // ---------------------------------------------------------------------------
 var _STUBS = [
-  'collectPerp', 'integrateCollected', 'checkUsername'
+  'checkUsername'
 ];
 
 var _stubHandlers = {};
@@ -1154,8 +1454,11 @@ var LocalEngine = Object.assign({
   buySlots:           buySlots,
   buyPerp:            buyPerp,
   chargePerp:         chargePerp,
+  collectPerp:        collectPerp,
+  integrateCollected: integrateCollected,
   setEmitter:         setEmitter,
   setSendDelta:       setSendDelta,
+  setPrngSeed:        setPrngSeed,
 }, _stubHandlers);
 
 export default LocalEngine;
