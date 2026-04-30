@@ -275,3 +275,57 @@ describe('applyDelta — clock-skew guard', () => {
     expect(result.last_seen_ts).toBeGreaterThan(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// setLocale reducer
+// ---------------------------------------------------------------------------
+
+describe('applyDelta — setLocale reducer', () => {
+  const addr = 'alice@example.com';
+
+  function makeLocaleDelta(addr, locale, ts) {
+    return { kind: 'delta', addr, op: 'setLocale', locale, ts: ts || Date.now() };
+  }
+
+  it('stores "de" locale on state', () => {
+    const s = freshState(addr);
+    const result = applyDelta(s, makeLocaleDelta(addr, 'de'));
+    expect(result.locale).toBe('de');
+  });
+
+  it('stores "en" locale on state', () => {
+    const s = freshState(addr);
+    const result = applyDelta(s, makeLocaleDelta(addr, 'en'));
+    expect(result.locale).toBe('en');
+  });
+
+  it('ignores invalid locale codes', () => {
+    const s = freshState(addr);
+    const result = applyDelta(s, makeLocaleDelta(addr, 'fr'));
+    expect(result.locale).toBeUndefined();
+  });
+
+  it('overwrites a previously set locale', () => {
+    let s = freshState(addr);
+    s = applyDelta(s, makeLocaleDelta(addr, 'de', 1000));
+    const result = applyDelta(s, makeLocaleDelta(addr, 'en', 2000));
+    expect(result.locale).toBe('en');
+  });
+
+  it('reset preserves locale across wipe', () => {
+    let s = freshState(addr);
+    s = applyDelta(s, makeLocaleDelta(addr, 'en', 1000));
+    const after = applyDelta(s, makeDelta(addr, 'reset', 2000));
+    expect(after.locale).toBe('en');
+  });
+
+  it('locale survives replay: setLocale then reset then setLocale', () => {
+    const deltas = [
+      makeLocaleDelta(addr, 'de', 1000),
+      makeDelta(addr, 'reset', 2000),
+      makeLocaleDelta(addr, 'en', 3000),
+    ];
+    const result = replay(deltas, addr);
+    expect(result.locale).toBe('en');
+  });
+});

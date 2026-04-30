@@ -1005,10 +1005,13 @@ define(function(require) {
         e.stopPropagation();
         var user = gnode.data.user;
         var text = _._('user description');
+        var i18n = require('i18n');
+        var currentLocale = i18n.getLocale() === 'en_US' ? 'en' : 'de';
         gnode.openGenericPopup({
           data: {
             title: user.display_name,
-            description: text
+            description: text,
+            currentLocale: currentLocale
           },
           template:'popup_user_data.html'
         });
@@ -3020,6 +3023,19 @@ define(function(require) {
       popup.on('button_click.RefreshButton',function(e) {
         e.stopPropagation();
         gnode.GameRoot.refresh();
+      });
+
+      popup.jdomelem.on('click touchend', '.Button[data-button-id="SetLocaleButton"]', function(e) {
+        e.stopPropagation();
+        var newLocale = $(this).data('locale');
+        var i18n = require('i18n');
+        var currentLocale = i18n.getLocale() === 'en_US' ? 'en' : 'de';
+        if (newLocale === currentLocale) { return; }
+        // Show brief overlay feedback, persist delta, then reload.
+        $('body').append('<div class="LangSwitchOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.4em;">Switching language…</div>');
+        app.remote.setLocale(newLocale).done(function() {
+          location.reload();
+        });
       });
 
       popup.on('button_click.ResetButton',function(e) {

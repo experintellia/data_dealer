@@ -4,6 +4,7 @@
   var button = data.button || _._('Close');
   var game = _.game();
   var user = game.data.user;
+  var currentLocale = data.currentLocale || 'de';
 %>
 <div class="PopupBody User">
   <div class="PopupHeader">
@@ -34,6 +35,13 @@
       </div>
       <div class="PopupContentText">
         <div class="PopupParagraph"><% print(_._('user text below'));  %></div>
+      </div>
+      <div class="PopupContentText">
+        <div class="PopupTitle"><% print(_._('language switcher title')); %></div>
+        <div class="LangSwitcher">
+          <div class="Button<%= currentLocale === 'en' ? ' active' : '' %>" data-button-id="SetLocaleButton" data-locale="en">EN</div>
+          <div class="Button<%= currentLocale === 'de' ? ' active' : '' %>" data-button-id="SetLocaleButton" data-locale="de">DE</div>
+        </div>
       </div>
       <div class="PopupButtons">
         <div class="Button" data-button-id="MainButton"><%= button %></div>
