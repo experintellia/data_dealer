@@ -17,11 +17,18 @@ define(function(require) {
     }
   };
 
-  _.each(['de_AT', 'en_US'], function(locale, index) {
-    $.getJSON('i18n/' + locale + '.json').then(function(data) {
-      i18n[locale] = data[locale];
+  var _ready = $.when.apply($, _.map(['de_AT', 'en_US'], function(locale) {
+    return $.getJSON('i18n/' + locale + '.json').then(function(data) {
+      // The JSON files store msgids at the top level: { "": metadata,
+      // "msgid": [msgctxt, "msgstr"], ... }.  There is no per-locale
+      // wrapper key, so the whole payload is the language table.
+      i18n[locale] = data;
     });
-  });
+  })).promise();
+
+  i18n.ready = function() {
+    return _ready;
+  };
 
   i18n.gettext = function(msgid) {
     var language = i18n[locale];

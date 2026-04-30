@@ -4,7 +4,6 @@ define(function(require) {
 
     var _ = require('underscore');
     var $ = require('jquery');
-    //var routie = require('routie');
 
     var Scroller = require('zynga-scroller');
     var core = require('zynga-animate');
@@ -14,6 +13,28 @@ define(function(require) {
     var Sound = require('createjs-sound');
     var Ticker = Easel.Ticker;
     var Ease = Easel.Ease;
+
+    // Shim CreateJS legacy Ticker.{addListener,removeListener,setFPS} onto
+    // the current EventDispatcher API so Render's tick-object callers work.
+    if (typeof Ticker.addListener !== 'function') {
+      var _tickHandlers = new WeakMap();
+      Ticker.addListener = function(obj) {
+        if (_tickHandlers.has(obj)) { return; }
+        var fn = function() { if (typeof obj.tick === 'function') { obj.tick(); } };
+        _tickHandlers.set(obj, fn);
+        Ticker.addEventListener('tick', fn);
+      };
+      Ticker.removeListener = function(obj) {
+        var fn = _tickHandlers.get(obj);
+        if (fn) {
+          Ticker.removeEventListener('tick', fn);
+          _tickHandlers.delete(obj);
+        }
+      };
+    }
+    if (typeof Ticker.setFPS !== 'function') {
+      Ticker.setFPS = function(fps) { Ticker.framerate = fps; };
+    }
 
     var app = require('app').getApplication();
     var setup = require('setup');
@@ -3836,7 +3857,7 @@ define(function(require) {
 
       node.jdomelem.on('click touchend','.ZoomControls .Fullscreen', function(e){
         e.stopPropagation();
-        app.game.toggleFullScreen();
+        app.game.resetZoom();
       });
 
 

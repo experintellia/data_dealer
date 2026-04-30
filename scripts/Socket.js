@@ -8,6 +8,42 @@ define(function(require) {
 
   var setup = require('setup');
 
+  // Drop-in replacement for the `$.jqmq` jQuery message-queue plugin (which
+  // isn't vendored).  Only the surface used by Socket / Game.js is supported:
+  //   add(item), start(), next()
+  // Behaviour: while paused, add() buffers.  start() flips paused → false and
+  // drains; with delay === -1, drain stops after one item until the callback
+  // calls next() (matches jqmq semantics).
+  function makeQueue(opts) {
+    var items = [];
+    var paused = !!opts.paused;
+    var processing = false;
+    var q = {
+      add: function(item) {
+        items.push(item);
+        if (!paused && !processing) q._drain();
+        return q;
+      },
+      start: function() {
+        paused = false;
+        if (!processing) q._drain();
+        return q;
+      },
+      next: function() {
+        processing = false;
+        if (!paused) q._drain();
+        return q;
+      },
+      _drain: function() {
+        var item = items.shift();
+        if (!item) return;
+        processing = true;
+        opts.callback.call(q, item);
+      }
+    };
+    return q;
+  }
+
   var Socket = function(path, settings) {
     var self = this;
 
@@ -21,7 +57,7 @@ define(function(require) {
     var subscriptions = [];
 
     if (settings.queue) {
-      this.queue = $.jqmq(settings.queue);
+      this.queue = makeQueue(settings.queue);
     }
 
     this.on = function(eventName, handler, needsQueue) {

@@ -32,14 +32,20 @@ describe('freshState', () => {
     expect(s.game_values.profiles_max).toBe(1);
   });
 
-  it('initialises all collection fields to empty arrays', () => {
+  it('initialises transient collection fields to empty arrays', () => {
     const s = freshState('alice@example.com');
-    expect(s.nodes).toEqual([]);
     expect(s.nodes_charging).toEqual([]);
     expect(s.nodes_collect).toEqual([]);
     expect(s.db_queue).toEqual([]);
     expect(s.mission_goals).toEqual([]);
-    expect(s.active_missions).toEqual([]);
+  });
+
+  it('seeds starting equipment from data/default_game.json', () => {
+    const s = freshState('alice@example.com');
+    expect(s.nodes.map((n) => n.gestalt)).toEqual(['database001']);
+    expect(s.nodes[0].full_path).toBe('Imperium.database001');
+    expect(s.nodes[0].game_id).toBe('database001');
+    expect(s.active_missions).toEqual(['mission001']);
   });
 
   it('accepts a custom seed overriding game_values', () => {
@@ -95,19 +101,20 @@ describe('applyDelta — convergence (acceptance criterion A)', () => {
 describe('applyDelta — reset op (acceptance criterion B)', () => {
   const addr = 'alice@example.com';
 
-  it('clears nodes and missions after reset', () => {
+  it('wipes player progress and re-seeds starting equipment after reset', () => {
     let s = freshState(addr);
     s = {
       ...s,
-      nodes: [{ game_type: 'ContactPerp', full_path: 'Imperium.Contact1' }],
+      nodes: s.nodes.concat([{ game_type: 'ContactPerp', full_path: 'Imperium.Contact1' }]),
       active_missions: ['mission_x', 'mission_y'],
       mission_goals: [{ goal_id: 'g1', amount: 10, current_amount: 5 }],
     };
 
     const after = applyDelta(s, makeDelta(addr, 'reset', 5000));
 
-    expect(after.nodes).toEqual([]);
-    expect(after.active_missions).toEqual([]);
+    // Player-bought node gone, seed nodes restored
+    expect(after.nodes.map((n) => n.gestalt)).toEqual(['database001']);
+    expect(after.active_missions).toEqual(['mission001']);
     expect(after.mission_goals).toEqual([]);
   });
 
@@ -137,7 +144,7 @@ describe('applyDelta — reset op (acceptance criterion B)', () => {
     let s = freshState(addr);
     const r1 = applyDelta(s, makeDelta(addr, 'reset', 1000));
     const r2 = applyDelta(r1, makeDelta(addr, 'reset', 2000));
-    expect(r2.nodes).toEqual([]);
+    expect(r2.nodes).toEqual(r1.nodes);
     expect(r2.game_values.cash_value).toBe(r1.game_values.cash_value);
   });
 });
@@ -156,8 +163,9 @@ describe('applyDelta — schema-version mismatch (acceptance criterion C)', () =
     const result = applyDelta(futureState, makeDelta(addr, 'buyKarma', 1000));
 
     expect(result.schema_version).toBe(SCHEMA_VERSION);
-    expect(result.nodes).toEqual([]);
-    expect(result.active_missions).toEqual([]);
+    // Schema-mismatch reset re-seeds the starter equipment, same as a normal reset.
+    expect(result.nodes.map((n) => n.gestalt)).toEqual(['database001']);
+    expect(result.active_missions).toEqual(['mission001']);
     expect(result.addr).toBe(addr);
   });
 
@@ -205,7 +213,7 @@ describe('applyDelta — malformed delta guard', () => {
     const s = freshState('alice@example.com');
     const result = applyDelta(s, { kind: 'delta', addr: s.addr, op: 'unknownOp9999', ts: 0 });
     expect(result.schema_version).toBe(SCHEMA_VERSION);
-    expect(result.nodes).toEqual([]);
+    expect(result.nodes).toEqual(s.nodes);
   });
 });
 
@@ -238,9 +246,12 @@ describe('applyDelta — reset replay semantics (issue #20)', () => {
       makeDelta(addr, 'reset', 3000),
     ], addr);
 
-    expect(withHistory.nodes).toEqual([]);
+    // Reset rebuilds from freshState, which includes the seeded starting
+    // equipment + trunk mission — only the player's *progress* is wiped.
+    const baseline = freshState(addr);
+    expect(withHistory.nodes).toEqual(baseline.nodes);
     expect(withHistory.mission_goals).toEqual([]);
-    expect(withHistory.active_missions).toEqual([]);
+    expect(withHistory.active_missions).toEqual(baseline.active_missions);
     // game_values restored to seed defaults
     expect(withHistory.game_values.cash_value).toBe(300);
     expect(withHistory.game_values.xp_level).toBe(1);

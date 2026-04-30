@@ -177,7 +177,10 @@ define(function(require) {
           return app.remote.getSessionLocale().then(function(data) {
             var locale = data.result === 'de' ? 'de_AT' : 'en_US';
             i18n.setLocale(locale);
-            // Now connect to the server via websocket.
+            // type_settings runs gettext at module load — must wait for
+            // the locale JSON before requiring Game.
+            $('#loadertext').text('Loading translations');
+            return i18n.ready().then(function() {
             $('#loadertext').text('Initializing socket');
             return app.initSocket(token).then(function() {
               // When handshake is complete, load game data and initialize the game engine.
@@ -185,7 +188,7 @@ define(function(require) {
               // Carefullly approaching async hell with deferred superpowers!
               return app.remote.loadGame(app.token).then(function(data) {
                 var html = app.renderView('game.html');
-                $('body').html(html);
+                $('#dd-control').html(html);
                 var Game = require('Game').getGame();
                 var gameData = data.result;
                 app.version = gameData.version;
@@ -197,6 +200,7 @@ define(function(require) {
                   window.Render = require('Render').getRender();
                 }
               });
+            });
             });
           });
         } else {
@@ -288,7 +292,11 @@ define(function(require) {
         else { return {} }
       },
       numeral: require('numeral'),
-      sprintf: require('sprintf'),
+      // vendor/sprintf.js's anonymous define() shadows its global export, so
+      // require('sprintf') returns an object wrapper.  Game.js loads the
+      // vendor file (which sets window.sprintf = y) before any _.sprintf
+      // call site, so reading from the global is safe here.
+      sprintf: window.sprintf,
       renderView: app.renderView,
       pad0: function(number, length) {
         // Fastest implementation according to http://jsperf.com/ways-to-0-pad-a-number

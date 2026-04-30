@@ -79,23 +79,66 @@ export function freshState(selfAddr, seed) {
     src.game_values || {}
   );
 
+  // Seed must live in freshState so reset/replay regenerates it
+  // deterministically; lazy seeding inside loadGame doesn't survive replay.
+  var seededNodes = _seedNodesFromTree(src);
+
   return {
     schema_version: SCHEMA_VERSION,
     addr: selfAddr || '',
     display_name: '',
     game_version: null,
     version: null,
-    nodes: [],
+    nodes: seededNodes,
     nodes_charging: [],
     nodes_collect: [],
     db_queue: [],
     game_values: gv,
     mission_goals: [],
-    active_missions: [],
+    active_missions: (src.active_missions || []).slice(),
     last_seen_ts: 0,
     node_counter: 0,
     integrated_ids: {},
   };
+}
+
+function _seedNodesFromTree(src) {
+  var out = [];
+
+  function splitFullType(ft) {
+    var s = String(ft || '');
+    var i = s.indexOf(':');
+    return i >= 0 ? [s.slice(0, i), s.slice(i + 1)] : ['', ''];
+  }
+
+  function walk(parentPath, child) {
+    if (!child || !child.full_type) return;
+    var parts = splitFullType(child.full_type);
+    var gameType = parts[0];
+    var gestalt = parts[1];
+    if (!gestalt) return;
+    var fullPath = parentPath + '.' + gestalt;
+    out.push({
+      // game_id MUST equal the path's last segment — Game.js:getByLastId looks
+      // nodes up that way (e.g. Database.cue → ps.origin = getByLastId(path)).
+      game_id: gestalt,
+      game_type: gameType,
+      full_type: child.full_type,
+      gestalt: gestalt,
+      full_path: fullPath,
+      instance_data: Object.assign({}, child.instance_data || {}),
+    });
+    var grandkids = child.children || [];
+    for (var i = 0; i < grandkids.length; i++) walk(fullPath, grandkids[i]);
+  }
+
+  ['Imperium', 'Database'].forEach(function (root) {
+    var node = src[root];
+    if (!node || !Array.isArray(node.children)) return;
+    for (var i = 0; i < node.children.length; i++) walk(root, node.children[i]);
+  });
+
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -224,10 +267,11 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
     }
   }
 
-  // Keep node_counter monotonic.
-  var counter = state.node_counter || 0;
-  var idNum = parseInt(String(newNode.game_id).replace('node_', ''), 10);
-  if (!isNaN(idNum) && idNum > counter) { counter = idNum; }
+  // Each buyPerp creates exactly one node, so the counter advances by 1 on
+  // every replayed delta.  (The handler in LocalEngine does the same; we
+  // can't read the value off newNode.game_id any more since it now equals
+  // the gestalt instead of an encoded counter.)
+  var counter = (state.node_counter || 0) + 1;
 
   return Object.assign({}, state, {
     nodes: nodes,

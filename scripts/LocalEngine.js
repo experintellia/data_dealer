@@ -265,7 +265,9 @@ function _buildLoadGameResponse(state, now) {
     karmalauters: ruleset.karmalauters,
     karmalizers: ruleset.karmalizers,
     server_time: { $date: now },
-    is_new_game: !(state.nodes && state.nodes.length),
+    // node_counter is bumped only by buyPerp; never by the seed, never by
+    // materialize. Zero ⇒ player hasn't bought anything yet.
+    is_new_game: !state.node_counter,
     missions: ruleset.missions,
     mission_goals: state.mission_goals || [],
     active_missions: state.active_missions || []
@@ -893,7 +895,8 @@ export function buyPerp(_token, parentPath, gestalt) {
 
   var nodeCounter = (state.node_counter || 0) + 1;
   var newNode = {
-    game_id: 'node_' + nodeCounter,
+    // game_id == gestalt (last path segment); see _seedNodesFromTree for invariant.
+    game_id: gestalt,
     game_type: gameType,
     full_type: gameType + ':' + gestalt,
     gestalt: gestalt,

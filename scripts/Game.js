@@ -4,7 +4,13 @@ define(function(require) {
 
     var _ = require('underscore');
     var $ = require('jquery');
-    var sprintf = require('sprintf');
+    require('sprintf'); // load the vendor file so window.sprintf is populated
+    // vendor/sprintf.js has an anonymous define() that returns an object
+    // ({sprintf, vsprintf}), which RequireJS treats as the module value and
+    // overrides the `exports: 'sprintf'` shim — same JSON3-style trap as
+    // vendor/preloadjs.js.  The script does set window.sprintf to the
+    // function itself, so we read it from there.
+    var sprintf = window.sprintf;
 
     var app = require('app').getApplication();
     var setup = require('setup');
@@ -905,7 +911,7 @@ define(function(require) {
             return app.initSocket(token).then(function() {
               // When handshake is complete, load game data and initialize the game engine.
               var html = app.renderView('game.html');
-              $('body').html(html);
+              $('#dd-control').html(html);
               // Carefullly approaching async hell with deferred superpowers!
               return app.remote.loadGame(app.token).then(function(data) {
                 var Game = require('Game').getGame();
@@ -1634,17 +1640,43 @@ define(function(require) {
     };
 
 
-    GameRoot.prototype.toggleFullScreen = function() {
-      var groot = this;
-      if (groot.fullScreenOn || groot.fullScreenOn === undefined) {
-        var width = $(window).width();
-        var height = $(window).height();
-        groot.setSize(width-32,height-64);
-        groot.fullScreenOn = false;
-      } else {
-        groot.setSize(groot.data.width,groot.data.height);
-        groot.fullScreenOn = true;
-      }
+    GameRoot.prototype.resetZoom = function() {
+      var vm = this.activeView && this.activeView.renderNode;
+      if (!vm || !vm.scroller || typeof vm.scroller.zoomTo !== 'function') return;
+      vm.scroller.options.animating = true;
+      vm.scroller.zoomTo(1, true);
+      this._centerActiveView(true);
+      vm.scroller.options.animating = false;
+    };
+
+    GameRoot.prototype._centerActiveView = function(animate) {
+      // activeView is only set after a switch_view trigger; before the first
+      // tab click Imperium is shown by default, so fall back to it.
+      var view = this.activeView || (this.getImperium && this.getImperium());
+      var vm = view && view.renderNode;
+      if (!vm || !vm.scroller || !vm.parentNode) return;
+
+      // Design home = where the legacy 960×600 stage would have centred:
+      // scroll-offset (-data.x, -data.y) plus half the legacy stage size.
+      var d = (view.data || {});
+      var rootData = (this.data || {});
+      var designStageW = rootData.width  || 960;
+      var designStageH = rootData.height || 600;
+      var homeX = -(d.x || 0) + designStageW / 2;
+      var homeY = -(d.y || 0) + designStageH / 2;
+
+      var vw = vm.parentNode.width;
+      var vh = vm.parentNode.height;
+      var maxX = Math.max(0, vm.width  - vw);
+      var maxY = Math.max(0, vm.height - vh);
+      var sx = Math.max(0, Math.min(maxX, homeX - vw / 2));
+      var sy = Math.max(0, Math.min(maxY, homeY - vh / 2));
+      vm.scroller.scrollTo(sx, sy, !!animate);
+    };
+
+    GameRoot.prototype.fitToWindow = function() {
+      this.setSize($(window).width() - 32, $(window).height() - 64);
+      this._centerActiveView(false);
     };
 
     GameRoot.prototype.setSize = function(width,height) {
@@ -2062,12 +2094,11 @@ define(function(require) {
       });
 
       game.render();
-
-      // Visual FIX, when new_game scroll to top
-      if (data.is_new_game) {
-        game.getImperium().renderNode.scrollTo({x:1024,y:0},0);
-      }
-
+      // fitToWindow handles centring; the legacy is_new_game scrollTo would
+      // be immediately overwritten so we no longer set it here.
+      game.fitToWindow();
+      $(window).off('resize.gameFit').on('resize.gameFit',
+        _.debounce(function() { game.fitToWindow(); }, 100));
 
       app.socket.queue.start();
 
@@ -3525,7 +3556,7 @@ define(function(require) {
         });
         mroot.updateMissionGoals(missions.mission_data.mission_goals);
       }
-      if (missions.mission_data, missions.mission_data.active_missions) {
+      if (missions.mission_data && missions.mission_data.active_missions) {
         _.each(missions.mission_data.active_missions, function(gestalt){
           var am = mroot.getMission(gestalt);
           mroot.getMission(gestalt).setState('active',true);
