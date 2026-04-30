@@ -146,7 +146,9 @@ function _seedNodesFromTree(src) {
     counter += 1;
     var fullPath = parentPath + '.' + gestalt;
     out.push({
-      game_id: 'node_' + counter,
+      // game_id MUST equal the path's last segment — Game.js:getByLastId looks
+      // nodes up that way (e.g. Database.cue → ps.origin = getByLastId(path)).
+      game_id: gestalt,
       game_type: gameTypeFromFullType(child.full_type),
       full_type: child.full_type,
       gestalt: gestalt,
@@ -292,10 +294,11 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
     }
   }
 
-  // Keep node_counter monotonic.
-  var counter = state.node_counter || 0;
-  var idNum = parseInt(String(newNode.game_id).replace('node_', ''), 10);
-  if (!isNaN(idNum) && idNum > counter) { counter = idNum; }
+  // Each buyPerp creates exactly one node, so the counter advances by 1 on
+  // every replayed delta.  (The handler in LocalEngine does the same; we
+  // can't read the value off newNode.game_id any more since it now equals
+  // the gestalt instead of an encoded counter.)
+  var counter = (state.node_counter || 0) + 1;
 
   return Object.assign({}, state, {
     nodes: nodes,

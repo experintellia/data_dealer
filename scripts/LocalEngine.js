@@ -907,7 +907,10 @@ export function buyPerp(_token, parentPath, gestalt) {
 
   var nodeCounter = (state.node_counter || 0) + 1;
   var newNode = {
-    game_id: 'node_' + nodeCounter,
+    // game_id MUST equal the path's last segment — Game.js:getByLastId looks
+    // nodes up that way (e.g. Database.cue → ps.origin = getByLastId(path)).
+    // The duplicate-path check above already guarantees uniqueness.
+    game_id: gestalt,
     game_type: gameType,
     full_type: gameType + ':' + gestalt,
     gestalt: gestalt,

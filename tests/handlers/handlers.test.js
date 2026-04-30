@@ -907,7 +907,7 @@ describe('buyPerp — happy path (contact gestalt)', () => {
     const s = getState();
     const ids = s.nodes.map(function(n) { return n.game_id; });
     expect(new Set(ids).size).toBe(2);  // all unique
-    expect(r1.result.node.game_id).toBe('node_1');
+    expect(r1.result.node.game_id).toBe('contact001');
   });
 });
 
