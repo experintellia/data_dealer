@@ -159,7 +159,7 @@
   ],
   "Topscores": [
     null,
-    "Top 50"
+    "Highscore"
   ],
   "Missions": [
     null,
@@ -239,19 +239,19 @@
   ],
   "topscore cash headline": [
     null,
-    "Data Dealer Top 50<br />CASH"
+    "Data Dealer Highscore<br />CASH"
   ],
   "topscore profiles headline": [
     null,
-    "Data Dealer Top 50<br />Profiles"
+    "Data Dealer Highscore<br />Profiles"
   ],
   "topscore xp headline": [
     null,
-    "Data Dealer Top 50<br />Experience Points (XP)"
+    "Data Dealer Highscore<br />Experience Points (XP)"
   ],
   "topscore spent headline": [
     null,
-    "Data Dealer Top 50<br />Cash Invested"
+    "Data Dealer Highscore<br />Cash Invested"
   ],
   "topscore cash text %s": [
     null,
@@ -271,19 +271,19 @@
   ],
   "topscore cash inranking": [
     null,
-    "Congrats, you've hoarded loads of cash and you're amongst the top 50 of all data dealers. Keep it up!"
+    "Congrats, you've hoarded loads of cash and you're amongst the top data dealers. Keep it up!"
   ],
   "topscore profiles inranking": [
     null,
-    "Congrats, you've collected enough people's profiles to find yourself in the top 50 of all data dealers! Right on."
+    "Congrats, you've collected enough people's profiles to find yourself among the top data dealers! Right on."
   ],
   "topscore xp text inranking": [
     null,
-    "Congrats, you're amongst the 50 most experienced data dealers! Top notch, keep it up!"
+    "Congrats, you're amongst the most experienced data dealers! Top notch, keep it up!"
   ],
   "topscore spent text inranking": [
     null,
-    "Congrats, you've burned enough cash to call yourself a serious top 50 investor. Keep the cash flow pumping!"
+    "Congrats, you've burned enough cash to call yourself a serious top investor. Keep the cash flow pumping!"
   ],
   "topscore Cash": [
     null,
@@ -883,7 +883,7 @@
   ],
   "userdebug reset game text": [
     null,
-    "Do you want to delete and reset your game and start again from scratch? <span class=\"warn\">Caution: All your game progress (levels, XP, profiles, items, cash, your ranks in the top 50) will be lost, forever!</span>"
+    "Do you want to delete and reset your game and start again from scratch? <span class=\"warn\">Caution: All your game progress (levels, XP, profiles, items, cash, your ranks in the highscore) will be lost, forever!</span>"
   ],
   "Reset Game": [
     null,

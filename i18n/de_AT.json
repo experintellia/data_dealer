@@ -159,7 +159,7 @@
   ],
   "Topscores": [
     null,
-    "Top50"
+    "Highscore"
   ],
   "Missions": [
     null,
@@ -239,51 +239,51 @@
   ],
   "topscore cash headline": [
     null,
-    "Data Dealer Top50<br />Cash"
+    "Data Dealer Highscore<br />Cash"
   ],
   "topscore profiles headline": [
     null,
-    "Data Dealer Top50<br />Gesammelte Profile"
+    "Data Dealer Highscore<br />Gesammelte Profile"
   ],
   "topscore xp headline": [
     null,
-    "Data Dealer Top50<br />Erfahrungspunkte (XP)"
+    "Data Dealer Highscore<br />Erfahrungspunkte (XP)"
   ],
   "topscore spent headline": [
     null,
-    "Data Dealer Top50<br />Investierte Kohle"
+    "Data Dealer Highscore<br />Investierte Kohle"
   ],
   "topscore cash text %s": [
     null,
-    "Du hast es noch nicht in die Top50 geschafft, hast aber aktuell mehr Cash als %s aller Data Dealer, yeah."
+    "Du hast es noch nicht in die Highscore-Liste geschafft, hast aber aktuell mehr Cash als %s aller Data Dealer, yeah."
   ],
   "topscore profiles text %s": [
     null,
-    "Du hast es noch nicht in die Top50 geschafft, hast aber mehr Profile gesammelt als %s aller Data Dealer, yeah."
+    "Du hast es noch nicht in die Highscore-Liste geschafft, hast aber mehr Profile gesammelt als %s aller Data Dealer, yeah."
   ],
   "topscore xp text %s": [
     null,
-    "Du hast es noch nicht in die Top50 geschafft, hast aber mehr XP als %s aller Data Dealer, yeah."
+    "Du hast es noch nicht in die Highscore-Liste geschafft, hast aber mehr XP als %s aller Data Dealer, yeah."
   ],
   "topscore spent text %s": [
     null,
-    "Du hast es noch nicht in die Top50 geschafft, hast aber mehr Cash verdient + investiert als %s aller Data Dealer!"
+    "Du hast es noch nicht in die Highscore-Liste geschafft, hast aber mehr Cash verdient + investiert als %s aller Data Dealer!"
   ],
   "topscore cash inranking": [
     null,
-    "Congrats, du hast so viel Cash, dass du es damit unter die Top50 aller Data Dealer geschafft hast! Weiter so."
+    "Congrats, du hast so viel Cash, dass du es damit in die Highscore-Liste aller Data Dealer geschafft hast! Weiter so."
   ],
   "topscore profiles inranking": [
     null,
-    "Congrats, du hast schon so viele Profile gesammelt, dass du unter den Top50 aller Data Dealer bist! Weiter so."
+    "Congrats, du hast schon so viele Profile gesammelt, dass du in der Highscore-Liste aller Data Dealer bist! Weiter so."
   ],
   "topscore xp text inranking": [
     null,
-    "Congrats, mit deinem aktuellen XP-Stand bist du momentan unter den Top50 aller Data Dealer! Weiter so."
+    "Congrats, mit deinem aktuellen XP-Stand bist du momentan in der Highscore-Liste aller Data Dealer! Weiter so."
   ],
   "topscore spent text inranking": [
     null,
-    "Congrats, du hast so viel Cash verdient + investiert, dass du damit aktuell in den Top50 gelandet bist! Weiter so."
+    "Congrats, du hast so viel Cash verdient + investiert, dass du damit aktuell in der Highscore-Liste gelandet bist! Weiter so."
   ],
   "topscore Cash": [
     null,
@@ -883,7 +883,7 @@
   ],
   "userdebug reset game text": [
     null,
-    "Hier kannst du bei Bedarf deinen Spielstand zurücksetzen und komplett von vorne beginnen.<br /><span class=\"warn\">Achtung: Dabei geht dein gesamter Spielfortschritt (erreichte Levels, XP, Profile, Items, Geld, dein Platz in den Top 50) verloren, für immer!</span>"
+    "Hier kannst du bei Bedarf deinen Spielstand zurücksetzen und komplett von vorne beginnen.<br /><span class=\"warn\">Achtung: Dabei geht dein gesamter Spielfortschritt (erreichte Levels, XP, Profile, Items, Geld, dein Platz in der Highscore-Liste) verloren, für immer!</span>"
   ],
   "Reset Game": [
     null,
