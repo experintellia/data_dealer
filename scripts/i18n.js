@@ -17,11 +17,15 @@ define(function(require) {
     }
   };
 
-  _.each(['de_AT', 'en_US'], function(locale, index) {
-    $.getJSON('i18n/' + locale + '.json').then(function(data) {
+  var _ready = $.when.apply($, _.map(['de_AT', 'en_US'], function(locale) {
+    return $.getJSON('i18n/' + locale + '.json').then(function(data) {
       i18n[locale] = data[locale];
     });
-  });
+  })).promise();
+
+  i18n.ready = function() {
+    return _ready;
+  };
 
   i18n.gettext = function(msgid) {
     var language = i18n[locale];

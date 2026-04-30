@@ -14,6 +14,31 @@ define(function(require) {
     var Ticker = Easel.Ticker;
     var Ease = Easel.Ease;
 
+    // CreateJS dropped the legacy Ticker.{addListener,removeListener,setFPS}
+    // API in favour of EventDispatcher + a `framerate` property. The Render
+    // code below still uses the old shape (objects with a tick() method); we
+    // shim the old API onto the new one so we don't have to touch every call
+    // site.
+    if (typeof Ticker.addListener !== 'function') {
+      var _tickHandlers = new WeakMap();
+      Ticker.addListener = function(obj) {
+        if (_tickHandlers.has(obj)) { return; }
+        var fn = function() { if (typeof obj.tick === 'function') { obj.tick(); } };
+        _tickHandlers.set(obj, fn);
+        Ticker.addEventListener('tick', fn);
+      };
+      Ticker.removeListener = function(obj) {
+        var fn = _tickHandlers.get(obj);
+        if (fn) {
+          Ticker.removeEventListener('tick', fn);
+          _tickHandlers.delete(obj);
+        }
+      };
+    }
+    if (typeof Ticker.setFPS !== 'function') {
+      Ticker.setFPS = function(fps) { Ticker.framerate = fps; };
+    }
+
     var app = require('app').getApplication();
     var setup = require('setup');
     var extend = require('util').extend;
