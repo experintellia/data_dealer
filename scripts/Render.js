@@ -3860,7 +3860,7 @@ define(function(require) {
 
       node.jdomelem.on('click touchend','.ZoomControls .Fullscreen', function(e){
         e.stopPropagation();
-        app.game.toggleFullScreen();
+        app.game.resetZoom();
       });
 
 

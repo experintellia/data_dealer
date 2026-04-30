@@ -1640,11 +1640,11 @@ define(function(require) {
     };
 
 
-    // The "fullscreen" button now resets the active ViewMap's zoom level —
+    // The fullscreen button now resets the active ViewMap's zoom level —
     // the game already fills the viewport on load (see fitToWindow below),
     // so toggling between window-size and the legacy 960×600 frame served
     // no purpose.  Falls back to a no-op if no ViewMap is active yet.
-    GameRoot.prototype.toggleFullScreen = function() {
+    GameRoot.prototype.resetZoom = function() {
       var vm = this.activeView && this.activeView.renderNode;
       if (vm && vm.scroller && typeof vm.scroller.zoomTo === 'function') {
         vm.scroller.options.animating = true;
