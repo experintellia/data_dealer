@@ -911,7 +911,7 @@ define(function(require) {
             return app.initSocket(token).then(function() {
               // When handshake is complete, load game data and initialize the game engine.
               var html = app.renderView('game.html');
-              $('body').html(html);
+              $('#dd-control').html(html);
               // Carefullly approaching async hell with deferred superpowers!
               return app.remote.loadGame(app.token).then(function(data) {
                 var Game = require('Game').getGame();

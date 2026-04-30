@@ -191,7 +191,7 @@ define(function(require) {
               // Carefullly approaching async hell with deferred superpowers!
               return app.remote.loadGame(app.token).then(function(data) {
                 var html = app.renderView('game.html');
-                $('body').html(html);
+                $('#dd-control').html(html);
                 var Game = require('Game').getGame();
                 var gameData = data.result;
                 app.version = gameData.version;

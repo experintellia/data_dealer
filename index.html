@@ -41,7 +41,10 @@
 
     <title>Data Dealer</title>
   </head>
-  <body id='dd-control'>
-    <!-- <a class="Button" href="#load" style="margin:30px auto; display:block; width:160px;">Load Game</a> -->
+  <body>
+    <!-- The game mounts into #dd-control rather than <body> so siblings
+         appended to <body> (e.g. the webxdc-dev simulator overlay) are
+         not wiped out when app.start renders game.html. -->
+    <div id='dd-control' style='width:100%;height:100%;'></div>
   </body>
 </html>
