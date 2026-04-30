@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { build, defineConfig } from 'vite';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
+import { buildXDC } from '@webxdc/vite-plugins';
 
 // Serve the @webxdc/vite-plugins simulator with an explicit Content-Type so
 // strict-MIME environments (GitHub Codespaces reverse proxy) don't block it.
@@ -151,6 +152,12 @@ export default defineConfig({
     viteStaticCopy({
       targets: [
         { src: 'index.html', dest: '' },
+        { src: 'manifest.toml', dest: '' },
+        { src: 'icon.png', dest: '' },
+        { src: 'CREDITS.txt', dest: '' },
+        { src: 'LICENSE.txt', dest: '' },
+        { src: 'LICENSE-CODE.txt', dest: '' },
+        { src: 'LICENSE-ASSETS.txt', dest: '' },
         { src: 'vendor', dest: '' },
         { src: 'css', dest: '' },
         { src: 'img', dest: '' },
@@ -161,5 +168,6 @@ export default defineConfig({
         ...amdScripts,
       ],
     }),
+    buildXDC({ inDir: 'dist', outDir: '.', outFileName: 'data-dealer.xdc' }),
   ],
 });

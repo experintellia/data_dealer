@@ -9,7 +9,7 @@
 
 ```bash
 pnpm install
-pnpm build    # produces dist/
+pnpm build    # produces dist/ and data-dealer.xdc
 pnpm test     # runs vitest
 ```
 
@@ -32,14 +32,18 @@ pnpm dev     # Vite dev server on http://localhost:3000
 ```
 
 Legacy AMD files are served as static files — no hot-reload for those until #58.
+A webxdc.js emulator is served by the dev plugin so the `window.webxdc` API
+is available in the browser.
 
 ## Building the webxdc archive
 
 ```bash
-pnpm build-xdc    # runs build then zips dist/ into data-dealer.xdc
+pnpm build    # produces dist/ and data-dealer.xdc in one step
 ```
 
 The `.xdc` file can be sent as an attachment in Delta Chat.
+The archive is produced by `@webxdc/vite-plugins`'s `buildXDC` plugin — no
+shell scripts or manual `zip` invocations are required.
 
 ## Project layout
 
@@ -51,11 +55,11 @@ scripts/          AMD source (legacy, unchanged until #58)
   esm-entry.js    ESM bundle entry — add imports here as #10/#11 land
 vendor/           Vendored runtime libs (committed; see below)
 tests/
+  build/          build smoke tests (dist/ layout + .xdc contents)
   state/          state model unit tests  (seed tests land with #10)
   materializer/   materializer unit tests (seed tests land with #11)
   handlers/       one file per RPC handler (land alongside each Wave 3 PR)
-esbuild.config.js Production build script
-vite.config.js    Dev server config
+vite.config.js    Build + dev server config (also produces data-dealer.xdc)
 vitest.config.js  Test runner config
 ```
 
@@ -107,7 +111,7 @@ from Node** without a browser or AMD runtime. Concretely:
    <script src="vendor/requirejs.js" data-main="scripts/require.config"></script>
    <script src="scripts/esm-bundle.js"></script>  <!-- must be after requirejs -->
    ```
-5. The AMD bridge in `esbuild.config.js` calls
+5. The AMD bridge in `vite.config.js` calls
    `define('state', [], () => stateModule)` so legacy requirejs code
    can `require('state')` without any changes.
 
@@ -119,9 +123,9 @@ written as standard ESM.
 
 The bridge works like this:
 
-1. **esbuild** bundles `scripts/esm-entry.js` into an IIFE that sets
+1. **Vite/Rollup** bundles `scripts/esm-entry.js` into an IIFE that sets
    `window.__DD = { moduleName: defaultExport, … }`.
-2. A footer appended by `esbuild.config.js` loops over `__DD` and calls
+2. A footer appended by `vite.config.js` loops over `__DD` and calls
    `define(name, [], () => __DD[name])` for each key.
 3. `dist/index.html` loads `esm-bundle.js` **after** `vendor/requirejs.js`
    so that `window.define` is available when the bridge footer runs.
