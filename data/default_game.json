@@ -1,27 +1,28 @@
 {
   "Database": {
-    "children": [], 
+    "children": [],
     "instance_data": {}
-  }, 
+  },
   "Imperium": {
     "children": [
       {
-        "full_type": "DatabasePerp:database001", 
+        "full_type": "DatabasePerp:database001",
         "instance_data": {
-          "x": 1024, 
+          "x": 1024,
           "y": 800
         }
       }
-    ], 
+    ],
     "instance_data": {}
-  }, 
+  },
+  "active_missions": ["mission001"],
   "game_values": {
-    "ap_snapshot": 6, 
-    "cash_value": 300, 
-    "karma_value": 50, 
-    "profiles_max": 1, 
-    "profiles_value": 0, 
-    "xp_level": 1, 
+    "ap_snapshot": 6,
+    "cash_value": 300,
+    "karma_value": 50,
+    "profiles_max": 1,
+    "profiles_value": 0,
+    "xp_level": 1,
     "xp_value": 1
   }
 }

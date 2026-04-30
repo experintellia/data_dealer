@@ -495,8 +495,11 @@ describe('resetGame', () => {
     }));
     await resetGame('tok');
     const { result } = await loadGame('tok');
+    // is_new_game is captured pre-seed — true on the very first load after reset
     expect(result.is_new_game).toBe(true);
-    expect(result.nodes).toHaveLength(0);
+    // …but starting equipment + trunk mission are seeded on that same call
+    expect(result.nodes.map((n) => n.gestalt)).toEqual(['database001']);
+    expect(result.active_missions).toEqual(['mission001']);
   });
 });
 

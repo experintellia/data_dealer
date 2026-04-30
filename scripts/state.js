@@ -98,6 +98,74 @@ export function freshState(selfAddr, seed) {
   };
 }
 
+/**
+ * seedNewGame(state, seed?) → state
+ *
+ * Materialises the starting equipment (Imperium/Database tree from
+ * data/default_game.json) into nodes[] and activates the trunk mission.
+ * Idempotent on a non-empty state — only applied when nodes, mission_goals
+ * and active_missions are all empty.  This mirrors what the original
+ * Python backend's `mongo.get_game` did the first time it inserted a doc
+ * for a new player; calling it lazily in loadGame keeps `is_new_game`
+ * reporting correct on the very first call after reset.
+ */
+export function seedNewGame(state, seed) {
+  var src = seed || _defaultSeed || {};
+
+  var hasNodes = state.nodes && state.nodes.length;
+  var hasMissions = state.active_missions && state.active_missions.length;
+  var hasGoals = state.mission_goals && state.mission_goals.length;
+  if (hasNodes || hasMissions || hasGoals) return state;
+
+  var seeded = _seedNodesFromTree(src);
+
+  return Object.assign({}, state, {
+    nodes: seeded.nodes,
+    active_missions: (src.active_missions || []).slice(),
+    node_counter: Math.max(state.node_counter || 0, seeded.counter),
+  });
+}
+
+function _seedNodesFromTree(src) {
+  var counter = 0;
+  var out = [];
+
+  function gestaltFromFullType(ft) {
+    var i = String(ft || '').indexOf(':');
+    return i >= 0 ? ft.slice(i + 1) : '';
+  }
+  function gameTypeFromFullType(ft) {
+    var i = String(ft || '').indexOf(':');
+    return i >= 0 ? ft.slice(0, i) : '';
+  }
+
+  function walk(parentPath, child) {
+    if (!child || !child.full_type) return;
+    var gestalt = gestaltFromFullType(child.full_type);
+    if (!gestalt) return;
+    counter += 1;
+    var fullPath = parentPath + '.' + gestalt;
+    out.push({
+      game_id: 'node_' + counter,
+      game_type: gameTypeFromFullType(child.full_type),
+      full_type: child.full_type,
+      gestalt: gestalt,
+      full_path: fullPath,
+      instance_data: Object.assign({}, child.instance_data || {}),
+    });
+    var grandkids = child.children || [];
+    for (var i = 0; i < grandkids.length; i++) walk(fullPath, grandkids[i]);
+  }
+
+  ['Imperium', 'Database'].forEach(function (root) {
+    var node = src[root];
+    if (!node || !Array.isArray(node.children)) return;
+    for (var i = 0; i < node.children.length; i++) walk(root, node.children[i]);
+  });
+
+  return { nodes: out, counter: counter };
+}
+
 // ---------------------------------------------------------------------------
 // Reducers
 // ---------------------------------------------------------------------------

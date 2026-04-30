@@ -1640,17 +1640,26 @@ define(function(require) {
     };
 
 
+    // The "fullscreen" button now resets the active ViewMap's zoom level —
+    // the game already fills the viewport on load (see fitToWindow below),
+    // so toggling between window-size and the legacy 960×600 frame served
+    // no purpose.  Falls back to a no-op if no ViewMap is active yet.
     GameRoot.prototype.toggleFullScreen = function() {
-      var groot = this;
-      if (groot.fullScreenOn || groot.fullScreenOn === undefined) {
-        var width = $(window).width();
-        var height = $(window).height();
-        groot.setSize(width-32,height-64);
-        groot.fullScreenOn = false;
-      } else {
-        groot.setSize(groot.data.width,groot.data.height);
-        groot.fullScreenOn = true;
+      var vm = this.activeView && this.activeView.renderNode;
+      if (vm && vm.scroller && typeof vm.scroller.zoomTo === 'function') {
+        vm.scroller.options.animating = true;
+        vm.scroller.zoomTo(1, true);
+        vm.scroller.options.animating = false;
       }
+    };
+
+    // Size the renderable area to the current viewport.  Called on initial
+    // load and on window resize so the game fills the available space by
+    // default rather than sitting in a 960×600 letterbox.
+    GameRoot.prototype.fitToWindow = function() {
+      var width = $(window).width();
+      var height = $(window).height();
+      this.setSize(width - 32, height - 64);
     };
 
     GameRoot.prototype.setSize = function(width,height) {
@@ -2074,6 +2083,10 @@ define(function(require) {
         game.getImperium().renderNode.scrollTo({x:1024,y:0},0);
       }
 
+      // Fill the viewport by default and keep it filled when the window
+      // resizes — matches the behaviour every other webxdc app exhibits.
+      game.fitToWindow();
+      $(window).on('resize.gameFit', function() { game.fitToWindow(); });
 
       app.socket.queue.start();
 
