@@ -981,8 +981,8 @@ define(function(require) {
           '<div class="LangPickerBox" style="background:#BFE7F5;border:3px solid #009FD9;border-radius:12px;padding:24px 32px;text-align:center;box-shadow:3px 3px 0px #009FD9,3px 3px 8px rgba(0,0,0,0.5);">' +
             '<div style="font-family:Bowlby;color:#009FD9;font-size:20px;margin-bottom:16px;">Choose your language<br>Sprache wählen</div>' +
             '<div style="display:flex;gap:16px;justify-content:center;">' +
-              '<div class="Button lang-pick" data-locale="en">EN</div>' +
-              '<div class="Button lang-pick" data-locale="de">DE</div>' +
+              '<div class="Button lang-pick" data-locale="en">🇺🇸🇬🇧🇦🇺 EN</div>' +
+              '<div class="Button lang-pick" data-locale="de">🇩🇪🇦🇹🇨🇭 DE</div>' +
             '</div>' +
           '</div>' +
         '</div>'
