@@ -1679,6 +1679,15 @@ define(function(require) {
       this._centerActiveView(false);
     };
 
+    // Size the renderable area to the current viewport.  Called on initial
+    // load and on window resize so the game fills the available space by
+    // default rather than sitting in a 960×600 letterbox.
+    GameRoot.prototype.fitToWindow = function() {
+      var width = $(window).width();
+      var height = $(window).height();
+      this.setSize(width - 32, height - 64);
+    };
+
     GameRoot.prototype.setSize = function(width,height) {
       width = width || this.renderNode.width;
       height = height || this.renderNode.height;

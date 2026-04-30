@@ -10,7 +10,7 @@
 // Remaining handlers are stubs that return a rejected Promise.
 
 import { getState, setState } from './boot.js';
-import { applyDelta } from './state.js';
+import { applyDelta, seedNewGame } from './state.js';
 import { materialize } from './materializer.js';
 import { now as clockNow } from './clock.js';
 import rulesetDe from '../data/ruleset_3.de.json' with { type: 'json' };
@@ -165,10 +165,24 @@ export function getSessionLocale() {
 export function loadGame(/* token */) {
   var state = getState();
   var now = clockNow();
+
+  // First call after a fresh start (or reset) seeds starting equipment and
+  // the trunk mission from data/default_game.json so the player isn't
+  // dropped into an empty Imperium with every mission flagged complete.
+  // Idempotent — no-op once any of nodes/active_missions/mission_goals
+  // are populated.  is_new_game is captured from the pre-seed state so
+  // GameRoot.loadGame still scrolls Imperium to the top on first boot.
+  var isNewGame = !(state.nodes && state.nodes.length);
+  var seeded = seedNewGame(state);
+  if (seeded !== state) {
+    state = seeded;
+    setState(state);
+  }
+
   var mat = materialize(state, now);
   setState(mat.state);
 
-  var gameData = _buildLoadGameResponse(mat.state, now);
+  var gameData = _buildLoadGameResponse(mat.state, now, isNewGame);
 
   // Schedule socket event emission via queueMicrotask so it runs after the
   // microtask that resolves the Deferred in Remote.js (result.then → d.resolve
@@ -217,7 +231,7 @@ export function resetGame(/* token */) {
 // Response builder
 // ---------------------------------------------------------------------------
 
-function _buildLoadGameResponse(state, now) {
+function _buildLoadGameResponse(state, now, isNewGame) {
   var ruleset = _getRuleset();
 
   // type_registry: merged dict of all perp/token/powerup type definitions.
