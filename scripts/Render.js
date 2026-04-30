@@ -3864,26 +3864,13 @@ define(function(require) {
 
       node.on('dblclick',function(e){
         e.stopPropagation();
+        // Same animating-toggle anti-pattern as zoomIn/zoomOut: don't flip
+        // it back to false synchronously, the scroller animation reads the
+        // flag every frame.
         if (node.zoomScale !== 1) {
-          node.scroller.options.animating=true;
           node.scroller.zoomTo(1, true, node.userAbsPos.x,node.userAbsPos.y);
-          node.scroller.options.animating=false;
-          // Cursor FX
-          //node.cursor.radius=12;
-          //node.cursor.strokeWidth=3;
-          //node.cursor.setOpacity(1);
-          //node.cursor.FXSimple({scaleX:3,scaleY:3,opacity:0},250);
         } else {
-          //node.scroller.zoomTo(0.5, true, node.userAbsPos.x,node.userAbsPos.y);
-          node.scroller.options.animating=true;
           node.scroller.zoomTo(node.scroller.options.minZoom, true, node.userAbsPos.x,node.userAbsPos.y);
-          node.scroller.options.animating=false;
-
-          // Cursor FX
-          //node.cursor.radius=24;
-          //node.cursor.strokeWidth=6;
-          //node.cursor.setOpacity(1);
-          //node.cursor.FXSimple({scaleX:0,scaleY:0,opacity:0},250);
         }
       });
 
@@ -3983,17 +3970,17 @@ define(function(require) {
     ViewMap.prototype.zoomIn = function(){
       var node = this;
       var zoomTo = (node.zoomScale+0.25 > 1) ? 1 : node.zoomScale+0.25;
-      node.scroller.options.animating=true;
+      // Don't toggle options.animating around zoomTo — the zynga-scroller
+      // animation loop reads it on every frame, so flipping it back to false
+      // synchronously cancels the animation mid-setup and the +/- buttons
+      // become silent no-ops. Let the scroller manage its own state.
       node.scroller.zoomTo(zoomTo, true);
-      node.scroller.options.animating=false;
     };
 
     ViewMap.prototype.zoomOut = function(){
       var node = this;
       var zoomTo = (node.zoomScale-0.25 < 0.5) ? 0.5 : node.zoomScale-0.25;
-      node.scroller.options.animating=true;
       node.scroller.zoomTo(zoomTo, true);
-      node.scroller.options.animating=false;
     };
 
     ViewMap.prototype.FXShow = function(){

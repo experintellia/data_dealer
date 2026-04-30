@@ -869,6 +869,10 @@ msgstr "OK"
 msgid "Close"
 msgstr "Close"
 
+#: views/mainmenu.html:8
+msgid "About"
+msgstr "About"
+
 #: views/popup_agent.html:31
 msgid "agent_popup selector title"
 msgstr "Acquire contact"

@@ -1024,6 +1024,15 @@ define(function(require) {
         });
         gnode.activeView = getById(view_id);
         gnode.activeView.setState('active',true);
+        // Refresh the new view's scroller dimensions against the current
+        // stage (it may have been resized while a different tab was active),
+        // then recentre on its content. Without this, switching to Database
+        // leaves the camera wherever the previous view was scrolled.
+        var vm = gnode.activeView && gnode.activeView.renderNode;
+        if (vm && typeof vm.updateScroller === 'function') {
+          vm.updateScroller();
+        }
+        gnode._centerActiveView(true);
       });
 
       gnode.on('toggle_locale',function(e) {
@@ -1637,6 +1646,12 @@ define(function(require) {
       config.popupContainer = this;
 
       var popup = gnode.notificationPopup = new Render.Popup(config);
+      // Tag the popup with the mission gestalt so the popup_close handler in
+      // initPopupEvents can persist the dismissal directly. Persisting in
+      // popup.callback (which only fires via popup.close(cb)) was unreliable
+      // — popup_close fires the moment the user clicks X, before the close
+      // animation/timeout chain that triggers the callback.
+      popup.notificationMission = notification.mission_active_gestalt;
       //gnode.lock();
 
       window.setTimeout(function(){
@@ -1651,17 +1666,8 @@ define(function(require) {
         gnode.renderNode.addPopup(popup);
         gnode.initPopupEvents(popup);
       }, config.delay || 0);
-      
+
       popup.callback = function(){
-        if (notification.mission_active_gestalt) {
-          // Mark this mission's briefing as seen so it doesn't reopen on reload.
-          var gestalt = notification.mission_active_gestalt;
-          groot.raw_data.mission_briefings_seen = groot.raw_data.mission_briefings_seen || {};
-          groot.raw_data.mission_briefings_seen[gestalt] = true;
-          if (app.remote && app.remote.dismissMissionBriefing) {
-            app.remote.dismissMissionBriefing(app.token, gestalt);
-          }
-        }
         groot.uncueNotification(notification);
         delete groot.notificationPopup;
         if (groot.NotificationQueue.length) {
@@ -1685,10 +1691,11 @@ define(function(require) {
       var vm = this.activeView && this.activeView.renderNode;
       if (!vm || !vm.scroller || typeof vm.scroller.zoomTo !== 'function') return;
       if (typeof vm.updateScroller === 'function') vm.updateScroller();
-      vm.scroller.options.animating = true;
+      // Don't toggle options.animating — the zynga-scroller animation reads
+      // the flag every frame, so flipping it back to false synchronously
+      // cancels the zoom mid-animation.
       vm.scroller.zoomTo(1, true);
       this._centerActiveView(true);
-      vm.scroller.options.animating = false;
     };
 
     // Re-centers the active ViewMap so the design home point sits in the
@@ -1881,7 +1888,7 @@ define(function(require) {
       var clipap = (this.ap_value < 0) ? 0 : this.ap_value
       sb.AP.val = (this.ap_value < 0) ? 0 : this.ap_value;
       sb.AP.max = this.xp_level.ap_max;
-      sb.AP.barsize = Math.round((sb.AP.val/this.xp_level.ap_max)*120);
+      sb.AP.barsize = Math.min(120, Math.max(0, Math.round((sb.AP.val/this.xp_level.ap_max)*120)));
       if (this.renderStatusbar && !silent) { this.renderStatusbar.FXUpdateAP(); }
     };
 
@@ -1891,7 +1898,7 @@ define(function(require) {
       }
       sb = this.data.status_bar;
       sb.cash.val = this.cash_value;
-      sb.cash.barsize = Math.round((this.cash_value/this.cash_max)*120);
+      sb.cash.barsize = Math.min(120, Math.max(0, Math.round((this.cash_value/this.cash_max)*120)));
       if (this.renderStatusbar && !silent) { this.renderStatusbar.FXUpdateCash(); }
     };
 
@@ -1905,7 +1912,7 @@ define(function(require) {
       sb = this.data.status_bar;
       sb.profiles.val = this.profiles_value;
       sb.profiles.max = this.profiles_max;
-      sb.profiles.barsize = Math.round((this.profiles_value/this.profiles_max)*120);
+      sb.profiles.barsize = Math.min(120, Math.max(0, Math.round((this.profiles_value/this.profiles_max)*120)));
       sb.profiles.crosssum = this.getDBTokensCrossSum();
       this.getDBTokensLength();
       sb.profiles.tokenslength = this.DBTokensLength;
@@ -1931,7 +1938,7 @@ define(function(require) {
       sb.karma.max = this.karma_max || 100;
       //var val_center = 50 - this.karma_value;
       //FIXME: set to correct level not 50;
-      sb.karma.barsize = Math.round((this.karma_value/this.karma_max)*59);
+      sb.karma.barsize = Math.min(59, Math.max(-59, Math.round((this.karma_value/this.karma_max)*59)));
       if (this.renderStatusbar && !silent) { this.renderStatusbar.FXUpdateKarma(); }
     };
 
@@ -1950,7 +1957,7 @@ define(function(require) {
       sb = this.data.status_bar;
       sb.XP.val = this.xp_value;
       sb.XP.level = this.xp_level.number;
-      sb.XP.barsize = Math.round(((this.xp_value - this.xp_level.xp_min) / (this.xp_level.xp_max - this.xp_level.xp_min)) * 96);
+      sb.XP.barsize = Math.min(96, Math.max(0, Math.round(((this.xp_value - this.xp_level.xp_min) / (this.xp_level.xp_max - this.xp_level.xp_min)) * 96)));
       if (this.renderStatusbar && !silent) { this.renderStatusbar.FXUpdateXP(); }
     };
 
@@ -2599,10 +2606,13 @@ define(function(require) {
             return;
           }
           if (gnode.renderPopup) { gnode.renderPopup.trigger('popup_close'); }
-          // TODO game_values
           var gv = data.result.game_values;
-          //groot.updateGameValues(data.result.game_values,data.result.levelup,data.result.missions,true);
           groot.setProfiles(data.result.game_values.profiles_value,true);
+          // Recompute game values + mission goals so integrate_profiles
+          // missions tick over right after DBTokensAbsolute is populated.
+          // setProfiles above already set profiles_value, so the inner
+          // setProfiles in updateGameValues is a no-op (guard by !== current).
+          groot.updateGameValues(data.result.game_values,data.result.levelup,data.result.missions,true);
           var profiles_increment = data.result.result.increment;
           var profiles_dup = data.result.result.dup;
           
@@ -2987,6 +2997,20 @@ define(function(require) {
 
       popup.on('popup_close',function(e) {
         e.stopPropagation();
+        // Persist mission-briefing dismissal synchronously here, not in
+        // popup.callback. Callback runs only when popup.close(cb) chains
+        // through; popup_close fires the moment the user clicks X.
+        if (popup.notificationMission) {
+          var gestalt = popup.notificationMission;
+          popup.notificationMission = null;
+          if (groot.raw_data) {
+            groot.raw_data.mission_briefings_seen = groot.raw_data.mission_briefings_seen || {};
+            groot.raw_data.mission_briefings_seen[gestalt] = true;
+          }
+          if (app.remote && app.remote.dismissMissionBriefing) {
+            app.remote.dismissMissionBriefing(app.token, gestalt);
+          }
+        }
         if (gnode.highlightTabs) {
           gnode.highlightTabs = [];
         }

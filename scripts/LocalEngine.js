@@ -202,6 +202,15 @@ export function loadGame(/* token */) {
   var mat = materialize(state, now);
   setState(mat.state);
 
+  // Re-arm one-shot materializers for any charges still in flight — without
+  // this, charges that cross a page reload would never fire node_ready.
+  var stillCharging = (mat.state && mat.state.nodes_charging) || [];
+  for (var i = 0; i < stillCharging.length; i++) {
+    if (typeof stillCharging[i].charge_end === 'number') {
+      _scheduleChargeReady(stillCharging[i].charge_end);
+    }
+  }
+
   var gameData = _buildLoadGameResponse(mat.state, now, isNewGame);
 
   // Schedule socket event emission via queueMicrotask so it runs after the
@@ -1124,9 +1133,34 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
     ts:     now,
   });
 
+  // Live-tick: nothing in the page periodically calls materialize(), so
+  // without this the charge ripens silently — the perp's UI blinks at zero
+  // but no node_ready fires until the player reloads (which runs materialize
+  // on cold-start). Schedule a one-shot materialize at exactly charge_end.
+  _scheduleChargeReady(chargeEntry.charge_end);
+
   return Promise.resolve({
     result: { game_values: newGv, duration: durationMs, levelup: false, missions: {} },
   });
+}
+
+// One-shot per charge: at charge_end, run materialize() to transition the
+// charging entry into nodes_collect and emit node_ready. Tests stub
+// setTimeout via the override clock; we use the host setTimeout directly so
+// production play actually fires.
+function _scheduleChargeReady(chargeEnd) {
+  if (typeof setTimeout !== 'function') return;
+  var msUntil = Math.max(0, chargeEnd - clockNow());
+  setTimeout(function () {
+    var s = getState();
+    if (!s) return;
+    var mat = materialize(s, clockNow());
+    setState(mat.state);
+    var events = mat.events || [];
+    for (var i = 0; i < events.length; i++) {
+      _emit(events[i].ev, events[i].pl);
+    }
+  }, msUntil);
 }
 
 // ---------------------------------------------------------------------------
@@ -1422,13 +1456,19 @@ export function integrateCollected(_token, collectId) {
     if (seenGestalts[gestalt]) return;
     if (!ruleset.tokens || !ruleset.tokens[gestalt]) return;
     var tok = tokensMap[gestalt];
+    // Deterministic spread around the Database centre so multiple new
+    // tokens on the same integrate don't all stack on top of each other
+    // at (0,0). Hash is gestalt-keyed so replay produces identical layout.
+    var hash = _djb2(gestalt);
+    var dx = (hash         % 1200) - 600;
+    var dy = ((hash >>> 8) %  800) - 400;
     var newNode = {
       game_id:    gestalt,
       gestalt:    gestalt,
       game_type:  'TokenPerp',
       full_type:  'TokenPerp:' + gestalt,
       full_path:  'Database.' + gestalt,
-      instance_data: { amount: tok.amount || 0 }
+      instance_data: { amount: tok.amount || 0, x: 1024 + dx, y: 800 + dy }
     };
     newNodes = newNodes.concat([newNode]);
     updatedNodes.push({
