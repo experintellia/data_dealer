@@ -143,6 +143,7 @@ define(function(require) {
       app.remote.addMethod('getPowerups');
       app.remote.addMethod('getProvidedPerps');
       app.remote.addMethod('getSessionLocale');
+      app.remote.addMethod('setLocale');
       app.remote.addMethod('buyKarma');
       app.remote.addMethod('buyPerp');
       app.remote.addMethod('buySlots');

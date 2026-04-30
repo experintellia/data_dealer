@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  getToken, ping, getSessionLocale, loadGame, getRanking, resetGame, setEmitter,
+  getToken, ping, getSessionLocale, setLocale, loadGame, getRanking, resetGame, setEmitter,
   setDisplayName, setPerpCoordinates, buyKarma,
   buyPowerup, sellPowerup, buySlots, buyPerp
 } from '../../scripts/LocalEngine.js';
@@ -1095,5 +1095,70 @@ describe('buyPerp — failure: unknown gestalt', () => {
     setState(mkBuyPerpState());
     const { result } = await buyPerp('tok', 'Imperium', 'noSuchPerp');
     expect(result.error).toBe(1);
+  });
+});
+
+// ── setLocale ────────────────────────────────────────────────────────────────
+
+describe('setLocale', () => {
+  beforeEach(() => setState(mkState()));
+
+  it('resolves with the locale code as result', async () => {
+    const data = await setLocale('en');
+    expect(data).toEqual({ result: 'en' });
+  });
+
+  it('persists "en" locale to state', async () => {
+    await setLocale('en');
+    const state = getState();
+    expect(state.locale).toBe('en');
+  });
+
+  it('persists "de" locale to state', async () => {
+    await setLocale('de');
+    const state = getState();
+    expect(state.locale).toBe('de');
+  });
+
+  it('invalid locale code is returned but state.locale stays undefined', async () => {
+    const data = await setLocale('fr');
+    expect(data).toEqual({ result: 'fr' });
+    const state = getState();
+    expect(state.locale).toBeUndefined();
+  });
+
+  it('locale is reflected by getSessionLocale after setLocale', async () => {
+    await setLocale('en');
+    const data = await getSessionLocale();
+    expect(data.result).toBe('en');
+  });
+
+  it('switching from de to en is reflected immediately', async () => {
+    await setLocale('de');
+    await setLocale('en');
+    const data = await getSessionLocale();
+    expect(data.result).toBe('en');
+  });
+});
+
+// ── getSessionLocale — persisted value ──────────────────────────────────────
+
+describe('getSessionLocale — persisted locale', () => {
+  it('returns "en" when state.locale is "en"', async () => {
+    setState(mkState({ locale: 'en' }));
+    const data = await getSessionLocale();
+    expect(data.result).toBe('en');
+  });
+
+  it('returns "de" when state.locale is "de"', async () => {
+    setState(mkState({ locale: 'de' }));
+    const data = await getSessionLocale();
+    expect(data.result).toBe('de');
+  });
+
+  it('falls back to "de" when state has no locale', async () => {
+    setState(mkState());
+    const data = await getSessionLocale();
+    expect(data.result).toBe('de');
   });
 });

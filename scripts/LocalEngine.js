@@ -146,12 +146,39 @@ export function ping() {
 /**
  * getSessionLocale() → Promise<{result: string}>
  * Returns locale string; Game.js checks === "de" for branch selection.
- * Defaults to "de" since that is the packaged ruleset.
+ * Returns state.locale if persisted, otherwise defaults to "de".
  */
 export function getSessionLocale() {
   var state = getState();
   var locale = (state && state.locale) || 'de';
   return Promise.resolve({ result: locale });
+}
+
+/**
+ * setLocale(localeCode) → Promise<{result: string}>
+ *
+ * Persists the player's preferred locale shorthand ('de' or 'en') as a delta
+ * so the choice survives a page reload.  The caller (popup_user_data button)
+ * is responsible for calling location.reload() after this resolves.
+ * Invalid locale codes are silently ignored (result still echoes the code).
+ */
+export function setLocale(localeCode) {
+  if (localeCode !== 'de' && localeCode !== 'en') {
+    return Promise.resolve({ result: localeCode });
+  }
+
+  var state = getState();
+  var delta = { kind: 'delta', op: 'setLocale', addr: state ? state.addr : '', locale: localeCode, ts: clockNow() };
+
+  // Apply locally so in-memory state reflects new locale immediately.
+  if (state) {
+    setState(Object.assign({}, state, { locale: localeCode }));
+  }
+
+  // Broadcast to webxdc update history for durable replay on cold start.
+  _persistDelta(delta);
+
+  return Promise.resolve({ result: localeCode });
 }
 
 /**
@@ -1448,6 +1475,7 @@ var LocalEngine = Object.assign({
   getToken:           getToken,
   ping:               ping,
   getSessionLocale:   getSessionLocale,
+  setLocale:          setLocale,
   loadGame:           loadGame,
   getRanking:         getRanking,
   resetGame:          resetGame,
