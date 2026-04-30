@@ -25,6 +25,14 @@ require([
     );
   }
 
+  var Remote = require('Remote');
+  // vendor/preloadjs.js bundles a JSON3 polyfill whose anonymous define()
+  // overrides the `exports: 'createjs.LoadQueue'` shim, so require('preload')
+  // returns the JSON3 object rather than the constructor.  The script still
+  // populates window.createjs.LoadQueue as a side-effect of loading, so we
+  // read it from there.
+  var LoadQueue = window.createjs.LoadQueue;
+
   var loaderView = require('tpl!../views/loader.html');
   $('#dd-control').html(loaderView());
 
