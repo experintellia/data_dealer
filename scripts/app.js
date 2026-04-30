@@ -288,7 +288,11 @@ define(function(require) {
         else { return {} }
       },
       numeral: require('numeral'),
-      sprintf: require('sprintf'),
+      // vendor/sprintf.js's anonymous define() shadows its global export, so
+      // require('sprintf') returns an object wrapper.  Game.js loads the
+      // vendor file (which sets window.sprintf = y) before any _.sprintf
+      // call site, so reading from the global is safe here.
+      sprintf: window.sprintf,
       renderView: app.renderView,
       pad0: function(number, length) {
         // Fastest implementation according to http://jsperf.com/ways-to-0-pad-a-number

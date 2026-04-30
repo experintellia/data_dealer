@@ -5,10 +5,8 @@ require.config({
       variable: 'D'
     }
   },
-  //enforceDefine: true,
   paths: {
     'createjs-easel': '../vendor/easeljs',
-    'createjs-preload': '../vendor/preloadjs',
     'createjs-tween': '../vendor/tweenjs',
     'createjs-sound': '../vendor/soundjs',
     jquery: '../vendor/jquery',
@@ -17,8 +15,6 @@ require.config({
     'native-console': '../vendor/native-console',
     numeral: '../vendor/numeral',
     'numeral-de': '../vendor/numeral-de',
-    preload: '../vendor/preloadjs',
-    routie: '../vendor/routie',
     sprintf: '../vendor/sprintf',
     text: '../vendor/text',
     tpl: '../vendor/tpl',
@@ -28,9 +24,6 @@ require.config({
   },
   shim: {
     'createjs-easel': {
-      exports: 'createjs'
-    },
-    'createjs-preload': {
       exports: 'createjs'
     },
     'createjs-sound': {
@@ -48,13 +41,11 @@ require.config({
     'numeral-de': {
       deps: ['numeral']
     },
-    preload: {
-      exports: 'createjs.LoadQueue'
-    },
-    'routie': {
-      exports: 'routie'
-    },
     'sprintf': {
+      // Note: vendor/sprintf.js has an anonymous define() that returns
+      // {sprintf, vsprintf} — RequireJS prefers that over this shim,
+      // so consumers (Game.js, app.js) read window.sprintf directly.
+      // The shim is left here for clarity.
       exports: 'sprintf'
     },
     'zynga-animate': {
@@ -75,4 +66,3 @@ require.config({
 });
 
 require(['bootstrap']);
-

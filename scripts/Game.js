@@ -4,7 +4,13 @@ define(function(require) {
 
     var _ = require('underscore');
     var $ = require('jquery');
-    var sprintf = require('sprintf');
+    require('sprintf'); // load the vendor file so window.sprintf is populated
+    // vendor/sprintf.js has an anonymous define() that returns an object
+    // ({sprintf, vsprintf}), which RequireJS treats as the module value and
+    // overrides the `exports: 'sprintf'` shim — same JSON3-style trap as
+    // vendor/preloadjs.js.  The script does set window.sprintf to the
+    // function itself, so we read it from there.
+    var sprintf = window.sprintf;
 
     var app = require('app').getApplication();
     var setup = require('setup');

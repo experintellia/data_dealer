@@ -4,7 +4,6 @@ define(function(require) {
 
     var _ = require('underscore');
     var $ = require('jquery');
-    //var routie = require('routie');
 
     var Scroller = require('zynga-scroller');
     var core = require('zynga-animate');
