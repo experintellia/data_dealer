@@ -40,14 +40,6 @@ export function boot(options) {
     _currentState = applyDelta(_currentState, update.payload);
   }, 0);
 
-  // Migrate stored history: older buyPerp deltas wrote `game_id: 'node_<n>'`
-  // while paths use the gestalt as their last segment — Game.js indexes the
-  // perp tree by game_id and looks parents up via the path's last segment, so
-  // every child of an old-id node failed to find its parent on render.
-  // Rewriting after replay keeps existing progress intact and is a no-op
-  // for newly-bought nodes (which already use gestalt-as-id).
-  _currentState = _normalizeNodeIds(_currentState);
-
   // Integration point for issue #11 (Thread N — materializer).
   // The real materializer will advance time-based progress (charge timers,
   // AP regen, etc.) against the replayed state.  For now this is a noop.
@@ -59,20 +51,6 @@ export function boot(options) {
   if (typeof options.onReady === 'function') {
     options.onReady(_currentState);
   }
-}
-
-function _normalizeNodeIds(state) {
-  if (!state || !Array.isArray(state.nodes) || !state.nodes.length) return state;
-  var changed = false;
-  var nodes = state.nodes.map(function (n) {
-    if (!n || typeof n.full_path !== 'string') return n;
-    var parts = n.full_path.split('.');
-    var last = parts[parts.length - 1];
-    if (!last || n.game_id === last) return n;
-    changed = true;
-    return Object.assign({}, n, { game_id: last });
-  });
-  return changed ? Object.assign({}, state, { nodes: nodes }) : state;
 }
 
 /**
