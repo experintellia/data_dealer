@@ -14,11 +14,8 @@ define(function(require) {
     var Ticker = Easel.Ticker;
     var Ease = Easel.Ease;
 
-    // CreateJS dropped the legacy Ticker.{addListener,removeListener,setFPS}
-    // API in favour of EventDispatcher + a `framerate` property. The Render
-    // code below still uses the old shape (objects with a tick() method); we
-    // shim the old API onto the new one so we don't have to touch every call
-    // site.
+    // Shim CreateJS legacy Ticker.{addListener,removeListener,setFPS} onto
+    // the current EventDispatcher API so Render's tick-object callers work.
     if (typeof Ticker.addListener !== 'function') {
       var _tickHandlers = new WeakMap();
       Ticker.addListener = function(obj) {

@@ -165,16 +165,10 @@ export function getSessionLocale() {
 export function loadGame(/* token */) {
   var state = getState();
   var now = clockNow();
-
-  // freshState now ships the trunk-mission seed inline, so a player whose
-  // node_counter is still 0 has not yet bought anything — that's our
-  // "is_new_game" signal for GameRoot.loadGame's scroll-to-top heuristic.
-  var isNewGame = !state.node_counter;
-
   var mat = materialize(state, now);
   setState(mat.state);
 
-  var gameData = _buildLoadGameResponse(mat.state, now, isNewGame);
+  var gameData = _buildLoadGameResponse(mat.state, now);
 
   // Schedule socket event emission via queueMicrotask so it runs after the
   // microtask that resolves the Deferred in Remote.js (result.then → d.resolve
@@ -223,7 +217,7 @@ export function resetGame(/* token */) {
 // Response builder
 // ---------------------------------------------------------------------------
 
-function _buildLoadGameResponse(state, now, isNewGame) {
+function _buildLoadGameResponse(state, now) {
   var ruleset = _getRuleset();
 
   // type_registry: merged dict of all perp/token/powerup type definitions.
@@ -271,7 +265,9 @@ function _buildLoadGameResponse(state, now, isNewGame) {
     karmalauters: ruleset.karmalauters,
     karmalizers: ruleset.karmalizers,
     server_time: { $date: now },
-    is_new_game: typeof isNewGame === 'boolean' ? isNewGame : !state.node_counter,
+    // node_counter is bumped only by buyPerp; never by the seed, never by
+    // materialize. Zero ⇒ player hasn't bought anything yet.
+    is_new_game: !state.node_counter,
     missions: ruleset.missions,
     mission_goals: state.mission_goals || [],
     active_missions: state.active_missions || []
@@ -899,9 +895,7 @@ export function buyPerp(_token, parentPath, gestalt) {
 
   var nodeCounter = (state.node_counter || 0) + 1;
   var newNode = {
-    // game_id MUST equal the path's last segment — Game.js:getByLastId looks
-    // nodes up that way (e.g. Database.cue → ps.origin = getByLastId(path)).
-    // The duplicate-path check above already guarantees uniqueness.
+    // game_id == gestalt (last path segment); see _seedNodesFromTree for invariant.
     game_id: gestalt,
     game_type: gameType,
     full_type: gameType + ':' + gestalt,

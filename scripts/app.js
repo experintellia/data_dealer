@@ -177,13 +177,10 @@ define(function(require) {
           return app.remote.getSessionLocale().then(function(data) {
             var locale = data.result === 'de' ? 'de_AT' : 'en_US';
             i18n.setLocale(locale);
-            // Wait for the locale JSONs to land before anything constructs
-            // Game (which pulls in type_settings and runs gettext at module
-            // load time). Otherwise every msgid logs a "No language file
-            // available" warning during the first paint.
+            // type_settings runs gettext at module load — must wait for
+            // the locale JSON before requiring Game.
             $('#loadertext').text('Loading translations');
             return i18n.ready().then(function() {
-            // Now connect to the server via websocket.
             $('#loadertext').text('Initializing socket');
             return app.initSocket(token).then(function() {
               // When handshake is complete, load game data and initialize the game engine.

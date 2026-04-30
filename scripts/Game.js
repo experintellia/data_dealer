@@ -1640,9 +1640,6 @@ define(function(require) {
     };
 
 
-    // The fullscreen button now resets zoom AND re-centers on the ViewMap's
-    // design home point — for Imperium that's where the seed places the
-    // Database (≈1024,800).  Falls back to a no-op if no ViewMap is active.
     GameRoot.prototype.resetZoom = function() {
       var vm = this.activeView && this.activeView.renderNode;
       if (!vm || !vm.scroller || typeof vm.scroller.zoomTo !== 'function') return;
@@ -1652,14 +1649,9 @@ define(function(require) {
       vm.scroller.options.animating = false;
     };
 
-    // Re-centers the active ViewMap so the design home point sits in the
-    // middle of the visible viewport — used both at startup and from the
-    // reset-zoom button so the player isn't staring at empty space when
-    // the window is wider than the legacy 960×600 frame.
     GameRoot.prototype._centerActiveView = function(animate) {
       // activeView is only set after a switch_view trigger; before the first
-      // tab click (i.e. on initial load) Imperium is shown by default, so
-      // fall back to it.
+      // tab click Imperium is shown by default, so fall back to it.
       var view = this.activeView || (this.getImperium && this.getImperium());
       var vm = view && view.renderNode;
       if (!vm || !vm.scroller || !vm.parentNode) return;
@@ -1682,15 +1674,8 @@ define(function(require) {
       vm.scroller.scrollTo(sx, sy, !!animate);
     };
 
-    // Size the renderable area to the current viewport.  Called on initial
-    // load and on window resize so the game fills the available space by
-    // default rather than sitting in a 960×600 letterbox.
     GameRoot.prototype.fitToWindow = function() {
-      var width = $(window).width();
-      var height = $(window).height();
-      this.setSize(width - 32, height - 64);
-      // After resizing, snap the active ViewMap back to its home point so
-      // the seed neighbourhood stays visually centred.
+      this.setSize($(window).width() - 32, $(window).height() - 64);
       this._centerActiveView(false);
     };
 
@@ -2109,16 +2094,11 @@ define(function(require) {
       });
 
       game.render();
-
-      // Visual FIX, when new_game scroll to top
-      if (data.is_new_game) {
-        game.getImperium().renderNode.scrollTo({x:1024,y:0},0);
-      }
-
-      // Fill the viewport by default and keep it filled when the window
-      // resizes — matches the behaviour every other webxdc app exhibits.
+      // fitToWindow handles centring; the legacy is_new_game scrollTo would
+      // be immediately overwritten so we no longer set it here.
       game.fitToWindow();
-      $(window).on('resize.gameFit', function() { game.fitToWindow(); });
+      $(window).off('resize.gameFit').on('resize.gameFit',
+        _.debounce(function() { game.fitToWindow(); }, 100));
 
       app.socket.queue.start();
 

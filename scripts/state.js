@@ -79,13 +79,8 @@ export function freshState(selfAddr, seed) {
     src.game_values || {}
   );
 
-  // Seed starting equipment + active missions inline so the baseline state
-  // produced by freshState (and therefore by the 'reset' reducer and by
-  // every cold-start replay) already contains the trunk-mission state.
-  // This MUST happen at the freshState level: lazy seeding inside loadGame
-  // doesn't survive replay, so a buyPerp delta committed after a reset
-  // would re-add itself on cold start *without* its seeded parent and
-  // crash GameRoot.loadGame's parent lookup.
+  // Seed must live in freshState so reset/replay regenerates it
+  // deterministically; lazy seeding inside loadGame doesn't survive replay.
   var seededNodes = _seedNodesFromTree(src);
 
   return {
@@ -107,37 +102,27 @@ export function freshState(selfAddr, seed) {
   };
 }
 
-/**
- * @deprecated Seed is now applied directly in freshState; this is kept as a
- * no-op shim so callers (e.g. LocalEngine.loadGame) compile during the
- * transition.  Remove once all call sites are gone.
- */
-export function seedNewGame(state) {
-  return state;
-}
-
 function _seedNodesFromTree(src) {
   var out = [];
 
-  function gestaltFromFullType(ft) {
-    var i = String(ft || '').indexOf(':');
-    return i >= 0 ? ft.slice(i + 1) : '';
-  }
-  function gameTypeFromFullType(ft) {
-    var i = String(ft || '').indexOf(':');
-    return i >= 0 ? ft.slice(0, i) : '';
+  function splitFullType(ft) {
+    var s = String(ft || '');
+    var i = s.indexOf(':');
+    return i >= 0 ? [s.slice(0, i), s.slice(i + 1)] : ['', ''];
   }
 
   function walk(parentPath, child) {
     if (!child || !child.full_type) return;
-    var gestalt = gestaltFromFullType(child.full_type);
+    var parts = splitFullType(child.full_type);
+    var gameType = parts[0];
+    var gestalt = parts[1];
     if (!gestalt) return;
     var fullPath = parentPath + '.' + gestalt;
     out.push({
       // game_id MUST equal the path's last segment — Game.js:getByLastId looks
       // nodes up that way (e.g. Database.cue → ps.origin = getByLastId(path)).
       game_id: gestalt,
-      game_type: gameTypeFromFullType(child.full_type),
+      game_type: gameType,
       full_type: child.full_type,
       gestalt: gestalt,
       full_path: fullPath,
