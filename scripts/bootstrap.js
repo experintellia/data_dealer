@@ -3,7 +3,6 @@
 require([
   'require',
   'jquery',
-  'preload',
   'Remote',
   'i18n',
   'routie',
@@ -17,19 +16,12 @@ require([
   var $ = require('jquery');
 
   var Remote = require('Remote');
-  // vendor/preloadjs.js bundles a JSON3 polyfill whose anonymous define()
-  // overrides the `exports: 'createjs.LoadQueue'` shim, so require('preload')
-  // returns the JSON3 object rather than the constructor.  The script still
-  // populates window.createjs.LoadQueue as a side-effect of loading, so we
-  // read it from there.
-  var LoadQueue = window.createjs.LoadQueue;
 
   var setup = require('setup');
-  var i18n = require('i18n');
 
   var remote = new Remote({endPoint: setup.jsonRpcUrl});
   remote.addMethod('getToken');
-  
+
   var loadGameViewsAndStart = function(){
     var app = require('app').getApplication();
     app.loadViews().then(function() {
@@ -42,62 +34,6 @@ require([
     });
   };
 
-  // some asset loading
-
-  var load = function() {
-    var now = Date.now();
-    var queue = new LoadQueue();
-
-    //queue.installPlugin(createjs.Sound);
-
-    queue.addEventListener('progress', function(event) {
-      var percentage = parseInt(event.loaded * 100, 10);
-      $('#loader').val(percentage);
-      $('#loadertext').text('Loading Game ' + percentage + "%");
-    });
-
-    // FIXME: make this a setup_local setting to match actual server configuration
-    queue.setMaxConnections(8);
-    queue.setUseXHR(false)
-
-    queue.addEventListener('fileload', function(event) {
-      switch (event.item.type) {
-        case LoadQueue.CSS:
-        (document.head || document.getElementsByTagName("head")[0]).appendChild(event.result);
-        console.info('Loaded stylesheet %s', event.item.src);
-        break;
-        case LoadQueue.IMAGE:
-        //console.info('Loaded image %s', event.item.src);
-        break;
-        case LoadQueue.JAVASCRIPT:
-        document.body.appendChild(event.result);
-        //console.info('Loaded script %s', event.item.src);
-        break;
-        case LoadQueue.JSON:
-        if (event.item.src.indexOf('/i18n/') > -1) {
-          console.info('Loaded language %s', event.item.src);
-        }
-        break;
-        default:
-        console.info('Loaded file %s', event.item.src);
-      }
-    });
-
-    queue.addEventListener('complete', function(event) {
-      console.info('We’re done, let’s sell your private data!');
-      $('#loadertext').text('Starting Game');
-      loadGameViewsAndStart();
-    });
-
-    $.getScript('scripts/asset-manifest.js').then(function() {
-      queue.loadManifest(filesManifest);
-    }).fail(function(){
-      if (setup.debug) {
-        loadGameViewsAndStart();
-      }
-    });
-  };
-
   // register some routes
 
   var routie_routes = {};
@@ -106,7 +42,10 @@ require([
       console.info('We got a token:', data.result);
       var view = require('tpl!../views/loader.html');
       $('#dd-control').html(view());
-      load();
+      // The original game ran a PreloadJS asset-manifest warmup pass here
+      // before starting the engine. The webxdc bundle ships every asset
+      // locally, so there is nothing to warm — start the game directly.
+      loadGameViewsAndStart();
     }).fail(function(data) {
       console.error('Error: ',data);
       console.error('Backend made a  bubu, do something!');
@@ -130,5 +69,5 @@ require([
   // FIXME: Starting with #load
   if (!location.hash) {
     routie('load');
-  } 
+  }
 });
