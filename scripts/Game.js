@@ -1640,6 +1640,7 @@ define(function(require) {
     };
 
 
+
     GameRoot.prototype.resetZoom = function() {
       var vm = this.activeView && this.activeView.renderNode;
       if (!vm || !vm.scroller || typeof vm.scroller.zoomTo !== 'function') return;
