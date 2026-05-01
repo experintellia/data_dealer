@@ -102,6 +102,7 @@ for stable selection. These selectors use kebab-case with the `dd-` prefix.
 | `dd-display-name-save-button` | Display name save button | Click to save user display name |
 | `dd-perp-buy-{gestalt}` | Buy button for perpetual in popup | Click to purchase a perpetual (gestalt identifies the perp type) |
 | `dd-leaderboard-row-{addr}` | Leaderboard entry row | Select to check scores for a player (addr is their address) |
+| `dd-reset-game-button` | Reset game button in debug tab | Click to trigger game reset (confirmation handled via browser dialog) |
 
 ### Using parameterized selectors in Playwright
 
