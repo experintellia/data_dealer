@@ -39,7 +39,7 @@
           <div class='RenderSprite Tobi'></div>
           1
         </div>
-        <div class="Button" data-button-id="CollectButton"><%= _._('Update') %></div>
+        <div class="Button" data-button-id="CollectButton" data-testid="dd-collect-button"><%= _._('Update') %></div>
       </div>
     <% } else { %>
       <div class="PopupButtons">
@@ -47,7 +47,7 @@
           <div class='RenderSprite Tobi'></div>
           1
         </div>
-        <div class="Button <% if (!states.idle || states.zeroresult) print('disabled'); %>" data-button-id="ChargeButton"><%= button2 %></div>
+        <div class="Button <% if (!states.idle || states.zeroresult) print('disabled'); %>" data-button-id="ChargeButton" data-testid="dd-charge-button"><%= button2 %></div>
         <div class="ButtonDecorator Time">
           <div class='RenderSprite Tobi'></div>
           <% print(_.toTime(data.charge_time)) %>

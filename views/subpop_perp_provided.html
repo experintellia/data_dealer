@@ -15,7 +15,7 @@ var button = data.buy_button_text || _._('Buy');
     <div class="ButtonDecorator Cash">
       <div class='RenderSprite Tobi'></div>
       <% print(_.toKSNum(data.price)); %></div>
-    <div class="Button" data-button-id="PerpBuyButton" data-button-gestalt="<%= p.gestalt %>"><%= button %></div>
+    <div class="Button" data-button-id="PerpBuyButton" data-button-gestalt="<%= p.gestalt %>" data-testid="dd-perp-buy-<%= p.gestalt %>"><%= button %></div>
   </div>
 
   <div class="Debug">
