@@ -102,3 +102,23 @@ for stable selection. These selectors use kebab-case with the `dd-` prefix.
 | `dd-display-name-save-button` | Display name save button | Click to save user display name |
 | `dd-perp-buy-{gestalt}` | Buy button for perpetual in popup | Click to purchase a perpetual (gestalt identifies the perp type) |
 | `dd-leaderboard-row-{addr}` | Leaderboard entry row | Select to check scores for a player (addr is their address) |
+
+### Using parameterized selectors in Playwright
+
+Some testids contain placeholders (`{gestalt}`, `{addr}`) that you must interpolate at test runtime:
+
+```js
+// Construct the full selector for a specific perpetual
+const gestalt = 'agent_4';
+const selector = `[data-testid="dd-perp-buy-${gestalt}"]`;
+await page.click(selector);
+
+// Construct the full selector for a specific leaderboard row
+const addr = 'player123@example.com';
+const rowSelector = `[data-testid="dd-leaderboard-row-${addr}"]`;
+const scoreText = await page.locator(rowSelector).locator('.TopscoreValue').textContent();
+```
+
+The placeholders correspond to:
+- `{gestalt}`: The perp's unique identifier (e.g., `agent_4`, `proxy_2`)
+- `{addr}`: The player's address or ID from the scoreboard data
