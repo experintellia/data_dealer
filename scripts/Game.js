@@ -3670,6 +3670,10 @@ define(function(require) {
       var groot = this.GameRoot;
       var mroot = groot.Missions;
       if (gnode.states.active && gnode.data.tutorial) {
+        // If the player already dismissed the mission briefing, the NPC coach
+        // intro has already been seen — skip re-queuing on reload.
+        var seenBriefings = (groot.raw_data && groot.raw_data.mission_briefings_seen) || {};
+        if (seenBriefings[gnode.gestalt]) { return false; }
         groot.setState('tutorial_active',true);
         // TODO: check each step for completion and delete everything before
         var steps = gnode.data.tutorial;
