@@ -12,7 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
-      actions: read
 
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +52,7 @@ jobs:
           echo "count=$COUNT" >> $GITHUB_OUTPUT
 
       - name: Upload .xdc artifact
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/v')
         id: upload_xdc
         uses: actions/upload-artifact@v4
         with:
@@ -69,7 +68,7 @@ jobs:
           message: |
             ## webxdc build ready
 
-            **Bundle:** `data-dealer.xdc` &mdash; ${{ steps.xdc_info.outputs.size }} / ${{ steps.xdc_info.outputs.count }} files
+            **Bundle:** `data-dealer.xdc` — ${{ steps.xdc_info.outputs.size }} / ${{ steps.xdc_info.outputs.count }} files
 
             [Download data-dealer.xdc](${{ steps.upload_xdc.outputs.artifact-url }})
 
@@ -77,28 +76,18 @@ jobs:
 
   release:
     name: Attach .xdc to GitHub Release
+    needs: [test]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
 
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
+      - name: Download .xdc artifact
+        uses: actions/download-artifact@v4
         with:
-          version: 10
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Build
-        run: pnpm build
+          name: data-dealer-xdc
 
       - name: Attach to GitHub Release
         uses: softprops/action-gh-release@v2
