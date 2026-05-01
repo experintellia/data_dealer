@@ -63,9 +63,9 @@ one is `100`). Tokens that the new profileset does *not* contain get diluted:
 So the bar was an honest "how saturated is this trait in your DB" indicator
 that drifted up and down as new (possibly off-topic) profilesets were merged.
 
-### What the port does instead
+### What the port did before #103
 
-`scripts/LocalEngine.js:1709-1711` (round 7 of #81) clamp-sums:
+`scripts/LocalEngine.js` (round 7 of #81) clamp-summed:
 
 ```js
 var newAmount = Math.min(100,
@@ -73,18 +73,30 @@ var newAmount = Math.min(100,
 ```
 
 Combined with the ruleset where every `tokens[].amount === 100`, *one*
-integration of any contact saturates every token in its `tokens` list to
-100 %. The bar is full forever after.
+integration of any contact saturated every token in its `tokens` list to
+100 %. The bar was full forever after.
 
-### Where the LocalEngine port should bind / compute
+### What the port does now (#103)
 
-The bar binding is fine (`instance_data.amount` ↔ `database_amount` ↔ bar
-fill); the *computation* in `_integrateProfiles` needs to switch from
-`min(100, old + new)` to the weighted-average merge above. New token nodes
-seeded for first-time integration need the same formula, which collapses
-correctly when `M = 0` to `new_share`.
+`integrateCollected` runs the upstream weighted-average merge:
 
-This is **non-trivial** — see the *Why this is not a small fix* section below.
+```js
+var M = (state.game_values.profiles_value) || 0;   // BEFORE the merge
+var N = increment;                                  // 0 on duplicate replay
+// per existing TokenPerp node:
+//   tok present:  newShare = min(100, (oldShare*M + tok.amount*N) / (M+N))
+//   tok absent:   newShare =          oldShare*M / (M+N)
+// per first-time-seeded TokenPerp:
+//   newShare = min(100, tok.amount * N / (M+N))    (= tok.amount when M = 0)
+```
+
+Dilution preserves the absolute count `profiles_value × share / 100`, so
+`mission_goals.current_amount` — fed by absolute counts and clamped
+monotonically in `_advanceIntegrateProfilesMissions` — keeps advancing.
+No ruleset changes; no mission-target rebalancing. The math is a verbatim
+transcription of `dd_app/dd_calc.py:Database.merge` running on the client
+instead of on the server, in line with the wider "port faithfully, just
+drop the server" project goal.
 
 ---
 
@@ -136,53 +148,65 @@ The orange colour matches the per-token DecoratorAmount bar (`#E85E2B` in
 both `css/Render.css:822` and `statusbar.html`) — visually announcing
 "this is the database-wide aggregate of those per-token bars."
 
-### What the port does instead
+### What the port did before #103
 
-Same root cause as (A): once every `instance_data.amount` saturates at 100,
-the mean is also 100 for any number of integrated tokens. The bar and label
-read 100 % forever after the first couple of integrations.
+Same root cause as (A): once every `instance_data.amount` saturated at
+100, the mean was also 100 for any number of integrated tokens. The bar
+and label read 100 % forever after the first couple of integrations.
 
-### Where the LocalEngine port should bind / compute
+### What the port does now (#103)
 
-No binding change is required: `crosssum` is already correctly derived from
-`DBTokens`. Once (A) is fixed, (B) reflects the right value automatically.
-The `count = 1` start in `getDBTokensCrossSum` produces a slight bias
-(`mean × N/(N+1)`); upstream behaviour matches that, so leave it alone.
+No binding change was required: `crosssum` was already correctly derived
+from `DBTokens`. Once (A) was fixed (weighted-average merge with
+dilution), (B) reflects the right value automatically. The `count = 1`
+start in `getDBTokensCrossSum` produces a slight bias (`mean × N/(N+1)`);
+upstream behaviour matches that, so it was left alone.
 
 ---
 
-## Why this is not a small fix (deferred to follow-up)
+## How the fix landed (#103)
 
-The brief allowed an in-PR fix only if it was ≤30 LOC. Switching
-`_integrateProfiles` to the upstream weighted-average merge is small
-(~10 LOC in `scripts/LocalEngine.js`), but it has knock-on effects that
-make the change non-trivial:
+Implemented as a verbatim transcription of upstream
+`dd_app/dd_calc.py:Database.merge` (and `dd_merger.py:UpgradeToken`),
+running on the client. The math fits in ~25 LOC of `_integrateProfiles`.
+The dilution case
+(`new_share = oldShare × M / (M + N)` for tokens absent from the new
+profileset) preserves the absolute count `profiles_value × share / 100`,
+so `mission_goals.current_amount` — clamped monotonically in
+`_advanceIntegrateProfilesMissions` — keeps advancing through the same
+inflection points the original game produced. No mission targets and no
+ruleset rows were rebalanced. Vitest fixtures in
+`tests/handlers/collect-integrate.test.js` were re-derived from the
+formula; a Playwright spec
+`tests/e2e/share-merge.spec.ts` exercises both the dilution and the
+duplicate-replay invariants end-to-end.
 
-1. **Test fixtures encode the sum-and-cap semantic.** Several specs in
+The earlier draft of this doc enumerated three reasons the fix was
+"non-trivial". They've been resolved as follows, kept here so future
+readers see the trail:
+
+1. **Test fixtures encoded the sum-and-cap semantic.** Several specs in
    `tests/handlers/collect-integrate.test.js` (e.g. `instance_data.amount`
-   becomes `5` after `2 + 3`, or saturates at `100` after `90 + 50`) need
-   to be re-derived from the weighted-average formula and re-asserted.
-2. **Mission progression reads `DBTokensAbsolute`.** With shares no longer
-   pinned at 100 %, `groot.DBTokensAbsolute[goal.target] =
-   profiles_value * amount / 100` no longer races ahead of every goal.
-   `mission002` (target 900 of `token008`) currently completes the moment
-   you integrate any contact whose tokens list contains `token008`,
-   because `amount` jumps to 100 and `profiles_value` is already ≥ 900.
-   Under the corrected formula it would complete only once enough
-   `token008`-bearing profiles have actually been merged. Existing
-   `_advanceIntegrateProfilesMissions` tests will need new expectations,
-   and the ruleset's mission targets may need rebalancing for the new
-   pacing.
+   becomes `5` after `2 + 3`, or saturates at `100` after `90 + 50`)
+   were re-derived from the weighted-average formula and re-asserted in
+   #103. A new dilution spec was added.
+2. **Mission progression reads `DBTokensAbsolute`.** Shares are no longer
+   pinned at 100 %, but `goal.current_amount =
+   profiles_value × amount / 100` still races ahead of every existing
+   goal because dilution preserves the absolute count.
+   `mission002` (target 900 of `token008`) still completes the moment
+   you integrate any contact whose tokens list contains `token008` with
+   `profiles_value ≥ 900`, exactly as before — verified by the existing
+   `mission progression — integrate_profiles flow` specs continue to
+   pass unchanged.
 3. **Ruleset shape is uniformly `amount: 100`.** Every contact / city in
    `data/ruleset_3.{en,de}.json` ships `tokens[].amount = 100`, meaning
-   "every profile from this source carries this token type." This makes
-   the weighted average converge to a function of *which* contacts the
-   player owns and how often each is collected; the resulting curve
-   needs play-testing rather than a one-line code change.
-
-For these reasons (A) and (B) are filed as a single follow-up issue
-(linked from the PR that introduces this document) with the proposed
-weighted-average formula. The current investigation closes #98.
+   "every profile from this source carries this token type." Under the
+   weighted-average merge that converges to a function of *which*
+   contacts the player owns and how often each is collected — exactly
+   what the upstream curves did, since the ruleset ships unmodified
+   from `datadealer/dd_rules` (see `data/UPSTREAM.txt`). No port-side
+   rebalancing was applied.
 
 ---
 
