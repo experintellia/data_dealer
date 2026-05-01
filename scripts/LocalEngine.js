@@ -1844,22 +1844,19 @@ export function integrateCollected(_token, collectId) {
   var M = (state.game_values && state.game_values.profiles_value) || 0;
   var N = increment;
   var denom = M + N;
+  // denom === 0 only happens on a replay against an empty DB — every
+  // share would round-trip to oldShare and no new tokens can be seeded
+  // (seedShare = 0). Bail before the per-node arithmetic.
+  var skipMerge = denom === 0;
 
   var newNodes = (state.nodes || []).map(function (n) {
+    if (skipMerge) return n;
     if (n.game_type !== 'TokenPerp' || !n.gestalt) return n;
     var oldShare = (n.instance_data && n.instance_data.amount) || 0;
-    var newShare;
-    if (denom === 0) {
-      newShare = oldShare;
-    } else {
-      var tok = tokensMap[n.gestalt];
-      if (tok) {
-        seenGestalts[n.gestalt] = true;
-        newShare = Math.min(100, (oldShare * M + (tok.amount || 0) * N) / denom);
-      } else {
-        newShare = Math.min(100, (oldShare * M) / denom);
-      }
-    }
+    var tok = tokensMap[n.gestalt];
+    if (tok) seenGestalts[n.gestalt] = true;
+    var psContrib = tok ? (tok.amount || 0) * N : 0;
+    var newShare = Math.min(100, (oldShare * M + psContrib) / denom);
     if (newShare === oldShare) return n;
     var updated = Object.assign({}, n, {
       instance_data: Object.assign({}, n.instance_data, { amount: newShare })
@@ -1882,15 +1879,12 @@ export function integrateCollected(_token, collectId) {
   // the new tile with collision avoidance around (1024,800), then
   // saveCoordsQueue persists the resolved position. Pre-seeding x/y
   // bypassed that and made every new token stack at a single hashed point.
-  // Initial share = ps_share * N / (M + N) (= ps_share when M = 0,
-  // = 0 on a duplicate replay where N = 0).
-  Object.keys(tokensMap).forEach(function (gestalt) {
+  // Initial share = ps_share * N / (M + N) (= ps_share when M = 0).
+  if (!skipMerge) Object.keys(tokensMap).forEach(function (gestalt) {
     if (seenGestalts[gestalt]) return;
     if (!ruleset.tokens || !ruleset.tokens[gestalt]) return;
     var tok = tokensMap[gestalt];
-    var seedShare = denom === 0
-      ? 0
-      : Math.min(100, ((tok.amount || 0) * N) / denom);
+    var seedShare = Math.min(100, ((tok.amount || 0) * N) / denom);
     var newNode = {
       game_id:    gestalt,
       gestalt:    gestalt,
@@ -1899,7 +1893,7 @@ export function integrateCollected(_token, collectId) {
       full_path:  'Database.' + gestalt,
       instance_data: { amount: seedShare }
     };
-    newNodes = newNodes.concat([newNode]);
+    newNodes.push(newNode);
     updatedNodes.push({
       game_id:       newNode.game_id,
       gestalt:       newNode.gestalt,

@@ -19,26 +19,17 @@
 
 import { test, expect } from '@playwright/test';
 
-// Helper: invoke a function from a named AMD module inside the page.
-// Must be called from within page.evaluate().
-function amdGet(modId: string): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).require([modId], resolve, reject);
-  });
-}
-
-test('integrate dilutes untouched token shares + crosssum stays under 100', async ({ page }) => {
+test.beforeEach(async ({ page }) => {
   await page.goto('/?devtools=1');
   await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
     timeout: 50_000,
   });
+});
 
-  // ── Seed two crafted db_queue entries that share token008 but differ on
-  //    the rest of their token lists, then integrate both and read the
-  //    resulting TokenPerp shares.  Doing this through `boot.setState` /
-  //    `LocalEngine.integrateCollected` keeps the test independent of
-  //    ruleset price/level gates and the canvas-heavy buy/charge flow.
+test('integrate dilutes untouched token shares + crosssum stays under 100', async ({ page }) => {
+  // Seed two crafted db_queue entries through `boot.setState` /
+  // `LocalEngine.integrateCollected` — keeps the test independent of
+  // ruleset price/level gates and the canvas-heavy buy/charge flow.
   const result = await page.evaluate(async () => {
     const boot = await new Promise<{
       getState(): any;
@@ -54,14 +45,6 @@ test('integrate dilutes untouched token shares + crosssum stays under 100', asyn
       ap_snapshot: 10,
       profiles_value: 0,
     });
-    // Two profilesets:
-    //   PS1 (200 profiles): token008 + token084
-    //   PS2 (200 profiles): token008 + token128 (no token084)
-    // After PS1: token084 share = 100, token008 share = 100, profiles=200.
-    // After PS2: token084 is *not* in PS2, so dilution kicks in:
-    //   share = 100 * 200 / (200 + 200) = 50.
-    // token008 is in both, so its share stays at 100.
-    // token128 is new: share = 100 * 200 / 400 = 50.
     state.db_queue = [
       {
         origin: 'Imperium.test.contactA',
@@ -126,11 +109,6 @@ test('integrate dilutes untouched token shares + crosssum stays under 100', asyn
 });
 
 test('integrating the same profileset twice does not change shares (N = 0 dup replay)', async ({ page }) => {
-  await page.goto('/?devtools=1');
-  await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
-    timeout: 50_000,
-  });
-
   const out = await page.evaluate(async () => {
     const boot = await new Promise<any>((res, rej) =>
       (window as any).require(['boot'], res, rej),
