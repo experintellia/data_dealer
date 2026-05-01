@@ -2008,8 +2008,8 @@ define(function(require) {
       };
       this.init(config);
 
-      // Seed display_name from webxdc.selfName on first boot.
-      // setDisplayName (Wave 3 #13) persists it as a delta so it survives reloads.
+      // Seed display_name from webxdc.selfName on first boot; persisted as a delta
+      // so the name survives reloads without prompting the user again.
       if (webxdcIdentity.applyWebxdcIdentity(this.data.user)) {
         app.remote.setDisplayName(app.token, this.data.user.display_name);
       }
