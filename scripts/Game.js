@@ -1199,6 +1199,9 @@ define(function(require) {
         // The seen-flag is persisted via the dismissMissionBriefing op so it
         // survives webxdc replay across reloads.
         var seenBriefings = (groot.raw_data && groot.raw_data.mission_briefings_seen) || {};
+        console.log('[briefing] mission_active check:', data.mission_active,
+          'seenBriefings=', seenBriefings,
+          'isSeen=', !!seenBriefings[data.mission_active]);
         if (!seenBriefings[data.mission_active]) {
           var mission = groot.Missions.getMission(data.mission_active);
           n = mergeData({},mission.data);
@@ -2987,10 +2990,6 @@ define(function(require) {
 
       popup.on('button_click.MainButton',function(e) {
         e.stopPropagation();
-        // Distinguish "user clicked Accept" from "user X'd out" so we don't
-        // mark a mission briefing as seen when the player aborted the
-        // conversation midway. Read by the popup_close handler below.
-        popup.accepted = true;
         popup.trigger('popup_close');
       });
 
@@ -3006,11 +3005,10 @@ define(function(require) {
 
       popup.on('popup_close',function(e) {
         e.stopPropagation();
-        // Mark a mission briefing as seen only when the user clicked the
-        // Accept button (popup.accepted) — not when they X'd out or clicked
-        // outside. If they aborted midway, the briefing should re-appear on
-        // next reload so they can re-read the conversation.
-        if (popup.notificationMission && popup.accepted) {
+        console.log('[briefing] popup_close fired; notificationMission=',
+          popup.notificationMission,
+          'hasRemoteFn=', !!(app.remote && app.remote.dismissMissionBriefing));
+        if (popup.notificationMission) {
           var gestalt = popup.notificationMission;
           popup.notificationMission = null;
           if (groot.raw_data) {
@@ -3018,7 +3016,17 @@ define(function(require) {
             groot.raw_data.mission_briefings_seen[gestalt] = true;
           }
           if (app.remote && app.remote.dismissMissionBriefing) {
-            app.remote.dismissMissionBriefing(app.token, gestalt);
+            console.log('[briefing] dispatching dismissMissionBriefing for', gestalt);
+            var r = app.remote.dismissMissionBriefing(app.token, gestalt);
+            if (r && typeof r.then === 'function') {
+              r.then(function (resp) {
+                console.log('[briefing] dismiss response:', resp);
+              }, function (err) {
+                console.log('[briefing] dismiss error:', err);
+              });
+            } else if (r && typeof r.done === 'function') {
+              r.done(function (resp) { console.log('[briefing] dismiss done:', resp); });
+            }
           }
         }
         if (gnode.highlightTabs) {

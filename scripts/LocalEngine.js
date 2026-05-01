@@ -212,6 +212,9 @@ export function loadGame(/* token */) {
   }
 
   var gameData = _buildLoadGameResponse(mat.state, now, isNewGame);
+  console.log('[LE] loadGame response: mission_briefings_seen=',
+    gameData.mission_briefings_seen,
+    'state.mission_briefings_seen=', mat.state.mission_briefings_seen);
 
   // Schedule socket event emission via queueMicrotask so it runs after the
   // microtask that resolves the Deferred in Remote.js (result.then → d.resolve
@@ -635,6 +638,9 @@ function _commitDelta(computedNewState, addr, op, args, result) {
   };
   // eslint-disable-next-line no-undef
   if (typeof webxdc !== 'undefined') {
+    if (op === 'dismissMissionBriefing' || op === 'markTokenSeen') {
+      console.log('[LE] _commitDelta → webxdc.sendUpdate', op, args);
+    }
     webxdc.sendUpdate({ payload: delta }, '');  // eslint-disable-line no-undef
   } else {
     setState(computedNewState);
@@ -1570,16 +1576,19 @@ export function markTokenSeen(_token, gestalt) {
 }
 
 export function dismissMissionBriefing(_token, gestalt) {
+  console.log('[LE] dismissMissionBriefing(', gestalt, ') type=', typeof gestalt);
   if (typeof gestalt !== 'string' || !gestalt) {
     return Promise.resolve({ result: { error: 0 } });
   }
   var state = getState();
   var seen = state.mission_briefings_seen || {};
   if (seen[gestalt]) {
+    console.log('[LE] already seen, skipping commit');
     return Promise.resolve({ result: { ok: true } });
   }
   var newSeen = Object.assign({}, seen, { [gestalt]: true });
   var newState = Object.assign({}, state, { mission_briefings_seen: newSeen });
+  console.log('[LE] committing delta; new seen=', newSeen);
   _commitDelta(newState, state.addr, 'dismissMissionBriefing', [gestalt], { gestalt: gestalt });
   return Promise.resolve({ result: { ok: true } });
 }
