@@ -4551,17 +4551,6 @@ define(function(require) {
             node.trigger('popup_cancel');
           }
         });
-        // Tutorial popups sit in the Stage's NoClose container (by design, to
-        // block accidental game-area taps for other popup types). For tutorials
-        // the backdrop tap should also advance the dialog, so add a dedicated
-        // handler that isn't blocked by NoClose.
-        if (node.extendClass === 'Tutorial') {
-          this.popupContainer.renderNode.popupContainerDomelem.on('touchend click',function(e){
-            e.stopPropagation();
-            e.preventDefault();
-            node.trigger('popup_close');
-          });
-        }
       }
 
       node.on('no_cash',function(e){
@@ -4637,13 +4626,27 @@ define(function(require) {
         node.trigger('popup_cancel');
       });
 
-      // Tutorial dialogs advance on tap anywhere. preventDefault on touchend
-      // suppresses the browser's synthetic click, so there's no ghost-click.
-      node.jdomelem.on('touchend click','.TutorialBody',function(e){
-        e.stopPropagation();
-        e.preventDefault();
-        node.trigger('popup_close');
-      });
+      // Tutorial dialogs advance on tap anywhere (body or backdrop).
+      // touchFired guards against the synthesized click that some browsers
+      // emit after touchend even when preventDefault() is called.
+      if (node.extendClass === 'Tutorial') {
+        var tutorialTouchFired = false;
+        var advanceTutorial = function(e) {
+          if (e.type === 'touchend') {
+            tutorialTouchFired = true;
+          } else if (tutorialTouchFired) {
+            tutorialTouchFired = false;
+            return;
+          }
+          e.stopPropagation();
+          e.preventDefault();
+          node.trigger('popup_close');
+        };
+        node.jdomelem.on('touchend click', '.TutorialBody', advanceTutorial);
+        if (this.popupContainer) {
+          this.popupContainer.renderNode.popupContainerDomelem.on('touchend click', advanceTutorial);
+        }
+      }
 
       node.jdomelem.on('click touchend','.Subpop[data-subpop-id="buyslots"] .BuySlotsInc',function(e){
         e.stopPropagation();
