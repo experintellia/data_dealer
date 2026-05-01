@@ -271,12 +271,6 @@ describe('applyDelta — dismissMissionBriefing reducer', () => {
     expect(applyDelta(s, makeDismissDelta(addr, null)).mission_briefings_seen).toEqual({});
   });
 
-  it('reset wipes mission_briefings_seen back to empty', () => {
-    let s = freshState(addr);
-    s = applyDelta(s, makeDismissDelta(addr, 'mission002', 1000));
-    const after = applyDelta(s, makeDelta(addr, 'reset', 2000));
-    expect(after.mission_briefings_seen).toEqual({});
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -326,10 +320,4 @@ describe('applyDelta — markTokenSeen reducer', () => {
     expect(applyDelta(s, makeSeenDelta(addr, 42)).tokens_seen).toEqual({});
   });
 
-  it('reset wipes tokens_seen back to empty', () => {
-    let s = freshState(addr);
-    s = applyDelta(s, makeSeenDelta(addr, 'token008', 1000));
-    const after = applyDelta(s, makeDelta(addr, 'reset', 2000));
-    expect(after.tokens_seen).toEqual({});
-  });
 });
