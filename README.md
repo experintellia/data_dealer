@@ -11,7 +11,8 @@ This repository is a port of the [Data Dealer](http://datadealer.com) browser ga
 - **Your messenger name is your player name** — identity is pulled straight from Delta Chat, no sign-up required.
 - **English and German** — switch languages in-game at any time without losing your progress.
 - **The full game, not a demo** — all original game mechanics are ported: buying/selling data profiles, charging and collecting from perps, karma, powerups, missions, and idle progression (your resources keep ticking even when the app is closed).
-- **Automated builds** — every pull request builds and tests the `.xdc` file; tagged releases publish it automatically.
+- **Two-variant releases** — every release ships an HQ bundle (~14 MiB, bit-exact lossless cartoon art) and a casual bundle (~5.5 MiB, palette-quantized; visually indistinguishable for typical play). Pick whichever your data plan or messenger likes better.
+- **Automated builds** — every pull request builds and tests both `.xdc` files; tagged releases publish both automatically.
 
 The port fuses three of the original repositories:
 
@@ -37,9 +38,13 @@ Run tests:
 
     $ npm test
 
-Build the `.xdc` file:
+Build the `.xdc` files:
 
-    $ npm run build
+    $ npm run build:all       # both: data-dealer-hq.xdc + data-dealer-casual.xdc
+    $ npm run build:hq        # HQ only — bit-exact lossless pixels
+    $ npm run build:casual    # casual only — pre-quantized assets
+
+The casual variant ships pre-quantized PNGs from [`img-casual/`](./img-casual/) and `icon-casual.png` (committed to the repo). If you change anything in [`img/`](./img/) or `icon.png`, run `npm run quantize-assets` (requires `pngquant` and `oxipng`) and commit the resulting diff.
 
 ## Licensing & credits
 

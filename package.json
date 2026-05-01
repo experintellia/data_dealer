@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:hq": "BUILD_VARIANT=hq vite build",
+    "build:casual": "BUILD_VARIANT=casual vite build",
+    "build:all": "pnpm build:hq && pnpm build:casual",
+    "quantize-assets": "node tools/quantize-assets.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
