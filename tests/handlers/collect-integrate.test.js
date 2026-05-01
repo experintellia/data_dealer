@@ -1871,3 +1871,116 @@ describe('mission progression — M_ALFONSO Alfonso (buy_perp)', () => {
     expect(result.missions.complete_missions).toContain(M_ALFONSO);
   });
 });
+
+// ── M_BOGUS — Bogus company tangle ───────────────────────────────────────────
+// buy_perp(proxy004)
+
+describe('mission progression — M_BOGUS Bogus company tangle (buy_perp)', () => {
+  var M_BOGUS = '3cb9492322191121ebf7a10aafd0fc4a000';
+  var M_MULT  = '1da63b8adf60878f693dfb9d9f73690f000';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('buying proxy004 completes M_BOGUS and activates M_MULT (Multiplication 101)', async () => {
+    setState(mkState({
+      game_values: mkHighGv({ xp_level: 9 }),
+      nodes: [],
+      active_missions: [M_BOGUS],
+      mission_goals: [{
+        mission: M_BOGUS, workflow: 'buy_perp', target: 'proxy004',
+        amount: null, position: 1, current_amount: 0, complete: false
+      }]
+    }));
+
+    const { result } = await buyPerp('tok', 'Imperium', 'proxy004');
+    const s = getState();
+    expect(s.mission_goals.find(g => g.mission === M_BOGUS).complete).toBe(true);
+    expect(s.active_missions).not.toContain(M_BOGUS);
+    expect(s.active_missions).toContain(M_MULT);
+    expect(result.missions.complete_missions).toContain(M_BOGUS);
+  });
+});
+
+// ── M_MULT — Multiplication 101 ───────────────────────────────────────────────
+// buy_perp(token055) + upgrade_token(token055)
+
+describe('mission progression — M_MULT Multiplication 101 (buy_perp + upgrade_token)', () => {
+  var M_MULT   = '1da63b8adf60878f693dfb9d9f73690f000';
+  var M_BIGAPPLE = '2f59d10a67ca7ee9006dfe5db31a4c5f000';
+  const T055 = 'Imperium.token055';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  function seedMMult() {
+    setState(mkState({
+      game_values: mkHighGv({ xp_level: 7 }),
+      nodes: [],
+      active_missions: [M_MULT],
+      mission_goals: [
+        { mission: M_MULT, workflow: 'buy_perp', target: 'token055',
+          amount: null, position: 1, current_amount: 0, complete: false },
+        { mission: M_MULT, workflow: 'upgrade_token', target: 'token055',
+          amount: null, position: 2, current_amount: 0, complete: false }
+      ]
+    }));
+  }
+
+  it('buying token055 marks buy_perp goal complete; mission stays active', async () => {
+    seedMMult();
+    await buyPerp('tok', 'Imperium', 'token055');
+    const goal = getState().mission_goals.find(
+      g => g.mission === M_MULT && g.workflow === 'buy_perp');
+    expect(goal.complete).toBe(true);
+    expect(getState().active_missions).toContain(M_MULT);
+  });
+
+  it('collecting from token055 after buying it completes M_MULT and activates M_BIGAPPLE', async () => {
+    seedMMult();
+    await buyPerp('tok', 'Imperium', 'token055');
+
+    // Seed collect entry for the TokenPerp node buyPerp created.
+    const s1 = getState();
+    setState(Object.assign({}, s1, {
+      nodes_collect: [{ path: T055, result: { amount: 0 } }]
+    }));
+
+    const { result } = await collectPerp('tok', T055);
+    const s = getState();
+    expect(s.mission_goals.filter(g => g.mission === M_MULT).every(g => g.complete)).toBe(true);
+    expect(s.active_missions).not.toContain(M_MULT);
+    expect(s.active_missions).toContain(M_BIGAPPLE);
+    expect(result.missions.complete_missions).toContain(M_MULT);
+  });
+});
+
+// ── M_BIGAPPLE — Big Apple, Big Data! ────────────────────────────────────────
+// buy_perp(city004)  — final mission in the trunk chain
+
+describe('mission progression — M_BIGAPPLE Big Apple, Big Data! (buy_perp)', () => {
+  var M_BIGAPPLE = '2f59d10a67ca7ee9006dfe5db31a4c5f000';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('buying city004 completes M_BIGAPPLE (last mission — no chain follow-up)', async () => {
+    setState(mkState({
+      game_values: mkHighGv({ xp_level: 11 }),
+      nodes: [],
+      active_missions: [M_BIGAPPLE],
+      mission_goals: [{
+        mission: M_BIGAPPLE, workflow: 'buy_perp', target: 'city004',
+        amount: null, position: 1, current_amount: 0, complete: false
+      }]
+    }));
+
+    const { result } = await buyPerp('tok', 'Imperium', 'city004');
+    const s = getState();
+    expect(s.mission_goals.find(g => g.mission === M_BIGAPPLE).complete).toBe(true);
+    expect(s.active_missions).not.toContain(M_BIGAPPLE);
+    expect(result.missions.complete_missions).toContain(M_BIGAPPLE);
+    // No required_mission points to M_BIGAPPLE, so no new mission activates.
+    expect(s.active_missions).toHaveLength(0);
+  });
+});
