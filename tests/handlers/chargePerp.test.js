@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-  chargePerp, setSendDelta, setEmitter,
+  chargePerp, loadGame, setSendDelta, setEmitter,
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
@@ -429,5 +429,77 @@ describe('chargePerp — no level-up keeps xp_level and decrements ap_snapshot',
     expect(result.levelup).toBe(false);
     expect(result.game_values.xp_level).toBe(1);
     expect(result.game_values.ap_snapshot).toBe(3);
+  });
+});
+
+// ── live-tick: setTimeout fires materialize at charge_end ──────────────────
+//
+// chargePerp schedules a one-shot setTimeout per charge so the perp
+// transitions from nodes_charging → nodes_collect without requiring a page
+// reload. loadGame re-arms the timer for charges still in flight after a
+// cold start.
+
+describe('chargePerp — live-tick setTimeout', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    setOverride(FIXED_NOW);
+    setState(mkState());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    clearOverride();
+    setEmitter(null);
+  });
+
+  it('schedules a setTimeout for charge_time ms at the host clock', async () => {
+    const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+    await chargePerp('tok', NODE_PATH);
+    // contact035 charge_time = 30000 ms.
+    const matched = setTimeoutSpy.mock.calls.find(function (c) { return c[1] === CHARGE_TIME; });
+    expect(matched).toBeDefined();
+  });
+
+  it('emits node_ready when fake timers advance past charge_end', async () => {
+    var events = [];
+    setEmitter(function (ev, payload) { events.push({ ev: ev, payload: payload }); });
+
+    await chargePerp('tok', NODE_PATH);
+    // Advance the host wall clock that setTimeout reads, AND the injectable
+    // game clock that materialize() consults — both must cross charge_end.
+    setOverride(FIXED_NOW + CHARGE_TIME + 1);
+    vi.advanceTimersByTime(CHARGE_TIME + 1);
+
+    expect(events.some(function (e) { return e.ev === 'node_ready'; })).toBe(true);
+    // State should reflect the materialised transition.
+    const s = getState();
+    expect(s.nodes_charging.length).toBe(0);
+    expect(s.nodes_collect.length).toBe(1);
+    expect(s.nodes_collect[0].path).toBe(NODE_PATH);
+  });
+
+  it('loadGame re-arms timers for charges still in flight', async () => {
+    // Seed state with an active charge whose charge_end is 30s from now.
+    setState(mkState({
+      nodes_charging: [{
+        path:         NODE_PATH,
+        result:       { amount: 1100 },
+        charge_start: FIXED_NOW,
+        charge_end:   FIXED_NOW + CHARGE_TIME,
+        game_id:      'node-abc123',
+        game_type:    'ContactPerp'
+      }]
+    }));
+
+    var events = [];
+    setEmitter(function (ev, payload) { events.push({ ev: ev, payload: payload }); });
+
+    await loadGame('tok');
+    // Without rearm, advancing timers would not fire node_ready because no
+    // setTimeout was scheduled in this test session.
+    setOverride(FIXED_NOW + CHARGE_TIME + 1);
+    vi.advanceTimersByTime(CHARGE_TIME + 1);
+
+    expect(events.some(function (e) { return e.ev === 'node_ready'; })).toBe(true);
   });
 });

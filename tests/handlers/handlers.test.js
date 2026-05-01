@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   getToken, ping, getSessionLocale, setLocale, loadGame, getRanking, setEmitter,
   setDisplayName, setPerpCoordinates, buyKarma,
-  buyPowerup, sellPowerup, buySlots, buyPerp
+  buyPowerup, sellPowerup, buySlots, buyPerp,
+  dismissMissionBriefing, markTokenSeen
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
@@ -1139,5 +1140,106 @@ describe('getSessionLocale — persisted locale', () => {
     setState(mkState());
     const data = await getSessionLocale();
     expect(data.result).toBe('de');
+  });
+});
+
+// ── dismissMissionBriefing ──────────────────────────────────────────────────
+
+describe('dismissMissionBriefing — happy path', () => {
+  beforeEach(() => setState(mkState()));
+
+  it('resolves to {result: {ok: true}}', async () => {
+    const data = await dismissMissionBriefing('tok', 'mission002');
+    expect(data).toEqual({ result: { ok: true } });
+  });
+
+  it('records the gestalt under state.mission_briefings_seen', async () => {
+    await dismissMissionBriefing('tok', 'mission002');
+    expect(getState().mission_briefings_seen).toEqual({ mission002: true });
+  });
+
+  it('is idempotent — re-dispatching the same gestalt does not throw', async () => {
+    await dismissMissionBriefing('tok', 'mission002');
+    const data = await dismissMissionBriefing('tok', 'mission002');
+    expect(data).toEqual({ result: { ok: true } });
+    expect(getState().mission_briefings_seen).toEqual({ mission002: true });
+  });
+
+  it('accumulates multiple dismissals', async () => {
+    await dismissMissionBriefing('tok', 'mission002');
+    await dismissMissionBriefing('tok', 'mission003');
+    expect(getState().mission_briefings_seen).toEqual({
+      mission002: true,
+      mission003: true
+    });
+  });
+});
+
+describe('dismissMissionBriefing — failure modes', () => {
+  beforeEach(() => setState(mkState()));
+
+  it('returns error 0 for empty string gestalt', async () => {
+    const data = await dismissMissionBriefing('tok', '');
+    expect(data).toEqual({ result: { error: 0 } });
+    expect(getState().mission_briefings_seen).toEqual({});
+  });
+
+  it('returns error 0 for non-string gestalt', async () => {
+    const data = await dismissMissionBriefing('tok', 42);
+    expect(data).toEqual({ result: { error: 0 } });
+  });
+
+  it('returns error 0 for undefined gestalt', async () => {
+    const data = await dismissMissionBriefing('tok');
+    expect(data).toEqual({ result: { error: 0 } });
+  });
+});
+
+// ── markTokenSeen ───────────────────────────────────────────────────────────
+
+describe('markTokenSeen — happy path', () => {
+  beforeEach(() => setState(mkState()));
+
+  it('resolves to {result: {ok: true}}', async () => {
+    const data = await markTokenSeen('tok', 'token008');
+    expect(data).toEqual({ result: { ok: true } });
+  });
+
+  it('records the gestalt under state.tokens_seen', async () => {
+    await markTokenSeen('tok', 'token008');
+    expect(getState().tokens_seen).toEqual({ token008: true });
+  });
+
+  it('is idempotent', async () => {
+    await markTokenSeen('tok', 'token008');
+    const data = await markTokenSeen('tok', 'token008');
+    expect(data).toEqual({ result: { ok: true } });
+    expect(getState().tokens_seen).toEqual({ token008: true });
+  });
+
+  it('accumulates multiple gestalts', async () => {
+    await markTokenSeen('tok', 'token001');
+    await markTokenSeen('tok', 'token008');
+    expect(getState().tokens_seen).toEqual({ token001: true, token008: true });
+  });
+});
+
+describe('markTokenSeen — failure modes', () => {
+  beforeEach(() => setState(mkState()));
+
+  it('returns error 0 for empty string gestalt', async () => {
+    const data = await markTokenSeen('tok', '');
+    expect(data).toEqual({ result: { error: 0 } });
+    expect(getState().tokens_seen).toEqual({});
+  });
+
+  it('returns error 0 for non-string gestalt', async () => {
+    const data = await markTokenSeen('tok', 42);
+    expect(data).toEqual({ result: { error: 0 } });
+  });
+
+  it('returns error 0 for undefined gestalt', async () => {
+    const data = await markTokenSeen('tok');
+    expect(data).toEqual({ result: { error: 0 } });
   });
 });

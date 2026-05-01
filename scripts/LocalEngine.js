@@ -1305,17 +1305,24 @@ export function collectPerp(_token, gperpPath) {
 
   if (gameType === 'ContactPerp' || gameType === 'ProjectPerp') {
     var collectId = _generateId();
-    // Profile-set token contributions come from the perp's contained_tokens —
-    // each entry's `amount` is the percentage of profiles that carry that
-    // token type. Without this, tokens_map stays empty, integrateCollected
-    // never creates TokenPerp nodes, DBTokensAbsolute never populates, and
-    // missions whose workflow is "integrate_profiles" never advance past 0.
+    // Profile-set token contributions come from the perp's `tokens` list in
+    // the ruleset — each entry's `amount` is the percentage of profiles that
+    // carry that token type. Without this, tokens_map stays empty,
+    // integrateCollected never creates TokenPerp nodes, DBTokensAbsolute
+    // never populates, and missions whose workflow is "integrate_profiles"
+    // (e.g. mission002 = 900 of token008) never advance past 0.
+    // (TokenPerps use `contained_tokens` for super-token decomposition; we
+    // accept either field so future ProjectPerps with that shape still work.)
     var tokensMap = {};
-    var contained = (typeData && typeData.contained_tokens) || [];
+    var profilesValue = cr.amount || 0;
+    var contained = (typeData && (typeData.tokens || typeData.contained_tokens)) || [];
     for (var ct = 0; ct < contained.length; ct++) {
       var ctEntry = contained[ct];
       if (ctEntry && ctEntry.gestalt) {
-        tokensMap[ctEntry.gestalt] = { amount: ctEntry.amount || 0 };
+        var pct = ctEntry.amount || 0;
+        tokensMap[ctEntry.gestalt] = {
+          amount: Math.floor((pct * profilesValue) / 100)
+        };
       }
     }
     var profileSet = { profiles_value: cr.amount || 0, tokens_map: tokensMap };

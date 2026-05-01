@@ -89,7 +89,9 @@ describe('full flow: ContactPerp charge → collect → integrate', () => {
 
     const data = await collectPerp('tok', PATH);
     expect(data.result.error).toBeUndefined();
-    expect(data.result.result.profile_set).toEqual({ profiles_value: 5, tokens_map: {} });
+    expect(data.result.result.profile_set.profiles_value).toBe(5);
+    // contact001's `tokens` list populates tokens_map (percentage * profiles).
+    expect(typeof data.result.result.profile_set.tokens_map).toBe('object');
     expect(data.result.result.origin).toBe(PATH);
     expect(typeof data.result.result.collect_id).toBe('string');
     expect(data.result.result.collect_id.length).toBeGreaterThan(0);
@@ -223,7 +225,6 @@ describe('collectPerp — ContactPerp', () => {
 
 describe('collectPerp — ProjectPerp', () => {
   const PATH = 'Imperium.City.project001';
-  const PS = { profiles_value: 10, tokens_map: {} };
 
   beforeEach(() => setOverride(FIXED_NOW));
   afterEach(() => clearOverride());
@@ -235,7 +236,8 @@ describe('collectPerp — ProjectPerp', () => {
     }));
 
     const { result } = await collectPerp('tok', PATH);
-    expect(result.result.profile_set).toEqual(PS);
+    expect(result.result.profile_set.profiles_value).toBe(10);
+    expect(typeof result.result.profile_set.tokens_map).toBe('object');
     expect(result.result.origin).toBe(PATH);
     expect(result.result.collect_id).toBeTruthy();
   });
@@ -252,7 +254,8 @@ describe('collectPerp — ProjectPerp', () => {
     expect(s.db_queue).toHaveLength(1);
     const q = s.db_queue[0];
     expect(q.collect_id).toBe(result.result.collect_id);
-    expect(q.profile_set).toEqual(PS);
+    expect(q.profile_set.profiles_value).toBe(10);
+    expect(typeof q.profile_set.tokens_map).toBe('object');
     expect(q.origin).toBe(PATH);
     expect(typeof q.collect_dt).toBe('number');
   });
@@ -599,5 +602,124 @@ describe('integrateCollected — level-up refills ap_snapshot to the new ap_max'
     expect(result.levelup).toBe(true);
     expect(result.game_values.xp_level).toBe(2);
     expect(result.game_values.ap_snapshot).toBe(8);
+  });
+});
+
+// ── #85 root cause: tokens_map is populated from typeData.tokens ────────────
+//
+// Contacts in the ruleset list yielded token types under `tokens`, not
+// `contained_tokens` (the latter is for TokenPerp super-token decomposition).
+// Each entry's `amount` is a percentage of profiles_value carrying that
+// token type. Without populated tokens_map, mission goals with workflow
+// "integrate_profiles" never advance — that's the 0/900 bug on mission002.
+
+describe('collectPerp — tokens_map population from typeData.tokens (#85)', () => {
+  // contact001 (Nurse Helen) has 12 tokens, each at 100%.
+  const PATH = 'Imperium.City.Agent0.contact001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('tokens_map carries an entry for every gestalt in typeData.tokens', async () => {
+    setState(mkState({
+      nodes:         [mkNode('ContactPerp', PATH)],
+      nodes_collect: [{ path: PATH, result: { amount: 10 } }]
+    }));
+
+    const { result } = await collectPerp('tok', PATH);
+    const tm = result.result.profile_set.tokens_map;
+    // contact001 lists token001, token002, ..., token018, origin012 — 12 in total.
+    expect(Object.keys(tm).sort()).toEqual([
+      'origin012',
+      'token001', 'token002', 'token003', 'token004', 'token005',
+      'token006', 'token007', 'token014', 'token015', 'token017',
+      'token018'
+    ].sort());
+  });
+
+  it('amount is floor(percentage * profiles_value / 100)', async () => {
+    setState(mkState({
+      nodes:         [mkNode('ContactPerp', PATH)],
+      nodes_collect: [{ path: PATH, result: { amount: 10 } }]
+    }));
+
+    const { result } = await collectPerp('tok', PATH);
+    // 100% * 10 profiles / 100 = 10 tokens per gestalt.
+    expect(result.result.profile_set.tokens_map.token001).toEqual({ amount: 10 });
+    expect(result.result.profile_set.tokens_map.token008).toBeUndefined(); // not in contact001's list
+  });
+
+  it('Jessica (contact035) yields token008 from her tokens list — unblocks mission002', async () => {
+    const JPATH = 'Imperium.CityVienna.Agent0.contact035';
+    setState(mkState({
+      nodes:         [mkNode('ContactPerp', JPATH)],
+      nodes_collect: [{ path: JPATH, result: { amount: 1100 } }]
+    }));
+
+    const { result } = await collectPerp('tok', JPATH);
+    // Jessica's token008 entry is 100% → 100% * 1100 = 1100 token008s.
+    expect(result.result.profile_set.tokens_map.token008).toEqual({ amount: 1100 });
+  });
+
+  it('tokens_map stays empty when typeData.tokens is missing', async () => {
+    // contact002 is not in the ruleset → typeData undefined → tokens_map empty.
+    const FPATH = 'Imperium.City.Agent0.contact002';
+    setState(mkState({
+      nodes:         [mkNode('ContactPerp', FPATH)],
+      nodes_collect: [{ path: FPATH, result: { amount: 5 } }]
+    }));
+
+    const { result } = await collectPerp('tok', FPATH);
+    expect(result.result.profile_set.tokens_map).toEqual({});
+  });
+});
+
+// ── integrateCollected payload shape ────────────────────────────────────────
+//
+// Newly seeded TokenPerp nodes must carry game_type and full_type so the
+// applyDelta reducer can append them on cold-start replay.
+
+describe('integrateCollected — payload shape for newly seeded TokenPerps', () => {
+  const COLLECT_ID = 'shape-001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('new node entries carry game_type=TokenPerp and full_type=TokenPerp:<gestalt>', async () => {
+    setState(mkState({
+      locale: 'en',
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 50, tokens_map: { token008: { amount: 25 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const newEntry = result.result.nodes.find(function (n) { return n.gestalt === 'token008'; });
+    expect(newEntry).toBeDefined();
+    expect(newEntry.game_type).toBe('TokenPerp');
+    expect(newEntry.full_type).toBe('TokenPerp:token008');
+    expect(newEntry.full_path).toBe('Database.token008');
+    expect(newEntry.game_id).toBe('token008');
+  });
+
+  it('seeded entries replay correctly through applyDelta', async () => {
+    setState(mkState({
+      locale: 'en',
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 50, tokens_map: { token008: { amount: 25 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    await integrateCollected('tok', COLLECT_ID);
+    const { getState } = await import('../../scripts/boot.js');
+    const persisted = getState().nodes.find(function (n) { return n.gestalt === 'token008'; });
+    expect(persisted.game_type).toBe('TokenPerp');
+    expect(persisted.full_type).toBe('TokenPerp:token008');
   });
 });
