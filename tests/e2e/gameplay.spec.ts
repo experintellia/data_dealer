@@ -109,21 +109,19 @@ test('gameplay: buy→charge→skip→collect→integrate decreases cash and inc
   expect(finalGv.profiles_value).toBeGreaterThan(initial.profiles);
 
   // ── 7. Sync the in-page Game layer so DOM testids reflect new values ──────
+  // Use the same updateGameValues path the game normally uses after engine calls.
+  // Without silent=true the FX animation runs (~250ms) and re-renders statusbar.
   await page.evaluate((gv: { cash_value: number; profiles_value: number }) => {
     const appModule: any = (window as any).require('app');
     const game: any = appModule && appModule.getApplication && appModule.getApplication().game;
     if (!game) return;
-    game.setCash(gv.cash_value, /* silent */ true);
-    game.setProfiles(gv.profiles_value, /* silent */ true);
-    if (game.renderStatusbar) game.renderStatusbar.render();
+    game.updateGameValues(gv);
   }, finalGv);
 
   // ── 8. Assert DOM ─────────────────────────────────────────────────────────
-  // cash-value should no longer show "270" (the starting value).
-  const cashText = await page.locator('[data-testid="cash-value"]').textContent();
-  expect(cashText).not.toBe('270');
-
-  // profiles-value should no longer show "0".
-  const profilesText = await page.locator('[data-testid="profiles-value"]').textContent();
-  expect(profilesText).not.toBe('0');
+  // After updateGameValues, the statusbar FX animation completes in ~250ms and
+  // re-renders the template.  Use not.toHaveText with a short timeout so
+  // Playwright waits for the animation rather than asserting immediately.
+  await expect(page.locator('[data-testid="cash-value"]')).not.toHaveText('270', { timeout: 2000 });
+  await expect(page.locator('[data-testid="profiles-value"]')).not.toHaveText('0', { timeout: 2000 });
 });
