@@ -4627,6 +4627,15 @@ define(function(require) {
         node.trigger('popup_cancel');
       });
 
+      // Tutorial dialogs have no Next button — tap anywhere on the bubble to
+      // advance.  touchend is used (not click) so it fires on the first lift
+      // without the 300 ms delay mobile browsers add to click.
+      node.jdomelem.on('click touchend','.TutorialBody',function(e){
+        e.stopPropagation();
+        e.preventDefault();
+        node.trigger('popup_close');
+      });
+
       node.jdomelem.on('click touchend','.Subpop[data-subpop-id="buyslots"] .BuySlotsInc',function(e){
         e.stopPropagation();
         e.preventDefault();
