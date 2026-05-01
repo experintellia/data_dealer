@@ -74,6 +74,60 @@ jobs:
 
             Drop the downloaded file into Delta Chat to test.
 
+  playwright:
+    name: Playwright e2e tests
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      # Ensure the Chromium binary (and its system deps) is present.
+      # In this CI environment PLAYWRIGHT_BROWSERS_PATH points to a pre-populated
+      # directory, so this is normally a no-op; on a clean runner it downloads
+      # the required revision.
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright e2e tests
+        run: pnpm test:e2e
+
+      - name: Upload Playwright traces and screenshots on failure
+        if: failure()
+        id: upload_pw_artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+      - name: Post sticky PR comment with Playwright artifact link
+        if: failure() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: playwright-failure
+          message: |
+            ## ❌ Playwright e2e tests failed
+
+            Traces and screenshots are attached to this run.
+
+            [Download playwright-report](${{ steps.upload_pw_artifacts.outputs.artifact-url }})
+
   release:
     name: Attach .xdc to GitHub Release
     needs: [test]

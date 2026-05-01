@@ -3,14 +3,14 @@
     <div class="StatusGraph" data-status-id="Profiles" style="width:<%= D.profiles_barsize %>px;"></div>
     <div class="StatusGraph" data-status-id="Profiles" style="top:25px;left:18px;height:6px;background:#E85E2B; width:<%= D.profiles_crosssum %>px;"></div>
     <div class="StatusIconFX"><div class="StatusIcon profiles"></div></div>
-    <div class="StatusText" data-status-id="Profiles"><% print(_.toKSNum(D.profiles_val)); %></div>
+    <div class="StatusText" data-status-id="Profiles" data-testid="profiles-value"><% print(_.toKSNum(D.profiles_val)); %></div>
     <div class="StatusTextSmall" data-status-id="Profiles"><% print(_.toKSNum(D.profiles_crosssum)); %>% <% print(_.toKSNum(D.profiles_tokenslength)+'/'+_.toKSNum(D.profiles.tokenslengthmax))  %></div>
   </div>
   <div class="StatusItem Cash<% if (D.cash_active > 0.2) { print(' active'); } %>" data-status-id="Cash" data-testid="dd-cash-counter">
     <div class="StatusBackground"></div>
     <div class="StatusGraph" data-status-id="Cash"></div>
     <div class="StatusIconFX"><div class="StatusIcon cash"></div></div>
-    <div class="StatusText" data-status-id="Profiles"><% print(_.toKSNum(D.cash_val)); %></div>
+    <div class="StatusText" data-status-id="Profiles" data-testid="cash-value"><% print(_.toKSNum(D.cash_val)); %></div>
   </div>
   <div class="StatusItem AP<% if (D.AP_active > 0.2) { print(' active'); } %>" data-status-id="AP">
     <div class="StatusBackground"></div>

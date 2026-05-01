@@ -15,6 +15,9 @@ import './devtools.js';
 // LocalEngine is exposed as an AMD module via the bridge so Remote.js can
 // require('LocalEngine').  The default export is the handler-method object.
 export { default as LocalEngine } from './LocalEngine.js';
+// Expose boot module (getState, setState) via AMD bridge so e2e tests and
+// any future AMD consumers can call require(['boot']).getState().
+export * as boot from './boot.js';
 
 // Bring the engine online before any AMD module can call into it.  Runs
 // synchronously: webxdc.js is loaded earlier in index.html so window.webxdc
