@@ -21,7 +21,7 @@ The port fuses three of the original repositories:
 
 > webxdc's per-chat sandbox model is almost a better fit for what Data Dealer was trying to be than what they actually built. Their planned multiplayer needed a server, social login, friend graphs — all of which evaporated when the company stopped paying hosting bills. webxdc gives you "every chat group is a game lobby" essentially for free, and there's no service to keep alive. The original architecture is the reason it died; webxdc's architecture is the reason a successor wouldn't.
 
-Planning for this port was done with [Claude](https://www.anthropic.com/claude).
+Planning and implementation of this port was done with [Claude](https://www.anthropic.com/claude).
 
 ## Development
 
