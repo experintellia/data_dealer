@@ -704,13 +704,21 @@ export function buyPowerup(token, perpPath, slot, gestalt) {
   var newNodes = state.nodes.slice();
   newNodes[nodeIdx] = Object.assign({}, node, { instance_data: newInstanceData });
 
-  var newState = Object.assign({}, state, { nodes: newNodes, game_values: newGameValues });
+  var preMissionStatePu = Object.assign({}, state, { nodes: newNodes, game_values: newGameValues });
+  var puMissionResult = _advanceBuyPowerupMissions(preMissionStatePu, gestalt);
+  newGameValues = _applyRewardsToGv(newGameValues, puMissionResult.rewards);
+  var newState = Object.assign({}, preMissionStatePu, {
+    game_values:     newGameValues,
+    mission_goals:   puMissionResult.mission_goals,
+    active_missions: puMissionResult.active_missions,
+  });
 
   var responseNode = {
     game_id: node.game_id, game_type: node.game_type,
     full_path: node.full_path, instance_data: newInstanceData
   };
-  var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
+  var result = { node: responseNode, game_values: newGameValues, levelup: levelup,
+                 missions: puMissionResult.missions || null };
 
   _commitDelta(newState, state.addr, 'buyPowerup',
     [token, perpPath, slot, gestalt], result);
@@ -1209,6 +1217,78 @@ function _applyRewardsToGv(gv, rewards) {
   });
 }
 
+function _advanceChargePerpMissions(state, gestalt) {
+  var activeMissions = state.active_missions || [];
+  var missionGoals = state.mission_goals || [];
+
+  if (!activeMissions.length || !missionGoals.length) {
+    return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
+  }
+
+  var changed = false;
+  var updatedGoals = missionGoals.map(function (goal) {
+    if (goal.workflow !== 'charge_perp' || goal.complete) return goal;
+    if (goal.target !== gestalt) return goal;
+    if (activeMissions.indexOf(goal.mission) === -1) return goal;
+    changed = true;
+    return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
+  });
+
+  if (!changed) {
+    return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
+  }
+
+  return _completeMissionsIfReady(updatedGoals, activeMissions);
+}
+
+function _advanceBuyPowerupMissions(state, powerupGestalt) {
+  var activeMissions = state.active_missions || [];
+  var missionGoals = state.mission_goals || [];
+
+  if (!activeMissions.length || !missionGoals.length) {
+    return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
+  }
+
+  var changed = false;
+  var updatedGoals = missionGoals.map(function (goal) {
+    if (goal.workflow !== 'buy_powerup' || goal.complete) return goal;
+    if (goal.target !== powerupGestalt) return goal;
+    if (activeMissions.indexOf(goal.mission) === -1) return goal;
+    changed = true;
+    return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
+  });
+
+  if (!changed) {
+    return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
+  }
+
+  return _completeMissionsIfReady(updatedGoals, activeMissions);
+}
+
+function _advanceUpgradeTokenMissions(state, tokenGestalt) {
+  var activeMissions = state.active_missions || [];
+  var missionGoals = state.mission_goals || [];
+
+  if (!activeMissions.length || !missionGoals.length) {
+    return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
+  }
+
+  var changed = false;
+  var updatedGoals = missionGoals.map(function (goal) {
+    if (goal.workflow !== 'upgrade_token' || goal.complete) return goal;
+    if (goal.target !== tokenGestalt) return goal;
+    if (activeMissions.indexOf(goal.mission) === -1) return goal;
+    changed = true;
+    return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
+  });
+
+  if (!changed) {
+    return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
+  }
+
+  return _completeMissionsIfReady(updatedGoals, activeMissions);
+}
+
 /**
  * Advance any active mission goals that have workflow==='buy_perp' and
  * target===gestalt.  Pure; does not mutate state.
@@ -1228,6 +1308,35 @@ function _advanceBuyPerpMissions(state, gestalt) {
       return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
     }
     return goal;
+  });
+
+  if (!changed) {
+    return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
+  }
+
+  return _completeMissionsIfReady(updatedGoals, activeMissions);
+}
+
+function _advanceCollectCashMissions(state, gestalt, cashGain) {
+  var activeMissions = state.active_missions || [];
+  var missionGoals = state.mission_goals || [];
+
+  if (!activeMissions.length || !missionGoals.length || !cashGain || !gestalt) {
+    return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
+  }
+
+  var changed = false;
+  var updatedGoals = missionGoals.map(function (goal) {
+    if (goal.workflow !== 'collect_cash' || goal.complete) return goal;
+    if (goal.target !== gestalt) return goal;
+    if (activeMissions.indexOf(goal.mission) === -1) return goal;
+    var newAmount = Math.min((goal.current_amount || 0) + cashGain, goal.amount);
+    if (newAmount === goal.current_amount) return goal;
+    changed = true;
+    return Object.assign({}, goal, {
+      current_amount: newAmount,
+      complete: newAmount >= goal.amount
+    });
   });
 
   if (!changed) {
@@ -1337,11 +1446,21 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
     });
   }
 
-  setState(Object.assign({}, state, {
+  var preMissionStateCharge = Object.assign({}, state, {
     nodes:          newNodes,
     nodes_charging: charging.concat([chargeEntry]),
     game_values:    newGv,
-  }));
+  });
+
+  var chargeMissionResult = _advanceChargePerpMissions(preMissionStateCharge, gestalt);
+  newGv = _applyRewardsToGv(newGv, chargeMissionResult.rewards);
+  var newStateCharge = Object.assign({}, preMissionStateCharge, {
+    game_values:     newGv,
+    mission_goals:   chargeMissionResult.mission_goals,
+    active_missions: chargeMissionResult.active_missions,
+  });
+
+  setState(newStateCharge);
 
   _persistDelta({
     kind:   'delta',
@@ -1359,7 +1478,8 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
   _scheduleChargeReady(chargeEntry.charge_end, chargeEntry.path);
 
   return Promise.resolve({
-    result: { game_values: newGv, duration: durationMs, levelup: levelup, missions: {} },
+    result: { game_values: newGv, duration: durationMs, levelup: levelup,
+              missions: chargeMissionResult.missions || {} },
   });
 }
 
@@ -1602,12 +1722,17 @@ export function collectPerp(_token, gperpPath) {
     last_seen_ts:  Math.max(now, ms.last_seen_ts || 0)
   });
 
-  // Only ContactPerp collects feed collect_profiles goals; ProjectPerp /
-  // ClientPerp / TokenPerp paths skip mission progression.
-  var collectMissionResult = (gameType === 'ContactPerp')
-    ? _advanceCollectProfilesMissions(preMissionState, gestalt, cr.amount || 0)
-    : { missions: null, mission_goals: preMissionState.mission_goals,
-        active_missions: preMissionState.active_missions };
+  var collectMissionResult;
+  if (gameType === 'ContactPerp') {
+    collectMissionResult = _advanceCollectProfilesMissions(preMissionState, gestalt, cr.amount || 0);
+  } else if (gameType === 'ClientPerp') {
+    collectMissionResult = _advanceCollectCashMissions(preMissionState, gestalt, cr.amount || 0);
+  } else if (gameType === 'TokenPerp') {
+    collectMissionResult = _advanceUpgradeTokenMissions(preMissionState, gestalt);
+  } else {
+    collectMissionResult = { missions: null, mission_goals: preMissionState.mission_goals,
+      active_missions: preMissionState.active_missions };
+  }
   newGv = _applyRewardsToGv(newGv, collectMissionResult.rewards);
   var newState = Object.assign({}, preMissionState, {
     game_values: newGv,
