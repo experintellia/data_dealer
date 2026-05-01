@@ -2543,10 +2543,10 @@
 .TutorialTapHint {
   text-align: center;
   font-family: Bowlby;
-  font-size: 11px;
-  color: #009FD9;
-  opacity: 0.6;
-  margin-top: 8px;
+  font-size: 16px;
+  color: #FFF;
+  text-shadow: 2px 2px 0px #00516e, -2px 2px 0px #00516e, 2px -2px 0px #00516e, -2px -2px 0px #00516e, 0px 2px 4px rgba(0,0,0,0.6);
+  margin-top: 12px;
 }
 
 .MissionDecorator {
