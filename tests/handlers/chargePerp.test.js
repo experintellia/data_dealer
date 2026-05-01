@@ -38,7 +38,10 @@ var BASE_GV = {
   cash_spent:      0,
   xp_value:        0,
   ap_snapshot:     3,
-  ap_update:       0,
+  // ap_update at FIXED_NOW so the materialize-on-entry call regenerates
+  // zero ticks (elapsed = 0). Tests that exercise regen explicitly
+  // override this.
+  ap_update:       FIXED_NOW,
   ap_inc_value:    1,
   ap_inc_interval: 120_000,
   ap_max:          6,
@@ -500,6 +503,40 @@ describe('chargePerp — live-tick setTimeout', () => {
     vi.advanceTimersByTime(CHARGE_TIME + 1);
 
     expect(events.some(function (e) { return e.ev === 'node_ready'; })).toBe(true);
+  });
+});
+
+// ── AP regen visibility ─────────────────────────────────────────────────────
+//
+// Without materialize-on-entry, state.ap_snapshot stays at the last
+// handler's value while the UI's APTicker shows a higher number, and
+// chargePerp refuses despite the visible AP bar.
+
+describe('chargePerp — sees AP regen since the last materialize', () => {
+  beforeEach(() => {
+    setOverride(FIXED_NOW);
+    setState(mkState({
+      // ap_snapshot=0, ap_update set 2 minutes ago → one full tick ready.
+      game_values: Object.assign({}, BASE_GV, {
+        ap_snapshot: 0,
+        ap_update: FIXED_NOW - 120_000,
+        ap_inc_value: 1,
+        ap_inc_interval: 120_000,
+        ap_max: 6
+      })
+    }));
+  });
+
+  afterEach(() => {
+    clearOverride();
+    setSendDelta(null);
+    setEmitter(null);
+  });
+
+  it('charges successfully because materialize regenerates the queued AP tick', async () => {
+    const { result } = await chargePerp('tok', NODE_PATH);
+    expect(result.error).toBeUndefined();
+    expect(result.duration).toBe(CHARGE_TIME);
   });
 });
 

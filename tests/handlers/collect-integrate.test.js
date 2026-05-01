@@ -7,9 +7,11 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  collectPerp, integrateCollected, loadGame, setEmitter, setPrngSeed
+  collectPerp, integrateCollected, chargePerp, buyPerp, loadGame,
+  setEmitter, setPrngSeed
 } from '../../scripts/LocalEngine.js';
 import { setState, getState } from '../../scripts/boot.js';
+import { materialize } from '../../scripts/materializer.js';
 import { freshState } from '../../scripts/state.js';
 import { setOverride, clearOverride, advance } from '../../scripts/clock.js';
 
@@ -1115,6 +1117,42 @@ describe('mission rewards — apply on completion', () => {
 
     const { result } = await integrateCollected('tok', COLLECT_ID);
     expect(result.game_values.cash_value).toBe(startCash);
+  });
+
+  it('end-to-end: charge car company → wait → collect adds ~584 cash', async () => {
+    const CAR_PATH = 'Imperium.City.Pusher0.client007';
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), {
+        cash_value: 100, ap_snapshot: 6, xp_level: 1
+      }),
+      nodes: [{
+        game_id: 'client007', game_type: 'ClientPerp',
+        full_type: 'ClientPerp:client007', gestalt: 'client007',
+        full_path: CAR_PATH,
+        instance_data: {}
+      }]
+    }));
+
+    const chargeRes = await chargePerp('tok', CAR_PATH);
+    expect(chargeRes.result.error).toBeUndefined();
+    expect(chargeRes.result.duration).toBe(60000); // car charge_time
+    const cashAfterCharge = getState().game_values.cash_value;
+    expect(cashAfterCharge).toBe(100); // car has no charge_cost
+
+    // Move clock past charge_end and materialize so the entry transitions.
+    setOverride(FIXED_NOW + 60001);
+    const matResult = materialize(getState(), FIXED_NOW + 60001);
+    setState(matResult.state);
+    expect(getState().nodes_collect).toHaveLength(1);
+    expect(getState().nodes_collect[0].path).toBe(CAR_PATH);
+
+    const collectRes = await collectPerp('tok', CAR_PATH);
+    expect(collectRes.result.error).toBeUndefined();
+    const finalCash = collectRes.result.game_values.cash_value;
+    // 584 ± 5% variation, rounded.
+    expect(finalCash - cashAfterCharge).toBeGreaterThanOrEqual(553);
+    expect(finalCash - cashAfterCharge).toBeLessThanOrEqual(614);
+    expect(getState().game_values.cash_value).toBe(finalCash);
   });
 
   it('completing mission001 grants its xp reward via collectPerp', async () => {

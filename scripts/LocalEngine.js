@@ -1238,9 +1238,16 @@ function _advanceBuyPerpMissions(state, gestalt) {
 // ---------------------------------------------------------------------------
 
 export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
-  var state   = getState();
-  var now     = clockNow();
-  var ruleset = _getRuleset();
+  var rawState = getState();
+  var now      = clockNow();
+  var ruleset  = _getRuleset();
+
+  // Materialize before reading game_values so AP regen ticks accumulated
+  // since the last handler call are visible. Without this, the UI's
+  // APTicker can show 1 AP while state.ap_snapshot still says 0, and
+  // chargePerp would refuse the action despite the visible bar.
+  var mat   = materialize(rawState, now);
+  var state = mat.state;
 
   var nodes   = state.nodes || [];
   var nodeIdx = -1;
@@ -1621,8 +1628,11 @@ export function collectPerp(_token, gperpPath) {
  *   0 — collect_id not in db_queue (already integrated or never collected)
  */
 export function integrateCollected(_token, collectId) {
-  var state = getState();
+  var rawState = getState();
   var now = clockNow();
+  // Materialize so the AP regen ticks accumulated since the last call are
+  // visible — same contract as collectPerp / chargePerp.
+  var state = materialize(rawState, now).state;
 
   // $pull db_queue entry.
   var entry = null;
