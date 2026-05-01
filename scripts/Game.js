@@ -988,14 +988,22 @@ define(function(require) {
         '</div>'
       );
       $('body').append($overlay);
-      $overlay.on('click', '.lang-pick', function() {
+      var picked = false;
+      $overlay.on('click touchend', '.lang-pick', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        if (picked) { return; }
+        picked = true;
         var chosen = $(this).data('locale');
         $overlay.find('.lang-pick').addClass('disabled');
         app.remote.setLocale(chosen).done(function() { location.reload(); });
       });
       if (canDismiss) {
-        $overlay.on('click', function(e) {
-          if (!$(e.target).closest('.LangPickerBox').length) { $overlay.remove(); }
+        $overlay.on('click touchend', function(e) {
+          if (!$(e.target).closest('.LangPickerBox').length) {
+            e.preventDefault();
+            $overlay.remove();
+          }
         });
       }
     }
