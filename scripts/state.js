@@ -15,7 +15,6 @@ var _defaultSeed = defaultGameData || { game_values: {} };
 // Every handler op that can appear as delta.op.  Read-only handlers
 // (getToken, ping, etc.) never produce deltas but get stubs for completeness.
 var OP_NAMES = [
-  'reset',
   'loadGame',
   'setPerpCoordinates',
   'integrateCollected',
@@ -81,8 +80,8 @@ export function freshState(selfAddr, seed) {
   );
 
   // Seed starting equipment + active missions inline so the baseline state
-  // produced by freshState (and therefore by the 'reset' reducer and by
-  // every cold-start replay) already contains the trunk-mission state.
+  // produced by freshState (and therefore by every cold-start replay)
+  // already contains the trunk-mission state.
   // This MUST happen at the freshState level: lazy seeding inside loadGame
   // doesn't survive replay, so a buyPerp delta committed after a reset
   // would re-add itself on cold start *without* its seeded parent and
@@ -161,16 +160,8 @@ function _seedNodesFromTree(src) {
 // Reducers
 // ---------------------------------------------------------------------------
 // Each reducer is a pure function (state, delta) → newState.
-// Only 'reset' is fully implemented here; Wave 3 issues (#12–#21) replace
-// the stubs with real logic.
 
 var reducers = {};
-
-// 'reset' discards all prior state and reseeds from the default game.
-// Addr and locale are preserved so identity and language choice survive a wipe.
-reducers.reset = function resetReducer(state) {
-  return Object.assign(freshState(state.addr), state.locale ? { locale: state.locale } : {});
-};
 
 reducers.setDisplayName = function setDisplayNameReducer(state, delta) {
   var args = delta.args || [];

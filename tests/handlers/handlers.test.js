@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  getToken, ping, getSessionLocale, setLocale, loadGame, getRanking, resetGame, setEmitter,
+  getToken, ping, getSessionLocale, setLocale, loadGame, getRanking, setEmitter,
   setDisplayName, setPerpCoordinates, buyKarma,
   buyPowerup, sellPowerup, buySlots, buyPerp
 } from '../../scripts/LocalEngine.js';
@@ -445,59 +445,6 @@ describe('materialization on boot', () => {
     await Promise.resolve();
 
     expect(emitted).toHaveLength(0);
-  });
-});
-
-// ── resetGame ─────────────────────────────────────────────────────────────────
-
-describe('resetGame', () => {
-  it('resolves to a truthy result', async () => {
-    setState(mkState());
-    const data = await resetGame('tok');
-    expect(data).toHaveProperty('result');
-    expect(data.result).toBeTruthy();
-  });
-
-  it('wipes player-bought nodes after reset (seed nodes are restored)', async () => {
-    setState(mkState({
-      nodes: [{ game_id: 'n1', game_type: 'ContactPerp', full_path: 'Imperium.n1',
-                full_type: 'ContactPerp:contact001', instance_data: {} }]
-    }));
-    await resetGame('tok');
-    expect(getState().nodes.map((n) => n.gestalt)).toEqual(['database001']);
-  });
-
-  it('restores trunk mission after reset', async () => {
-    setState(mkState({ active_missions: ['m1', 'm2'] }));
-    await resetGame('tok');
-    expect(getState().active_missions).toEqual(['mission001']);
-  });
-
-  it('restores game_values to seed defaults after reset', async () => {
-    setState(mkState({ game_values: { cash_value: 99999, xp_level: 10 } }));
-    await resetGame('tok');
-    expect(getState().game_values.cash_value).toBe(300);
-    expect(getState().game_values.xp_level).toBe(1);
-  });
-
-  it('preserves addr (identity must survive reset)', async () => {
-    setState(mkState());
-    await resetGame('tok');
-    expect(getState().addr).toBe('test@local');
-  });
-
-  it('reset followed by loadGame reflects a new game', async () => {
-    setState(mkState({
-      nodes: [{ game_id: 'n1', game_type: 'ContactPerp', full_path: 'Imperium.n1',
-                full_type: 'ContactPerp:contact001', instance_data: {} }]
-    }));
-    await resetGame('tok');
-    const { result } = await loadGame('tok');
-    // is_new_game is captured pre-seed — true on the very first load after reset
-    expect(result.is_new_game).toBe(true);
-    // …but starting equipment + trunk mission are seeded on that same call
-    expect(result.nodes.map((n) => n.gestalt)).toEqual(['database001']);
-    expect(result.active_missions).toEqual(['mission001']);
   });
 });
 

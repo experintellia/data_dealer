@@ -3,10 +3,11 @@
 // No DOM globals in handler bodies; safe to import from Node for tests.
 //
 // Handlers implemented here: getToken, ping, getSessionLocale, loadGame (#12),
-// resetGame (#20), getRanking, setDisplayName, setPerpCoordinates (#13),
+// getRanking, setDisplayName, setPerpCoordinates (#13),
 //   getProvidedPerps, getPowerups (#14), buyKarma (#19),
 //   buyPowerup, sellPowerup, buySlots (#18), buyPerp (#15),
 //   chargePerp (#16), collectPerp, integrateCollected (#17).
+// resetGame is intentionally absent — in webxdc, reset = re-share the .xdc.
 // Remaining handlers are stubs that return a rejected Promise.
 
 import { getState, setState } from './boot.js';
@@ -217,33 +218,6 @@ export function loadGame(/* token */) {
   });
 
   return Promise.resolve({ result: gameData });
-}
-
-/**
- * resetGame(token) → Promise<{result: true}>
- *
- * Emits a 'reset' delta that wipes all game state while preserving the
- * player's identity (addr).  Game.js calls location.reload() after this
- * resolves, so the payload is ignored — any 200-truthy value suffices.
- *
- * Cold-start replay note: webxdc update history is append-only, so prior
- * deltas remain in the log.  applyDelta's 'reset' reducer turns them into a
- * no-op prefix.  Compaction is deferred to Phase 7 (#35).
- */
-export function resetGame(/* token */) {
-  var state = getState();
-  var delta = { kind: 'delta', op: 'reset', addr: state.addr, ts: clockNow() };
-
-  // Apply locally so in-memory state is consistent before the page reload.
-  setState(applyDelta(state, delta));
-
-  // Broadcast to webxdc update history for durable replay on cold start.
-  // eslint-disable-next-line no-undef
-  if (typeof webxdc !== 'undefined') {
-    webxdc.sendUpdate({ payload: delta }, ''); // eslint-disable-line no-undef
-  }
-
-  return Promise.resolve({ result: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -1479,7 +1453,6 @@ var LocalEngine = Object.assign({
   setLocale:          setLocale,
   loadGame:           loadGame,
   getRanking:         getRanking,
-  resetGame:          resetGame,
   setDisplayName:     setDisplayName,
   setPerpCoordinates: setPerpCoordinates,
   getProvidedPerps:   getProvidedPerps,

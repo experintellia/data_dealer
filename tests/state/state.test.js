@@ -3,8 +3,7 @@ import { freshState, applyDelta, SCHEMA_VERSION } from '../../scripts/state.js';
 
 // Required acceptance criteria from issue #10:
 //   A. Two divergent replay sequences with the same delta-set converge to identical state.
-//   B. Reset op wipes prior state.
-//   C. Schema-version mismatch handled gracefully.
+//   B. Schema-version mismatch handled gracefully.
 
 function replay(deltas, addr) {
   return deltas.reduce((s, d) => applyDelta(s, d), freshState(addr));
@@ -98,58 +97,7 @@ describe('applyDelta — convergence (acceptance criterion A)', () => {
   });
 });
 
-describe('applyDelta — reset op (acceptance criterion B)', () => {
-  const addr = 'alice@example.com';
-
-  it('wipes player progress and re-seeds starting equipment after reset', () => {
-    let s = freshState(addr);
-    s = {
-      ...s,
-      nodes: s.nodes.concat([{ game_type: 'ContactPerp', full_path: 'Imperium.Contact1' }]),
-      active_missions: ['mission_x', 'mission_y'],
-      mission_goals: [{ goal_id: 'g1', amount: 10, current_amount: 5 }],
-    };
-
-    const after = applyDelta(s, makeDelta(addr, 'reset', 5000));
-
-    // Player-bought node gone, seed nodes restored
-    expect(after.nodes.map((n) => n.gestalt)).toEqual(['database001']);
-    expect(after.active_missions).toEqual(['mission001']);
-    expect(after.mission_goals).toEqual([]);
-  });
-
-  it('restores game_values to seed defaults after reset', () => {
-    let s = freshState(addr);
-    s = { ...s, game_values: { ...s.game_values, cash_value: 99999, xp_level: 10 } };
-
-    const after = applyDelta(s, makeDelta(addr, 'reset', 5000));
-
-    expect(after.game_values.cash_value).toBe(300);
-    expect(after.game_values.xp_level).toBe(1);
-  });
-
-  it('preserves addr after reset (identity must survive wipe)', () => {
-    const s = freshState(addr);
-    const after = applyDelta(s, makeDelta(addr, 'reset', 5000));
-    expect(after.addr).toBe(addr);
-  });
-
-  it('preserves schema_version after reset', () => {
-    const s = freshState(addr);
-    const after = applyDelta(s, makeDelta(addr, 'reset', 5000));
-    expect(after.schema_version).toBe(SCHEMA_VERSION);
-  });
-
-  it('multiple resets are idempotent', () => {
-    let s = freshState(addr);
-    const r1 = applyDelta(s, makeDelta(addr, 'reset', 1000));
-    const r2 = applyDelta(r1, makeDelta(addr, 'reset', 2000));
-    expect(r2.nodes).toEqual(r1.nodes);
-    expect(r2.game_values.cash_value).toBe(r1.game_values.cash_value);
-  });
-});
-
-describe('applyDelta — schema-version mismatch (acceptance criterion C)', () => {
+describe('applyDelta — schema-version mismatch (acceptance criterion B)', () => {
   const addr = 'alice@example.com';
 
   it('resets to valid fresh state when schema_version is a future value', () => {
@@ -175,10 +123,6 @@ describe('applyDelta — schema-version mismatch (acceptance criterion C)', () =
     expect(result.schema_version).toBe(SCHEMA_VERSION);
   });
 
-  it('does not crash on reset op when schema_version mismatches', () => {
-    const badState = { ...freshState(addr), schema_version: 999 };
-    expect(() => applyDelta(badState, makeDelta(addr, 'reset', 1000))).not.toThrow();
-  });
 });
 
 describe('applyDelta — other-peer filter', () => {
@@ -192,7 +136,7 @@ describe('applyDelta — other-peer filter', () => {
   it('processes own-addr deltas normally', () => {
     const addr = 'alice@example.com';
     const s = freshState(addr);
-    const result = applyDelta(s, makeDelta(addr, 'reset', 1000));
+    const result = applyDelta(s, makeDelta(addr, 'ping', 1000));
     expect(result).not.toBe(s);
     expect(result.schema_version).toBe(SCHEMA_VERSION);
   });
@@ -206,7 +150,7 @@ describe('applyDelta — malformed delta guard', () => {
 
   it('returns state unchanged for wrong kind', () => {
     const s = freshState('alice@example.com');
-    expect(applyDelta(s, { kind: 'snapshot', op: 'reset' })).toBe(s);
+    expect(applyDelta(s, { kind: 'snapshot', op: 'ping' })).toBe(s);
   });
 
   it('returns state unchanged for unknown op (after clock guard update)', () => {
@@ -214,47 +158,6 @@ describe('applyDelta — malformed delta guard', () => {
     const result = applyDelta(s, { kind: 'delta', addr: s.addr, op: 'unknownOp9999', ts: 0 });
     expect(result.schema_version).toBe(SCHEMA_VERSION);
     expect(result.nodes).toEqual(s.nodes);
-  });
-});
-
-describe('applyDelta — reset replay semantics (issue #20)', () => {
-  const addr = 'alice@example.com';
-
-  it('reset + ops produces same game state as a fresh start + same ops', () => {
-    // Pre-reset ops (stubs): their effect on state is wiped by reset.
-    const preOps = [
-      makeDelta(addr, 'buyKarma', 1000),
-      makeDelta(addr, 'chargePerp', 2000),
-    ];
-    const postOp = makeDelta(addr, 'buyPerp', 4000);
-
-    const viaReset = replay([...preOps, makeDelta(addr, 'reset', 3000), postOp], addr);
-    const viaFresh  = replay([postOp], addr);
-
-    // Game-meaningful fields must be identical; last_seen_ts may differ.
-    expect(viaReset.nodes).toEqual(viaFresh.nodes);
-    expect(viaReset.game_values).toEqual(viaFresh.game_values);
-    expect(viaReset.active_missions).toEqual(viaFresh.active_missions);
-    expect(viaReset.addr).toBe(viaFresh.addr);
-  });
-
-  it('replay-through-reset discards prior history', () => {
-    // Any ops before the reset delta must not survive into post-reset state.
-    const withHistory = replay([
-      makeDelta(addr, 'buyKarma', 1000),
-      makeDelta(addr, 'collectPerp', 2000),
-      makeDelta(addr, 'reset', 3000),
-    ], addr);
-
-    // Reset rebuilds from freshState, which includes the seeded starting
-    // equipment + trunk mission — only the player's *progress* is wiped.
-    const baseline = freshState(addr);
-    expect(withHistory.nodes).toEqual(baseline.nodes);
-    expect(withHistory.mission_goals).toEqual([]);
-    expect(withHistory.active_missions).toEqual(baseline.active_missions);
-    // game_values restored to seed defaults
-    expect(withHistory.game_values.cash_value).toBe(300);
-    expect(withHistory.game_values.xp_level).toBe(1);
   });
 });
 
@@ -312,20 +215,4 @@ describe('applyDelta — setLocale reducer', () => {
     expect(result.locale).toBe('en');
   });
 
-  it('reset preserves locale across wipe', () => {
-    let s = freshState(addr);
-    s = applyDelta(s, makeLocaleDelta(addr, 'en', 1000));
-    const after = applyDelta(s, makeDelta(addr, 'reset', 2000));
-    expect(after.locale).toBe('en');
-  });
-
-  it('locale survives replay: setLocale then reset then setLocale', () => {
-    const deltas = [
-      makeLocaleDelta(addr, 'de', 1000),
-      makeDelta(addr, 'reset', 2000),
-      makeLocaleDelta(addr, 'en', 3000),
-    ];
-    const result = replay(deltas, addr);
-    expect(result.locale).toBe('en');
-  });
 });
