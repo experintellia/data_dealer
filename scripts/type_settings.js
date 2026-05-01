@@ -340,44 +340,6 @@ define(function(require) {
               }
             },
             "frameSrc": "MainSprites.png"
-          },
-
-          "perp_background_old": {
-            "frameMap": {
-              "active": {
-                "height": 184,
-                "pivotx": 70,
-                "pivoty": 87,
-                "width": 145,
-                "x": 206,
-                "y": 309
-              },
-              "drag": {
-                "height": 193,
-                "pivotx": 72,
-                "pivoty": 94,
-                "width": 146,
-                "x": 652,
-                "y": 309
-              },
-              "hover": {
-                "height": 195,
-                "pivotx": 78,
-                "pivoty": 95,
-                "width": 156,
-                "x": 496,
-                "y": 301
-              },
-              "normal": {
-                "height": 184,
-                "pivotx": 70,
-                "pivoty": 87,
-                "width": 145,
-                "x": 351,
-                "y": 309
-              }
-            },
-            "frameSrc": "sprites_100x100.png"
           }
         }
       },
