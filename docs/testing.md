@@ -101,7 +101,7 @@ for stable selection. These selectors use kebab-case with the `dd-` prefix.
 | `dd-display-name-input` | Display name input field | Interact with to set user display name |
 | `dd-display-name-save-button` | Display name save button | Click to save user display name |
 | `dd-perp-buy-{gestalt}` | Buy button for perpetual in popup | Click to purchase a perpetual (gestalt identifies the perp type) |
-| `dd-leaderboard-row-{addr}` | Leaderboard entry row | Select to check scores for a player (addr is their address) |
+| `dd-leaderboard-row-{id}` | Leaderboard entry row | Select to check scores for a player (id is address, player id, 'self' for current user, or rank_{position} fallback) |
 | `dd-reset-game-button` | Reset game button in debug tab | Click to trigger game reset (confirmation handled via browser dialog) |
 
 ### Using parameterized selectors in Playwright
@@ -115,11 +115,15 @@ const selector = `[data-testid="dd-perp-buy-${gestalt}"]`;
 await page.click(selector);
 
 // Construct the full selector for a specific leaderboard row
+// Phase 5: only 'self' is available; Phase 6 will use address or player id
+const selfRowSelector = `[data-testid="dd-leaderboard-row-self"]`;
+const selfScore = await page.locator(selfRowSelector).locator('.TopscoreValue').textContent();
+
+// For other players (Phase 6+), use their address or id:
 const addr = 'player123@example.com';
-const rowSelector = `[data-testid="dd-leaderboard-row-${addr}"]`;
-const scoreText = await page.locator(rowSelector).locator('.TopscoreValue').textContent();
+const otherRowSelector = `[data-testid="dd-leaderboard-row-${addr}"]`;
 ```
 
 The placeholders correspond to:
 - `{gestalt}`: The perp's unique identifier (e.g., `agent_4`, `proxy_2`)
-- `{addr}`: The player's address or ID from the scoreboard data
+- `{id}`: The player's unique identifier from the scoreboard (address, id, 'self' for current user, or rank position fallback)
