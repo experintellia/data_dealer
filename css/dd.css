@@ -74,10 +74,10 @@ html {
 
 .DDAuthLogo {
   font-family: Bowlby, sans-serif;
-  color: #009fd9;
+  color: #00d4ff;
   font-size: 28px;
   letter-spacing: 3px;
-  text-shadow: 0 0 16px rgba(0, 159, 217, 0.5);
+  text-shadow: 0 0 20px rgba(0, 200, 255, 0.7);
   margin-bottom: 28px;
   text-transform: uppercase;
 }
@@ -134,7 +134,7 @@ html {
 
 #loadertext {
   font-family: Voltaire, sans-serif;
-  color: rgba(0, 200, 255, 0.6);
+  color: rgba(255, 255, 255, 0.65);
   font-size: 13px;
   letter-spacing: 1px;
   margin-top: 10px;
