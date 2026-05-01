@@ -8,10 +8,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   collectPerp, integrateCollected, chargePerp, buyPerp, buyPowerup, loadGame,
-  setEmitter, setPrngSeed
+  setEmitter, setPrngSeed, setSendDelta
 } from '../../scripts/LocalEngine.js';
 import { setState, getState } from '../../scripts/boot.js';
 import { materialize } from '../../scripts/materializer.js';
+import { applyDelta } from '../../scripts/state.js';
 import { freshState } from '../../scripts/state.js';
 import { setOverride, clearOverride, advance } from '../../scripts/clock.js';
 
@@ -1982,5 +1983,84 @@ describe('mission progression — M_BIGAPPLE Big Apple, Big Data! (buy_perp)', (
     expect(result.missions.complete_missions).toContain(M_BIGAPPLE);
     // No required_mission points to M_BIGAPPLE, so no new mission activates.
     expect(s.active_missions).toHaveLength(0);
+  });
+});
+
+// ── Cold-start replay regression tests ───────────────────────────────────────
+// Verify that mission progress produced by chargePerp and buyPowerup survives
+// a simulated cold-start reload: capture the delta via setSendDelta, then
+// replay it with applyDelta against the pre-action state and assert that
+// mission_goals and active_missions reflect the completed goal.
+
+describe('cold-start replay — chargePerp mission progress survives applyDelta', () => {
+  const C007 = 'Imperium.City.Pusher0.client007';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); setSendDelta(null); });
+
+  it('chargePerp delta carries missions so mission003 goal survives reload', async () => {
+    const initialState = mkState({
+      game_values: mkHighGv(),
+      nodes: [mkClientNode2('client007', C007)],
+      active_missions: ['mission003'],
+      mission_goals: [{
+        mission: 'mission003', workflow: 'charge_perp', target: 'client007',
+        amount: null, position: 1, current_amount: 0, complete: false
+      }]
+    });
+    setState(initialState);
+
+    var capturedDelta = null;
+    setSendDelta(function (d) { capturedDelta = d; });
+
+    await chargePerp('tok', C007);
+    expect(capturedDelta).not.toBeNull();
+
+    // Simulate cold-start: replay the delta against the state that existed
+    // before the charge (as if the app was killed and restarted mid-session).
+    const replayed = applyDelta(initialState, capturedDelta);
+    const goal = replayed.mission_goals.find(g => g.mission === 'mission003');
+    expect(goal).toBeDefined();
+    expect(goal.complete).toBe(true);
+    expect(replayed.active_missions).not.toContain('mission003');
+    expect(replayed.active_missions).toContain('mission004');
+  });
+});
+
+describe('cold-start replay — buyPowerup mission progress survives applyDelta', () => {
+  const P001 = 'Imperium.City.project001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); setSendDelta(null); });
+
+  it('buyPowerup delta carries missions so mission006 partial progress survives reload', async () => {
+    const initialState = mkState({
+      game_values: mkHighGv({ xp_level: 2 }),
+      nodes: [mkProjectNode('project001', P001)],
+      active_missions: ['mission006'],
+      mission_goals: [
+        { mission: 'mission006', workflow: 'buy_powerup', target: 'upgrade001',
+          amount: null, position: 1, current_amount: 0, complete: false },
+        { mission: 'mission006', workflow: 'buy_powerup', target: 'ad002',
+          amount: null, position: 2, current_amount: 0, complete: false },
+        { mission: 'mission006', workflow: 'buy_powerup', target: 'teammember020',
+          amount: null, position: 3, current_amount: 0, complete: false }
+      ]
+    });
+    setState(initialState);
+
+    var capturedDelta = null;
+    setSendDelta(function (d) { capturedDelta = d; });
+
+    await buyPowerup('tok', P001, 0, 'upgrade001');
+    expect(capturedDelta).not.toBeNull();
+
+    // Replay the delta against the initial state (cold-start simulation).
+    const replayed = applyDelta(initialState, capturedDelta);
+    const goals = replayed.mission_goals.filter(g => g.mission === 'mission006');
+    expect(goals.find(g => g.target === 'upgrade001').complete).toBe(true);
+    expect(goals.find(g => g.target === 'ad002').complete).toBe(false);
+    // Mission still active — only one of three goals complete.
+    expect(replayed.active_missions).toContain('mission006');
   });
 });

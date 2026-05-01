@@ -650,6 +650,7 @@ function _commitDelta(computedNewState, addr, op, args, result) {
   } else {
     setState(computedNewState);
   }
+  if (_sendDelta) _sendDelta(delta);
 }
 
 // ---------------------------------------------------------------------------
@@ -1467,7 +1468,8 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
     addr:   state.addr,
     op:     'chargePerp',
     args:   [path],
-    result: { chargeEntry: chargeEntry, nodeIdx: nodeIdx, cashDelta: chargeCost, xpInc: xpInc },
+    result: { chargeEntry: chargeEntry, nodeIdx: nodeIdx, cashDelta: chargeCost, xpInc: xpInc,
+              missions: chargeMissionResult.missions || null },
     ts:     now,
   });
 

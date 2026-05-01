@@ -241,9 +241,12 @@ function _nodeGvReducer(state, delta) {
     return Object.assign({}, n, { instance_data: res.node.instance_data });
   });
 
+  var mp = _missionDataFromResult(state, res);
   return Object.assign({}, state, {
-    nodes:       newNodes,
-    game_values: Object.assign({}, state.game_values, res.game_values || {})
+    nodes:           newNodes,
+    game_values:     Object.assign({}, state.game_values, res.game_values || {}),
+    mission_goals:   mp.mission_goals,
+    active_missions: mp.active_missions,
   });
 }
 
@@ -336,10 +339,13 @@ reducers.chargePerp = function chargePerpReducer(state, delta) {
     ap_snapshot: Math.max(0, (gv.ap_snapshot || 0) - 1),
   });
 
+  var mp = _missionDataFromResult(state, r);
   return Object.assign({}, state, {
-    nodes:          newNodes,
-    nodes_charging: stillCharging.concat([chargeEntry]),
-    game_values:    newGv,
+    nodes:           newNodes,
+    nodes_charging:  stillCharging.concat([chargeEntry]),
+    game_values:     newGv,
+    mission_goals:   mp.mission_goals,
+    active_missions: mp.active_missions,
   });
 };
 
