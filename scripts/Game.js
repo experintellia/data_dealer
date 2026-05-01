@@ -1710,26 +1710,25 @@ define(function(require) {
     // middle of the visible viewport — used both at startup and from the
     // reset-zoom button so the player isn't staring at empty space when
     // the window is wider than the legacy 960×600 frame.
+    // Debounced: rapid callers during initial mount (fitToWindow → render
+    // after_render → tutorial switch_view) collapse into one scroll.
     GameRoot.prototype._centerActiveView = function(animate) {
-      // activeView is only set after a switch_view trigger; before the first
-      // tab click (i.e. on initial load) Imperium is shown by default, so
-      // fall back to it.
-      var view = this.activeView || (this.getImperium && this.getImperium());
-      var vm = view && view.renderNode;
-      if (!vm || !vm.scroller || !vm.parentNode) return;
-
-      // Centre on the middle of the ViewMap. The legacy "design home" math
-      // (-data.x + designStageW/2) resolved to the design-stage centre, not
-      // the content area, so on Imperium it parked the camera in the empty
-      // top-left quadrant. Centring on vm.width/2 always shows the seeded
-      // content (e.g. database001 at 1024,800 in a 2920×2200 ViewMap).
-      var vw = vm.parentNode.width;
-      var vh = vm.parentNode.height;
-      var maxX = Math.max(0, vm.width  - vw);
-      var maxY = Math.max(0, vm.height - vh);
-      var sx = Math.max(0, Math.min(maxX, vm.width  / 2 - vw / 2));
-      var sy = Math.max(0, Math.min(maxY, vm.height / 2 - vh / 2));
-      vm.scroller.scrollTo(sx, sy, !!animate);
+      var self = this;
+      clearTimeout(self._centerActiveViewTimer);
+      self._centerActiveViewTimer = setTimeout(function() {
+        self._centerActiveViewTimer = null;
+        // activeView is set only after a switch_view; fall back to Imperium.
+        var view = self.activeView || (self.getImperium && self.getImperium());
+        var vm = view && view.renderNode;
+        if (!vm || !vm.scroller || !vm.parentNode) return;
+        var vw = vm.parentNode.width;
+        var vh = vm.parentNode.height;
+        var maxX = Math.max(0, vm.width  - vw);
+        var maxY = Math.max(0, vm.height - vh);
+        var sx = Math.max(0, Math.min(maxX, vm.width  / 2 - vw / 2));
+        var sy = Math.max(0, Math.min(maxY, vm.height / 2 - vh / 2));
+        vm.scroller.scrollTo(sx, sy, animate);
+      }, 50);
     };
 
     // Size the renderable area to the current viewport.  Called on initial

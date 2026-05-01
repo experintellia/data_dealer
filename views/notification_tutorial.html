@@ -1,6 +1,5 @@
 <%
   var data = D.data || {};
-  var button = data.button || _._('OK');
   var says = data.says || _._('Mark sagt:');
   var text = data.description || "";
   var title = data.title || "Neuer Kontakt!";
@@ -14,9 +13,7 @@
       <div class="NotificationText">
         <%= text  %>
       </div>
-      <div class="PopupButtons TutorialButtons">
-        <div class="Button" data-button-id="MainButton"><%= button %></div>
-      </div>
+      <div class="TutorialTapHint">tap anywhere to continue</div>
     </div>
   </div>
 </div>

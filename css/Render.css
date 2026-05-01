@@ -2540,9 +2540,13 @@
   position:relative;
 }
 
-.TutorialButtons {
-  bottom:36px;
-  position:relative;
+.TutorialTapHint {
+  text-align: center;
+  font-family: Bowlby;
+  font-size: 11px;
+  color: #009FD9;
+  opacity: 0.6;
+  margin-top: 8px;
 }
 
 .MissionDecorator {
@@ -2699,6 +2703,7 @@
   animation: AniScaleOpacity 0.2s reverse;
   height: 174px;
   padding:0px;
+  cursor: pointer;
 }
 
 .PopupBody a {

@@ -3675,6 +3675,9 @@ define(function(require) {
       this.jdomelem2 = $("<img class='ViewMapContainerImg' src='"+setup.imagePathPrefix+config.background+"'>");
 
       this.jdomelemZoom = $('<div class="ZoomControls"><div class="ZoomIn"></div><div class="ZoomOut"></div><div class="Fullscreen"></div></div>');
+      this._jZoomIn  = this.jdomelemZoom.find('.ZoomIn');
+      this._jZoomOut = this.jdomelemZoom.find('.ZoomOut');
+      this._jFullscreen = this.jdomelemZoom.find('.Fullscreen');
 
       this.domelem2 = this.jdomelem2[0];
       this.jdomelem3 = this.popupContainerDomelem = $("<div class='PopupContainer'></div>");
@@ -3922,19 +3925,22 @@ define(function(require) {
         if (e.touches[0] && e.touches[0].target && e.touches[0].target.tagName.match(/input|textarea|select/i)) {
           return;
         }
-        var pageX = e.touches[0].pageX;
-        var pageY = e.touches[0].pageY;
-        var userScaledPos = {};
-        userScaledPos.x = (pageX-node.jdomelem.offset().left)*node.dragHandler.scale;
-        userScaledPos.y = (pageY-node.jdomelem.offset().top)*node.dragHandler.scale;
-
+        var touch = e.touches[0];
+        var parentOffset = node.parentNode.jdomelem.offset();
+        // Mirror mousedown's userAbsPos so the double-tap zoom handler works
+        // on pure-touch devices where mousedown never fires.
+        node.userAbsPos = {
+          x: touch.pageX - parentOffset.left,
+          y: touch.pageY - parentOffset.top
+        };
         node.scroller.doTouchStart(e.touches, e.timeStamp);
         e.preventDefault();
-      }, false);
+      }, {passive: false});
 
       node.useDragHandler.domelem.addEventListener("touchmove", function(e) {
         node.scroller.doTouchMove(e.touches, e.timeStamp, e.scale);
-      }, false);
+        e.preventDefault();
+      }, {passive: false});
 
       node.useDragHandler.domelem.addEventListener("touchend", function(e) {
         node.scroller.doTouchEnd(e.timeStamp);
@@ -3972,14 +3978,14 @@ define(function(require) {
     };
 
     ViewMap.prototype._updateZoomButtonsState = function(){
-      if (!this.jdomelemZoom) return;
+      if (!this._jZoomIn) return;
       var maxZoom = (this.scroller && this.scroller.options && this.scroller.options.maxZoom) || 1;
       var minZoom = (this.scroller && this.scroller.options && this.scroller.options.minZoom) || 0.5;
       var atMax = this.zoomScale >= maxZoom - 0.001;
       var atMin = this.zoomScale <= minZoom + 0.001;
-      this.jdomelemZoom.find('.ZoomIn').toggleClass('disabled', atMax);
-      this.jdomelemZoom.find('.ZoomOut').toggleClass('disabled', atMin);
-      this.jdomelemZoom.find('.Fullscreen').toggleClass('disabled', atMin && atMax);
+      this._jZoomIn.toggleClass('disabled', atMax);
+      this._jZoomOut.toggleClass('disabled', atMin);
+      this._jFullscreen.toggleClass('disabled', atMin && atMax);
     };
 
     ViewMap.prototype.zoomIn = function(){
@@ -4619,6 +4625,35 @@ define(function(require) {
         node.trigger('popup_close');
         node.trigger('popup_cancel');
       });
+
+      // Tutorial dialogs advance on tap anywhere (body or backdrop).
+      // tutorialTouchFired guards against the synthesized click that some
+      // browsers emit after touchend even when preventDefault() is called.
+      if (node.extendClass === 'Tutorial') {
+        var tutorialTouchFired = false;
+        var advanceTutorial = function(e) {
+          if (e.type === 'touchend') {
+            tutorialTouchFired = true;
+          } else if (tutorialTouchFired) {
+            tutorialTouchFired = false;
+            return;
+          }
+          e.stopPropagation();
+          e.preventDefault();
+          node.trigger('popup_close');
+        };
+        node.jdomelem.on('touchend click', '.TutorialBody', advanceTutorial);
+        if (this.popupContainer) {
+          var $tutorialContainer = this.popupContainer.renderNode.popupContainerDomelem;
+          $tutorialContainer.on('touchend click', advanceTutorial);
+          // Each tutorial step creates a new Popup and calls initEvents, so
+          // without cleanup advanceTutorial accumulates on the persistent
+          // container element (Popup.close never calls .off on it).
+          node.on('popup_close', function() {
+            $tutorialContainer.off('touchend click', advanceTutorial);
+          });
+        }
+      }
 
       node.jdomelem.on('click touchend','.Subpop[data-subpop-id="buyslots"] .BuySlotsInc',function(e){
         e.stopPropagation();
