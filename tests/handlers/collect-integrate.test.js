@@ -7,11 +7,12 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  collectPerp, integrateCollected, chargePerp, buyPerp, loadGame,
-  setEmitter, setPrngSeed
+  collectPerp, integrateCollected, chargePerp, buyPerp, buyPowerup, loadGame,
+  setEmitter, setPrngSeed, setSendDelta
 } from '../../scripts/LocalEngine.js';
 import { setState, getState } from '../../scripts/boot.js';
 import { materialize } from '../../scripts/materializer.js';
+import { applyDelta } from '../../scripts/state.js';
 import { freshState } from '../../scripts/state.js';
 import { setOverride, clearOverride, advance } from '../../scripts/clock.js';
 
@@ -1206,5 +1207,860 @@ describe('mission rewards — apply on completion', () => {
     const { result } = await collectPerp('tok', JESSICA);
     // contact035 xp_inc=1 + mission001 reward=2.
     expect(result.game_values.xp_value).toBe(startXp + 1 + 2);
+  });
+});
+
+// ── Per-mission integration tests: missions 003–016 ──────────────────────────
+//
+// Covers all new workflow helpers added in #97:
+//   _advanceChargePerpMissions   (charge_perp goals)
+//   _advanceCollectCashMissions  (collect_cash goals)
+//   _advanceBuyPowerupMissions   (buy_powerup goals)
+//   _advanceUpgradeTokenMissions (upgrade_token goals)
+//
+// Each block seeds active_missions + mission_goals, calls the relevant
+// handler(s), and asserts: goal progress · completion · reward · chain.
+
+// IDs for the hash-named missions (title in parentheses).
+var M_CASH_IN  = 'a388da08d87dc9fd6d543977a2047262000'; // Cash in!
+var M_DB_MACH  = 'e59302bed28769c3c76761c14516e764000'; // Database machine
+var M_PSYCHO   = 'e33a3ef9d70038e0a9c6d088f37d02cb000'; // Psycho
+var M_COUCH    = 'af1149c315321ef4f477893fcc1807e1000'; // Couch Potato
+var M_EMPLOYEE = 'b638f35b5ec6b0558981378c9037c3d3000'; // Employee Monitoring
+var M_IMAGE    = '9f5735d01587f640cc862e0a82280d3f000'; // Improve your image
+var M_COLLAB   = '16f302f84b84498a734dfdbe1a7794b9000'; // Unofficial collaboration
+var M_ALFONSO  = 'dc481d7863ceb18575c50d36e2c5ecfe000'; // Alfonso
+
+// High-level game_values: enough cash/level/AP for all purchases in tests.
+function mkHighGv(overrides) {
+  return mkGv(Object.assign({ xp_level: 10, cash_value: 100000, ap_snapshot: 6 }, overrides || {}));
+}
+
+function mkProjectNode(gestalt, path) {
+  return { game_id: gestalt, game_type: 'ProjectPerp', full_type: 'ProjectPerp:' + gestalt,
+    gestalt: gestalt, full_path: path, instance_data: {} };
+}
+function mkClientNode2(gestalt, path) {
+  return { game_id: gestalt, game_type: 'ClientPerp', full_type: 'ClientPerp:' + gestalt,
+    gestalt: gestalt, full_path: path, instance_data: {} };
+}
+function mkContactNode(gestalt, path) {
+  return { game_id: gestalt, game_type: 'ContactPerp', full_type: 'ContactPerp:' + gestalt,
+    gestalt: gestalt, full_path: path, instance_data: {} };
+}
+function mkTokenNode2(gestalt, path, amount) {
+  return { game_id: gestalt, game_type: 'TokenPerp', full_type: 'TokenPerp:' + gestalt,
+    gestalt: gestalt, full_path: path, instance_data: { amount: amount || 0 } };
+}
+
+// ── mission003 — Rookie Dealer ───────────────────────────────────────────────
+// charge_perp(client007, amount:null)
+
+describe('mission progression — mission003 Rookie Dealer (charge_perp)', () => {
+  const C007 = 'Imperium.City.Pusher0.client007';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('charging client007 completes goal, grants +600 cash reward, activates mission004', async () => {
+    setState(mkState({
+      game_values: mkHighGv(),
+      nodes: [mkClientNode2('client007', C007)],
+      active_missions: ['mission003'],
+      mission_goals: [{
+        mission: 'mission003', workflow: 'charge_perp', target: 'client007',
+        amount: null, position: 1, current_amount: 0, complete: false
+      }]
+    }));
+    const startCash = getState().game_values.cash_value;
+
+    const { result } = await chargePerp('tok', C007);
+    expect(result.error).toBeUndefined();
+
+    const s = getState();
+    const goal = s.mission_goals.find(g => g.mission === 'mission003');
+    expect(goal.complete).toBe(true);
+    expect(s.active_missions).not.toContain('mission003');
+    expect(s.active_missions).toContain('mission004');
+    // client007 charge_cost=0; mission003 reward = +600 cash
+    expect(s.game_values.cash_value).toBe(startCash + 600);
+    expect(s.mission_goals.filter(g => g.mission === 'mission004')).toHaveLength(2);
+  });
+});
+
+// ── mission004 — You're a winner! ────────────────────────────────────────────
+// buy_perp(project001, null) + charge_perp(project001, null)
+
+describe("mission progression — mission004 You're a winner! (buy_perp + charge_perp)", () => {
+  const P001 = 'Imperium.project001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  function seedM004() {
+    setState(mkState({
+      game_values: mkHighGv({ xp_level: 2 }),
+      nodes: [],
+      active_missions: ['mission004'],
+      mission_goals: [
+        { mission: 'mission004', workflow: 'buy_perp', target: 'project001',
+          amount: null, position: 1, current_amount: 0, complete: false },
+        { mission: 'mission004', workflow: 'charge_perp', target: 'project001',
+          amount: null, position: 2, current_amount: 0, complete: false }
+      ]
+    }));
+  }
+
+  it('buying project001 marks the buy_perp goal complete; mission stays active', async () => {
+    seedM004();
+    await buyPerp('tok', 'Imperium', 'project001');
+    const goals = getState().mission_goals.filter(g => g.mission === 'mission004');
+    expect(goals.find(g => g.workflow === 'buy_perp').complete).toBe(true);
+    expect(goals.find(g => g.workflow === 'charge_perp').complete).toBe(false);
+    expect(getState().active_missions).toContain('mission004');
+  });
+
+  it('charging project001 after buying it completes mission004 and activates M_CASH_IN', async () => {
+    seedM004();
+    await buyPerp('tok', 'Imperium', 'project001');
+    const { result } = await chargePerp('tok', P001);
+    expect(result.error).toBeUndefined();
+
+    const s = getState();
+    expect(s.active_missions).not.toContain('mission004');
+    expect(s.active_missions).toContain(M_CASH_IN);
+    expect(result.missions.complete_missions).toContain('mission004');
+  });
+});
+
+// ── M_CASH_IN — Cash in! ─────────────────────────────────────────────────────
+// collect_cash(client007, 500)
+
+describe('mission progression — M_CASH_IN Cash in! (collect_cash)', () => {
+  const C007 = 'Imperium.City.Pusher0.client007';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('collecting 200 cash advances goal to 200 without completing mission', async () => {
+    setState(mkState({
+      game_values: mkHighGv({ cash_value: 0 }),
+      nodes: [mkClientNode2('client007', C007)],
+      nodes_collect: [{ path: C007, result: { amount: 200 } }],
+      active_missions: [M_CASH_IN],
+      mission_goals: [{
+        mission: M_CASH_IN, workflow: 'collect_cash', target: 'client007',
+        amount: 500, position: 1, current_amount: 0, complete: false
+      }]
+    }));
+
+    await collectPerp('tok', C007);
+    const goal = getState().mission_goals.find(g => g.mission === M_CASH_IN);
+    expect(goal.current_amount).toBe(200);
+    expect(goal.complete).toBe(false);
+    expect(getState().active_missions).toContain(M_CASH_IN);
+  });
+
+  it('collecting 600 fills the 500 goal, grants +200 cash reward, activates mission006', async () => {
+    setState(mkState({
+      game_values: mkHighGv({ cash_value: 0 }),
+      nodes: [mkClientNode2('client007', C007)],
+      nodes_collect: [{ path: C007, result: { amount: 600 } }],
+      active_missions: [M_CASH_IN],
+      mission_goals: [{
+        mission: M_CASH_IN, workflow: 'collect_cash', target: 'client007',
+        amount: 500, position: 1, current_amount: 0, complete: false
+      }]
+    }));
+
+    const { result } = await collectPerp('tok', C007);
+    const s = getState();
+    const goal = s.mission_goals.find(g => g.mission === M_CASH_IN);
+    expect(goal.current_amount).toBe(500); // capped at goal.amount
+    expect(goal.complete).toBe(true);
+    expect(s.active_missions).not.toContain(M_CASH_IN);
+    expect(s.active_missions).toContain('mission006');
+    // start=0 + collect=600 + reward=200 = 800
+    expect(s.game_values.cash_value).toBe(800);
+    expect(result.missions.complete_missions).toContain(M_CASH_IN);
+  });
+});
+
+// ── mission006 — Upgrade raffle ───────────────────────────────────────────────
+// buy_powerup(upgrade001 on project001) + buy_powerup(ad002) + buy_powerup(teammember020)
+
+describe('mission progression — mission006 Upgrade raffle (buy_powerup x3)', () => {
+  const P001 = 'Imperium.City.project001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('buying upgrade001 marks goal 1 complete; mission still active', async () => {
+    setState(mkState({
+      game_values: mkHighGv({ xp_level: 2 }),
+      nodes: [mkProjectNode('project001', P001)],
+      active_missions: ['mission006'],
+      mission_goals: [
+        { mission: 'mission006', workflow: 'buy_powerup', target: 'upgrade001',
+          amount: null, position: 1, current_amount: 0, complete: false },
+        { mission: 'mission006', workflow: 'buy_powerup', target: 'ad002',
+          amount: null, position: 2, current_amount: 0, complete: false },
+        { mission: 'mission006', workflow: 'buy_powerup', target: 'teammember020',
+          amount: null, position: 3, current_amount: 0, complete: false }
+      ]
+    }));
+    await buyPowerup('tok', P001, 0, 'upgrade001');
+    const goals = getState().mission_goals.filter(g => g.mission === 'mission006');
+    expect(goals.find(g => g.target === 'upgrade001').complete).toBe(true);
+    expect(goals.find(g => g.target === 'ad002').complete).toBe(false);
+    expect(getState().active_missions).toContain('mission006');
+  });
+
+  it('buying all three powerups completes mission006, grants reward, activates mission007', async () => {
+    setState(mkState({
+      game_values: mkHighGv({ xp_level: 2 }),
+      nodes: [mkProjectNode('project001', P001)],
+      active_missions: ['mission006'],
+      mission_goals: [
+        { mission: 'mission006', workflow: 'buy_powerup', target: 'upgrade001',
+          amount: null, position: 1, current_amount: 0, complete: false },
+        { mission: 'mission006', workflow: 'buy_powerup', target: 'ad002',
+          amount: null, position: 2, current_amount: 0, complete: false },
+        { mission: 'mission006', workflow: 'buy_powerup', target: 'teammember020',
+          amount: null, position: 3, current_amount: 0, complete: false }
+      ]
+    }));
+
+    await buyPowerup('tok', P001, 0, 'upgrade001');
+    await buyPowerup('tok', P001, 1, 'ad002');
+    const { result } = await buyPowerup('tok', P001, 2, 'teammember020');
+
+    const s = getState();
+    expect(s.mission_goals.filter(g => g.mission === 'mission006').every(g => g.complete)).toBe(true);
+    expect(s.active_missions).not.toContain('mission006');
+    expect(s.active_missions).toContain('mission007');
+    expect(result.missions.complete_missions).toContain('mission006');
+  });
+});
+
+// ── mission007 — Nurse Helen ──────────────────────────────────────────────────
+// buy_perp(contact001, null) + collect_profiles(contact001, 3000) + integrate_profiles(token017, 3000)
+
+describe('mission progression — mission007 Nurse Helen (buy+collect+integrate)', () => {
+  const CT1 = 'Imperium.contact001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  function seedM007() {
+    setState(mkState({
+      game_values: mkHighGv({ xp_level: 3 }),
+      nodes: [],
+      active_missions: ['mission007'],
+      mission_goals: [
+        { mission: 'mission007', workflow: 'buy_perp', target: 'contact001',
+          amount: null, position: 1, current_amount: 0, complete: false },
+        { mission: 'mission007', workflow: 'collect_profiles', target: 'contact001',
+          amount: 3000, position: 2, current_amount: 0, complete: false },
+        { mission: 'mission007', workflow: 'integrate_profiles', target: 'token017',
+          amount: 3000, position: 3, current_amount: 0, complete: false }
+      ]
+    }));
+  }
+
+  it('buying contact001 marks buy_perp goal complete; mission stays active', async () => {
+    seedM007();
+    await buyPerp('tok', 'Imperium', 'contact001');
+    const goal = getState().mission_goals.find(
+      g => g.mission === 'mission007' && g.workflow === 'buy_perp');
+    expect(goal.complete).toBe(true);
+    expect(getState().active_missions).toContain('mission007');
+  });
+
+  it('full 3-step flow completes mission007 and activates M_DB_MACH', async () => {
+    seedM007();
+    await buyPerp('tok', 'Imperium', 'contact001');
+
+    // Seed collect entry for the node buyPerp just created.
+    const s1 = getState();
+    setState(Object.assign({}, s1, {
+      nodes_collect: [{ path: CT1, result: { amount: 3000 } }]
+    }));
+
+    const { result: colRes } = await collectPerp('tok', CT1);
+    const collectId = colRes.result.collect_id;
+
+    const { result: intRes } = await integrateCollected('tok', collectId);
+
+    const s = getState();
+    expect(s.mission_goals.filter(g => g.mission === 'mission007').every(g => g.complete)).toBe(true);
+    expect(s.active_missions).not.toContain('mission007');
+    expect(s.active_missions).toContain(M_DB_MACH);
+    expect(intRes.missions.complete_missions).toContain('mission007');
+  });
+});
+
+// ── M_DB_MACH — Database machine ─────────────────────────────────────────────
+// upgrade_token(token007, null)
+
+describe('mission progression — M_DB_MACH Database machine (upgrade_token)', () => {
+  const T007 = 'Database.token007';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('collecting from token007 completes upgrade_token goal and activates mission008', async () => {
+    setState(mkState({
+      game_values: mkHighGv(),
+      nodes: [mkTokenNode2('token007', T007, 0)],
+      nodes_collect: [{ path: T007, result: { amount: 0 } }],
+      active_missions: [M_DB_MACH],
+      mission_goals: [{
+        mission: M_DB_MACH, workflow: 'upgrade_token', target: 'token007',
+        amount: null, position: 1, current_amount: 0, complete: false
+      }]
+    }));
+
+    const { result } = await collectPerp('tok', T007);
+    expect(result.error).toBeUndefined();
+
+    const s = getState();
+    const goal = s.mission_goals.find(g => g.mission === M_DB_MACH);
+    expect(goal.complete).toBe(true);
+    expect(s.active_missions).not.toContain(M_DB_MACH);
+    expect(s.active_missions).toContain('mission008');
+    expect(result.missions.complete_missions).toContain(M_DB_MACH);
+  });
+});
+
+// ── mission008 — Sick World ───────────────────────────────────────────────────
+// buy_perp(client002, null) + charge_perp(client002, null) + buy_perp(contact019, null)
+
+describe('mission progression — mission008 Sick World (buy+charge+buy)', () => {
+  const C2 = 'Imperium.client002';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  function seedM008() {
+    setState(mkState({
+      game_values: mkHighGv({ xp_level: 4 }),
+      nodes: [],
+      active_missions: ['mission008'],
+      mission_goals: [
+        { mission: 'mission008', workflow: 'buy_perp', target: 'client002',
+          amount: null, position: 1, current_amount: 0, complete: false },
+        { mission: 'mission008', workflow: 'charge_perp', target: 'client002',
+          amount: null, position: 2, current_amount: 0, complete: false },
+        { mission: 'mission008', workflow: 'buy_perp', target: 'contact019',
+          amount: null, position: 3, current_amount: 0, complete: false }
+      ]
+    }));
+  }
+
+  it('buying client002 then charging then buying contact019 completes mission008 + activates mission005', async () => {
+    seedM008();
+    await buyPerp('tok', 'Imperium', 'client002');
+    await chargePerp('tok', C2);
+    const { result } = await buyPerp('tok', 'Imperium', 'contact019');
+
+    const s = getState();
+    expect(s.mission_goals.filter(g => g.mission === 'mission008').every(g => g.complete)).toBe(true);
+    expect(s.active_missions).not.toContain('mission008');
+    expect(s.active_missions).toContain('mission005');
+    expect(result.missions.complete_missions).toContain('mission008');
+  });
+});
+
+// ── mission005 — So green! ────────────────────────────────────────────────────
+// integrate_profiles(token084, 10000) + collect_cash(client007, 500)
+
+describe('mission progression — mission005 So green! (integrate_profiles + collect_cash)', () => {
+  const C007 = 'Imperium.City.Pusher0.client007';
+  const COLL_ID = 'so-green-001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  function seedM005(extraGoalFields) {
+    setState(mkState({
+      game_values: mkHighGv({ cash_value: 0 }),
+      nodes: [mkClientNode2('client007', C007)],
+      active_missions: ['mission005'],
+      mission_goals: [
+        Object.assign({ mission: 'mission005', workflow: 'integrate_profiles', target: 'token084',
+          amount: 10000, position: 1, current_amount: 0, complete: false }, extraGoalFields || {}),
+        { mission: 'mission005', workflow: 'collect_cash', target: 'client007',
+          amount: 500, position: 2, current_amount: 0, complete: false }
+      ]
+    }));
+  }
+
+  it('integrating 10000 profiles at 100% token084 fills integrate_profiles goal', async () => {
+    setState(mkState({
+      game_values: mkHighGv({ cash_value: 0 }),
+      nodes: [mkClientNode2('client007', C007)],
+      active_missions: ['mission005'],
+      mission_goals: [
+        { mission: 'mission005', workflow: 'integrate_profiles', target: 'token084',
+          amount: 10000, position: 1, current_amount: 0, complete: false },
+        { mission: 'mission005', workflow: 'collect_cash', target: 'client007',
+          amount: 500, position: 2, current_amount: 0, complete: false }
+      ],
+      db_queue: [{
+        origin: 'Imperium.City.contact001',
+        collect_id: COLL_ID,
+        profile_set: { profiles_value: 10000, tokens_map: { token084: { amount: 100 } } },
+        collect_dt: FIXED_NOW
+      }]
+    }));
+
+    await integrateCollected('tok', COLL_ID);
+    const goal = getState().mission_goals.find(
+      g => g.mission === 'mission005' && g.workflow === 'integrate_profiles');
+    expect(goal.current_amount).toBe(10000);
+    expect(goal.complete).toBe(true);
+    expect(getState().active_missions).toContain('mission005'); // cash goal still pending
+  });
+
+  it('collect_cash + integrate both complete → mission005 done, grants reward, activates M_PSYCHO', async () => {
+    setState(mkState({
+      game_values: mkHighGv({ cash_value: 0 }),
+      nodes: [mkClientNode2('client007', C007)],
+      nodes_collect: [{ path: C007, result: { amount: 600 } }],
+      active_missions: ['mission005'],
+      mission_goals: [
+        { mission: 'mission005', workflow: 'integrate_profiles', target: 'token084',
+          amount: 10000, position: 1, current_amount: 10000, complete: true },
+        { mission: 'mission005', workflow: 'collect_cash', target: 'client007',
+          amount: 500, position: 2, current_amount: 0, complete: false }
+      ]
+    }));
+
+    const { result } = await collectPerp('tok', C007);
+    const s = getState();
+    expect(s.mission_goals.filter(g => g.mission === 'mission005').every(g => g.complete)).toBe(true);
+    expect(s.active_missions).not.toContain('mission005');
+    expect(s.active_missions).toContain(M_PSYCHO);
+    // start=0 + collect=600 + reward=1000 = 1600
+    expect(s.game_values.cash_value).toBe(1600);
+    expect(result.missions.complete_missions).toContain('mission005');
+  });
+});
+
+// ── M_PSYCHO — Psycho ─────────────────────────────────────────────────────────
+// buy_perp(project003) + buy_powerup(upgrade015 on project003) + charge_perp(project003)
+
+describe('mission progression — M_PSYCHO Psycho (buy_perp + buy_powerup + charge_perp)', () => {
+  const P3 = 'Imperium.project003';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('all three goals complete → M_PSYCHO done, activates M_COUCH', async () => {
+    setState(mkState({
+      game_values: mkHighGv({ xp_level: 5 }),
+      nodes: [],
+      active_missions: [M_PSYCHO],
+      mission_goals: [
+        { mission: M_PSYCHO, workflow: 'buy_perp', target: 'project003',
+          amount: null, position: 1, current_amount: 0, complete: false },
+        { mission: M_PSYCHO, workflow: 'buy_powerup', target: 'upgrade015',
+          amount: null, position: 2, current_amount: 0, complete: false },
+        { mission: M_PSYCHO, workflow: 'charge_perp', target: 'project003',
+          amount: null, position: 3, current_amount: 0, complete: false }
+      ]
+    }));
+
+    await buyPerp('tok', 'Imperium', 'project003');
+    await buyPowerup('tok', P3, 0, 'upgrade015');
+    const { result } = await chargePerp('tok', P3);
+    expect(result.error).toBeUndefined();
+
+    const s = getState();
+    expect(s.mission_goals.filter(g => g.mission === M_PSYCHO).every(g => g.complete)).toBe(true);
+    expect(s.active_missions).not.toContain(M_PSYCHO);
+    expect(s.active_missions).toContain(M_COUCH);
+    expect(result.missions.complete_missions).toContain(M_PSYCHO);
+  });
+});
+
+// ── M_COUCH — Couch Potato ────────────────────────────────────────────────────
+// collect_profiles(contact019, 6000) + integrate_profiles(token088, 6000) + collect_cash(client002, 500)
+
+describe('mission progression — M_COUCH Couch Potato (collect+integrate+cash)', () => {
+  const CT19 = 'Imperium.contact019';
+  const C2   = 'Imperium.City.Pusher0.client002';
+  const COLL_ID = 'couch-001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('all three goals complete → M_COUCH done, activates M_EMPLOYEE', async () => {
+    setState(mkState({
+      game_values: mkHighGv({ cash_value: 0 }),
+      nodes: [
+        mkContactNode('contact019', CT19),
+        mkClientNode2('client002', C2)
+      ],
+      nodes_collect: [
+        { path: CT19, result: { amount: 6000 } },
+        { path: C2,   result: { amount: 600  } }
+      ],
+      active_missions: [M_COUCH],
+      mission_goals: [
+        { mission: M_COUCH, workflow: 'collect_profiles', target: 'contact019',
+          amount: 6000, position: 1, current_amount: 0, complete: false },
+        { mission: M_COUCH, workflow: 'integrate_profiles', target: 'token088',
+          amount: 6000, position: 2, current_amount: 0, complete: false },
+        { mission: M_COUCH, workflow: 'collect_cash', target: 'client002',
+          amount: 500, position: 3, current_amount: 0, complete: false }
+      ]
+    }));
+
+    // Step 1: collect from contact019 — fills collect_profiles goal.
+    const { result: c19Res } = await collectPerp('tok', CT19);
+    const collectId = c19Res.result.collect_id;
+    const goal1 = getState().mission_goals.find(
+      g => g.mission === M_COUCH && g.workflow === 'collect_profiles');
+    expect(goal1.current_amount).toBe(6000);
+    expect(goal1.complete).toBe(true);
+
+    // Step 2: integrate — fills integrate_profiles goal via token088 in tokens_map.
+    await integrateCollected('tok', collectId);
+    const goal2 = getState().mission_goals.find(
+      g => g.mission === M_COUCH && g.workflow === 'integrate_profiles');
+    expect(goal2.complete).toBe(true);
+
+    // Step 3: collect cash from client002.
+    const { result } = await collectPerp('tok', C2);
+    const s = getState();
+    expect(s.mission_goals.filter(g => g.mission === M_COUCH).every(g => g.complete)).toBe(true);
+    expect(s.active_missions).not.toContain(M_COUCH);
+    expect(s.active_missions).toContain(M_EMPLOYEE);
+    expect(result.missions.complete_missions).toContain(M_COUCH);
+  });
+});
+
+// ── M_EMPLOYEE — Employee Monitoring ─────────────────────────────────────────
+// buy_perp(client006) + collect_cash(client006, 2000)
+
+describe('mission progression — M_EMPLOYEE Employee Monitoring (buy_perp + collect_cash)', () => {
+  const C6 = 'Imperium.client006';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('buying client006 then collecting 2000+ cash completes M_EMPLOYEE, activates M_IMAGE', async () => {
+    setState(mkState({
+      game_values: mkHighGv(),
+      nodes: [],
+      active_missions: [M_EMPLOYEE],
+      mission_goals: [
+        { mission: M_EMPLOYEE, workflow: 'buy_perp', target: 'client006',
+          amount: null, position: 1, current_amount: 0, complete: false },
+        { mission: M_EMPLOYEE, workflow: 'collect_cash', target: 'client006',
+          amount: 2000, position: 2, current_amount: 0, complete: false }
+      ]
+    }));
+
+    await buyPerp('tok', 'Imperium', 'client006');
+    // Seed collect entry for the newly created node.
+    const s1 = getState();
+    setState(Object.assign({}, s1, {
+      nodes_collect: [{ path: C6, result: { amount: 2500 } }]
+    }));
+
+    const { result } = await collectPerp('tok', C6);
+    const s = getState();
+    const goals = s.mission_goals.filter(g => g.mission === M_EMPLOYEE);
+    expect(goals.every(g => g.complete)).toBe(true);
+    expect(s.active_missions).not.toContain(M_EMPLOYEE);
+    expect(s.active_missions).toContain(M_IMAGE);
+    expect(result.missions.complete_missions).toContain(M_EMPLOYEE);
+  });
+});
+
+// ── M_IMAGE — Improve your image ─────────────────────────────────────────────
+// buy_powerup(teammember043 on project003) + buy_powerup(ad006 on project003)
+
+describe('mission progression — M_IMAGE Improve your image (buy_powerup x2)', () => {
+  const P3 = 'Imperium.City.project003';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('buying teammember043 then ad006 on project003 completes M_IMAGE, activates M_COLLAB', async () => {
+    setState(mkState({
+      game_values: mkHighGv({ xp_level: 5 }),
+      nodes: [mkProjectNode('project003', P3)],
+      active_missions: [M_IMAGE],
+      mission_goals: [
+        { mission: M_IMAGE, workflow: 'buy_powerup', target: 'teammember043',
+          amount: null, position: 1, current_amount: 0, complete: false },
+        { mission: M_IMAGE, workflow: 'buy_powerup', target: 'ad006',
+          amount: null, position: 2, current_amount: 0, complete: false }
+      ]
+    }));
+
+    await buyPowerup('tok', P3, 0, 'teammember043');
+    const { result } = await buyPowerup('tok', P3, 1, 'ad006');
+
+    const s = getState();
+    expect(s.mission_goals.filter(g => g.mission === M_IMAGE).every(g => g.complete)).toBe(true);
+    expect(s.active_missions).not.toContain(M_IMAGE);
+    expect(s.active_missions).toContain(M_COLLAB);
+    expect(result.missions.complete_missions).toContain(M_IMAGE);
+  });
+});
+
+// ── M_COLLAB — Unofficial collaboration ──────────────────────────────────────
+// buy_perp(agent004) + buy_perp(contact026)
+
+describe('mission progression — M_COLLAB Unofficial collaboration (buy_perp x2)', () => {
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('buying agent004 then contact026 completes M_COLLAB, activates M_ALFONSO', async () => {
+    setState(mkState({
+      game_values: mkHighGv({ xp_level: 7 }),
+      nodes: [],
+      active_missions: [M_COLLAB],
+      mission_goals: [
+        { mission: M_COLLAB, workflow: 'buy_perp', target: 'agent004',
+          amount: null, position: 1, current_amount: 0, complete: false },
+        { mission: M_COLLAB, workflow: 'buy_perp', target: 'contact026',
+          amount: null, position: 2, current_amount: 0, complete: false }
+      ]
+    }));
+
+    await buyPerp('tok', 'Imperium', 'agent004');
+    const { result } = await buyPerp('tok', 'Imperium', 'contact026');
+
+    const s = getState();
+    expect(s.mission_goals.filter(g => g.mission === M_COLLAB).every(g => g.complete)).toBe(true);
+    expect(s.active_missions).not.toContain(M_COLLAB);
+    expect(s.active_missions).toContain(M_ALFONSO);
+    expect(result.missions.complete_missions).toContain(M_COLLAB);
+  });
+});
+
+// ── M_ALFONSO — Alfonso ───────────────────────────────────────────────────────
+// buy_perp(pusher003)
+
+describe('mission progression — M_ALFONSO Alfonso (buy_perp)', () => {
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('buying pusher003 completes M_ALFONSO, grants reward, activates 3cb94923... chain', async () => {
+    const M_BOGUS = '3cb9492322191121ebf7a10aafd0fc4a000';
+    setState(mkState({
+      game_values: mkHighGv(),
+      nodes: [],
+      active_missions: [M_ALFONSO],
+      mission_goals: [{
+        mission: M_ALFONSO, workflow: 'buy_perp', target: 'pusher003',
+        amount: null, position: 1, current_amount: 0, complete: false
+      }]
+    }));
+
+    const { result } = await buyPerp('tok', 'Imperium', 'pusher003');
+    const s = getState();
+    expect(s.mission_goals.find(g => g.mission === M_ALFONSO).complete).toBe(true);
+    expect(s.active_missions).not.toContain(M_ALFONSO);
+    expect(s.active_missions).toContain(M_BOGUS);
+    expect(result.missions.complete_missions).toContain(M_ALFONSO);
+  });
+});
+
+// ── M_BOGUS — Bogus company tangle ───────────────────────────────────────────
+// buy_perp(proxy004)
+
+describe('mission progression — M_BOGUS Bogus company tangle (buy_perp)', () => {
+  var M_BOGUS = '3cb9492322191121ebf7a10aafd0fc4a000';
+  var M_MULT  = '1da63b8adf60878f693dfb9d9f73690f000';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('buying proxy004 completes M_BOGUS and activates M_MULT (Multiplication 101)', async () => {
+    setState(mkState({
+      game_values: mkHighGv({ xp_level: 9 }),
+      nodes: [],
+      active_missions: [M_BOGUS],
+      mission_goals: [{
+        mission: M_BOGUS, workflow: 'buy_perp', target: 'proxy004',
+        amount: null, position: 1, current_amount: 0, complete: false
+      }]
+    }));
+
+    const { result } = await buyPerp('tok', 'Imperium', 'proxy004');
+    const s = getState();
+    expect(s.mission_goals.find(g => g.mission === M_BOGUS).complete).toBe(true);
+    expect(s.active_missions).not.toContain(M_BOGUS);
+    expect(s.active_missions).toContain(M_MULT);
+    expect(result.missions.complete_missions).toContain(M_BOGUS);
+  });
+});
+
+// ── M_MULT — Multiplication 101 ───────────────────────────────────────────────
+// buy_perp(token055) + upgrade_token(token055)
+
+describe('mission progression — M_MULT Multiplication 101 (buy_perp + upgrade_token)', () => {
+  var M_MULT   = '1da63b8adf60878f693dfb9d9f73690f000';
+  var M_BIGAPPLE = '2f59d10a67ca7ee9006dfe5db31a4c5f000';
+  const T055 = 'Imperium.token055';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  function seedMMult() {
+    setState(mkState({
+      game_values: mkHighGv({ xp_level: 7 }),
+      nodes: [],
+      active_missions: [M_MULT],
+      mission_goals: [
+        { mission: M_MULT, workflow: 'buy_perp', target: 'token055',
+          amount: null, position: 1, current_amount: 0, complete: false },
+        { mission: M_MULT, workflow: 'upgrade_token', target: 'token055',
+          amount: null, position: 2, current_amount: 0, complete: false }
+      ]
+    }));
+  }
+
+  it('buying token055 marks buy_perp goal complete; mission stays active', async () => {
+    seedMMult();
+    await buyPerp('tok', 'Imperium', 'token055');
+    const goal = getState().mission_goals.find(
+      g => g.mission === M_MULT && g.workflow === 'buy_perp');
+    expect(goal.complete).toBe(true);
+    expect(getState().active_missions).toContain(M_MULT);
+  });
+
+  it('collecting from token055 after buying it completes M_MULT and activates M_BIGAPPLE', async () => {
+    seedMMult();
+    await buyPerp('tok', 'Imperium', 'token055');
+
+    // Seed collect entry for the TokenPerp node buyPerp created.
+    const s1 = getState();
+    setState(Object.assign({}, s1, {
+      nodes_collect: [{ path: T055, result: { amount: 0 } }]
+    }));
+
+    const { result } = await collectPerp('tok', T055);
+    const s = getState();
+    expect(s.mission_goals.filter(g => g.mission === M_MULT).every(g => g.complete)).toBe(true);
+    expect(s.active_missions).not.toContain(M_MULT);
+    expect(s.active_missions).toContain(M_BIGAPPLE);
+    expect(result.missions.complete_missions).toContain(M_MULT);
+  });
+});
+
+// ── M_BIGAPPLE — Big Apple, Big Data! ────────────────────────────────────────
+// buy_perp(city004)  — final mission in the trunk chain
+
+describe('mission progression — M_BIGAPPLE Big Apple, Big Data! (buy_perp)', () => {
+  var M_BIGAPPLE = '2f59d10a67ca7ee9006dfe5db31a4c5f000';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('buying city004 completes M_BIGAPPLE (last mission — no chain follow-up)', async () => {
+    setState(mkState({
+      game_values: mkHighGv({ xp_level: 11 }),
+      nodes: [],
+      active_missions: [M_BIGAPPLE],
+      mission_goals: [{
+        mission: M_BIGAPPLE, workflow: 'buy_perp', target: 'city004',
+        amount: null, position: 1, current_amount: 0, complete: false
+      }]
+    }));
+
+    const { result } = await buyPerp('tok', 'Imperium', 'city004');
+    const s = getState();
+    expect(s.mission_goals.find(g => g.mission === M_BIGAPPLE).complete).toBe(true);
+    expect(s.active_missions).not.toContain(M_BIGAPPLE);
+    expect(result.missions.complete_missions).toContain(M_BIGAPPLE);
+    // No required_mission points to M_BIGAPPLE, so no new mission activates.
+    expect(s.active_missions).toHaveLength(0);
+  });
+});
+
+// ── Cold-start replay regression tests ───────────────────────────────────────
+// Verify that mission progress produced by chargePerp and buyPowerup survives
+// a simulated cold-start reload: capture the delta via setSendDelta, then
+// replay it with applyDelta against the pre-action state and assert that
+// mission_goals and active_missions reflect the completed goal.
+
+describe('cold-start replay — chargePerp mission progress survives applyDelta', () => {
+  const C007 = 'Imperium.City.Pusher0.client007';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); setSendDelta(null); });
+
+  it('chargePerp delta carries missions so mission003 goal survives reload', async () => {
+    const initialState = mkState({
+      game_values: mkHighGv(),
+      nodes: [mkClientNode2('client007', C007)],
+      active_missions: ['mission003'],
+      mission_goals: [{
+        mission: 'mission003', workflow: 'charge_perp', target: 'client007',
+        amount: null, position: 1, current_amount: 0, complete: false
+      }]
+    });
+    setState(initialState);
+
+    var capturedDelta = null;
+    setSendDelta(function (d) { capturedDelta = d; });
+
+    await chargePerp('tok', C007);
+    expect(capturedDelta).not.toBeNull();
+
+    // Simulate cold-start: replay the delta against the state that existed
+    // before the charge (as if the app was killed and restarted mid-session).
+    const replayed = applyDelta(initialState, capturedDelta);
+    const goal = replayed.mission_goals.find(g => g.mission === 'mission003');
+    expect(goal).toBeDefined();
+    expect(goal.complete).toBe(true);
+    expect(replayed.active_missions).not.toContain('mission003');
+    expect(replayed.active_missions).toContain('mission004');
+  });
+});
+
+describe('cold-start replay — buyPowerup mission progress survives applyDelta', () => {
+  const P001 = 'Imperium.City.project001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); setSendDelta(null); });
+
+  it('buyPowerup delta carries missions so mission006 partial progress survives reload', async () => {
+    const initialState = mkState({
+      game_values: mkHighGv({ xp_level: 2 }),
+      nodes: [mkProjectNode('project001', P001)],
+      active_missions: ['mission006'],
+      mission_goals: [
+        { mission: 'mission006', workflow: 'buy_powerup', target: 'upgrade001',
+          amount: null, position: 1, current_amount: 0, complete: false },
+        { mission: 'mission006', workflow: 'buy_powerup', target: 'ad002',
+          amount: null, position: 2, current_amount: 0, complete: false },
+        { mission: 'mission006', workflow: 'buy_powerup', target: 'teammember020',
+          amount: null, position: 3, current_amount: 0, complete: false }
+      ]
+    });
+    setState(initialState);
+
+    var capturedDelta = null;
+    setSendDelta(function (d) { capturedDelta = d; });
+
+    await buyPowerup('tok', P001, 0, 'upgrade001');
+    expect(capturedDelta).not.toBeNull();
+
+    // Replay the delta against the initial state (cold-start simulation).
+    const replayed = applyDelta(initialState, capturedDelta);
+    const goals = replayed.mission_goals.filter(g => g.mission === 'mission006');
+    expect(goals.find(g => g.target === 'upgrade001').complete).toBe(true);
+    expect(goals.find(g => g.target === 'ad002').complete).toBe(false);
+    // Mission still active — only one of three goals complete.
+    expect(replayed.active_missions).toContain('mission006');
   });
 });
