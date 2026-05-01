@@ -3924,17 +3924,24 @@ define(function(require) {
         }
         var pageX = e.touches[0].pageX;
         var pageY = e.touches[0].pageY;
-        var userScaledPos = {};
-        userScaledPos.x = (pageX-node.jdomelem.offset().left)*node.dragHandler.scale;
-        userScaledPos.y = (pageY-node.jdomelem.offset().top)*node.dragHandler.scale;
-
+        // Mirror what mousedown stores so the double-tap zoom handler (which
+        // reads node.userAbsPos) works on pure-touch devices where mousedown
+        // never fires.
+        node.userAbsPos = {
+          x: pageX - node.parentNode.jdomelem.offset().left,
+          y: pageY - node.parentNode.jdomelem.offset().top
+        };
         node.scroller.doTouchStart(e.touches, e.timeStamp);
+        // Prevent the browser from generating synthetic mouse events and from
+        // scrolling the outer page while the user is panning the ViewMap.
         e.preventDefault();
-      }, false);
+      }, {passive: false});
 
       node.useDragHandler.domelem.addEventListener("touchmove", function(e) {
         node.scroller.doTouchMove(e.touches, e.timeStamp, e.scale);
-      }, false);
+        // Prevent the page from scrolling while the ViewMap is being panned.
+        e.preventDefault();
+      }, {passive: false});
 
       node.useDragHandler.domelem.addEventListener("touchend", function(e) {
         node.scroller.doTouchEnd(e.timeStamp);

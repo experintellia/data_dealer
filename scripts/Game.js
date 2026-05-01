@@ -1711,6 +1711,20 @@ define(function(require) {
     // reset-zoom button so the player isn't staring at empty space when
     // the window is wider than the legacy 960×600 frame.
     GameRoot.prototype._centerActiveView = function(animate) {
+      // Debounce: rapid callers during initial mount (fitToWindow → render
+      // after_render → tutorial switch_view) all converge into a single final
+      // scroll so the camera doesn't visibly jump before settling.
+      var self = this;
+      if (self._centerActiveViewTimer) {
+        clearTimeout(self._centerActiveViewTimer);
+      }
+      self._centerActiveViewTimer = setTimeout(function() {
+        self._centerActiveViewTimer = null;
+        self._doCenter(animate);
+      }, 50);
+    };
+
+    GameRoot.prototype._doCenter = function(animate) {
       // activeView is only set after a switch_view trigger; before the first
       // tab click (i.e. on initial load) Imperium is shown by default, so
       // fall back to it.
