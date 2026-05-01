@@ -1,11 +1,12 @@
-// Seed user.display_name from the webxdc messenger identity on first boot.
-// Returns true when the name was seeded, false when an existing value was preserved.
-// Wave 3 #13 implements the setDisplayName persistence handler; Game.js calls
-// that RPC after applyWebxdcIdentity returns true so the two compose cleanly.
+// Sync user.display_name with the webxdc messenger identity on every boot.
+// Returns true when the name was changed (first boot or messenger name updated),
+// false when it already matched.
 
 export function applyWebxdcIdentity(user) {
-  if (!user || user.display_name) { return false; }
-  user.display_name = globalThis.webxdc.selfName;
+  if (!user) { return false; }
+  var selfName = globalThis.webxdc.selfName;
+  if (user.display_name === selfName) { return false; }
+  user.display_name = selfName;
   return true;
 }
 

@@ -42,7 +42,6 @@ define(function(require) {
         'tpl!../views/notification_item.html',
         'tpl!../views/notification_tutorial.html',
         'tpl!../views/popup_user_data.html',
-        'tpl!../views/form_displayname.html',
         'tpl!../views/popup_status.html',
         'tpl!../views/popup_karma.html',
         'tpl!../views/popup_agent.html',
