@@ -1215,6 +1215,46 @@ describe('dismissMissionBriefing — failure modes', () => {
   });
 });
 
+// ── dismissMissionBriefing — round-trip / reload-guard tests (issue #83) ────
+
+describe('dismissMissionBriefing — reload guard (issue #83)', () => {
+  // Happy path: dismiss → loadGame response carries the seen flag so that
+  // makeNotifications' seenBriefings guard returns false (don't show).
+  it('loadGame response includes mission_briefings_seen after dismiss', async () => {
+    setState(mkState());
+    await dismissMissionBriefing('tok', 'mission001');
+    const { result } = await loadGame('tok');
+    expect(result.mission_briefings_seen).toEqual({ mission001: true });
+  });
+
+  // Replay-from-zero: applying the dismiss delta to a freshState produces a
+  // state where loadGame also carries the seen flag — the flag survives a cold
+  // restart that replays history from serial 0.
+  it('dismiss delta replayed from fresh state keeps briefing closed', async () => {
+    const addr = 'test@local';
+    const dismissDelta = {
+      kind: 'delta',
+      addr,
+      op: 'dismissMissionBriefing',
+      args: ['mission001'],
+      result: {},
+      ts: Date.now()
+    };
+    const replayed = applyDelta(freshState(addr), dismissDelta);
+    setState(replayed);
+    const { result } = await loadGame('tok');
+    expect(result.mission_briefings_seen).toEqual({ mission001: true });
+  });
+
+  // Reload mid-briefing: player reloaded before dismissing — loadGame response
+  // must NOT have the flag so the briefing correctly reopens.
+  it('no dismiss delta → loadGame response has no seen flag for the gestalt', async () => {
+    setState(mkState());
+    const { result } = await loadGame('tok');
+    expect(result.mission_briefings_seen).toEqual({});
+  });
+});
+
 // ── markTokenSeen ───────────────────────────────────────────────────────────
 
 describe('markTokenSeen — happy path', () => {
