@@ -634,7 +634,7 @@ describe('integrateCollected — ap cost', () => {
     expect(result.game_values.ap_snapshot).toBe(4);
   });
 
-  it('clamps ap_snapshot at 0 — never goes negative', async () => {
+  it('returns error 1 when ap_snapshot is 0 (parity with chargePerp)', async () => {
     setState(mkState({
       game_values: Object.assign({}, mkGv(), { ap_snapshot: 0, ap_max: 6 }),
       db_queue: [{
@@ -645,8 +645,8 @@ describe('integrateCollected — ap cost', () => {
       }]
     }));
 
-    const { result } = await integrateCollected('tok', COLLECT_ID);
-    expect(result.game_values.ap_snapshot).toBe(0);
+    const data = await integrateCollected('tok', COLLECT_ID);
+    expect(data.result.error).toBe(1);
   });
 
   it('level-up refill overrides the AP cost — full ap_max after crossing threshold', async () => {
@@ -903,6 +903,36 @@ describe('mission progression — integrate_profiles flow', () => {
     const goal = getState().mission_goals.find(g => g.mission === 'mission002');
     expect(goal.current_amount).toBe(900);
     expect(goal.complete).toBe(true);
+  });
+
+  it('progress is monotonic — a smaller integrate does not roll back current_amount', async () => {
+    // First integrate fills mission002 to 900 (Jessica 100% × 1100 profiles).
+    seedMission002Active();
+    await integrateCollected('tok', COLLECT_ID);
+
+    // Construct a hypothetical second integrate from a 50%-coverage contact
+    // that, naively, would compute a smaller absoluteAmount. Using
+    // _advanceIntegrateProfilesMissions directly via state setup: feed a
+    // db_queue entry whose profile_set has lower amount on token008, then
+    // assert mission002.current_amount stays at the high-water mark.
+    const s = getState();
+    s.mission_goals = s.mission_goals.map(g =>
+      g.mission === 'mission002'
+        ? Object.assign({}, g, { current_amount: 500, complete: false })
+        : g
+    );
+    s.active_missions = s.active_missions.concat(['mission002']);
+    s.db_queue = [{
+      origin: JESSICA, collect_id: 'second-integrate',
+      profile_set: { profiles_value: 100, tokens_map: { token008: { amount: 50 } } },
+      collect_dt: FIXED_NOW
+    }];
+    setState(s);
+
+    await integrateCollected('tok', 'second-integrate');
+    // 100 profiles × 50% = 50 absolute → would regress from 500 if not guarded.
+    const goal = getState().mission_goals.find(g => g.mission === 'mission002');
+    expect(goal.current_amount).toBeGreaterThanOrEqual(500);
   });
 });
 

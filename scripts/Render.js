@@ -3897,21 +3897,14 @@ define(function(require) {
 
         // Start scroller
         node.dragging=true;
-        console.log('[pan] mousedown: page=', e.pageX, e.pageY,
-          'scrollerHasDoTouchStart=', typeof node.scroller.doTouchStart);
         node.scroller.doTouchStart([{
           pageX: e.pageX,
           pageY: e.pageY
         }], e.timeStamp);
       });
 
-      var _panMoveLogged = false;
       node.useDragHandler.on('mousemove',function(e){
         if (node.dragging) {
-          if (!_panMoveLogged) {
-            console.log('[pan] first mousemove during drag: page=', e.pageX, e.pageY);
-            _panMoveLogged = true;
-          }
           node.scroller.doTouchMove([{
             pageX: e.pageX,
             pageY: e.pageY
@@ -3920,10 +3913,6 @@ define(function(require) {
       });
 
       node.useDragHandler.on('mouseup',function(e){
-        if (node.dragging) {
-          console.log('[pan] mouseup ending drag at page=', e.pageX, e.pageY);
-          _panMoveLogged = false;
-        }
         node.dragging=false;
         node.scroller.doTouchEnd(e.timeStamp);
       });

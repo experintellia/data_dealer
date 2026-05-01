@@ -207,12 +207,14 @@ export function loadGame(/* token */) {
   var seededState = _seedMissionGoals(mat.state);
   setState(seededState);
 
-  // Re-arm one-shot materializers for any charges still in flight — without
-  // this, charges that cross a page reload would never fire node_ready.
+  // Re-arm one-shot materializers for any charges still in flight. Clear
+  // any prior handles first so calling loadGame twice doesn't queue
+  // duplicate node_ready emissions for the same charge.
+  _clearAllChargeReady();
   var stillCharging = (seededState && seededState.nodes_charging) || [];
   for (var i = 0; i < stillCharging.length; i++) {
     if (typeof stillCharging[i].charge_end === 'number') {
-      _scheduleChargeReady(stillCharging[i].charge_end);
+      _scheduleChargeReady(stillCharging[i].charge_end, stillCharging[i].path);
     }
   }
 
@@ -1081,12 +1083,14 @@ function _advanceIntegrateProfilesMissions(state, profilesValue, nodes) {
     if (activeMissions.indexOf(goal.mission) === -1) return goal;
     var pct = amountByGestalt[goal.target] || 0;
     var absoluteAmount = Math.floor((profilesValue * pct) / 100);
-    var capped = Math.min(absoluteAmount, goal.amount);
-    if (capped === goal.current_amount) return goal;
+    // Monotonic — never let a later integrate roll back progress (e.g. if
+    // profiles_value drops or coverage decays, mission progress sticks).
+    var newAmount = Math.max(goal.current_amount || 0, Math.min(absoluteAmount, goal.amount));
+    if (newAmount === goal.current_amount) return goal;
     changed = true;
     return Object.assign({}, goal, {
-      current_amount: capped,
-      complete: capped >= goal.amount
+      current_amount: newAmount,
+      complete: newAmount >= goal.amount
     });
   });
 
@@ -1352,23 +1356,49 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
   // without this the charge ripens silently — the perp's UI blinks at zero
   // but no node_ready fires until the player reloads (which runs materialize
   // on cold-start). Schedule a one-shot materialize at exactly charge_end.
-  _scheduleChargeReady(chargeEntry.charge_end);
+  _scheduleChargeReady(chargeEntry.charge_end, chargeEntry.path);
 
   return Promise.resolve({
     result: { game_values: newGv, duration: durationMs, levelup: levelup, missions: {} },
   });
 }
 
+// Active charge-ready timers, keyed by path. Tracking lets us clear stale
+// handles before re-scheduling — e.g. when loadGame replays history we
+// re-arm every in-flight charge, and without cleanup duplicate timers fire
+// duplicate node_ready events for the same charge.
+var _chargeReadyTimers = {};
+
+function _clearChargeReady(path) {
+  if (!path || !_chargeReadyTimers[path]) return;
+  clearTimeout(_chargeReadyTimers[path]);
+  delete _chargeReadyTimers[path];
+}
+
+function _clearAllChargeReady() {
+  Object.keys(_chargeReadyTimers).forEach(function (p) {
+    clearTimeout(_chargeReadyTimers[p]);
+  });
+  _chargeReadyTimers = {};
+}
+
 // One-shot per charge: at charge_end, run materialize() to transition the
 // charging entry into nodes_collect and emit node_ready. Tests stub
 // setTimeout via the override clock; we use the host setTimeout directly so
 // production play actually fires.
-function _scheduleChargeReady(chargeEnd) {
+function _scheduleChargeReady(chargeEnd, path) {
   if (typeof setTimeout !== 'function') return;
+  _clearChargeReady(path);
   var msUntil = Math.max(0, chargeEnd - clockNow());
-  setTimeout(function () {
+  var handle = setTimeout(function () {
+    if (path) delete _chargeReadyTimers[path];
     var s = getState();
     if (!s) return;
+    // Skip if the charge no longer exists (cancelled / already collected).
+    if (path) {
+      var stillCharging = (s.nodes_charging || []).some(function (c) { return c.path === path; });
+      if (!stillCharging) return;
+    }
     var mat = materialize(s, clockNow());
     setState(mat.state);
     var events = mat.events || [];
@@ -1376,6 +1406,7 @@ function _scheduleChargeReady(chargeEnd) {
       _emit(events[i].ev, events[i].pl);
     }
   }, msUntil);
+  if (path) _chargeReadyTimers[path] = handle;
 }
 
 // ---------------------------------------------------------------------------
@@ -1626,6 +1657,7 @@ export function collectPerp(_token, gperpPath) {
  *
  * Error codes:
  *   0 — collect_id not in db_queue (already integrated or never collected)
+ *   1 — insufficient AP (parity with chargePerp)
  */
 export function integrateCollected(_token, collectId) {
   var rawState = getState();
@@ -1633,6 +1665,10 @@ export function integrateCollected(_token, collectId) {
   // Materialize so the AP regen ticks accumulated since the last call are
   // visible — same contract as collectPerp / chargePerp.
   var state = materialize(rawState, now).state;
+
+  if ((state.game_values && state.game_values.ap_snapshot || 0) < 1) {
+    return Promise.resolve({ result: { error: 1 } });
+  }
 
   // $pull db_queue entry.
   var entry = null;

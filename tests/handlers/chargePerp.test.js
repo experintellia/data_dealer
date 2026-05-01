@@ -504,6 +504,32 @@ describe('chargePerp — live-tick setTimeout', () => {
 
     expect(events.some(function (e) { return e.ev === 'node_ready'; })).toBe(true);
   });
+
+  it('calling loadGame twice does not duplicate node_ready emits for one charge', async () => {
+    setState(mkState({
+      nodes_charging: [{
+        path:         NODE_PATH,
+        result:       { amount: 1100 },
+        charge_start: FIXED_NOW,
+        charge_end:   FIXED_NOW + CHARGE_TIME,
+        game_id:      'node-abc123',
+        game_type:    'ContactPerp'
+      }]
+    }));
+
+    var events = [];
+    setEmitter(function (ev, payload) {
+      if (ev === 'node_ready') events.push(payload);
+    });
+
+    await loadGame('tok');
+    await loadGame('tok');
+    setOverride(FIXED_NOW + CHARGE_TIME + 1);
+    vi.advanceTimersByTime(CHARGE_TIME + 1);
+
+    // Without _clearAllChargeReady, two timers would queue and fire twice.
+    expect(events.length).toBe(1);
+  });
 });
 
 // ── AP regen visibility ─────────────────────────────────────────────────────
