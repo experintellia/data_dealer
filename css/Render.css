@@ -584,6 +584,17 @@
   background-position: -315px -703px;
 }
 
+.ZoomControls div.disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  cursor: default;
+}
+.ZoomControls div.disabled:hover {
+  -webkit-transform: none;
+  -moz-transform: none;
+  transform: none;
+}
+
 .ZoomControls div:hover {
   -webkit-transform: scale(1.1,1.1);
   -moz-transform: scale(1.1,1.1);

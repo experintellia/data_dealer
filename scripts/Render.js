@@ -3805,6 +3805,7 @@ define(function(require) {
       node.scroller.options.minZoom = (minZoom < 0.5) ? 0.5 : minZoom;
       node.scroller.zoomTo(this.zoomScale);
       node.scroller.setDimensions(stage.width, stage.height, node.getSize().width, node.getSize().height);
+      node._updateZoomButtonsState();
     };
 
     ViewMap.prototype.initScroller = function(){
@@ -3841,12 +3842,6 @@ define(function(require) {
         minZoom:0.5,
         maxZoom:1
       });
-      // Confirm we got the real Scroller, not the old stub (which had
-      // doTouchStart = function(){} — typeof would still be 'function',
-      // but the prototype name and method count let us detect it).
-      console.log('[viewmap] Scroller initialised: hasZoomTo=',
-        typeof node.scroller.zoomTo, 'protoKeys=',
-        Object.keys(Scroller.prototype).length);
       //node.scroller.setDimensions(node.parentNode.getSize().width, node.parentNode.getSize().height, node.getSize().width, node.getSize().height);
       node.scroller.setPosition(0,0);
       node.updateScroller();
@@ -3984,21 +3979,31 @@ define(function(require) {
       } else {
         this.jdomelem.removeClass('zoomHide1');
       }
+      this._updateZoomButtonsState();
+    };
+
+    ViewMap.prototype._updateZoomButtonsState = function(){
+      if (!this.jdomelemZoom) return;
+      var maxZoom = (this.scroller && this.scroller.options && this.scroller.options.maxZoom) || 1;
+      var minZoom = (this.scroller && this.scroller.options && this.scroller.options.minZoom) || 0.5;
+      var atMax = this.zoomScale >= maxZoom - 0.001;
+      var atMin = this.zoomScale <= minZoom + 0.001;
+      this.jdomelemZoom.find('.ZoomIn').toggleClass('disabled', atMax);
+      this.jdomelemZoom.find('.ZoomOut').toggleClass('disabled', atMin);
+      this.jdomelemZoom.find('.Fullscreen').toggleClass('disabled', atMin && atMax);
     };
 
     ViewMap.prototype.zoomIn = function(){
       var node = this;
       var zoomTo = (node.zoomScale+0.25 > 1) ? 1 : node.zoomScale+0.25;
-      console.log('[zoom] zoomIn: from', node.zoomScale, 'to', zoomTo,
-        'scrollerHasZoomTo=', typeof node.scroller.zoomTo);
+      if (zoomTo === node.zoomScale) return;
       node.scroller.zoomTo(zoomTo, true);
     };
 
     ViewMap.prototype.zoomOut = function(){
       var node = this;
       var zoomTo = (node.zoomScale-0.25 < 0.5) ? 0.5 : node.zoomScale-0.25;
-      console.log('[zoom] zoomOut: from', node.zoomScale, 'to', zoomTo,
-        'scrollerHasZoomTo=', typeof node.scroller.zoomTo);
+      if (zoomTo === node.zoomScale) return;
       node.scroller.zoomTo(zoomTo, true);
     };
 
