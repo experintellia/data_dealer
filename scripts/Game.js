@@ -2008,12 +2008,10 @@ define(function(require) {
       };
       this.init(config);
 
-      // Seed display_name from webxdc on first boot. Calling setDisplayName here
-      // composes with Wave 3 #13 when the persistence handler lands.
+      // Seed display_name from webxdc.selfName on first boot.
+      // setDisplayName (Wave 3 #13) persists it as a delta so it survives reloads.
       if (webxdcIdentity.applyWebxdcIdentity(this.data.user)) {
-        app.remote.setDisplayName(app.token, this.data.user.display_name).fail(function() {
-          // NotImplemented until Wave 3 #13; in-memory state is already updated above.
-        });
+        app.remote.setDisplayName(app.token, this.data.user.display_name);
       }
 
       this.initGameValues();
@@ -3122,7 +3120,6 @@ define(function(require) {
           button.text(_._('user Displayname saved.'));
           dnameinput.blur();
           groot.Topscores.updateScores();
-          popup.jdomelem.find(".DisplayNameOnce").delay('600').animate({height:0,opacity:0},400).hide(200);
         } else {
           console.error('Displayname set failed', data);
           popup.trigger('error');
