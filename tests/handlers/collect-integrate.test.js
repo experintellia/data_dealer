@@ -611,6 +611,62 @@ describe('collectPerp — level-up refills ap_snapshot to the new ap_max', () =>
   });
 });
 
+describe('integrateCollected — ap cost', () => {
+  const COLLECT_ID = 'ap-cost-001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('decrements ap_snapshot by 1', async () => {
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), { ap_snapshot: 5, ap_max: 6 }),
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 1, tokens_map: {} },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.game_values.ap_snapshot).toBe(4);
+  });
+
+  it('clamps ap_snapshot at 0 — never goes negative', async () => {
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), { ap_snapshot: 0, ap_max: 6 }),
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 1, tokens_map: {} },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.game_values.ap_snapshot).toBe(0);
+  });
+
+  it('level-up refill overrides the AP cost — full ap_max after crossing threshold', async () => {
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), {
+        xp_value: 10, xp_level: 1, ap_snapshot: 3, ap_max: 6
+      }),
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 1, tokens_map: {}, xp_gain: 10 },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.levelup).toBe(true);
+    expect(result.game_values.xp_level).toBe(2);
+    expect(result.game_values.ap_snapshot).toBe(8); // level 2 ap_max, not 3-1=2
+  });
+});
+
 describe('integrateCollected — level-up refills ap_snapshot to the new ap_max', () => {
   const COLLECT_ID = 'lvlup-integrate-001';
 

@@ -1633,7 +1633,8 @@ export function integrateCollected(_token, collectId) {
     xp_value:       (state.game_values.xp_value    || 0) + xpGain,
     karma_value: Math.max(-100, Math.min(100,
       (state.game_values.karma_value || 0) + karmaGain)),
-    profiles_value: (state.game_values.profiles_value || 0) + increment
+    profiles_value: (state.game_values.profiles_value || 0) + increment,
+    ap_snapshot:    Math.max(0, (state.game_values.ap_snapshot || 0) - 1)
   });
 
   var ruleset = _getRuleset();
