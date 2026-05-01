@@ -152,7 +152,6 @@ define(function(require) {
       app.remote.addMethod('setDisplayName');
       app.remote.addMethod('getRanking');
       app.remote.addMethod('ping');
-      app.remote.addMethod('resetGame');
       app.remote.addMethod('sellPowerup');
       app.remote.addMethod('setPerpCoordinates');
 

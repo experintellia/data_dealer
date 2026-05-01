@@ -3057,19 +3057,6 @@ define(function(require) {
         gnode.GameRoot.refresh();
       });
 
-      popup.on('button_click.ResetButton',function(e) {
-        e.stopPropagation();
-        var r = confirm(_._("Do you really want to delete and reset your game? (all your progress will be lost, forever!)"));
-        if (r==true) {
-          gnode.GameRoot.lock();
-          app.remote.resetGame(app.token).done(function(){
-            location.reload();
-          });
-        } else {
-          $(this).find('.Button[data-button-id="ResetButton"].active').removeClass('active');
-        }
-      });
-
     };
 
     GameRoot.prototype.saveDisplayName = function(container) {
@@ -3135,17 +3122,6 @@ define(function(require) {
           }
         }
       });
-    };
-
-    //FIXME: this could be abused høhø
-    GameRoot.prototype.evilResetGame = function() {
-      var r = confirm(_._("Do you really want to delete and reset your game? (all your progress will be lost, forever!)"));
-      if (r==true) {
-        gnode.GameRoot.lock();
-        app.remote.resetGame(app.token).done(function(){
-          location.reload();
-        });
-      }
     };
 
     GamePerp.prototype.updatePopup = function() {
