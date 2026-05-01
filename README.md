@@ -1,5 +1,7 @@
 # Data Dealer (webxdc port) #
 
+[![Tests](https://github.com/experintellia/data_dealer/actions/workflows/test.yml/badge.svg)](https://github.com/experintellia/data_dealer/actions/workflows/test.yml)
+
 ## About this fork
 
 This repository is a work-in-progress port of the [Data Dealer](http://datadealer.com) browser game into a [webxdc](https://webxdc.org) mini-app — a self-contained, offline-capable application that runs inside a Delta Chat group. The aim is a full-game port (not a demo), fusing three of the original repositories:

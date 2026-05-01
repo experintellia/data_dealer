@@ -3,12 +3,15 @@ name: Tests
 on:
   push:
     branches: [main, master]
+    tags: ['v*']
   pull_request:
 
 jobs:
   test:
     name: Unit tests
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
@@ -38,3 +41,55 @@ jobs:
           name: coverage-report
           path: coverage/
           retention-days: 30
+
+      - name: Get .xdc bundle info
+        if: github.event_name == 'pull_request'
+        id: xdc_info
+        run: |
+          SIZE=$(du -sh data-dealer.xdc | cut -f1)
+          COUNT=$(unzip -l data-dealer.xdc | tail -1 | awk '{print $2}')
+          echo "size=$SIZE" >> $GITHUB_OUTPUT
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+
+      - name: Upload .xdc artifact
+        if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/v')
+        id: upload_xdc
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-dealer-xdc
+          path: data-dealer.xdc
+          retention-days: 30
+
+      - name: Post sticky PR comment with artifact link
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: xdc-artifact
+          message: |
+            ## webxdc build ready
+
+            **Bundle:** `data-dealer.xdc` — ${{ steps.xdc_info.outputs.size }} / ${{ steps.xdc_info.outputs.count }} files
+
+            [Download data-dealer.xdc](${{ steps.upload_xdc.outputs.artifact-url }})
+
+            Drop the downloaded file into Delta Chat to test.
+
+  release:
+    name: Attach .xdc to GitHub Release
+    needs: [test]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Download .xdc artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: data-dealer-xdc
+
+      - name: Attach to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: data-dealer.xdc
