@@ -7,6 +7,7 @@
   var goal_amount = goal.amount || 1;
   var current_amount = goal.current_amount || 0;
   
+  var tdata = {};
   var target_title;
   var target_sprite;
   if (goal.project) {
@@ -14,15 +15,15 @@
     var pdata = ptype.type_data || {};
     var project_title = pdata.title;
     project_title = _.span(project_title);
-    var powerupdata =  { title: goal.target };
+    var powerupdata = { title: goal.target };
     if (ptype[goal.target]) {
-      powerupdata = ptype[goal.target].type_data;
+      powerupdata = ptype[goal.target].type_data || powerupdata;
     }
     target_sprite = powerupdata.popup_sprite;
     target_title = powerupdata.title;
 
   } else {
-    var tdata = game.getTypeData(goal.target) || {};
+    tdata = game.getTypeData(goal.target) || {};
     target_title = tdata.title;
     target_sprite = tdata.popup_sprite;
   }
