@@ -239,3 +239,8 @@ Per the issue's "any RNG, anti-cheat, or rate-limiting we'll need to mirror
   cross-check should diff the two — anything in the server return that
   isn't in response-shapes is dead weight on the wire and can be dropped
   in the port.
+- **UI meter bindings** (per-TokenPerp database bar, profiles
+  status-bar orange bar / % label): `docs/ui-meters.md` (issue #98 —
+  documents what `instance_data.amount` (`share`) and the derived
+  `crosssum` are supposed to mean, where the upstream merge math lives,
+  and why the LocalEngine port currently saturates them at 100 %).
