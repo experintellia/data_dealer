@@ -1018,3 +1018,125 @@ describe('loadGame seeds mission_goals from active_missions', () => {
     expect(getState().mission_goals.length).toBe(goalsAfterFirst);
   });
 });
+
+// ── Cash invariants & mission rewards ───────────────────────────────────────
+
+describe('cash invariants — collect/integrate must not deduct cash', () => {
+  const PATH = 'Imperium.City.Agent0.contact001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('ContactPerp collect leaves cash_value unchanged', async () => {
+    const startCash = 270;
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), { cash_value: startCash }),
+      nodes: [mkNode('ContactPerp', PATH)],
+      nodes_collect: [{ path: PATH, result: { amount: 5 } }]
+    }));
+
+    const { result } = await collectPerp('tok', PATH);
+    expect(result.game_values.cash_value).toBe(startCash);
+    expect(getState().game_values.cash_value).toBe(startCash);
+  });
+
+  it('integrateCollected leaves cash_value unchanged when no rewards fire', async () => {
+    const startCash = 270;
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), { cash_value: startCash }),
+      db_queue: [{
+        origin: PATH, collect_id: 'no-rewards',
+        profile_set: { profiles_value: 1, tokens_map: {} },
+        collect_dt: FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', 'no-rewards');
+    expect(result.game_values.cash_value).toBe(startCash);
+  });
+});
+
+describe('mission rewards — apply on completion', () => {
+  const JESSICA = 'Imperium.City.Agent0.contact035';
+  const COLLECT_ID = 'rewards-001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('completing mission002 grants its 100 cash + 1 xp reward', async () => {
+    const startCash = 200;
+    const startXp = 0;
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), {
+        cash_value: startCash, xp_value: startXp
+      }),
+      active_missions: ['mission002'],
+      mission_goals: [{
+        mission: 'mission002',
+        workflow: 'integrate_profiles',
+        target: 'token008',
+        amount: 900,
+        position: 1,
+        current_amount: 0,
+        complete: false
+      }],
+      db_queue: [{
+        origin: JESSICA, collect_id: COLLECT_ID,
+        profile_set: { profiles_value: 1100, tokens_map: { token008: { amount: 100 } } },
+        collect_dt: FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.game_values.cash_value).toBe(startCash + 100);
+    expect(result.game_values.xp_value).toBeGreaterThanOrEqual(startXp + 1);
+  });
+
+  it('partial-progress integrate (no completion) yields no rewards', async () => {
+    const startCash = 200;
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), { cash_value: startCash }),
+      active_missions: ['mission002'],
+      mission_goals: [{
+        mission: 'mission002',
+        workflow: 'integrate_profiles',
+        target: 'token008',
+        amount: 900,
+        position: 1,
+        current_amount: 0,
+        complete: false
+      }],
+      db_queue: [{
+        origin: JESSICA, collect_id: COLLECT_ID,
+        profile_set: { profiles_value: 500, tokens_map: { token008: { amount: 50 } } },
+        collect_dt: FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.game_values.cash_value).toBe(startCash);
+  });
+
+  it('completing mission001 grants its xp reward via collectPerp', async () => {
+    const startXp = 0;
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), { xp_value: startXp }),
+      nodes: [mkNode('ContactPerp', JESSICA)],
+      nodes_collect: [{ path: JESSICA, result: { amount: 1100 } }],
+      active_missions: ['mission001'],
+      mission_goals: [{
+        mission: 'mission001',
+        workflow: 'collect_profiles',
+        target: 'contact035',
+        amount: 900,
+        position: 2,
+        current_amount: 0,
+        complete: false
+      }]
+    }));
+
+    const { result } = await collectPerp('tok', JESSICA);
+    // contact035 xp_inc=1 + mission001 reward=2.
+    expect(result.game_values.xp_value).toBe(startXp + 1 + 2);
+  });
+});

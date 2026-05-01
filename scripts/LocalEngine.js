@@ -960,6 +960,7 @@ export function buyPerp(_token, parentPath, gestalt) {
   }
 
   var missionResult = _advanceBuyPerpMissions(state, gestalt);
+  newGv = _applyRewardsToGv(newGv, missionResult.rewards);
 
   // profile_set for project*/contact*/city* gestalts:
   // initial data batch pushed to db_queue; city-buy path also read by Game.js:3816.
@@ -1166,9 +1167,42 @@ function _completeMissionsIfReady(updatedGoals, activeMissions) {
         mission_goals: updatedGoals
       }
     },
+    rewards: _collectMissionRewards(ruleset, completed),
     mission_goals: updatedGoals,
     active_missions: newActive
   };
+}
+
+// Sums up cash / xp / karma rewards across the just-completed missions so
+// the caller can fold them into the new game_values. Without this, mission
+// completion notifications fire but the player never sees the payout.
+function _collectMissionRewards(ruleset, completedGestalts) {
+  var totals = { cash_value: 0, xp_value: 0, karma_value: 0, profiles_max: 0 };
+  if (!completedGestalts.length || !ruleset || !ruleset.missions) return totals;
+  completedGestalts.forEach(function (mGestalt) {
+    var def = _findMissionDef(ruleset, mGestalt);
+    var rewards = (def && def.type_data && def.type_data.rewards) || [];
+    rewards.forEach(function (r) {
+      if (!r || typeof r.amount !== 'number') return;
+      if (Object.prototype.hasOwnProperty.call(totals, r.target)) {
+        totals[r.target] += r.amount;
+      }
+    });
+  });
+  return totals;
+}
+
+// Folds reward totals into a fresh game_values object, clamping karma to
+// [-100, 100] to match the integrate/karmalizer math.
+function _applyRewardsToGv(gv, rewards) {
+  if (!rewards) return gv;
+  return Object.assign({}, gv, {
+    cash_value:   (gv.cash_value   || 0) + (rewards.cash_value   || 0),
+    xp_value:     (gv.xp_value     || 0) + (rewards.xp_value     || 0),
+    karma_value:  Math.max(-100, Math.min(100,
+                  (gv.karma_value  || 0) + (rewards.karma_value || 0))),
+    profiles_max: (gv.profiles_max || 0) + (rewards.profiles_max || 0)
+  });
 }
 
 /**
@@ -1196,33 +1230,7 @@ function _advanceBuyPerpMissions(state, gestalt) {
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
   }
 
-  var updatedMissionIds = [];
-  var completedMissionIds = [];
-  activeMissions.forEach(function (mGestalt) {
-    var goals = updatedGoals.filter(function (g) { return g.mission === mGestalt; });
-    if (!goals.length) { return; }
-    updatedMissionIds.push(mGestalt);
-    if (goals.every(function (g) { return g.complete; })) {
-      completedMissionIds.push(mGestalt);
-    }
-  });
-
-  var newActiveMissions = activeMissions.filter(function (m) {
-    return completedMissionIds.indexOf(m) === -1;
-  });
-
-  return {
-    missions: {
-      complete_missions: completedMissionIds,
-      updated_missions: updatedMissionIds,
-      mission_data: {
-        active_missions: newActiveMissions,
-        mission_goals: updatedGoals
-      }
-    },
-    mission_goals: updatedGoals,
-    active_missions: newActiveMissions
-  };
+  return _completeMissionsIfReady(updatedGoals, activeMissions);
 }
 
 // ---------------------------------------------------------------------------
@@ -1557,7 +1565,9 @@ export function collectPerp(_token, gperpPath) {
     ? _advanceCollectProfilesMissions(preMissionState, gestalt, cr.amount || 0)
     : { missions: null, mission_goals: preMissionState.mission_goals,
         active_missions: preMissionState.active_missions };
+  newGv = _applyRewardsToGv(newGv, collectMissionResult.rewards);
   var newState = Object.assign({}, preMissionState, {
+    game_values: newGv,
     mission_goals: collectMissionResult.mission_goals,
     active_missions: collectMissionResult.active_missions
   });
@@ -1716,7 +1726,9 @@ export function integrateCollected(_token, collectId) {
   var missionResult = _advanceIntegrateProfilesMissions(
     preMissionState, newGv.profiles_value || 0, newNodes
   );
+  newGv = _applyRewardsToGv(newGv, missionResult.rewards);
   var newState = Object.assign({}, preMissionState, {
+    game_values: newGv,
     mission_goals: missionResult.mission_goals,
     active_missions: missionResult.active_missions
   });

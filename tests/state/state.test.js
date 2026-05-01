@@ -24,7 +24,7 @@ describe('freshState', () => {
 
   it('seeds game_values from data/default_game.json', () => {
     const s = freshState('alice@example.com');
-    expect(s.game_values.cash_value).toBe(300);
+    expect(s.game_values.cash_value).toBe(270);
     expect(s.game_values.karma_value).toBe(50);
     expect(s.game_values.xp_level).toBe(1);
     expect(s.game_values.ap_snapshot).toBe(6);

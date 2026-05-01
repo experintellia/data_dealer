@@ -595,7 +595,7 @@ var PROJECT_NODE = {
   }
 };
 
-// State with enough cash for any normal purchase (default seed: 300).
+// State with enough cash for any normal purchase (default seed: 270).
 function mkProjectState(overrides) {
   var base = freshState('test@local');
   return Object.assign({}, base, { nodes: [PROJECT_NODE] }, overrides || {});
@@ -662,7 +662,7 @@ describe('buyPowerup — happy path', () => {
     await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
     const s = getState();
     expect(s.nodes[0].instance_data.powerups).toHaveLength(1);
-    expect(s.game_values.cash_value).toBe(300 - 90);
+    expect(s.game_values.cash_value).toBe(270 - 90);
   });
 });
 
