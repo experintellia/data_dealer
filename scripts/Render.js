@@ -4551,6 +4551,17 @@ define(function(require) {
             node.trigger('popup_cancel');
           }
         });
+        // Tutorial popups sit in the Stage's NoClose container (by design, to
+        // block accidental game-area taps for other popup types). For tutorials
+        // the backdrop tap should also advance the dialog, so add a dedicated
+        // handler that isn't blocked by NoClose.
+        if (node.extendClass === 'Tutorial') {
+          this.popupContainer.renderNode.popupContainerDomelem.on('touchend click',function(e){
+            e.stopPropagation();
+            e.preventDefault();
+            node.trigger('popup_close');
+          });
+        }
       }
 
       node.on('no_cash',function(e){
