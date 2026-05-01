@@ -1,3 +1,44 @@
+# Architecture
+
+## Key frontend modules
+
+#### `scripts/app.js`
+- Low-level API
+- Registers templates and backend calls
+- Handles template rendering
+
+#### `scripts/bootstrap.js`
+- Asset loading and boot sequence
+- Token validation and session init
+
+#### `scripts/Game.js`
+- Game controller
+- Game logic and workflows
+- Tree-like node structure of controller nodes
+- Invokes rendering and handles game-side events
+
+#### `scripts/Render.js`
+- Hybrid HTML/Canvas render engine
+- DOM manipulation via jQuery/VanillaJS
+- Transitions and FX with EaselJS/TweenJS
+- UI-side event handling, feeding events back to Game
+
+#### `scripts/LocalEngine.js`
+- All game handler implementations (buyPerp, chargePerp, collectPerp, buyKarma, etc.)
+- Ported from the original Python dd_app backend
+
+#### `scripts/state.js`
+- Immutable state model; rebuilt by replaying `webxdc.sendUpdate` history
+
+#### `scripts/materializer.js`
+- Idle-progression system: AP regeneration and charge completion as a pure function of (state, now)
+
+## Sprites and game data
+
+Sprite files (`sprite-001.png`, `sprite-002.png`, …) for characters and game elements are in `img/`. Sprite-sheet coordinates are defined in the vendored `dd_rules` data under `data/`.
+
+---
+
 # Network-layer architecture (post-Wave-1 stubs)
 
 ## Overview
