@@ -3675,6 +3675,9 @@ define(function(require) {
       this.jdomelem2 = $("<img class='ViewMapContainerImg' src='"+setup.imagePathPrefix+config.background+"'>");
 
       this.jdomelemZoom = $('<div class="ZoomControls"><div class="ZoomIn"></div><div class="ZoomOut"></div><div class="Fullscreen"></div></div>');
+      this._jZoomIn  = this.jdomelemZoom.find('.ZoomIn');
+      this._jZoomOut = this.jdomelemZoom.find('.ZoomOut');
+      this._jFullscreen = this.jdomelemZoom.find('.Fullscreen');
 
       this.domelem2 = this.jdomelem2[0];
       this.jdomelem3 = this.popupContainerDomelem = $("<div class='PopupContainer'></div>");
@@ -3922,24 +3925,20 @@ define(function(require) {
         if (e.touches[0] && e.touches[0].target && e.touches[0].target.tagName.match(/input|textarea|select/i)) {
           return;
         }
-        var pageX = e.touches[0].pageX;
-        var pageY = e.touches[0].pageY;
-        // Mirror what mousedown stores so the double-tap zoom handler (which
-        // reads node.userAbsPos) works on pure-touch devices where mousedown
-        // never fires.
+        var touch = e.touches[0];
+        var parentOffset = node.parentNode.jdomelem.offset();
+        // Mirror mousedown's userAbsPos so the double-tap zoom handler works
+        // on pure-touch devices where mousedown never fires.
         node.userAbsPos = {
-          x: pageX - node.parentNode.jdomelem.offset().left,
-          y: pageY - node.parentNode.jdomelem.offset().top
+          x: touch.pageX - parentOffset.left,
+          y: touch.pageY - parentOffset.top
         };
         node.scroller.doTouchStart(e.touches, e.timeStamp);
-        // Prevent the browser from generating synthetic mouse events and from
-        // scrolling the outer page while the user is panning the ViewMap.
         e.preventDefault();
       }, {passive: false});
 
       node.useDragHandler.domelem.addEventListener("touchmove", function(e) {
         node.scroller.doTouchMove(e.touches, e.timeStamp, e.scale);
-        // Prevent the page from scrolling while the ViewMap is being panned.
         e.preventDefault();
       }, {passive: false});
 
@@ -3979,14 +3978,14 @@ define(function(require) {
     };
 
     ViewMap.prototype._updateZoomButtonsState = function(){
-      if (!this.jdomelemZoom) return;
+      if (!this._jZoomIn) return;
       var maxZoom = (this.scroller && this.scroller.options && this.scroller.options.maxZoom) || 1;
       var minZoom = (this.scroller && this.scroller.options && this.scroller.options.minZoom) || 0.5;
       var atMax = this.zoomScale >= maxZoom - 0.001;
       var atMin = this.zoomScale <= minZoom + 0.001;
-      this.jdomelemZoom.find('.ZoomIn').toggleClass('disabled', atMax);
-      this.jdomelemZoom.find('.ZoomOut').toggleClass('disabled', atMin);
-      this.jdomelemZoom.find('.Fullscreen').toggleClass('disabled', atMin && atMax);
+      this._jZoomIn.toggleClass('disabled', atMax);
+      this._jZoomOut.toggleClass('disabled', atMin);
+      this._jFullscreen.toggleClass('disabled', atMin && atMax);
     };
 
     ViewMap.prototype.zoomIn = function(){
@@ -4627,10 +4626,9 @@ define(function(require) {
         node.trigger('popup_cancel');
       });
 
-      // Tutorial dialogs have no Next button — tap anywhere on the bubble to
-      // advance.  touchend is used (not click) so it fires on the first lift
-      // without the 300 ms delay mobile browsers add to click.
-      node.jdomelem.on('click touchend','.TutorialBody',function(e){
+      // Tutorial dialogs advance on tap anywhere. preventDefault on touchend
+      // suppresses the browser's synthetic click, so there's no ghost-click.
+      node.jdomelem.on('touchend click','.TutorialBody',function(e){
         e.stopPropagation();
         e.preventDefault();
         node.trigger('popup_close');
