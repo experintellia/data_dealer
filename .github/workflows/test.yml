@@ -74,6 +74,71 @@ jobs:
 
             Drop the downloaded file into Delta Chat to test.
 
+  playwright:
+    name: Playwright e2e tests
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      # Cache the Playwright browser binaries so browser downloads don't repeat
+      # on every run.  The cache key includes the Playwright version so a
+      # version bump automatically invalidates it.
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers (Chromium only)
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install Playwright system deps (cached browser)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      - name: Run Playwright e2e tests
+        run: pnpm test:e2e
+
+      - name: Upload Playwright traces and screenshots on failure
+        if: failure()
+        id: upload_pw_artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+      - name: Post sticky PR comment with Playwright artifact link
+        if: failure() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: playwright-failure
+          message: |
+            ## ❌ Playwright e2e tests failed
+
+            Traces and screenshots are attached to this run.
+
+            [Download playwright-report](${{ steps.upload_pw_artifacts.outputs.artifact-url }})
+
   release:
     name: Attach .xdc to GitHub Release
     needs: [test]
