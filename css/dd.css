@@ -54,7 +54,92 @@ body {
 }
 
 .hidden {
-  display:none;    
+  display:none;
+}
+
+html {
+  height: 100%;
+}
+
+/* Loading screen */
+.DDLoader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 300px;
+  gap: 0;
+}
+
+.DDAuthLogo {
+  font-family: Bowlby, sans-serif;
+  color: #009fd9;
+  font-size: 28px;
+  letter-spacing: 3px;
+  text-shadow: 0 0 16px rgba(0, 159, 217, 0.5);
+  margin-bottom: 28px;
+  text-transform: uppercase;
+}
+
+.DDLoaderSpinner {
+  width: 80px;
+  height: 80px;
+  background: url(../img/largespinner.png) no-repeat center center;
+  background-size: contain;
+  animation: DDSpinnerRotate 1.2s linear infinite;
+  -webkit-animation: DDSpinnerRotate 1.2s linear infinite;
+  margin-bottom: 28px;
+  opacity: 0.85;
+}
+
+@-webkit-keyframes DDSpinnerRotate {
+  from { -webkit-transform: rotate(0deg); }
+  to   { -webkit-transform: rotate(360deg); }
+}
+@keyframes DDSpinnerRotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+#loader {
+  display: block;
+  width: 260px;
+  height: 6px;
+  margin: 0;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border: none;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+#loader::-webkit-progress-bar {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+#loader::-webkit-progress-value {
+  background: linear-gradient(90deg, #007aaa, #009fd9, #00d4ff);
+  border-radius: 3px;
+  box-shadow: 0 0 8px rgba(0, 159, 217, 0.8);
+}
+
+#loader::-moz-progress-bar {
+  background: linear-gradient(90deg, #007aaa, #009fd9, #00d4ff);
+  border-radius: 3px;
+}
+
+#loadertext {
+  font-family: Voltaire, sans-serif;
+  color: rgba(0, 200, 255, 0.6);
+  font-size: 13px;
+  letter-spacing: 1px;
+  margin-top: 10px;
+  min-height: 18px;
+  text-transform: uppercase;
 }
 
 
