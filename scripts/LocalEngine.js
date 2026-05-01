@@ -86,13 +86,20 @@ export function setSendDelta(fn) {
   _sendDelta = fn;
 }
 
+// Single persistence path: capture for tests, then either fire the production
+// webxdc.sendUpdate (listener will echo and apply via applyDelta) or, in
+// Node/no-webxdc environments, emulate the listener echo synchronously.
+// This is the only place outside the listener that calls setState — it IS the
+// listener-equivalent for environments without webxdc.
 function _persistDelta(delta) {
-  if (_sendDelta) {
-    _sendDelta(delta);
-    return;
-  }
+  if (_sendDelta) _sendDelta(delta);
   // eslint-disable-next-line no-undef
-  if (typeof webxdc !== 'undefined') webxdc.sendUpdate({ payload: delta }, '');
+  if (typeof webxdc !== 'undefined') {
+    // eslint-disable-next-line no-undef
+    webxdc.sendUpdate({ payload: delta }, '');
+  } else {
+    setState(applyDelta(getState(), delta));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -169,15 +176,15 @@ export function setLocale(localeCode) {
   }
 
   var state = getState();
-  var delta = { kind: 'delta', op: 'setLocale', addr: state ? state.addr : '', locale: localeCode, ts: clockNow() };
-
-  // Apply locally so in-memory state reflects new locale immediately.
-  if (state) {
-    setState(Object.assign({}, state, { locale: localeCode }));
-  }
-
-  // Broadcast to webxdc update history for durable replay on cold start.
-  _persistDelta(delta);
+  // _persistDelta handles state mutation via the listener (production) or its
+  // synchronous emulation (Node/tests).  Handler does not setState directly.
+  _persistDelta({
+    kind: 'delta',
+    op: 'setLocale',
+    addr: state ? state.addr : '',
+    locale: localeCode,
+    ts: clockNow()
+  });
 
   return Promise.resolve({ result: localeCode });
 }
@@ -381,24 +388,18 @@ export function getRanking(_token, type) {
 // Delta helpers
 // ---------------------------------------------------------------------------
 
-// Persist a delta to the webxdc update history (no-op when webxdc is absent,
-// e.g. in Node/vitest).  The reducer in state.js applies the same mutation on
-// replay so state survives a reload.
-function _emitDelta(addr, op, args, result) {
-  // eslint-disable-next-line no-undef
-  if (typeof webxdc !== 'undefined') {
-    // eslint-disable-next-line no-undef
-    webxdc.sendUpdate({
-      payload: {
-        kind: 'delta',
-        addr: addr,
-        op: op,
-        args: args,
-        result: result,
-        ts: clockNow()
-      }
-    }, '');
-  }
+// Build a canonical delta envelope.  Always paired with _persistDelta — never
+// pass the result anywhere else.  Kept as a tiny helper so handler call sites
+// don't repeat the kind/ts boilerplate.
+function _mkDelta(addr, op, args, result) {
+  return {
+    kind:   'delta',
+    addr:   addr,
+    op:     op,
+    args:   args,
+    result: result,
+    ts:     clockNow()
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -434,9 +435,7 @@ export function setDisplayName(/* token, */ _, dname) {
     return Promise.resolve({ result: { error: 1 } });
   }
 
-  var newState = Object.assign({}, state, { display_name: dname });
-  setState(newState);
-  _emitDelta(state.addr, 'setDisplayName', [dname], {});
+  _persistDelta(_mkDelta(state.addr, 'setDisplayName', [dname], {}));
 
   return Promise.resolve({ result: {} });
 }
@@ -470,20 +469,9 @@ export function setPerpCoordinates(/* token, */ _, updates) {
     coordMap[path] = pos;
   }
 
-  var nodes = state.nodes.map(function (node) {
-    var pos = coordMap[node.full_path];
-    if (!pos) return node;
-    return Object.assign({}, node, {
-      instance_data: Object.assign({}, node.instance_data, {
-        x: pos.x,
-        y: pos.y
-      })
-    });
-  });
-
-  var newState = Object.assign({}, state, { nodes: nodes });
-  setState(newState);
-  _emitDelta(state.addr, 'setPerpCoordinates', [updates], {});
+  // Coordinate updates are pure args → reducer; no need to recompute nodes here.
+  // The reducer in state.js mirrors this map-and-merge.
+  _persistDelta(_mkDelta(state.addr, 'setPerpCoordinates', [updates], {}));
 
   return Promise.resolve({ result: 1 });
 }
@@ -549,8 +537,8 @@ export function buyKarma(_token, karmalauterGestalt) {
 
   if (levelup) newGv.ap_snapshot = newLevel.ap_max;
 
-  setState(Object.assign({}, state, { game_values: newGv }));
-  _emitDelta(state.addr, 'buyKarma', [karmalauterGestalt], { game_values: newGv });
+  _persistDelta(_mkDelta(state.addr, 'buyKarma', [karmalauterGestalt],
+    { game_values: newGv }));
 
   var response = { game_values: newGv };
   if (levelup) response.levelup = true;
@@ -632,26 +620,11 @@ function _checkLevelup(currentLevel, newXp) {
   return _getLevelByXP(newXp) > currentLevel;
 }
 
-// webxdc.sendUpdate triggers setUpdateListener → applyDelta in boot.js, so we
-// must NOT also call setState — that would double-apply the change.
-// In Node/test environments there is no listener, so setState directly.
-function _commitDelta(computedNewState, addr, op, args, result) {
-  var delta = {
-    kind: 'delta',
-    addr: addr,
-    op: op,
-    args: args,
-    result: result,
-    ts: clockNow()
-  };
-  // eslint-disable-next-line no-undef
-  if (typeof webxdc !== 'undefined') {
-    webxdc.sendUpdate({ payload: delta }, '');  // eslint-disable-line no-undef
-  } else {
-    setState(computedNewState);
-  }
-  if (_sendDelta) _sendDelta(delta);
-}
+// All delta-emitting handlers funnel through _persistDelta (above). The legacy
+// _commitDelta(computedNewState, addr, op, args, result) entry point that
+// did setState(computedNewState) on the no-webxdc branch is gone — the
+// reducer in scripts/state.js is now the sole transformation, applied via
+// applyDelta in the listener (production) or in _persistDelta's fallback.
 
 // ---------------------------------------------------------------------------
 // buyPowerup(token, perpPath, slot, gestalt)
@@ -708,11 +681,6 @@ export function buyPowerup(token, perpPath, slot, gestalt) {
   var preMissionStatePu = Object.assign({}, state, { nodes: newNodes, game_values: newGameValues });
   var puMissionResult = _advanceBuyPowerupMissions(preMissionStatePu, gestalt);
   newGameValues = _applyRewardsToGv(newGameValues, puMissionResult.rewards);
-  var newState = Object.assign({}, preMissionStatePu, {
-    game_values:     newGameValues,
-    mission_goals:   puMissionResult.mission_goals,
-    active_missions: puMissionResult.active_missions,
-  });
 
   var responseNode = {
     game_id: node.game_id, game_type: node.game_type,
@@ -721,8 +689,8 @@ export function buyPowerup(token, perpPath, slot, gestalt) {
   var result = { node: responseNode, game_values: newGameValues, levelup: levelup,
                  missions: puMissionResult.missions || null };
 
-  _commitDelta(newState, state.addr, 'buyPowerup',
-    [token, perpPath, slot, gestalt], result);
+  _persistDelta(_mkDelta(state.addr, 'buyPowerup',
+    [token, perpPath, slot, gestalt], result));
 
   return Promise.resolve({ result: result });
 }
@@ -777,16 +745,14 @@ export function sellPowerup(token, perpPath, slot, gestalt) {
   var newNodes = state.nodes.slice();
   newNodes[nodeIdx] = Object.assign({}, node, { instance_data: newInstanceData });
 
-  var newState = Object.assign({}, state, { nodes: newNodes, game_values: newGameValues });
-
   var responseNode = {
     game_id: node.game_id, game_type: node.game_type,
     full_path: node.full_path, instance_data: newInstanceData
   };
   var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
 
-  _commitDelta(newState, state.addr, 'sellPowerup',
-    [token, perpPath, slot, gestalt], result);
+  _persistDelta(_mkDelta(state.addr, 'sellPowerup',
+    [token, perpPath, slot, gestalt], result));
 
   return Promise.resolve({ result: result });
 }
@@ -842,16 +808,14 @@ export function buySlots(token, perpPath, slotType, num) {
   var newNodes = state.nodes.slice();
   newNodes[nodeIdx] = Object.assign({}, node, { instance_data: newInstanceData });
 
-  var newState = Object.assign({}, state, { nodes: newNodes, game_values: newGameValues });
-
   var responseNode = {
     game_id: node.game_id, game_type: node.game_type,
     full_path: node.full_path, instance_data: newInstanceData
   };
   var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
 
-  _commitDelta(newState, state.addr, 'buySlots',
-    [token, perpPath, slotType, num], result);
+  _persistDelta(_mkDelta(state.addr, 'buySlots',
+    [token, perpPath, slotType, num], result));
 
   return Promise.resolve({ result: result });
 }
@@ -997,23 +961,12 @@ export function buyPerp(_token, parentPath, gestalt) {
     newDbQueue = newDbQueue.concat([{ origin: newFullPath, collect_id: collectId, profile_set: generatedProfileSet }]);
   }
 
-  setState(Object.assign({}, state, {
-    nodes: (state.nodes || []).concat([newNode]),
-    db_queue: newDbQueue,
-    game_values: newGv,
-    mission_goals: missionResult.mission_goals || state.mission_goals,
-    active_missions: missionResult.active_missions || state.active_missions,
-    node_counter: nodeCounter
-  }));
-
-  var payload = { node: newNode, game_values: newGv, levelup: levelup, missions: missionResult.missions || null };
+  var payload = { node: newNode, game_values: newGv, levelup: levelup,
+                  node_counter: nodeCounter,
+                  missions: missionResult.missions || null };
   if (profileSetPayload) { payload.profile_set = profileSetPayload; }
 
-  // eslint-disable-next-line no-undef
-  if (typeof webxdc !== 'undefined') {
-    webxdc.sendUpdate({ payload: { kind: 'delta', addr: state.addr, op: 'buyPerp',
-      args: [parentPath, gestalt], result: payload, ts: clockNow() } }, '');
-  }
+  _persistDelta(_mkDelta(state.addr, 'buyPerp', [parentPath, gestalt], payload));
 
   return Promise.resolve({ result: payload });
 }
@@ -1455,23 +1408,19 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
 
   var chargeMissionResult = _advanceChargePerpMissions(preMissionStateCharge, gestalt);
   newGv = _applyRewardsToGv(newGv, chargeMissionResult.rewards);
-  var newStateCharge = Object.assign({}, preMissionStateCharge, {
-    game_values:     newGv,
-    mission_goals:   chargeMissionResult.mission_goals,
-    active_missions: chargeMissionResult.active_missions,
-  });
 
-  setState(newStateCharge);
-
-  _persistDelta({
-    kind:   'delta',
-    addr:   state.addr,
-    op:     'chargePerp',
-    args:   [path],
-    result: { chargeEntry: chargeEntry, nodeIdx: nodeIdx, cashDelta: chargeCost, xpInc: xpInc,
-              missions: chargeMissionResult.missions || null },
-    ts:     now,
-  });
+  // Carry the post-mutation game_values snapshot in the delta so the reducer
+  // applies via Object.assign — idempotent under self-echo. Legacy fields
+  // (cashDelta, xpInc) stay so already-persisted pre-fix deltas still replay
+  // correctly on cold start.
+  _persistDelta(_mkDelta(state.addr, 'chargePerp', [path], {
+    chargeEntry:  chargeEntry,
+    nodeIdx:      nodeIdx,
+    cashDelta:    chargeCost,
+    xpInc:        xpInc,
+    game_values:  newGv,
+    missions:     chargeMissionResult.missions || null
+  }));
 
   // Live-tick: nothing in the page periodically calls materialize(), so
   // without this the charge ripens silently — the perp's UI blinks at zero
@@ -1615,7 +1564,8 @@ export function collectPerp(_token, gperpPath) {
     }
   }
   if (!collectEntry) {
-    setState(ms);
+    // Materialized state is recoverable (materialize is pure), so an early
+    // return doesn't persist it — the next handler call re-materialises.
     return Promise.resolve({ result: { error: 1 } });
   }
 
@@ -1627,7 +1577,6 @@ export function collectPerp(_token, gperpPath) {
     }
   }
   if (!node) {
-    setState(ms);
     return Promise.resolve({ result: { error: 2 } });
   }
 
@@ -1692,7 +1641,6 @@ export function collectPerp(_token, gperpPath) {
     innerResult = { token_upgraded_amount: newAmount };
 
   } else {
-    setState(ms);
     return Promise.resolve({ result: { error: 3 } });
   }
 
@@ -1745,7 +1693,7 @@ export function collectPerp(_token, gperpPath) {
   var deltaResult = { game_values: newGv, path: gperpPath, missions: collectMissionResult.missions };
   if (dbEntry)     deltaResult.db_entry     = dbEntry;
   if (tokenUpdate) deltaResult.token_update = tokenUpdate;
-  _commitDelta(newState, state.addr, 'collectPerp', [gperpPath], deltaResult);
+  _persistDelta(_mkDelta(state.addr, 'collectPerp', [gperpPath], deltaResult));
 
   var response = Object.assign(
     { result: innerResult, game_values: newGv, levelup: levelup,
@@ -1936,9 +1884,9 @@ export function integrateCollected(_token, collectId) {
   });
 
   // Persist delta for webxdc replay; result carries full state for the reducer.
-  _commitDelta(newState, state.addr, 'integrateCollected', [collectId],
+  _persistDelta(_mkDelta(state.addr, 'integrateCollected', [collectId],
     { increment: increment, dup: dup, game_values: newGv, nodes: updatedNodes,
-      missions: missionResult.missions });
+      missions: missionResult.missions }));
 
   var response = {
     result: { nodes: updatedNodes, increment: increment, dup: dup },
@@ -1970,9 +1918,7 @@ export function markTokenSeen(_token, gestalt) {
   if (seen[gestalt]) {
     return Promise.resolve({ result: { ok: true } });
   }
-  var newSeen = Object.assign({}, seen, { [gestalt]: true });
-  var newState = Object.assign({}, state, { tokens_seen: newSeen });
-  _commitDelta(newState, state.addr, 'markTokenSeen', [gestalt], { gestalt: gestalt });
+  _persistDelta(_mkDelta(state.addr, 'markTokenSeen', [gestalt], { gestalt: gestalt }));
   return Promise.resolve({ result: { ok: true } });
 }
 
@@ -1985,9 +1931,8 @@ export function dismissMissionBriefing(_token, gestalt) {
   if (seen[gestalt]) {
     return Promise.resolve({ result: { ok: true } });
   }
-  var newSeen = Object.assign({}, seen, { [gestalt]: true });
-  var newState = Object.assign({}, state, { mission_briefings_seen: newSeen });
-  _commitDelta(newState, state.addr, 'dismissMissionBriefing', [gestalt], { gestalt: gestalt });
+  _persistDelta(_mkDelta(state.addr, 'dismissMissionBriefing',
+    [gestalt], { gestalt: gestalt }));
   return Promise.resolve({ result: { ok: true } });
 }
 

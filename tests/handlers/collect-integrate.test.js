@@ -2141,7 +2141,7 @@ describe('cold-start replay — buyPowerup mission progress survives applyDelta'
 // the collectPerp reducer (scripts/state.js ~line 352) is taught to drop the
 // matching nodes_charging entry.
 
-describe.skip('collectPerp — replay from zero leaves no orphan nodes_charging', () => {
+describe('collectPerp — replay from zero leaves no orphan nodes_charging', () => {
   const C007 = 'Imperium.City.Pusher0.client007';
 
   beforeEach(() => setOverride(FIXED_NOW));

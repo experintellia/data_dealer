@@ -38,7 +38,7 @@
  *                         via Object.assign({}, state.game_values, res.game_values).
  *                         Echo-safe. Regression guard.
  *
- * Every describe is `describe.skip(...)` so CI stays green. Once Phase 2 of
+ * Every describe is `describe(...)` so CI stays green. Once Phase 2 of
  * #120 lands the snapshot-based delta convention across all handlers, these
  * tests should be unskipped to lock in the invariant.
  */
@@ -117,7 +117,7 @@ function mkChargeState(overrides) {
   return Object.assign({}, base, { nodes: [mkChargeNode()] }, overrides, { game_values: gv });
 }
 
-describe.skip('chargePerp — listener echo idempotence', () => {
+describe('chargePerp — listener echo idempotence', () => {
   beforeEach(() => setOverride(FIXED_NOW));
 
   it('listener echo does not double-deduct cash_value', async () => {
@@ -198,7 +198,7 @@ function mkKarmaState() {
   });
 }
 
-describe.skip('buyKarma — listener echo idempotence (regression guard)', () => {
+describe('buyKarma — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-deduct cash_value', async () => {
     const captured = [];
     setSendDelta(d => captured.push(d));
@@ -255,7 +255,7 @@ function mkBuyPerpState(overrides) {
   }, overrides || {});
 }
 
-describe.skip('buyPerp — listener echo idempotence (regression guard)', () => {
+describe('buyPerp — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-deduct cash on a successful buy', async () => {
     const captured = [];
     setSendDelta(d => captured.push(d));
@@ -351,7 +351,7 @@ function mkChargingEntry(path, result, gameType) {
   };
 }
 
-describe.skip('collectPerp — listener echo idempotence (regression guard)', () => {
+describe('collectPerp — listener echo idempotence (regression guard)', () => {
   beforeEach(() => setOverride(FIXED_NOW));
 
   function setupCharged() {
@@ -421,7 +421,7 @@ describe.skip('collectPerp — listener echo idempotence (regression guard)', ()
 // Reducer applies snapshot-style game_values merge. db_queue removal is by
 // collect_id filter (idempotent). Regression guard.
 
-describe.skip('integrateCollected — listener echo idempotence (regression guard)', () => {
+describe('integrateCollected — listener echo idempotence (regression guard)', () => {
   beforeEach(() => setOverride(FIXED_NOW));
 
   async function chargeCollectAndCapture() {
@@ -523,7 +523,7 @@ function mkStateWithPowerup() {
 
 // ── buyPowerup ──────────────────────────────────────────────────────────────
 
-describe.skip('buyPowerup — listener echo idempotence (regression guard)', () => {
+describe('buyPowerup — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-deduct cash on powerup buy', async () => {
     setState(mkProjectState());
     const captured = [];
@@ -565,7 +565,7 @@ describe.skip('buyPowerup — listener echo idempotence (regression guard)', () 
 
 // ── sellPowerup ─────────────────────────────────────────────────────────────
 
-describe.skip('sellPowerup — listener echo idempotence (regression guard)', () => {
+describe('sellPowerup — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-refund cash on powerup sell', async () => {
     setState(mkStateWithPowerup());
     const captured = [];
@@ -605,7 +605,7 @@ describe.skip('sellPowerup — listener echo idempotence (regression guard)', ()
 
 // ── buySlots ────────────────────────────────────────────────────────────────
 
-describe.skip('buySlots — listener echo idempotence (regression guard)', () => {
+describe('buySlots — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-deduct cash on slot purchase', async () => {
     setState(mkProjectState());
     const captured = [];

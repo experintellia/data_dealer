@@ -326,7 +326,7 @@ describe('applyDelta — markTokenSeen reducer', () => {
 // #117 — applyDelta silently drops deltas when state.addr is unset
 // ---------------------------------------------------------------------------
 
-describe.skip('applyDelta — addr guard does not silently drop deltas pre-boot (#117)', () => {
+describe('applyDelta — addr guard does not silently drop deltas pre-boot (#117)', () => {
   // Reproduces #117: when a non-empty history replays before state.addr
   // is populated (e.g. boot ordering races where the listener fires before
   // state.addr = webxdc.selfAddr is set), deltas can be silently dropped
