@@ -605,15 +605,13 @@ describe('integrateCollected — level-up refills ap_snapshot to the new ap_max'
   });
 });
 
-// ── #85 root cause: tokens_map is populated from typeData.tokens ────────────
+// ── tokens_map populated from typeData.tokens ──────────────────────────────
 //
-// Contacts in the ruleset list yielded token types under `tokens`, not
-// `contained_tokens` (the latter is for TokenPerp super-token decomposition).
-// Each entry's `amount` is a percentage of profiles_value carrying that
-// token type. Without populated tokens_map, mission goals with workflow
-// "integrate_profiles" never advance — that's the 0/900 bug on mission002.
+// Contacts list yielded token types under `tokens`; each entry's `amount`
+// is a percentage of profiles_value. Without a populated tokens_map,
+// integrate_profiles missions can't advance.
 
-describe('collectPerp — tokens_map population from typeData.tokens (#85)', () => {
+describe('collectPerp — tokens_map population from typeData.tokens', () => {
   // contact001 (Nurse Helen) has 12 tokens, each at 100%.
   const PATH = 'Imperium.City.Agent0.contact001';
 

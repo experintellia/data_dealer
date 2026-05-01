@@ -471,7 +471,6 @@ describe('chargePerp — live-tick setTimeout', () => {
     vi.advanceTimersByTime(CHARGE_TIME + 1);
 
     expect(events.some(function (e) { return e.ev === 'node_ready'; })).toBe(true);
-    // State should reflect the materialised transition.
     const s = getState();
     expect(s.nodes_charging.length).toBe(0);
     expect(s.nodes_collect.length).toBe(1);

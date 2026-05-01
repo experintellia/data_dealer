@@ -242,7 +242,6 @@ describe('applyDelta — dismissMissionBriefing reducer', () => {
     let s = freshState(addr);
     s = applyDelta(s, makeDismissDelta(addr, 'mission002', 1000));
     const result = applyDelta(s, makeDismissDelta(addr, 'mission002', 2000));
-    expect(result.mission_briefings_seen).toEqual(s.mission_briefings_seen);
     expect(result.mission_briefings_seen).toBe(s.mission_briefings_seen);
   });
 
@@ -305,7 +304,6 @@ describe('applyDelta — markTokenSeen reducer', () => {
     let s = freshState(addr);
     s = applyDelta(s, makeSeenDelta(addr, 'token008', 1000));
     const result = applyDelta(s, makeSeenDelta(addr, 'token008', 2000));
-    expect(result.tokens_seen).toEqual(s.tokens_seen);
     expect(result.tokens_seen).toBe(s.tokens_seen);
   });
 
