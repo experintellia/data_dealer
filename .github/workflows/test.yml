@@ -29,8 +29,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Build
-        run: pnpm build
+      - name: Build both variants (HQ + casual)
+        # Casual variant assets are pre-quantized in img-casual/ and
+        # icon-casual.png; CI does not need pngquant/oxipng installed.
+        # See README.md "Bundle variants" and `pnpm quantize-assets`.
+        run: pnpm build:all
 
       - name: Run tests with coverage
         run: pnpm test:coverage
@@ -47,33 +50,52 @@ jobs:
         if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         id: xdc_info
         run: |
-          SIZE=$(du -sh data-dealer.xdc | cut -f1)
-          COUNT=$(unzip -l data-dealer.xdc | tail -1 | awk '{print $2}')
-          echo "size=$SIZE" >> $GITHUB_OUTPUT
-          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          HQ_SIZE=$(du -h data-dealer-hq.xdc | cut -f1)
+          HQ_COUNT=$(unzip -l data-dealer-hq.xdc | tail -1 | awk '{print $2}')
+          CASUAL_SIZE=$(du -h data-dealer-casual.xdc | cut -f1)
+          CASUAL_COUNT=$(unzip -l data-dealer-casual.xdc | tail -1 | awk '{print $2}')
+          {
+            echo "hq_size=$HQ_SIZE"
+            echo "hq_count=$HQ_COUNT"
+            echo "casual_size=$CASUAL_SIZE"
+            echo "casual_count=$CASUAL_COUNT"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Upload .xdc artifact
+      - name: Upload HQ .xdc artifact
         if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
-        id: upload_xdc
+        id: upload_xdc_hq
         uses: actions/upload-artifact@v4
         with:
-          name: data-dealer-xdc
-          path: data-dealer.xdc
+          name: data-dealer-hq-xdc
+          path: data-dealer-hq.xdc
           retention-days: 30
 
-      - name: Post sticky PR comment with artifact link
+      - name: Upload casual .xdc artifact
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+        id: upload_xdc_casual
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-dealer-casual-xdc
+          path: data-dealer-casual.xdc
+          retention-days: 30
+
+      - name: Post sticky PR comment with artifact links
         if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: xdc-artifact
           message: |
-            ## webxdc build ready
+            ## webxdc build ready — two variants
 
-            **Bundle:** `data-dealer.xdc` — ${{ steps.xdc_info.outputs.size }} / ${{ steps.xdc_info.outputs.count }} files
+            | Variant | Size | Files | Download |
+            |---|---|---|---|
+            | **Casual** (recommended for casual play) | ${{ steps.xdc_info.outputs.casual_size }} | ${{ steps.xdc_info.outputs.casual_count }} | [data-dealer-casual.xdc](${{ steps.upload_xdc_casual.outputs.artifact-url }}) |
+            | **HQ** (full-quality sprites) | ${{ steps.xdc_info.outputs.hq_size }} | ${{ steps.xdc_info.outputs.hq_count }} | [data-dealer-hq.xdc](${{ steps.upload_xdc_hq.outputs.artifact-url }}) |
 
-            [Download data-dealer.xdc](${{ steps.upload_xdc.outputs.artifact-url }})
-
-            Drop the downloaded file into Delta Chat to test.
+            Both bundles are functionally identical. The casual variant
+            quantizes sprite atlases to a 256-color palette (visually
+            indistinguishable on cartoon art) for ~60% smaller bundle.
+            Drop either file into Delta Chat to test.
 
   playwright:
     name: Playwright e2e tests
@@ -139,12 +161,19 @@ jobs:
       actions: read
 
     steps:
-      - name: Download .xdc artifact
+      - name: Download HQ .xdc artifact
         uses: actions/download-artifact@v4
         with:
-          name: data-dealer-xdc
+          name: data-dealer-hq-xdc
+
+      - name: Download casual .xdc artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: data-dealer-casual-xdc
 
       - name: Attach to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: data-dealer.xdc
+          files: |
+            data-dealer-hq.xdc
+            data-dealer-casual.xdc
