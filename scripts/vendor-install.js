@@ -14,7 +14,8 @@
 //   requirejs-text bower: 2.0.9     npm: 2.0.12+
 //   routie        bower: 0.3.2 (joestrong) — no matching npm pkg; stub in vendor/
 //   tpl           bower: dawsontoth commit — no npm pkg; impl in vendor/
-//   zynga-animate/scroller — no npm pkg; stubs in vendor/
+//   zynga-animate — no npm pkg; vendored verbatim
+//   zynga-scroller — no npm pkg; vendored from upstream + AMD wrapper
 //   jquery-mobile bower: 1.3.2     — no matching npm pkg with this version; stub in vendor/
 //
 // If internet access is available, replace the stubs with their real versions:
@@ -79,7 +80,7 @@ cp('sprintf-js/dist/sprintf.min.js',             'sprintf.js');
 cp('json2/lib/JSON2.js',                         'json2.js');
 
 console.log('\nVendor population complete.');
-console.log('Stubs already in repo: native-console.js, routie.js, tpl.js,');
+console.log('Stubs / vendored verbatim in repo: native-console.js, routie.js, tpl.js,');
 console.log('  zynga-animate.js, zynga-scroller.js, jquery-mobile.js');
 console.log('\nFiles in vendor/:');
 readdirSync(vendorDir).sort().forEach(f => console.log('  ' + f));

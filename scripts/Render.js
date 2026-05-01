@@ -3833,12 +3833,20 @@ define(function(require) {
         zooming: true,
         locking:false,
         bouncing:false,
-        //animating:true,
-        animating:false,
+        // animating:true means zoomTo and scrollTo with animate=true tween
+        // smoothly via core.effect.Animate; the previous stub left this
+        // false because it had no animation loop anyway.
+        animating:true,
         animationDuration:300,
         minZoom:0.5,
         maxZoom:1
       });
+      // Confirm we got the real Scroller, not the old stub (which had
+      // doTouchStart = function(){} — typeof would still be 'function',
+      // but the prototype name and method count let us detect it).
+      console.log('[viewmap] Scroller initialised: hasZoomTo=',
+        typeof node.scroller.zoomTo, 'protoKeys=',
+        Object.keys(Scroller.prototype).length);
       //node.scroller.setDimensions(node.parentNode.getSize().width, node.parentNode.getSize().height, node.getSize().width, node.getSize().height);
       node.scroller.setPosition(0,0);
       node.updateScroller();
@@ -3894,14 +3902,21 @@ define(function(require) {
 
         // Start scroller
         node.dragging=true;
+        console.log('[pan] mousedown: page=', e.pageX, e.pageY,
+          'scrollerHasDoTouchStart=', typeof node.scroller.doTouchStart);
         node.scroller.doTouchStart([{
           pageX: e.pageX,
           pageY: e.pageY
         }], e.timeStamp);
       });
 
+      var _panMoveLogged = false;
       node.useDragHandler.on('mousemove',function(e){
         if (node.dragging) {
+          if (!_panMoveLogged) {
+            console.log('[pan] first mousemove during drag: page=', e.pageX, e.pageY);
+            _panMoveLogged = true;
+          }
           node.scroller.doTouchMove([{
             pageX: e.pageX,
             pageY: e.pageY
@@ -3910,6 +3925,10 @@ define(function(require) {
       });
 
       node.useDragHandler.on('mouseup',function(e){
+        if (node.dragging) {
+          console.log('[pan] mouseup ending drag at page=', e.pageX, e.pageY);
+          _panMoveLogged = false;
+        }
         node.dragging=false;
         node.scroller.doTouchEnd(e.timeStamp);
       });
@@ -3970,16 +3989,16 @@ define(function(require) {
     ViewMap.prototype.zoomIn = function(){
       var node = this;
       var zoomTo = (node.zoomScale+0.25 > 1) ? 1 : node.zoomScale+0.25;
-      // Don't toggle options.animating around zoomTo — the zynga-scroller
-      // animation loop reads it on every frame, so flipping it back to false
-      // synchronously cancels the animation mid-setup and the +/- buttons
-      // become silent no-ops. Let the scroller manage its own state.
+      console.log('[zoom] zoomIn: from', node.zoomScale, 'to', zoomTo,
+        'scrollerHasZoomTo=', typeof node.scroller.zoomTo);
       node.scroller.zoomTo(zoomTo, true);
     };
 
     ViewMap.prototype.zoomOut = function(){
       var node = this;
       var zoomTo = (node.zoomScale-0.25 < 0.5) ? 0.5 : node.zoomScale-0.25;
+      console.log('[zoom] zoomOut: from', node.zoomScale, 'to', zoomTo,
+        'scrollerHasZoomTo=', typeof node.scroller.zoomTo);
       node.scroller.zoomTo(zoomTo, true);
     };
 

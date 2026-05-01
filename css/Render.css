@@ -2005,6 +2005,17 @@
   text-align: left;
 }
 
+/* About dialog: long text body would otherwise scroll under the absolute
+   PopupButtons strip at bottom:-10px. Make the tab content scroll inside
+   .PopupContent and reserve room for the buttons. */
+.PopupBody.User .PopupContent {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.PopupBody.User .PopupTab {
+  padding-bottom: 56px;
+}
+
 .SubpopContainer {
   position: absolute;
   visibility:hidden;
