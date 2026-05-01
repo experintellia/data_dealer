@@ -1272,9 +1272,14 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
   if ((gv.ap_snapshot || 0) < 1)           return Promise.resolve({ result: { error: 1 } });
   if ((gv.cash_value  || 0) < chargeCost)  return Promise.resolve({ result: { error: 1 } });
 
+  // ClientPerps don't carry collect_amount in the ruleset — they ship
+  // income_base / income_factor instead. Fall back so charging the car
+  // company actually pays out when collected. (Income_factor / consumed-
+  // tokens scaling is a separate enhancement; this gives the base payout.)
   var baseAmount = typeof instanceData.collect_amount === 'number'
     ? instanceData.collect_amount
-    : (typeof typeData.collect_amount === 'number' ? typeData.collect_amount : 0);
+    : (typeof typeData.collect_amount === 'number' ? typeData.collect_amount
+      : (typeof typeData.income_base   === 'number' ? typeData.income_base   : 0));
   var chargeResult = { amount: _getVariatedAmount(baseAmount, now, path) };
 
   var durationMs  = typeData.charge_time;

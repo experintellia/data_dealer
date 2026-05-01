@@ -502,3 +502,45 @@ describe('chargePerp — live-tick setTimeout', () => {
     expect(events.some(function (e) { return e.ev === 'node_ready'; })).toBe(true);
   });
 });
+
+// ── ClientPerp income payout end-to-end ─────────────────────────────────────
+//
+// chargePerp on a ClientPerp must base chargeResult.amount on income_base
+// when typeData has no collect_amount. Without this, cr.amount stays 0 and
+// collectPerp's ClientPerp branch adds zero cash — the car company appears
+// to do nothing.
+
+describe('chargePerp — ClientPerp uses income_base when collect_amount is missing', () => {
+  const CAR_PATH = 'Imperium.City.Pusher0.client007';
+
+  beforeEach(() => {
+    setOverride(FIXED_NOW);
+    setState(Object.assign({}, freshState('test@local'), {
+      nodes: [{
+        game_id: 'node_client007',
+        game_type: 'ClientPerp',
+        full_type: 'ClientPerp:client007',
+        gestalt: 'client007',
+        full_path: CAR_PATH,
+        instance_data: {}
+      }],
+      game_values: Object.assign({}, BASE_GV, { cash_value: 300, ap_snapshot: 6 })
+    }));
+  });
+
+  afterEach(() => {
+    clearOverride();
+    setSendDelta(null);
+    setEmitter(null);
+  });
+
+  it('chargeEntry.result.amount is roughly income_base (584 ± 5%)', async () => {
+    await chargePerp('tok', CAR_PATH);
+    const charging = getState().nodes_charging;
+    expect(charging).toHaveLength(1);
+    const amount = charging[0].result.amount;
+    // ±5% variation, round() can nudge boundary by 1.
+    expect(amount).toBeGreaterThanOrEqual(553);
+    expect(amount).toBeLessThanOrEqual(614);
+  });
+});
