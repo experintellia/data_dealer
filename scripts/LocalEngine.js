@@ -1035,6 +1035,7 @@ function _seedGoalRow(missionGestalt, g) {
     target: g.target,
     amount: g.amount,
     position: g.position,
+    project: g.project || null,
     current_amount: 0,
     complete: false
   };
