@@ -455,10 +455,15 @@ describe('integrateCollected — token node updates', () => {
   beforeEach(() => setOverride(FIXED_NOW));
   afterEach(() => clearOverride());
 
-  it('increments token node instance_data.amount from tokens_map', async () => {
+  it('merges instance_data.amount as a weighted-average share', async () => {
+    // Upstream dd_app/dd_calc.py Database.merge:
+    //   new_share = min(100, (db_share * M + ps_share * N) / (M + N))
+    // M = profiles_value before merge (here 6), N = ps.profiles_value (4),
+    // db_share = 2, ps_share = 3 → (2*6 + 3*4)/(6+4) = 24/10 = 2.4.
     const tokenNode = mkNode('TokenPerp', TOKEN_PATH, { amount: 2 });
     tokenNode.gestalt = 'token_a';
     setState(mkState({
+      game_values: mkGv({ profiles_value: 6 }),
       nodes: [tokenNode],
       db_queue: [{
         origin:      'Imperium.City.contact001',
@@ -470,21 +475,26 @@ describe('integrateCollected — token node updates', () => {
 
     const { result } = await integrateCollected('tok', COLLECT_ID);
     expect(result.result.nodes).toHaveLength(1);
-    expect(result.result.nodes[0].instance_data.amount).toBe(5);
+    expect(result.result.nodes[0].instance_data.amount).toBeCloseTo(2.4, 6);
     expect(result.result.increment).toBe(4);
     expect(result.result.dup).toBe(0);
-    expect(result.game_values.profiles_value).toBe(4);
+    expect(result.game_values.profiles_value).toBe(10);
   });
 
-  it('caps instance_data.amount at 100 — bar width = amount/100*60px must not overflow', async () => {
-    const tokenNode = mkNode('TokenPerp', TOKEN_PATH, { amount: 90 });
+  it('clamps instance_data.amount at 100 — bar width = amount/100*60px must not overflow', async () => {
+    // Construct a state where the weighted average overshoots 100 so the
+    // upstream `min(100, …)` clamp is exercised. db_share=99, M=10,
+    // ps_share=200 (hypothetical bad ruleset row), N=10 → (99*10 + 200*10)/20
+    // = 149.5, clamped to 100.
+    const tokenNode = mkNode('TokenPerp', TOKEN_PATH, { amount: 99 });
     tokenNode.gestalt = 'token_a';
     setState(mkState({
+      game_values: mkGv({ profiles_value: 10 }),
       nodes: [tokenNode],
       db_queue: [{
         origin:      'Imperium.City.contact001',
         collect_id:  COLLECT_ID,
-        profile_set: { profiles_value: 4, tokens_map: { token_a: { amount: 50 } } },
+        profile_set: { profiles_value: 10, tokens_map: { token_a: { amount: 200 } } },
         collect_dt:  FIXED_NOW
       }]
     }));
@@ -493,7 +503,9 @@ describe('integrateCollected — token node updates', () => {
     expect(result.result.nodes[0].instance_data.amount).toBe(100);
   });
 
-  it('caps a fresh-seeded TokenPerp at 100 too', async () => {
+  it('clamps a fresh-seeded TokenPerp at 100 too', async () => {
+    // Seed share = ps_share * N / (M + N). With M=0 this collapses to ps_share,
+    // so an over-100 ruleset row still hits the clamp at seed time.
     setState(mkState({
       locale: 'en',
       db_queue: [{
@@ -507,6 +519,57 @@ describe('integrateCollected — token node updates', () => {
     const { result } = await integrateCollected('tok', COLLECT_ID);
     const seeded = result.result.nodes.find(n => n.gestalt === 'token008');
     expect(seeded.instance_data.amount).toBe(100);
+  });
+
+  it('dilutes a TokenPerp not present in the new profileset', async () => {
+    // The whole point of the upstream merge: tokens that the new profileset
+    // does *not* contribute to should be diluted as the DB grows. This is
+    // what makes the per-tile bar (and the status-bar crosssum) move down,
+    // not just up. db_share=80, M=10, no ps_share, N=10 → 80*10/(10+10) = 40.
+    // Absolute count is preserved: M*old/100 = 8 == (M+N)*new/100.
+    const tokenA = mkNode('TokenPerp', 'Imperium.Database.token_a', { amount: 80 });
+    tokenA.gestalt = 'token_a';
+    setState(mkState({
+      game_values: mkGv({ profiles_value: 10 }),
+      nodes: [tokenA],
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 10, tokens_map: { token_b: { amount: 100 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const updatedA = result.result.nodes.find(n => n.gestalt === 'token_a');
+    expect(updatedA).toBeDefined();
+    expect(updatedA.instance_data.amount).toBeCloseTo(40, 6);
+    // Absolute count of token_a profiles must not regress.
+    const absBefore = (10 * 80) / 100;
+    const absAfter  = ((10 + 10) * updatedA.instance_data.amount) / 100;
+    expect(absAfter).toBeCloseTo(absBefore, 6);
+  });
+
+  it('does not change shares on a duplicate collect_id replay (N = 0)', async () => {
+    const tokenNode = mkNode('TokenPerp', TOKEN_PATH, { amount: 40 });
+    tokenNode.gestalt = 'token_a';
+    setState(mkState({
+      game_values:    mkGv({ profiles_value: 10 }),
+      integrated_ids: { [COLLECT_ID]: true },
+      nodes: [tokenNode],
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 10, tokens_map: { token_a: { amount: 100 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.result.dup).toBe(10);
+    expect(result.result.increment).toBe(0);
+    // Share is unchanged because N (= increment) is 0; M+N = M, db share kept.
+    expect(result.result.nodes ?? []).toHaveLength(0);
   });
 
   it('returns game_values, levelup, and missions for server parity', async () => {

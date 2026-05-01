@@ -1829,15 +1829,37 @@ export function integrateCollected(_token, collectId) {
   var tokensMap = ps.tokens_map || {};
   var updatedNodes = [];
   var seenGestalts = {};
+
+  // Weighted-average share merge — upstream dd_app/dd_calc.py
+  // `Database.merge` computes:
+  //   new_share = min(100, (db_share * M + ps_share * N) / (M + N))
+  // for every TokenPerp the new profileset touches, and dilutes
+  // un-touched tokens by:
+  //   new_share = (db_share * M) / (M + N)
+  // `M` is `profiles_value` *before* this integration; `N` is the new
+  // profileset's `profiles_value` (== `increment`, so 0 on a duplicate
+  // collect_id replay → no share change). This preserves the absolute
+  // count `profiles_value * share / 100`, so mission_goals' monotonic
+  // current_amount keeps advancing. See docs/ui-meters.md.
+  var M = (state.game_values && state.game_values.profiles_value) || 0;
+  var N = increment;
+  var denom = M + N;
+  // denom === 0 only happens on a replay against an empty DB — every
+  // share would round-trip to oldShare and no new tokens can be seeded
+  // (seedShare = 0). Bail before the per-node arithmetic.
+  var skipMerge = denom === 0;
+
   var newNodes = (state.nodes || []).map(function (n) {
+    if (skipMerge) return n;
+    if (n.game_type !== 'TokenPerp' || !n.gestalt) return n;
+    var oldShare = (n.instance_data && n.instance_data.amount) || 0;
     var tok = tokensMap[n.gestalt];
-    if (!tok) return n;
-    seenGestalts[n.gestalt] = true;
-    // amount is a percentage [0,100]; cap so the bar (width = amount/100*60px)
-    // doesn't overflow and so absoluteAmount = profiles*amount/100 stays sane.
-    var newAmount = Math.min(100, ((n.instance_data && n.instance_data.amount) || 0) + (tok.amount || 0));
+    if (tok) seenGestalts[n.gestalt] = true;
+    var psContrib = tok ? (tok.amount || 0) * N : 0;
+    var newShare = Math.min(100, (oldShare * M + psContrib) / denom);
+    if (newShare === oldShare) return n;
     var updated = Object.assign({}, n, {
-      instance_data: Object.assign({}, n.instance_data, { amount: newAmount })
+      instance_data: Object.assign({}, n.instance_data, { amount: newShare })
     });
     updatedNodes.push({
       game_id:       updated.game_id,
@@ -1857,19 +1879,21 @@ export function integrateCollected(_token, collectId) {
   // the new tile with collision avoidance around (1024,800), then
   // saveCoordsQueue persists the resolved position. Pre-seeding x/y
   // bypassed that and made every new token stack at a single hashed point.
-  Object.keys(tokensMap).forEach(function (gestalt) {
+  // Initial share = ps_share * N / (M + N) (= ps_share when M = 0).
+  if (!skipMerge) Object.keys(tokensMap).forEach(function (gestalt) {
     if (seenGestalts[gestalt]) return;
     if (!ruleset.tokens || !ruleset.tokens[gestalt]) return;
     var tok = tokensMap[gestalt];
+    var seedShare = Math.min(100, ((tok.amount || 0) * N) / denom);
     var newNode = {
       game_id:    gestalt,
       gestalt:    gestalt,
       game_type:  'TokenPerp',
       full_type:  'TokenPerp:' + gestalt,
       full_path:  'Database.' + gestalt,
-      instance_data: { amount: Math.min(100, tok.amount || 0) }
+      instance_data: { amount: seedShare }
     };
-    newNodes = newNodes.concat([newNode]);
+    newNodes.push(newNode);
     updatedNodes.push({
       game_id:       newNode.game_id,
       gestalt:       newNode.gestalt,
