@@ -2008,12 +2008,10 @@ define(function(require) {
       };
       this.init(config);
 
-      // Seed display_name from webxdc on first boot. Calling setDisplayName here
-      // composes with Wave 3 #13 when the persistence handler lands.
+      // Seed display_name from webxdc.selfName on first boot; persisted as a delta
+      // so the name survives reloads without prompting the user again.
       if (webxdcIdentity.applyWebxdcIdentity(this.data.user)) {
-        app.remote.setDisplayName(app.token, this.data.user.display_name).fail(function() {
-          // NotImplemented until Wave 3 #13; in-memory state is already updated above.
-        });
+        app.remote.setDisplayName(app.token, this.data.user.display_name);
       }
 
       this.initGameValues();
@@ -3077,13 +3075,6 @@ define(function(require) {
         gnode.Charge();
       });
 
-      groot.bindDisplayNameValidation(popup);
-
-      popup.on('button_click.SaveDisplayName',function(e) {
-        e.stopPropagation();
-        groot.saveDisplayName(popup);
-      });
-
       popup.jdomelem.on('click touchend','a.ml',function(e) {
         e.stopPropagation();
         e.preventDefault();
@@ -3106,71 +3097,6 @@ define(function(require) {
         gnode.GameRoot.refresh();
       });
 
-    };
-
-    GameRoot.prototype.saveDisplayName = function(container) {
-      var groot = this;
-      var popup = container;
-      var button = popup.jdomelem.find('.Button[data-button-id=SaveDisplayName]');
-      var dnameinput = popup.jdomelem.find(".DisplayName");
-      var dname = dnameinput.val();
-      app.remote.setDisplayName(app.token,dname).done(function(data){
-        if (data.result && data.result.error === undefined) {
-          groot.data.user.display_name = dname;
-          button.removeClass('active');
-          button.addClass('disabled');
-          button.text(_._('user Displayname saved.'));
-          dnameinput.blur();
-          groot.Topscores.updateScores();
-          popup.jdomelem.find(".DisplayNameOnce").delay('600').animate({height:0,opacity:0},400).hide(200);
-        } else {
-          console.error('Displayname set failed', data);
-          popup.trigger('error');
-          if (popup.buttonTimeOut) {
-            window.clearTimeout(popup.buttonTimeOut);
-          }
-          popup.buttonTimeOut = window.setTimeout(function(){
-            button.removeClass('ERROR disabled');
-          }, 1000);
-        }
-      })
-      .fail(function(data){
-        console.error('Displayname set failed', data);
-        popup.trigger('error');
-      });
-    };
-
-    GameRoot.prototype.bindDisplayNameValidation = function(container){
-      var popup = container;
-      var button = popup.jdomelem.find('.Button[data-button-id=SaveDisplayName]');
-      popup.jdomelem.find('.DisplayName').off("keypress");
-      popup.jdomelem.find('.DisplayName').off("focus");
-      popup.jdomelem.find('.DisplayName').on("focus", function (event) {
-        button.removeClass('disabled');
-        button.text(_._('user Save'));
-      });
-      popup.jdomelem.find('.DisplayName').on("keypress", function (event) {
-        var txtinput = $(this);
-        txtinput.width = txtinput.width;
-        txtinput.removeClass('error');
-        button.removeClass('disabled');
-        button.text(_._('user Save'));
-        if (event.charCode===13) {
-          popup.trigger('button_click.SaveDisplayName');
-        }
-        else if (event.charCode!=0) {
-          //var regex = new RegExp(/^[\u00C0-\u1FFF\u2C00-\uD7FF\w-][\u00C0-\u1FFF\u2C00-\uD7FF\w- ]+$/)
-          var regex = new RegExp(/^[\u00C0-\u1FFF\u2C00-\uD7FF\w- ]+$/)
-          //var regex = new RegExp("^[a-zA-Z]+$");
-          var key = String.fromCharCode(!event.charCode ? event.which : event.charCode);
-          //var key = txtinput.val();
-          if (!regex.test(key)) {
-            event.preventDefault();
-            txtinput.width(txtinput.width()).addClass('error');
-            return false;
-          }
-        }
-      });
     };
 
     GamePerp.prototype.updatePopup = function() {
@@ -3362,13 +3288,6 @@ define(function(require) {
       var gnode = this;
       var groot = this.GameRoot;
 
-      gnode.on('button_click.SaveDisplayName',function(e) {
-        e.stopPropagation();
-        var node = gnode.renderNode;
-        groot.saveDisplayName(node);
-      });
-
-
       gnode.on('viewtab_selected',function(e,type) {
         var all_hidden = true;
         gnode.children.each(function(score){
@@ -3379,7 +3298,6 @@ define(function(require) {
         });
         var first = gnode.children.set[0];
         if (first && all_hidden && gnode.children.length) {
-          groot.bindDisplayNameValidation(gnode.renderNode);
           first.renderNode.show();
           gnode.renderNode.jdomelem.find('.ViewTabMenuButton[data-button-gestalt="' + first.scoretype + '"]').addClass('active');
         }

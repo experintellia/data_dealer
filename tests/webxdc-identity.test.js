@@ -20,10 +20,17 @@ describe('webxdc identity', () => {
     expect(seeded).toBe(true);
   });
 
-  it('existing display_name is preserved on subsequent boots', () => {
-    const user = { display_name: 'CustomName' };
+  it('unchanged messenger name is a no-op on subsequent boots', () => {
+    const user = { display_name: 'Alice' };
     const seeded = applyWebxdcIdentity(user);
-    expect(user.display_name).toBe('CustomName');
+    expect(user.display_name).toBe('Alice');
     expect(seeded).toBe(false);
+  });
+
+  it('updated messenger name replaces stored name on boot', () => {
+    const user = { display_name: 'OldName' };
+    const seeded = applyWebxdcIdentity(user);
+    expect(user.display_name).toBe('Alice');
+    expect(seeded).toBe(true);
   });
 });
