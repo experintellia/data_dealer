@@ -82,3 +82,23 @@ to avoid browser-side evaluation:
 import { setOverride, clearOverride } from '../scripts/clock.js';
 // (works because clock.js has no DOM globals)
 ```
+
+## Stable selectors for UI testing
+
+All load-bearing UI elements used by Playwright tests carry `data-testid` attributes
+for stable selection. These selectors use kebab-case with the `dd-` prefix.
+
+### Testid registry
+
+| Testid | Element | Usage |
+|---|---|---|
+| `dd-cash-counter` | Cash status bar value | Select to check cash amount |
+| `dd-profile-counter` | Profile status bar value | Select to check profile score |
+| `dd-karma-counter` | Karma status bar indicator | Select to check karma state |
+| `dd-collect-ready` | Decorator ready indicator on nodes | Select to check if a node is ready to collect |
+| `dd-collect-button` | Collect button on client/contact/token popups | Click to trigger collect action |
+| `dd-charge-button` | Charge button on client/contact/token popups | Click to trigger charge action |
+| `dd-display-name-input` | Display name input field | Interact with to set user display name |
+| `dd-display-name-save-button` | Display name save button | Click to save user display name |
+| `dd-perp-buy-{gestalt}` | Buy button for perpetual in popup | Click to purchase a perpetual (gestalt identifies the perp type) |
+| `dd-leaderboard-row-{addr}` | Leaderboard entry row | Select to check scores for a player (addr is their address) |

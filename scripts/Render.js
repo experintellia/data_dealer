@@ -2664,7 +2664,7 @@ define(function(require) {
       }
 
       this.frame = config.frame || 'normal';
-      this.jdomelem = $("<div class='DecoratorReady'></div>").attr('id','Decorator'+this._id);
+      this.jdomelem = $("<div class='DecoratorReady'></div>").attr('id','Decorator'+this._id).attr('data-testid','dd-collect-ready');
       this.jdomelem.append(textCollect.clone());
       this.domelem = this.jdomelem[0];
       this.clickable=true;
