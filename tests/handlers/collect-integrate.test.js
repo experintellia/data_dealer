@@ -756,11 +756,6 @@ describe('integrateCollected — payload shape for newly seeded TokenPerps', () 
 });
 
 // ── Mission progression: collect_profiles + integrate_profiles ──────────────
-//
-// End-to-end: charge → collect → integrate from Jessica (contact035), and
-// assert that the integrate_profiles goal on mission002 (target token008,
-// amount 900) advances and completes. mission003 should activate when
-// mission002 completes (required_mission chain).
 
 describe('mission progression — integrate_profiles flow', () => {
   const JESSICA = 'Imperium.City.Agent0.contact035';

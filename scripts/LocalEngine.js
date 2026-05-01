@@ -1006,11 +1006,6 @@ export function buyPerp(_token, parentPath, gestalt) {
   return Promise.resolve({ result: payload });
 }
 
-// Build mission_goals rows for any active mission that has none yet, by
-// pulling its ruleset goals (workflow / target / amount / position). Idempotent
-// — won't duplicate goals that already exist for a given mission. Without this
-// the mission_goals array stays empty, so progression handlers find nothing to
-// advance and integrate_profiles missions never tick.
 function _findMissionDef(ruleset, gestalt) {
   if (!ruleset || !ruleset.missions || !gestalt) return null;
   for (var i = 0; i < ruleset.missions.length; i++) {
@@ -1020,6 +1015,21 @@ function _findMissionDef(ruleset, gestalt) {
   return null;
 }
 
+// Canonical mission-goal row shape. One source so adding a field touches one place.
+function _seedGoalRow(missionGestalt, g) {
+  return {
+    mission: missionGestalt,
+    workflow: g.workflow,
+    target: g.target,
+    amount: g.amount,
+    position: g.position,
+    current_amount: 0,
+    complete: false
+  };
+}
+
+// Without this, fresh games (or saves activated by legacy code) have empty
+// mission_goals and progression handlers find nothing to advance.
 function _seedMissionGoals(state) {
   var activeMissions = state.active_missions || [];
   if (!activeMissions.length) return state;
@@ -1039,15 +1049,7 @@ function _seedMissionGoals(state) {
     var mDef = _findMissionDef(ruleset, mGestalt);
     if (!mDef || !mDef.type_data || !mDef.type_data.goals) return;
     mDef.type_data.goals.forEach(function (g) {
-      newGoals.push({
-        mission: mGestalt,
-        workflow: g.workflow,
-        target: g.target,
-        amount: g.amount,
-        position: g.position,
-        current_amount: 0,
-        complete: false
-      });
+      newGoals.push(_seedGoalRow(mGestalt, g));
       added = true;
     });
   });
@@ -1056,9 +1058,8 @@ function _seedMissionGoals(state) {
   return Object.assign({}, state, { mission_goals: newGoals });
 }
 
-// Advance integrate_profiles goals after an integrate. current_amount =
-// profiles_value * (instance_data.amount of TokenPerp[gestalt]) / 100,
-// matching the UI's groot.DBTokensAbsolute math (Game.js:5439).
+// current_amount math mirrors TokenPerp.setAmount → DBTokensAbsolute
+// (Game.js:5439) so the LocalEngine and UI agree on completion.
 function _advanceIntegrateProfilesMissions(state, profilesValue, nodes) {
   var goals = state.mission_goals || [];
   var activeMissions = state.active_missions || [];
@@ -1095,12 +1096,10 @@ function _advanceIntegrateProfilesMissions(state, profilesValue, nodes) {
   return _completeMissionsIfReady(updatedGoals, activeMissions);
 }
 
-// Advance collect_profiles goals after a collect. current_amount accumulates
-// profiles collected from a specific contact gestalt.
 function _advanceCollectProfilesMissions(state, contactGestalt, profilesCollected) {
   var goals = state.mission_goals || [];
   var activeMissions = state.active_missions || [];
-  if (!goals.length || !activeMissions.length || !profilesCollected) {
+  if (!goals.length || !activeMissions.length || !profilesCollected || !contactGestalt) {
     return { missions: null, mission_goals: goals, active_missions: activeMissions };
   }
 
@@ -1125,9 +1124,6 @@ function _advanceCollectProfilesMissions(state, contactGestalt, profilesCollecte
   return _completeMissionsIfReady(updatedGoals, activeMissions);
 }
 
-// Shared completion bookkeeping: any active mission whose goals are all
-// complete moves out of active_missions, and the next mission whose
-// required_mission matches it activates (with its goals seeded from ruleset).
 function _completeMissionsIfReady(updatedGoals, activeMissions) {
   var ruleset = _getRuleset();
   var completed = [];
@@ -1151,15 +1147,7 @@ function _completeMissionsIfReady(updatedGoals, activeMissions) {
       if (completed.indexOf(req) === -1) return;
       newActive.push(gestalt);
       (def.type_data.goals || []).forEach(function (g) {
-        updatedGoals = updatedGoals.concat([{
-          mission: gestalt,
-          workflow: g.workflow,
-          target: g.target,
-          amount: g.amount,
-          position: g.position,
-          current_amount: 0,
-          complete: false
-        }]);
+        updatedGoals = updatedGoals.concat([_seedGoalRow(gestalt, g)]);
       });
     });
   }
@@ -1491,11 +1479,8 @@ export function collectPerp(_token, gperpPath) {
 
   if (gameType === 'ContactPerp' || gameType === 'ProjectPerp') {
     var collectId = _generateId();
-    // Each `tokens` entry's `amount` is a percentage of profiles carrying
-    // that token type. We pass it through unchanged — TokenPerp.setAmount
-    // computes absoluteAmount = profiles_value * amount / 100 downstream.
-    // ContactPerps use `tokens`; TokenPerps use `contained_tokens` for
-    // super-token decomposition; accept either.
+    // ContactPerps store yielded token-types under `tokens`; TokenPerps
+    // (super-token decomposition) under `contained_tokens` — accept either.
     var tokensMap = {};
     var contained = (typeData && (typeData.tokens || typeData.contained_tokens)) || [];
     for (var ct = 0; ct < contained.length; ct++) {
@@ -1566,13 +1551,12 @@ export function collectPerp(_token, gperpPath) {
     last_seen_ts:  Math.max(now, ms.last_seen_ts || 0)
   });
 
-  // Advance collect_profiles goals against the contact gestalt this collect
-  // was sourced from. Only ContactPerp collects feed mission progress.
-  var collectMissionResult = _advanceCollectProfilesMissions(
-    preMissionState,
-    (gameType === 'ContactPerp') ? gestalt : null,
-    (gameType === 'ContactPerp') ? (cr.amount || 0) : 0
-  );
+  // Only ContactPerp collects feed collect_profiles goals; ProjectPerp /
+  // ClientPerp / TokenPerp paths skip mission progression.
+  var collectMissionResult = (gameType === 'ContactPerp')
+    ? _advanceCollectProfilesMissions(preMissionState, gestalt, cr.amount || 0)
+    : { missions: null, mission_goals: preMissionState.mission_goals,
+        active_missions: preMissionState.active_missions };
   var newState = Object.assign({}, preMissionState, {
     mission_goals: collectMissionResult.mission_goals,
     active_missions: collectMissionResult.active_missions

@@ -167,6 +167,18 @@ function _seedNodesFromTree(src) {
 
 var reducers = {};
 
+// Pulls mission_goals + active_missions out of a delta result whose
+// progression handler shipped them under .missions.mission_data. Returns
+// pass-through values when the delta has no mission update so reducers can
+// always spread the result without a conditional.
+function _missionDataFromResult(state, r) {
+  var md = r && r.missions && r.missions.mission_data;
+  return {
+    mission_goals: (md && md.mission_goals) || state.mission_goals,
+    active_missions: (md && md.active_missions) || state.active_missions
+  };
+}
+
 reducers.setDisplayName = function setDisplayNameReducer(state, delta) {
   var args = delta.args || [];
   var dname = args[0];
@@ -275,16 +287,7 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
     }
   }
 
-  var missionGoals = state.mission_goals;
-  var activeMissions = state.active_missions;
-  if (r.missions && r.missions.mission_data) {
-    if (r.missions.mission_data.mission_goals) {
-      missionGoals = r.missions.mission_data.mission_goals;
-    }
-    if (r.missions.mission_data.active_missions) {
-      activeMissions = r.missions.mission_data.active_missions;
-    }
-  }
+  var mp = _missionDataFromResult(state, r);
 
   // Each buyPerp creates exactly one node, so the counter advances by 1 on
   // every replayed delta.  (The handler in LocalEngine does the same; we
@@ -296,8 +299,8 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
     nodes: nodes,
     db_queue: dbQueue,
     game_values: r.game_values || state.game_values,
-    mission_goals: missionGoals,
-    active_missions: activeMissions,
+    mission_goals: mp.mission_goals,
+    active_missions: mp.active_missions,
     node_counter: counter
   });
 };
@@ -369,27 +372,14 @@ reducers.collectPerp = function collectPerpReducer(state, delta) {
     });
   }
 
-  // Mission progression carried in delta.result.missions.mission_data
-  // mirrors the buyPerp path so cold-start replay reconstructs the same
-  // mission_goals + active_missions the live handler computed.
-  var newMissionGoals = state.mission_goals;
-  var newActiveMissions = state.active_missions;
-  if (r.missions && r.missions.mission_data) {
-    if (r.missions.mission_data.mission_goals) {
-      newMissionGoals = r.missions.mission_data.mission_goals;
-    }
-    if (r.missions.mission_data.active_missions) {
-      newActiveMissions = r.missions.mission_data.active_missions;
-    }
-  }
-
+  var mp = _missionDataFromResult(state, r);
   return Object.assign({}, state, {
     nodes_collect: newCollect,
     game_values:   newGv,
     db_queue:      newQueue,
     nodes:         newNodes,
-    mission_goals: newMissionGoals,
-    active_missions: newActiveMissions
+    mission_goals: mp.mission_goals,
+    active_missions: mp.active_missions
   });
 };
 
@@ -433,24 +423,14 @@ reducers.integrateCollected = function integrateCollectedReducer(state, delta) {
     });
   }
 
-  var newMissionGoals = state.mission_goals;
-  var newActiveMissions = state.active_missions;
-  if (r.missions && r.missions.mission_data) {
-    if (r.missions.mission_data.mission_goals) {
-      newMissionGoals = r.missions.mission_data.mission_goals;
-    }
-    if (r.missions.mission_data.active_missions) {
-      newActiveMissions = r.missions.mission_data.active_missions;
-    }
-  }
-
+  var mp = _missionDataFromResult(state, r);
   return Object.assign({}, state, {
     db_queue:       newQueue,
     integrated_ids: newIntegratedIds,
     game_values:    newGv,
     nodes:          newNodes,
-    mission_goals: newMissionGoals,
-    active_missions: newActiveMissions
+    mission_goals: mp.mission_goals,
+    active_missions: mp.active_missions
   });
 };
 
