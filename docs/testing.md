@@ -98,6 +98,7 @@ for stable selection. These selectors use kebab-case with the `dd-` prefix.
 | `dd-collect-ready` | Decorator ready indicator on nodes | Select to check if a node is ready to collect |
 | `dd-collect-button` | Collect button on client/contact/token popups | Click to trigger collect action |
 | `dd-charge-button` | Charge button on client/contact/token popups | Click to trigger charge action |
+| `dd-integrate-button` | Integrate button on profileset popup | Click to integrate collected profiles into the database |
 | `dd-display-name-input` | Display name input field | Interact with to set user display name |
 | `dd-display-name-save-button` | Display name save button | Click to save user display name |
 | `dd-perp-buy-{gestalt}` | Buy button for perpetual in popup | Click to purchase a perpetual (gestalt identifies the perp type) |
