@@ -607,3 +607,57 @@ describe('chargePerp — ClientPerp uses income_base when collect_amount is miss
     expect(amount).toBeLessThanOrEqual(614);
   });
 });
+
+// ── webxdc echo idempotence (regression for state-sync bug) ───────────────────
+//
+// Production webxdc invokes setUpdateListener for own sendUpdate calls, so
+// chargePerp's setState + sendUpdate sequence runs the reducer a second time
+// over already-mutated state. The reducer must therefore be idempotent for
+// that re-application, otherwise cash and ap_snapshot get double-deducted —
+// the UI shows the once-deducted snapshot returned by the handler while the
+// engine state holds the twice-deducted value, so the next charge fails with
+// "no_cash" / "no_AP" despite a green status bar.
+
+describe('chargePerp — listener echo is idempotent', () => {
+  beforeEach(() => {
+    setOverride(FIXED_NOW);
+    setState(mkState());
+  });
+
+  it('replaying the captured delta on top of the post-handler state matches handler state', async () => {
+    const captured = [];
+    setSendDelta(d => captured.push(d));
+
+    await chargePerp('tok', NODE_PATH);
+    const handlerState = getState();
+
+    // Simulate webxdc echoing the own update into setUpdateListener: apply
+    // the captured delta on top of the state the handler already wrote.
+    const echoed = applyDelta(handlerState, captured[0]);
+
+    expect(echoed.game_values.cash_value).toBe(handlerState.game_values.cash_value);
+    expect(echoed.game_values.cash_spent).toBe(handlerState.game_values.cash_spent);
+    expect(echoed.game_values.ap_snapshot).toBe(handlerState.game_values.ap_snapshot);
+    expect(echoed.game_values.xp_value).toBe(handlerState.game_values.xp_value);
+  });
+
+  it('cash is not double-deducted when listener echoes own update', async () => {
+    const captured = [];
+    setSendDelta(d => captured.push(d));
+
+    await chargePerp('tok', NODE_PATH);
+    const echoed = applyDelta(getState(), captured[0]);
+
+    expect(echoed.game_values.cash_value).toBe(500 - CHARGE_COST);
+  });
+
+  it('ap_snapshot is not double-deducted when listener echoes own update', async () => {
+    const captured = [];
+    setSendDelta(d => captured.push(d));
+
+    await chargePerp('tok', NODE_PATH);
+    const echoed = applyDelta(getState(), captured[0]);
+
+    expect(echoed.game_values.ap_snapshot).toBe(2);
+  });
+});

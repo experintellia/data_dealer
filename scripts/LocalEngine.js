@@ -1463,13 +1463,21 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
 
   setState(newStateCharge);
 
+  // Carry the post-mutation game_values snapshot so the reducer is idempotent
+  // when the listener replays this delta on top of the just-setState'd state
+  // (production webxdc echoes own updates into setUpdateListener). Without the
+  // snapshot, the reducer's incremental cash/ap math runs a second time and
+  // double-deducts — the UI then shows cash the engine no longer believes the
+  // player has, so subsequent charges fail with "no_cash" despite a green bar.
+  // cashDelta/xpInc remain in the payload for cold-replay backwards compat
+  // with deltas persisted before this fix.
   _persistDelta({
     kind:   'delta',
     addr:   state.addr,
     op:     'chargePerp',
     args:   [path],
     result: { chargeEntry: chargeEntry, nodeIdx: nodeIdx, cashDelta: chargeCost, xpInc: xpInc,
-              missions: chargeMissionResult.missions || null },
+              game_values: newGv, missions: chargeMissionResult.missions || null },
     ts:     now,
   });
 

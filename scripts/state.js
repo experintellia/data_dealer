@@ -332,12 +332,19 @@ reducers.chargePerp = function chargePerpReducer(state, delta) {
   });
 
   var gv    = state.game_values || {};
-  var newGv = Object.assign({}, gv, {
-    cash_value:  (gv.cash_value  || 0) - cashDelta,
-    cash_spent:  (gv.cash_spent  || 0) + cashDelta,
-    xp_value:    (gv.xp_value   || 0) + xpInc,
-    ap_snapshot: Math.max(0, (gv.ap_snapshot || 0) - 1),
-  });
+  // Prefer the post-mutation snapshot when the handler ships one — applying a
+  // snapshot is idempotent, so the listener's echo of an own update doesn't
+  // double-deduct cash/ap on top of the handler's setState. Fall back to
+  // the incremental form for replay of older deltas that predate the
+  // snapshot field.
+  var newGv = r.game_values
+    ? Object.assign({}, gv, r.game_values)
+    : Object.assign({}, gv, {
+        cash_value:  (gv.cash_value  || 0) - cashDelta,
+        cash_spent:  (gv.cash_spent  || 0) + cashDelta,
+        xp_value:    (gv.xp_value   || 0) + xpInc,
+        ap_snapshot: Math.max(0, (gv.ap_snapshot || 0) - 1),
+      });
 
   var mp = _missionDataFromResult(state, r);
   return Object.assign({}, state, {
