@@ -447,6 +447,26 @@ describe('materialization on boot', () => {
 
     expect(emitted).toHaveLength(0);
   });
+
+  it('AP regen survives reload — first loadGame seeds the clock, second ticks', async () => {
+    setOverride(FIXED_NOW);
+    setState(mkState({
+      game_values: Object.assign({}, freshState('test@local').game_values, {
+        ap_snapshot: 0, ap_update: null
+      })
+    }));
+
+    // First load seeds ap_update without granting any ticks.
+    await loadGame('tok');
+    expect(getState().game_values.ap_update).toBe(FIXED_NOW);
+    expect(getState().game_values.ap_snapshot).toBe(0);
+
+    // Two minutes later (one ap_inc_interval at level 1) → +1 AP.
+    setOverride(FIXED_NOW + 120000);
+    await loadGame('tok');
+    expect(getState().game_values.ap_snapshot).toBe(1);
+    expect(getState().game_values.ap_update).toBe(FIXED_NOW + 120000);
+  });
 });
 
 // ── setDisplayName ────────────────────────────────────────────────────────────

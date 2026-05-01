@@ -18,6 +18,9 @@
   "active_missions": ["mission001"],
   "game_values": {
     "ap_snapshot": 6,
+    "ap_max": 6,
+    "ap_inc_value": 1,
+    "ap_inc_interval": 120000,
     "cash_value": 270,
     "karma_value": 50,
     "profiles_max": 1,
