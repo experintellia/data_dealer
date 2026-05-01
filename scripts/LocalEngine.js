@@ -1305,21 +1305,20 @@ export function collectPerp(_token, gperpPath) {
 
   if (gameType === 'ContactPerp' || gameType === 'ProjectPerp') {
     var collectId = _generateId();
-    // Each `tokens` entry's `amount` is a percentage of profiles_value that
-    // carry that token type. ContactPerps use `tokens`, TokenPerps use
-    // `contained_tokens` (super-token decomposition); accept either.
+    // Each `tokens` entry's `amount` is a percentage of profiles carrying
+    // that token type. We pass it through unchanged — TokenPerp.setAmount
+    // computes absoluteAmount = profiles_value * amount / 100 downstream.
+    // ContactPerps use `tokens`; TokenPerps use `contained_tokens` for
+    // super-token decomposition; accept either.
     var tokensMap = {};
-    var profilesValue = cr.amount || 0;
     var contained = (typeData && (typeData.tokens || typeData.contained_tokens)) || [];
     for (var ct = 0; ct < contained.length; ct++) {
       var ctEntry = contained[ct];
       if (ctEntry && ctEntry.gestalt) {
-        tokensMap[ctEntry.gestalt] = {
-          amount: Math.floor(((ctEntry.amount || 0) * profilesValue) / 100)
-        };
+        tokensMap[ctEntry.gestalt] = { amount: ctEntry.amount || 0 };
       }
     }
-    var profileSet = { profiles_value: profilesValue, tokens_map: tokensMap };
+    var profileSet = { profiles_value: cr.amount || 0, tokens_map: tokensMap };
     dbEntry = {
       origin:      gperpPath,
       collect_id:  collectId,
@@ -1463,7 +1462,9 @@ export function integrateCollected(_token, collectId) {
     var tok = tokensMap[n.gestalt];
     if (!tok) return n;
     seenGestalts[n.gestalt] = true;
-    var newAmount = ((n.instance_data && n.instance_data.amount) || 0) + (tok.amount || 0);
+    // amount is a percentage [0,100]; cap so the bar (width = amount/100*60px)
+    // doesn't overflow and so absoluteAmount = profiles*amount/100 stays sane.
+    var newAmount = Math.min(100, ((n.instance_data && n.instance_data.amount) || 0) + (tok.amount || 0));
     var updated = Object.assign({}, n, {
       instance_data: Object.assign({}, n.instance_data, { amount: newAmount })
     });
@@ -1495,7 +1496,7 @@ export function integrateCollected(_token, collectId) {
       game_type:  'TokenPerp',
       full_type:  'TokenPerp:' + gestalt,
       full_path:  'Database.' + gestalt,
-      instance_data: { amount: tok.amount || 0 }
+      instance_data: { amount: Math.min(100, tok.amount || 0) }
     };
     newNodes = newNodes.concat([newNode]);
     updatedNodes.push({

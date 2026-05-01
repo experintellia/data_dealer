@@ -473,6 +473,39 @@ describe('integrateCollected — token node updates', () => {
     expect(result.game_values.profiles_value).toBe(4);
   });
 
+  it('caps instance_data.amount at 100 — bar width = amount/100*60px must not overflow', async () => {
+    const tokenNode = mkNode('TokenPerp', TOKEN_PATH, { amount: 90 });
+    tokenNode.gestalt = 'token_a';
+    setState(mkState({
+      nodes: [tokenNode],
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 4, tokens_map: { token_a: { amount: 50 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.result.nodes[0].instance_data.amount).toBe(100);
+  });
+
+  it('caps a fresh-seeded TokenPerp at 100 too', async () => {
+    setState(mkState({
+      locale: 'en',
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 50, tokens_map: { token008: { amount: 250 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const seeded = result.result.nodes.find(n => n.gestalt === 'token008');
+    expect(seeded.instance_data.amount).toBe(100);
+  });
+
   it('returns game_values, levelup, and missions for server parity', async () => {
     setState(mkState({
       db_queue: [{
@@ -635,15 +668,14 @@ describe('collectPerp — tokens_map population from typeData.tokens', () => {
     ].sort());
   });
 
-  it('amount is floor(percentage * profiles_value / 100)', async () => {
+  it('amount is the raw ruleset percentage (passed through unchanged)', async () => {
     setState(mkState({
       nodes:         [mkNode('ContactPerp', PATH)],
       nodes_collect: [{ path: PATH, result: { amount: 10 } }]
     }));
 
     const { result } = await collectPerp('tok', PATH);
-    // 100% * 10 profiles / 100 = 10 tokens per gestalt.
-    expect(result.result.profile_set.tokens_map.token001).toEqual({ amount: 10 });
+    expect(result.result.profile_set.tokens_map.token001).toEqual({ amount: 100 });
     expect(result.result.profile_set.tokens_map.token008).toBeUndefined(); // not in contact001's list
   });
 
@@ -655,8 +687,9 @@ describe('collectPerp — tokens_map population from typeData.tokens', () => {
     }));
 
     const { result } = await collectPerp('tok', JPATH);
-    // Jessica's token008 entry is 100% → 100% * 1100 = 1100 token008s.
-    expect(result.result.profile_set.tokens_map.token008).toEqual({ amount: 1100 });
+    // Jessica lists token008 at 100%; downstream absoluteAmount =
+    // profiles_value * amount / 100 = 1100, which exceeds mission002's 900 target.
+    expect(result.result.profile_set.tokens_map.token008).toEqual({ amount: 100 });
   });
 
   it('tokens_map stays empty when typeData.tokens is missing', async () => {

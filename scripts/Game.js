@@ -2987,6 +2987,10 @@ define(function(require) {
 
       popup.on('button_click.MainButton',function(e) {
         e.stopPropagation();
+        // Distinguish "user clicked Accept" from "user X'd out" so we don't
+        // mark a mission briefing as seen when the player aborted the
+        // conversation midway. Read by the popup_close handler below.
+        popup.accepted = true;
         popup.trigger('popup_close');
       });
 
@@ -3002,10 +3006,11 @@ define(function(require) {
 
       popup.on('popup_close',function(e) {
         e.stopPropagation();
-        // Persist mission-briefing dismissal synchronously here, not in
-        // popup.callback. Callback runs only when popup.close(cb) chains
-        // through; popup_close fires the moment the user clicks X.
-        if (popup.notificationMission) {
+        // Mark a mission briefing as seen only when the user clicked the
+        // Accept button (popup.accepted) — not when they X'd out or clicked
+        // outside. If they aborted midway, the briefing should re-appear on
+        // next reload so they can re-read the conversation.
+        if (popup.notificationMission && popup.accepted) {
           var gestalt = popup.notificationMission;
           popup.notificationMission = null;
           if (groot.raw_data) {
