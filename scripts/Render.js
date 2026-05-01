@@ -4627,8 +4627,8 @@ define(function(require) {
       });
 
       // Tutorial dialogs advance on tap anywhere (body or backdrop).
-      // touchFired guards against the synthesized click that some browsers
-      // emit after touchend even when preventDefault() is called.
+      // tutorialTouchFired guards against the synthesized click that some
+      // browsers emit after touchend even when preventDefault() is called.
       if (node.extendClass === 'Tutorial') {
         var tutorialTouchFired = false;
         var advanceTutorial = function(e) {
@@ -4644,7 +4644,14 @@ define(function(require) {
         };
         node.jdomelem.on('touchend click', '.TutorialBody', advanceTutorial);
         if (this.popupContainer) {
-          this.popupContainer.renderNode.popupContainerDomelem.on('touchend click', advanceTutorial);
+          var $tutorialContainer = this.popupContainer.renderNode.popupContainerDomelem;
+          $tutorialContainer.on('touchend click', advanceTutorial);
+          // Each tutorial step creates a new Popup and calls initEvents, so
+          // without cleanup advanceTutorial accumulates on the persistent
+          // container element (Popup.close never calls .off on it).
+          node.on('popup_close', function() {
+            $tutorialContainer.off('touchend click', advanceTutorial);
+          });
         }
       }
 
