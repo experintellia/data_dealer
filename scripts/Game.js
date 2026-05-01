@@ -1199,9 +1199,6 @@ define(function(require) {
         // The seen-flag is persisted via the dismissMissionBriefing op so it
         // survives webxdc replay across reloads.
         var seenBriefings = (groot.raw_data && groot.raw_data.mission_briefings_seen) || {};
-        console.log('[briefing] mission_active check:', data.mission_active,
-          'seenBriefings=', seenBriefings,
-          'isSeen=', !!seenBriefings[data.mission_active]);
         if (!seenBriefings[data.mission_active]) {
           var mission = groot.Missions.getMission(data.mission_active);
           n = mergeData({},mission.data);
@@ -3005,9 +3002,6 @@ define(function(require) {
 
       popup.on('popup_close',function(e) {
         e.stopPropagation();
-        console.log('[briefing] popup_close fired; notificationMission=',
-          popup.notificationMission,
-          'hasRemoteFn=', !!(app.remote && app.remote.dismissMissionBriefing));
         if (popup.notificationMission) {
           var gestalt = popup.notificationMission;
           popup.notificationMission = null;
@@ -3016,17 +3010,7 @@ define(function(require) {
             groot.raw_data.mission_briefings_seen[gestalt] = true;
           }
           if (app.remote && app.remote.dismissMissionBriefing) {
-            console.log('[briefing] dispatching dismissMissionBriefing for', gestalt);
-            var r = app.remote.dismissMissionBriefing(app.token, gestalt);
-            if (r && typeof r.then === 'function') {
-              r.then(function (resp) {
-                console.log('[briefing] dismiss response:', resp);
-              }, function (err) {
-                console.log('[briefing] dismiss error:', err);
-              });
-            } else if (r && typeof r.done === 'function') {
-              r.done(function (resp) { console.log('[briefing] dismiss done:', resp); });
-            }
+            app.remote.dismissMissionBriefing(app.token, gestalt);
           }
         }
         if (gnode.highlightTabs) {

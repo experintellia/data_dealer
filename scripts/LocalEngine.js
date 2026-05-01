@@ -200,21 +200,23 @@ export function loadGame(/* token */) {
   var isNewGame = !state.node_counter;
 
   var mat = materialize(state, now);
-  setState(mat.state);
+  // Lazy-seed mission_goals from ruleset for any active mission that hasn't
+  // had its goals populated yet (e.g. fresh game, or a mission activated by
+  // legacy code that didn't seed goals). This is the prerequisite for
+  // mission progression: empty goals → progression handlers no-op.
+  var seededState = _seedMissionGoals(mat.state);
+  setState(seededState);
 
   // Re-arm one-shot materializers for any charges still in flight — without
   // this, charges that cross a page reload would never fire node_ready.
-  var stillCharging = (mat.state && mat.state.nodes_charging) || [];
+  var stillCharging = (seededState && seededState.nodes_charging) || [];
   for (var i = 0; i < stillCharging.length; i++) {
     if (typeof stillCharging[i].charge_end === 'number') {
       _scheduleChargeReady(stillCharging[i].charge_end);
     }
   }
 
-  var gameData = _buildLoadGameResponse(mat.state, now, isNewGame);
-  console.log('[LE] loadGame response: mission_briefings_seen=',
-    gameData.mission_briefings_seen,
-    'state.mission_briefings_seen=', mat.state.mission_briefings_seen);
+  var gameData = _buildLoadGameResponse(seededState, now, isNewGame);
 
   // Schedule socket event emission via queueMicrotask so it runs after the
   // microtask that resolves the Deferred in Remote.js (result.then → d.resolve
@@ -289,8 +291,12 @@ function _buildLoadGameResponse(state, now, isNewGame) {
     missions: ruleset.missions,
     mission_goals: state.mission_goals || [],
     active_missions: state.active_missions || [],
-    mission_briefings_seen: state.mission_briefings_seen || {},
-    tokens_seen: state.tokens_seen || {}
+    // Clone the seen-maps so Game.js mutating raw_data.* doesn't poison
+    // state.* via shared object reference (which would make
+    // dismissMissionBriefing / markTokenSeen think the gestalt is already
+    // seen and skip the delta commit, so the dismissal never persists).
+    mission_briefings_seen: Object.assign({}, state.mission_briefings_seen || {}),
+    tokens_seen: Object.assign({}, state.tokens_seen || {})
   };
 }
 
@@ -638,9 +644,6 @@ function _commitDelta(computedNewState, addr, op, args, result) {
   };
   // eslint-disable-next-line no-undef
   if (typeof webxdc !== 'undefined') {
-    if (op === 'dismissMissionBriefing' || op === 'markTokenSeen') {
-      console.log('[LE] _commitDelta → webxdc.sendUpdate', op, args);
-    }
     webxdc.sendUpdate({ payload: delta }, '');  // eslint-disable-line no-undef
   } else {
     setState(computedNewState);
@@ -1001,6 +1004,183 @@ export function buyPerp(_token, parentPath, gestalt) {
   }
 
   return Promise.resolve({ result: payload });
+}
+
+// Build mission_goals rows for any active mission that has none yet, by
+// pulling its ruleset goals (workflow / target / amount / position). Idempotent
+// — won't duplicate goals that already exist for a given mission. Without this
+// the mission_goals array stays empty, so progression handlers find nothing to
+// advance and integrate_profiles missions never tick.
+function _findMissionDef(ruleset, gestalt) {
+  if (!ruleset || !ruleset.missions || !gestalt) return null;
+  for (var i = 0; i < ruleset.missions.length; i++) {
+    var def = ruleset.missions[i];
+    if (def && def.type_data && def.type_data.gestalt === gestalt) return def;
+  }
+  return null;
+}
+
+function _seedMissionGoals(state) {
+  var activeMissions = state.active_missions || [];
+  if (!activeMissions.length) return state;
+  var ruleset = _getRuleset();
+  if (!ruleset || !ruleset.missions) return state;
+
+  var existingGoals = state.mission_goals || [];
+  var existingByMission = {};
+  existingGoals.forEach(function (g) {
+    existingByMission[g.mission] = true;
+  });
+
+  var newGoals = existingGoals.slice();
+  var added = false;
+  activeMissions.forEach(function (mGestalt) {
+    if (existingByMission[mGestalt]) return;
+    var mDef = _findMissionDef(ruleset, mGestalt);
+    if (!mDef || !mDef.type_data || !mDef.type_data.goals) return;
+    mDef.type_data.goals.forEach(function (g) {
+      newGoals.push({
+        mission: mGestalt,
+        workflow: g.workflow,
+        target: g.target,
+        amount: g.amount,
+        position: g.position,
+        current_amount: 0,
+        complete: false
+      });
+      added = true;
+    });
+  });
+
+  if (!added) return state;
+  return Object.assign({}, state, { mission_goals: newGoals });
+}
+
+// Advance integrate_profiles goals after an integrate. current_amount =
+// profiles_value * (instance_data.amount of TokenPerp[gestalt]) / 100,
+// matching the UI's groot.DBTokensAbsolute math (Game.js:5439).
+function _advanceIntegrateProfilesMissions(state, profilesValue, nodes) {
+  var goals = state.mission_goals || [];
+  var activeMissions = state.active_missions || [];
+  if (!goals.length || !activeMissions.length) {
+    return { missions: null, mission_goals: goals, active_missions: activeMissions };
+  }
+
+  var amountByGestalt = {};
+  (nodes || []).forEach(function (n) {
+    if (n.game_type === 'TokenPerp' && n.gestalt && n.instance_data) {
+      amountByGestalt[n.gestalt] = n.instance_data.amount || 0;
+    }
+  });
+
+  var changed = false;
+  var updatedGoals = goals.map(function (goal) {
+    if (goal.workflow !== 'integrate_profiles' || goal.complete) return goal;
+    if (activeMissions.indexOf(goal.mission) === -1) return goal;
+    var pct = amountByGestalt[goal.target] || 0;
+    var absoluteAmount = Math.floor((profilesValue * pct) / 100);
+    var capped = Math.min(absoluteAmount, goal.amount);
+    if (capped === goal.current_amount) return goal;
+    changed = true;
+    return Object.assign({}, goal, {
+      current_amount: capped,
+      complete: capped >= goal.amount
+    });
+  });
+
+  if (!changed) {
+    return { missions: null, mission_goals: goals, active_missions: activeMissions };
+  }
+
+  return _completeMissionsIfReady(updatedGoals, activeMissions);
+}
+
+// Advance collect_profiles goals after a collect. current_amount accumulates
+// profiles collected from a specific contact gestalt.
+function _advanceCollectProfilesMissions(state, contactGestalt, profilesCollected) {
+  var goals = state.mission_goals || [];
+  var activeMissions = state.active_missions || [];
+  if (!goals.length || !activeMissions.length || !profilesCollected) {
+    return { missions: null, mission_goals: goals, active_missions: activeMissions };
+  }
+
+  var changed = false;
+  var updatedGoals = goals.map(function (goal) {
+    if (goal.workflow !== 'collect_profiles' || goal.complete) return goal;
+    if (goal.target !== contactGestalt) return goal;
+    if (activeMissions.indexOf(goal.mission) === -1) return goal;
+    var newAmount = Math.min((goal.current_amount || 0) + profilesCollected, goal.amount);
+    if (newAmount === goal.current_amount) return goal;
+    changed = true;
+    return Object.assign({}, goal, {
+      current_amount: newAmount,
+      complete: newAmount >= goal.amount
+    });
+  });
+
+  if (!changed) {
+    return { missions: null, mission_goals: goals, active_missions: activeMissions };
+  }
+
+  return _completeMissionsIfReady(updatedGoals, activeMissions);
+}
+
+// Shared completion bookkeeping: any active mission whose goals are all
+// complete moves out of active_missions, and the next mission whose
+// required_mission matches it activates (with its goals seeded from ruleset).
+function _completeMissionsIfReady(updatedGoals, activeMissions) {
+  var ruleset = _getRuleset();
+  var completed = [];
+  var stillActive = activeMissions.filter(function (mGestalt) {
+    var goals = updatedGoals.filter(function (g) { return g.mission === mGestalt; });
+    if (!goals.length) return true;
+    if (goals.every(function (g) { return g.complete; })) {
+      completed.push(mGestalt);
+      return false;
+    }
+    return true;
+  });
+
+  var newActive = stillActive.slice();
+  if (ruleset && ruleset.missions && completed.length) {
+    ruleset.missions.forEach(function (def) {
+      if (!def || !def.type_data) return;
+      var req = def.type_data.required_mission;
+      var gestalt = def.type_data.gestalt;
+      if (!req || !gestalt || newActive.indexOf(gestalt) !== -1) return;
+      if (completed.indexOf(req) === -1) return;
+      newActive.push(gestalt);
+      (def.type_data.goals || []).forEach(function (g) {
+        updatedGoals = updatedGoals.concat([{
+          mission: gestalt,
+          workflow: g.workflow,
+          target: g.target,
+          amount: g.amount,
+          position: g.position,
+          current_amount: 0,
+          complete: false
+        }]);
+      });
+    });
+  }
+
+  var updatedMissions = activeMissions.filter(function (m) {
+    var goals = updatedGoals.filter(function (g) { return g.mission === m; });
+    return goals.some(function (g) { return g.current_amount > 0 || g.complete; });
+  });
+
+  return {
+    missions: {
+      complete_missions: completed,
+      updated_missions: updatedMissions,
+      mission_data: {
+        active_missions: newActive,
+        mission_goals: updatedGoals
+      }
+    },
+    mission_goals: updatedGoals,
+    active_missions: newActive
+  };
 }
 
 /**
@@ -1378,7 +1558,7 @@ export function collectPerp(_token, gperpPath) {
     });
   }
 
-  var newState = Object.assign({}, ms, {
+  var preMissionState = Object.assign({}, ms, {
     nodes:         newNodes,
     nodes_collect: newCollect,
     db_queue:      newQueue,
@@ -1386,14 +1566,26 @@ export function collectPerp(_token, gperpPath) {
     last_seen_ts:  Math.max(now, ms.last_seen_ts || 0)
   });
 
-  var deltaResult = { game_values: newGv, path: gperpPath };
+  // Advance collect_profiles goals against the contact gestalt this collect
+  // was sourced from. Only ContactPerp collects feed mission progress.
+  var collectMissionResult = _advanceCollectProfilesMissions(
+    preMissionState,
+    (gameType === 'ContactPerp') ? gestalt : null,
+    (gameType === 'ContactPerp') ? (cr.amount || 0) : 0
+  );
+  var newState = Object.assign({}, preMissionState, {
+    mission_goals: collectMissionResult.mission_goals,
+    active_missions: collectMissionResult.active_missions
+  });
+
+  var deltaResult = { game_values: newGv, path: gperpPath, missions: collectMissionResult.missions };
   if (dbEntry)     deltaResult.db_entry     = dbEntry;
   if (tokenUpdate) deltaResult.token_update = tokenUpdate;
   _commitDelta(newState, state.addr, 'collectPerp', [gperpPath], deltaResult);
 
   var response = Object.assign(
     { result: innerResult, game_values: newGv, levelup: levelup,
-      missions: { complete_missions: [], updated_missions: [] } },
+      missions: collectMissionResult.missions || { complete_missions: [], updated_missions: [] } },
     incident ? { karma_incident: incident.gestalt } : {}
   );
 
@@ -1527,7 +1719,7 @@ export function integrateCollected(_token, collectId) {
     });
   }
 
-  var newState = Object.assign({}, state, {
+  var preMissionState = Object.assign({}, state, {
     db_queue:       newQueue,
     nodes:          newNodes,
     game_values:    newGv,
@@ -1535,15 +1727,25 @@ export function integrateCollected(_token, collectId) {
     last_seen_ts:   Math.max(now, state.last_seen_ts || 0)
   });
 
+  // Advance integrate_profiles goals against the new TokenPerp amounts.
+  var missionResult = _advanceIntegrateProfilesMissions(
+    preMissionState, newGv.profiles_value || 0, newNodes
+  );
+  var newState = Object.assign({}, preMissionState, {
+    mission_goals: missionResult.mission_goals,
+    active_missions: missionResult.active_missions
+  });
+
   // Persist delta for webxdc replay; result carries full state for the reducer.
   _commitDelta(newState, state.addr, 'integrateCollected', [collectId],
-    { increment: increment, dup: dup, game_values: newGv, nodes: updatedNodes });
+    { increment: increment, dup: dup, game_values: newGv, nodes: updatedNodes,
+      missions: missionResult.missions });
 
   var response = {
     result: { nodes: updatedNodes, increment: increment, dup: dup },
     game_values: newGv,
     levelup: levelup,
-    missions: { complete_missions: [], updated_missions: [] }
+    missions: missionResult.missions || { complete_missions: [], updated_missions: [] }
   };
 
   if (levelup) {
@@ -1576,19 +1778,16 @@ export function markTokenSeen(_token, gestalt) {
 }
 
 export function dismissMissionBriefing(_token, gestalt) {
-  console.log('[LE] dismissMissionBriefing(', gestalt, ') type=', typeof gestalt);
   if (typeof gestalt !== 'string' || !gestalt) {
     return Promise.resolve({ result: { error: 0 } });
   }
   var state = getState();
   var seen = state.mission_briefings_seen || {};
   if (seen[gestalt]) {
-    console.log('[LE] already seen, skipping commit');
     return Promise.resolve({ result: { ok: true } });
   }
   var newSeen = Object.assign({}, seen, { [gestalt]: true });
   var newState = Object.assign({}, state, { mission_briefings_seen: newSeen });
-  console.log('[LE] committing delta; new seen=', newSeen);
   _commitDelta(newState, state.addr, 'dismissMissionBriefing', [gestalt], { gestalt: gestalt });
   return Promise.resolve({ result: { ok: true } });
 }

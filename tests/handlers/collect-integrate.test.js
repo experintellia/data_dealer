@@ -7,9 +7,9 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  collectPerp, integrateCollected, setEmitter, setPrngSeed
+  collectPerp, integrateCollected, loadGame, setEmitter, setPrngSeed
 } from '../../scripts/LocalEngine.js';
-import { setState } from '../../scripts/boot.js';
+import { setState, getState } from '../../scripts/boot.js';
 import { freshState } from '../../scripts/state.js';
 import { setOverride, clearOverride, advance } from '../../scripts/clock.js';
 
@@ -752,5 +752,218 @@ describe('integrateCollected — payload shape for newly seeded TokenPerps', () 
     const persisted = getState().nodes.find(function (n) { return n.gestalt === 'token008'; });
     expect(persisted.game_type).toBe('TokenPerp');
     expect(persisted.full_type).toBe('TokenPerp:token008');
+  });
+});
+
+// ── Mission progression: collect_profiles + integrate_profiles ──────────────
+//
+// End-to-end: charge → collect → integrate from Jessica (contact035), and
+// assert that the integrate_profiles goal on mission002 (target token008,
+// amount 900) advances and completes. mission003 should activate when
+// mission002 completes (required_mission chain).
+
+describe('mission progression — integrate_profiles flow', () => {
+  const JESSICA = 'Imperium.City.Agent0.contact035';
+  const COLLECT_ID = 'mission-progress-001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  function seedMission002Active() {
+    setState(mkState({
+      active_missions: ['mission002'],
+      mission_goals: [{
+        mission: 'mission002',
+        workflow: 'integrate_profiles',
+        target: 'token008',
+        amount: 900,
+        position: 1,
+        current_amount: 0,
+        complete: false
+      }],
+      db_queue: [{
+        origin:      JESSICA,
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 1100, tokens_map: { token008: { amount: 100 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+  }
+
+  it('integrating Jessica advances mission002.current_amount to the absoluteAmount', async () => {
+    seedMission002Active();
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const goal = getState().mission_goals.find(g => g.mission === 'mission002');
+    // profiles_value=1100, amount=100% → absolute=1100, capped at goal.amount=900.
+    expect(goal.current_amount).toBe(900);
+    expect(goal.complete).toBe(true);
+    // Response carries the same shape Game.js consumes.
+    expect(result.missions.complete_missions).toContain('mission002');
+  });
+
+  it('partial integrate (50% coverage) advances current_amount but stays incomplete', async () => {
+    setState(mkState({
+      active_missions: ['mission002'],
+      mission_goals: [{
+        mission: 'mission002',
+        workflow: 'integrate_profiles',
+        target: 'token008',
+        amount: 900,
+        position: 1,
+        current_amount: 0,
+        complete: false
+      }],
+      db_queue: [{
+        origin:      JESSICA,
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 1000, tokens_map: { token008: { amount: 50 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    await integrateCollected('tok', COLLECT_ID);
+    const goal = getState().mission_goals.find(g => g.mission === 'mission002');
+    // profiles_value=1000, amount=50% → absolute=500.
+    expect(goal.current_amount).toBe(500);
+    expect(goal.complete).toBe(false);
+  });
+
+  it('completing mission002 activates mission003 (required_mission chain) with seeded goals', async () => {
+    seedMission002Active();
+    await integrateCollected('tok', COLLECT_ID);
+    const s = getState();
+    expect(s.active_missions).not.toContain('mission002');
+    expect(s.active_missions).toContain('mission003');
+    const m3goal = s.mission_goals.find(g => g.mission === 'mission003');
+    expect(m3goal).toBeDefined();
+    expect(m3goal.current_amount).toBe(0);
+    expect(m3goal.complete).toBe(false);
+  });
+
+  it('mission_goals delta replays cleanly through applyDelta', async () => {
+    seedMission002Active();
+    await integrateCollected('tok', COLLECT_ID);
+    // Cold-start replay: take the persisted state, run loadGame.
+    const s1 = getState();
+    setState(s1);
+    await loadGame('tok');
+    const goal = getState().mission_goals.find(g => g.mission === 'mission002');
+    expect(goal.current_amount).toBe(900);
+    expect(goal.complete).toBe(true);
+  });
+});
+
+describe('mission progression — collect_profiles flow', () => {
+  const JESSICA = 'Imperium.City.Agent0.contact035';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('collecting Jessica advances mission001.current_amount by the collected profile count', async () => {
+    setState(mkState({
+      nodes: [mkNode('ContactPerp', JESSICA)],
+      nodes_collect: [{ path: JESSICA, result: { amount: 600 } }],
+      active_missions: ['mission001'],
+      mission_goals: [{
+        mission: 'mission001',
+        workflow: 'collect_profiles',
+        target: 'contact035',
+        amount: 900,
+        position: 2,
+        current_amount: 0,
+        complete: false
+      }]
+    }));
+
+    await collectPerp('tok', JESSICA);
+    const goal = getState().mission_goals.find(g => g.mission === 'mission001');
+    expect(goal.current_amount).toBe(600);
+    expect(goal.complete).toBe(false);
+  });
+
+  it('two collects from Jessica complete mission001 (cumulative)', async () => {
+    setState(mkState({
+      nodes: [mkNode('ContactPerp', JESSICA)],
+      nodes_collect: [{ path: JESSICA, result: { amount: 600 } }],
+      active_missions: ['mission001'],
+      mission_goals: [{
+        mission: 'mission001',
+        workflow: 'collect_profiles',
+        target: 'contact035',
+        amount: 900,
+        position: 2,
+        current_amount: 0,
+        complete: false
+      }]
+    }));
+
+    await collectPerp('tok', JESSICA);
+    setState(Object.assign({}, getState(), {
+      nodes_collect: [{ path: JESSICA, result: { amount: 600 } }]
+    }));
+    const { result } = await collectPerp('tok', JESSICA);
+
+    const goal = getState().mission_goals.find(g => g.mission === 'mission001');
+    expect(goal.current_amount).toBe(900);
+    expect(goal.complete).toBe(true);
+    expect(result.missions.complete_missions).toContain('mission001');
+  });
+
+  it('collecting from a non-target contact does not advance mission001', async () => {
+    const HELEN = 'Imperium.City.Agent1.contact001';
+    setState(mkState({
+      nodes: [mkNode('ContactPerp', HELEN)],
+      nodes_collect: [{ path: HELEN, result: { amount: 1500 } }],
+      active_missions: ['mission001'],
+      mission_goals: [{
+        mission: 'mission001',
+        workflow: 'collect_profiles',
+        target: 'contact035',
+        amount: 900,
+        position: 2,
+        current_amount: 0,
+        complete: false
+      }]
+    }));
+
+    await collectPerp('tok', HELEN);
+    const goal = getState().mission_goals.find(g => g.mission === 'mission001');
+    expect(goal.current_amount).toBe(0);
+    expect(goal.complete).toBe(false);
+  });
+});
+
+describe('loadGame seeds mission_goals from active_missions', () => {
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('fresh game with mission001 active gets goals seeded from ruleset on first loadGame', async () => {
+    setState(mkState({
+      active_missions: ['mission001'],
+      mission_goals: []
+    }));
+
+    await loadGame('tok');
+
+    const goals = getState().mission_goals;
+    const m1 = goals.find(g => g.mission === 'mission001');
+    expect(m1).toBeDefined();
+    expect(m1.workflow).toBe('collect_profiles');
+    expect(m1.target).toBe('contact035');
+    expect(m1.amount).toBe(900);
+    expect(m1.current_amount).toBe(0);
+    expect(m1.complete).toBe(false);
+  });
+
+  it('idempotent — re-running loadGame does not duplicate goals', async () => {
+    setState(mkState({
+      active_missions: ['mission001'],
+      mission_goals: []
+    }));
+
+    await loadGame('tok');
+    const goalsAfterFirst = getState().mission_goals.length;
+    await loadGame('tok');
+    expect(getState().mission_goals.length).toBe(goalsAfterFirst);
   });
 });

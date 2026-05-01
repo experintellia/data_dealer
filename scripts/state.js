@@ -369,11 +369,27 @@ reducers.collectPerp = function collectPerpReducer(state, delta) {
     });
   }
 
+  // Mission progression carried in delta.result.missions.mission_data
+  // mirrors the buyPerp path so cold-start replay reconstructs the same
+  // mission_goals + active_missions the live handler computed.
+  var newMissionGoals = state.mission_goals;
+  var newActiveMissions = state.active_missions;
+  if (r.missions && r.missions.mission_data) {
+    if (r.missions.mission_data.mission_goals) {
+      newMissionGoals = r.missions.mission_data.mission_goals;
+    }
+    if (r.missions.mission_data.active_missions) {
+      newActiveMissions = r.missions.mission_data.active_missions;
+    }
+  }
+
   return Object.assign({}, state, {
     nodes_collect: newCollect,
     game_values:   newGv,
     db_queue:      newQueue,
-    nodes:         newNodes
+    nodes:         newNodes,
+    mission_goals: newMissionGoals,
+    active_missions: newActiveMissions
   });
 };
 
@@ -417,11 +433,24 @@ reducers.integrateCollected = function integrateCollectedReducer(state, delta) {
     });
   }
 
+  var newMissionGoals = state.mission_goals;
+  var newActiveMissions = state.active_missions;
+  if (r.missions && r.missions.mission_data) {
+    if (r.missions.mission_data.mission_goals) {
+      newMissionGoals = r.missions.mission_data.mission_goals;
+    }
+    if (r.missions.mission_data.active_missions) {
+      newActiveMissions = r.missions.mission_data.active_missions;
+    }
+  }
+
   return Object.assign({}, state, {
     db_queue:       newQueue,
     integrated_ids: newIntegratedIds,
     game_values:    newGv,
-    nodes:          newNodes
+    nodes:          newNodes,
+    mission_goals: newMissionGoals,
+    active_missions: newActiveMissions
   });
 };
 
