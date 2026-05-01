@@ -95,23 +95,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      # Cache the Playwright browser binaries so browser downloads don't repeat
-      # on every run.  The cache key includes the Playwright version so a
-      # version bump automatically invalidates it.
-      - name: Cache Playwright browsers
-        id: pw-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install Playwright browsers (Chromium only)
-        if: steps.pw-cache.outputs.cache-hit != 'true'
+      # Ensure the Chromium binary (and its system deps) is present.
+      # In this CI environment PLAYWRIGHT_BROWSERS_PATH points to a pre-populated
+      # directory, so this is normally a no-op; on a clean runner it downloads
+      # the required revision.
+      - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
-
-      - name: Install Playwright system deps (cached browser)
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
 
       - name: Run Playwright e2e tests
         run: pnpm test:e2e
