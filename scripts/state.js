@@ -34,6 +34,8 @@ var OP_NAMES = [
   'ping',
   'checkUsername',
   'setLocale',
+  'dismissMissionBriefing',
+  'markTokenSeen',
 ];
 
 /**
@@ -104,6 +106,8 @@ export function freshState(selfAddr, seed) {
     last_seen_ts: 0,
     node_counter: 0,
     integrated_ids: {},
+    mission_briefings_seen: {},
+    tokens_seen: {},
   };
 }
 
@@ -162,6 +166,18 @@ function _seedNodesFromTree(src) {
 // Each reducer is a pure function (state, delta) → newState.
 
 var reducers = {};
+
+// Pulls mission_goals + active_missions out of a delta result whose
+// progression handler shipped them under .missions.mission_data. Returns
+// pass-through values when the delta has no mission update so reducers can
+// always spread the result without a conditional.
+function _missionDataFromResult(state, r) {
+  var md = r && r.missions && r.missions.mission_data;
+  return {
+    mission_goals: (md && md.mission_goals) || state.mission_goals,
+    active_missions: (md && md.active_missions) || state.active_missions
+  };
+}
 
 reducers.setDisplayName = function setDisplayNameReducer(state, delta) {
   var args = delta.args || [];
@@ -271,16 +287,7 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
     }
   }
 
-  var missionGoals = state.mission_goals;
-  var activeMissions = state.active_missions;
-  if (r.missions && r.missions.mission_data) {
-    if (r.missions.mission_data.mission_goals) {
-      missionGoals = r.missions.mission_data.mission_goals;
-    }
-    if (r.missions.mission_data.active_missions) {
-      activeMissions = r.missions.mission_data.active_missions;
-    }
-  }
+  var mp = _missionDataFromResult(state, r);
 
   // Each buyPerp creates exactly one node, so the counter advances by 1 on
   // every replayed delta.  (The handler in LocalEngine does the same; we
@@ -292,8 +299,8 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
     nodes: nodes,
     db_queue: dbQueue,
     game_values: r.game_values || state.game_values,
-    mission_goals: missionGoals,
-    active_missions: activeMissions,
+    mission_goals: mp.mission_goals,
+    active_missions: mp.active_missions,
     node_counter: counter
   });
 };
@@ -365,11 +372,14 @@ reducers.collectPerp = function collectPerpReducer(state, delta) {
     });
   }
 
+  var mp = _missionDataFromResult(state, r);
   return Object.assign({}, state, {
     nodes_collect: newCollect,
     game_values:   newGv,
     db_queue:      newQueue,
-    nodes:         newNodes
+    nodes:         newNodes,
+    mission_goals: mp.mission_goals,
+    active_missions: mp.active_missions
   });
 };
 
@@ -391,20 +401,57 @@ reducers.integrateCollected = function integrateCollectedReducer(state, delta) {
 
   var newNodes = state.nodes;
   if (r.nodes && r.nodes.length) {
+    var existingPaths = {};
     var updMap = {};
     r.nodes.forEach(function (u) { updMap[u.full_path] = u; });
     newNodes = state.nodes.map(function (n) {
+      existingPaths[n.full_path] = true;
       var u = updMap[n.full_path];
       return u ? Object.assign({}, n, { instance_data: u.instance_data }) : n;
     });
+    // Append fresh TokenPerp nodes (first-time integration of a token type).
+    r.nodes.forEach(function (u) {
+      if (existingPaths[u.full_path]) return;
+      newNodes = newNodes.concat([{
+        game_id:       u.game_id,
+        gestalt:       u.gestalt,
+        game_type:     u.game_type,
+        full_type:     u.full_type,
+        full_path:     u.full_path,
+        instance_data: u.instance_data || {}
+      }]);
+    });
   }
 
+  var mp = _missionDataFromResult(state, r);
   return Object.assign({}, state, {
     db_queue:       newQueue,
     integrated_ids: newIntegratedIds,
     game_values:    newGv,
-    nodes:          newNodes
+    nodes:          newNodes,
+    mission_goals: mp.mission_goals,
+    active_missions: mp.active_missions
   });
+};
+
+reducers.markTokenSeen = function markTokenSeenReducer(state, delta) {
+  var args = delta.args || [];
+  var gestalt = args[0];
+  if (typeof gestalt !== 'string' || !gestalt) return state;
+  var seen = Object.assign({}, state.tokens_seen || {});
+  if (seen[gestalt]) return state;
+  seen[gestalt] = true;
+  return Object.assign({}, state, { tokens_seen: seen });
+};
+
+reducers.dismissMissionBriefing = function dismissMissionBriefingReducer(state, delta) {
+  var args = delta.args || [];
+  var gestalt = args[0];
+  if (typeof gestalt !== 'string' || !gestalt) return state;
+  var seen = Object.assign({}, state.mission_briefings_seen || {});
+  if (seen[gestalt]) return state;
+  seen[gestalt] = true;
+  return Object.assign({}, state, { mission_briefings_seen: seen });
 };
 
 // Stubs — return state unchanged until Wave 4+ fills them in.

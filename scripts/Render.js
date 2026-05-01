@@ -32,9 +32,10 @@ define(function(require) {
         }
       };
     }
-    if (typeof Ticker.setFPS !== 'function') {
-      Ticker.setFPS = function(fps) { Ticker.framerate = fps; };
-    }
+    // Always override setFPS so we use the modern `framerate=` setter even
+    // when the legacy method still exists (it logs a deprecation warning
+    // on every call in current TweenJS builds).
+    Ticker.setFPS = function(fps) { Ticker.framerate = fps; };
 
     var app = require('app').getApplication();
     var setup = require('setup');
@@ -3804,6 +3805,7 @@ define(function(require) {
       node.scroller.options.minZoom = (minZoom < 0.5) ? 0.5 : minZoom;
       node.scroller.zoomTo(this.zoomScale);
       node.scroller.setDimensions(stage.width, stage.height, node.getSize().width, node.getSize().height);
+      node._updateZoomButtonsState();
     };
 
     ViewMap.prototype.initScroller = function(){
@@ -3832,8 +3834,10 @@ define(function(require) {
         zooming: true,
         locking:false,
         bouncing:false,
-        //animating:true,
-        animating:false,
+        // animating:true means zoomTo and scrollTo with animate=true tween
+        // smoothly via core.effect.Animate; the previous stub left this
+        // false because it had no animation loop anyway.
+        animating:true,
         animationDuration:300,
         minZoom:0.5,
         maxZoom:1
@@ -3863,26 +3867,13 @@ define(function(require) {
 
       node.on('dblclick',function(e){
         e.stopPropagation();
+        // Same animating-toggle anti-pattern as zoomIn/zoomOut: don't flip
+        // it back to false synchronously, the scroller animation reads the
+        // flag every frame.
         if (node.zoomScale !== 1) {
-          node.scroller.options.animating=true;
           node.scroller.zoomTo(1, true, node.userAbsPos.x,node.userAbsPos.y);
-          node.scroller.options.animating=false;
-          // Cursor FX
-          //node.cursor.radius=12;
-          //node.cursor.strokeWidth=3;
-          //node.cursor.setOpacity(1);
-          //node.cursor.FXSimple({scaleX:3,scaleY:3,opacity:0},250);
         } else {
-          //node.scroller.zoomTo(0.5, true, node.userAbsPos.x,node.userAbsPos.y);
-          node.scroller.options.animating=true;
           node.scroller.zoomTo(node.scroller.options.minZoom, true, node.userAbsPos.x,node.userAbsPos.y);
-          node.scroller.options.animating=false;
-
-          // Cursor FX
-          //node.cursor.radius=24;
-          //node.cursor.strokeWidth=6;
-          //node.cursor.setOpacity(1);
-          //node.cursor.FXSimple({scaleX:0,scaleY:0,opacity:0},250);
         }
       });
 
@@ -3977,22 +3968,32 @@ define(function(require) {
       } else {
         this.jdomelem.removeClass('zoomHide1');
       }
+      this._updateZoomButtonsState();
+    };
+
+    ViewMap.prototype._updateZoomButtonsState = function(){
+      if (!this.jdomelemZoom) return;
+      var maxZoom = (this.scroller && this.scroller.options && this.scroller.options.maxZoom) || 1;
+      var minZoom = (this.scroller && this.scroller.options && this.scroller.options.minZoom) || 0.5;
+      var atMax = this.zoomScale >= maxZoom - 0.001;
+      var atMin = this.zoomScale <= minZoom + 0.001;
+      this.jdomelemZoom.find('.ZoomIn').toggleClass('disabled', atMax);
+      this.jdomelemZoom.find('.ZoomOut').toggleClass('disabled', atMin);
+      this.jdomelemZoom.find('.Fullscreen').toggleClass('disabled', atMin && atMax);
     };
 
     ViewMap.prototype.zoomIn = function(){
       var node = this;
       var zoomTo = (node.zoomScale+0.25 > 1) ? 1 : node.zoomScale+0.25;
-      node.scroller.options.animating=true;
-      node.scroller.zoomTo(node.zoomScale+0.25, true);
-      node.scroller.options.animating=false;
+      if (zoomTo === node.zoomScale) return;
+      node.scroller.zoomTo(zoomTo, true);
     };
 
     ViewMap.prototype.zoomOut = function(){
       var node = this;
       var zoomTo = (node.zoomScale-0.25 < 0.5) ? 0.5 : node.zoomScale-0.25;
-      node.scroller.options.animating=true;
+      if (zoomTo === node.zoomScale) return;
       node.scroller.zoomTo(zoomTo, true);
-      node.scroller.options.animating=false;
     };
 
     ViewMap.prototype.FXShow = function(){
@@ -4703,6 +4704,13 @@ define(function(require) {
         token.parents('.PopupTab').addClass('hasPopup');
         container.addClass('open');
         container.find('.Subpop[data-subpop-id='+subpopid+']').addClass('open');
+        // subpop-id is "token<gestalt>"; surface the gestalt so the game side
+        // can persist the seen-flag and clear the NEW badge across reloads.
+        var gestalt = (subpopid && subpopid.indexOf('token') === 0) ? subpopid.slice(5) : '';
+        if (gestalt) {
+          token.find('.new').remove();
+          node.trigger('popup_token_seen', [gestalt]);
+        }
       });
 
       node.jdomelem.on('click touchend','.SubpopClose, .Button[data-button-id=OKButton]',function(e){

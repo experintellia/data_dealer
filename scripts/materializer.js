@@ -106,20 +106,23 @@ function materialize(state, now) {
   var newGv = Object.assign({}, gv);
   if (
     typeof gv.ap_snapshot    === 'number' &&
-    typeof gv.ap_update      === 'number' &&
     typeof gv.ap_inc_value   === 'number' &&
     gv.ap_inc_interval > 0                &&
     typeof gv.ap_max         === 'number'
   ) {
-    var elapsed = Math.max(0, now - gv.ap_update);
-    var ticks   = Math.floor(elapsed / gv.ap_inc_interval);
+    // Lazy-init: when ap_update is null/undefined (e.g. fresh game), start
+    // the regen clock at `now` so the next materialize-after-elapsed-time
+    // can tick. Without this, ap_update stays null forever and regen never
+    // runs, so APs added in-memory by Game.js APTicker reset to ap_snapshot
+    // on every reload.
+    var apUpdate = (typeof gv.ap_update === 'number') ? gv.ap_update : now;
+    var elapsed  = Math.max(0, now - apUpdate);
+    var ticks    = Math.floor(elapsed / gv.ap_inc_interval);
     newGv = Object.assign({}, gv, {
       ap_snapshot: Math.min(gv.ap_max, gv.ap_snapshot + ticks * gv.ap_inc_value),
-      // Advance ap_update only to the last full-tick boundary so that the
+      // Advance ap_update only to the last full-tick boundary so the
       // fractional remainder is preserved across stepwise materializations.
-      // Setting ap_update = now would silently discard sub-interval progress
-      // and violate the composability invariant.
-      ap_update: gv.ap_update + ticks * gv.ap_inc_interval,
+      ap_update: apUpdate + ticks * gv.ap_inc_interval,
     });
   }
 

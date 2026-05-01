@@ -24,7 +24,7 @@ describe('freshState', () => {
 
   it('seeds game_values from data/default_game.json', () => {
     const s = freshState('alice@example.com');
-    expect(s.game_values.cash_value).toBe(300);
+    expect(s.game_values.cash_value).toBe(270);
     expect(s.game_values.karma_value).toBe(50);
     expect(s.game_values.xp_level).toBe(1);
     expect(s.game_values.ap_snapshot).toBe(6);
@@ -213,6 +213,111 @@ describe('applyDelta — setLocale reducer', () => {
     s = applyDelta(s, makeLocaleDelta(addr, 'de', 1000));
     const result = applyDelta(s, makeLocaleDelta(addr, 'en', 2000));
     expect(result.locale).toBe('en');
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// dismissMissionBriefing reducer
+// ---------------------------------------------------------------------------
+
+describe('applyDelta — dismissMissionBriefing reducer', () => {
+  const addr = 'alice@example.com';
+
+  function makeDismissDelta(addr, gestalt, ts) {
+    return { kind: 'delta', addr, op: 'dismissMissionBriefing', args: [gestalt], ts: ts || Date.now() };
+  }
+
+  it('freshState seeds mission_briefings_seen as an empty object', () => {
+    expect(freshState(addr).mission_briefings_seen).toEqual({});
+  });
+
+  it('records the dismissed gestalt under mission_briefings_seen', () => {
+    const s = freshState(addr);
+    const result = applyDelta(s, makeDismissDelta(addr, 'mission002'));
+    expect(result.mission_briefings_seen).toEqual({ mission002: true });
+  });
+
+  it('is idempotent — second dispatch leaves mission_briefings_seen unchanged', () => {
+    let s = freshState(addr);
+    s = applyDelta(s, makeDismissDelta(addr, 'mission002', 1000));
+    const result = applyDelta(s, makeDismissDelta(addr, 'mission002', 2000));
+    expect(result.mission_briefings_seen).toBe(s.mission_briefings_seen);
+  });
+
+  it('accumulates multiple gestalts', () => {
+    let s = freshState(addr);
+    s = applyDelta(s, makeDismissDelta(addr, 'mission002', 1000));
+    s = applyDelta(s, makeDismissDelta(addr, 'mission003', 2000));
+    expect(s.mission_briefings_seen).toEqual({ mission002: true, mission003: true });
+  });
+
+  it('leaves mission_briefings_seen empty when args is missing', () => {
+    const s = freshState(addr);
+    const bad = { kind: 'delta', addr, op: 'dismissMissionBriefing', ts: 1000 };
+    const result = applyDelta(s, bad);
+    expect(result.mission_briefings_seen).toEqual({});
+  });
+
+  it('leaves mission_briefings_seen empty when gestalt is empty string', () => {
+    const s = freshState(addr);
+    const result = applyDelta(s, makeDismissDelta(addr, ''));
+    expect(result.mission_briefings_seen).toEqual({});
+  });
+
+  it('leaves mission_briefings_seen empty when gestalt is non-string', () => {
+    const s = freshState(addr);
+    expect(applyDelta(s, makeDismissDelta(addr, 42)).mission_briefings_seen).toEqual({});
+    expect(applyDelta(s, makeDismissDelta(addr, null)).mission_briefings_seen).toEqual({});
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// markTokenSeen reducer
+// ---------------------------------------------------------------------------
+
+describe('applyDelta — markTokenSeen reducer', () => {
+  const addr = 'alice@example.com';
+
+  function makeSeenDelta(addr, gestalt, ts) {
+    return { kind: 'delta', addr, op: 'markTokenSeen', args: [gestalt], ts: ts || Date.now() };
+  }
+
+  it('freshState seeds tokens_seen as an empty object', () => {
+    expect(freshState(addr).tokens_seen).toEqual({});
+  });
+
+  it('records the seen gestalt under tokens_seen', () => {
+    const s = freshState(addr);
+    const result = applyDelta(s, makeSeenDelta(addr, 'token008'));
+    expect(result.tokens_seen).toEqual({ token008: true });
+  });
+
+  it('is idempotent — second dispatch leaves tokens_seen unchanged', () => {
+    let s = freshState(addr);
+    s = applyDelta(s, makeSeenDelta(addr, 'token008', 1000));
+    const result = applyDelta(s, makeSeenDelta(addr, 'token008', 2000));
+    expect(result.tokens_seen).toBe(s.tokens_seen);
+  });
+
+  it('accumulates multiple gestalts', () => {
+    let s = freshState(addr);
+    s = applyDelta(s, makeSeenDelta(addr, 'token001', 1000));
+    s = applyDelta(s, makeSeenDelta(addr, 'token008', 2000));
+    expect(s.tokens_seen).toEqual({ token001: true, token008: true });
+  });
+
+  it('leaves tokens_seen empty when args is missing', () => {
+    const s = freshState(addr);
+    const bad = { kind: 'delta', addr, op: 'markTokenSeen', ts: 1000 };
+    expect(applyDelta(s, bad).tokens_seen).toEqual({});
+  });
+
+  it('leaves tokens_seen empty when gestalt is empty or non-string', () => {
+    const s = freshState(addr);
+    expect(applyDelta(s, makeSeenDelta(addr, '')).tokens_seen).toEqual({});
+    expect(applyDelta(s, makeSeenDelta(addr, 42)).tokens_seen).toEqual({});
   });
 
 });

@@ -200,9 +200,25 @@ export function loadGame(/* token */) {
   var isNewGame = !state.node_counter;
 
   var mat = materialize(state, now);
-  setState(mat.state);
+  // Lazy-seed mission_goals from ruleset for any active mission that hasn't
+  // had its goals populated yet (e.g. fresh game, or a mission activated by
+  // legacy code that didn't seed goals). This is the prerequisite for
+  // mission progression: empty goals → progression handlers no-op.
+  var seededState = _seedMissionGoals(mat.state);
+  setState(seededState);
 
-  var gameData = _buildLoadGameResponse(mat.state, now, isNewGame);
+  // Re-arm one-shot materializers for any charges still in flight. Clear
+  // any prior handles first so calling loadGame twice doesn't queue
+  // duplicate node_ready emissions for the same charge.
+  _clearAllChargeReady();
+  var stillCharging = (seededState && seededState.nodes_charging) || [];
+  for (var i = 0; i < stillCharging.length; i++) {
+    if (typeof stillCharging[i].charge_end === 'number') {
+      _scheduleChargeReady(stillCharging[i].charge_end, stillCharging[i].path);
+    }
+  }
+
+  var gameData = _buildLoadGameResponse(seededState, now, isNewGame);
 
   // Schedule socket event emission via queueMicrotask so it runs after the
   // microtask that resolves the Deferred in Remote.js (result.then → d.resolve
@@ -276,7 +292,13 @@ function _buildLoadGameResponse(state, now, isNewGame) {
     locale_persisted: !!state.locale,
     missions: ruleset.missions,
     mission_goals: state.mission_goals || [],
-    active_missions: state.active_missions || []
+    active_missions: state.active_missions || [],
+    // Clone the seen-maps so Game.js mutating raw_data.* doesn't poison
+    // state.* via shared object reference (which would make
+    // dismissMissionBriefing / markTokenSeen think the gestalt is already
+    // seen and skip the delta commit, so the dismissal never persists).
+    mission_briefings_seen: Object.assign({}, state.mission_briefings_seen || {}),
+    tokens_seen: Object.assign({}, state.tokens_seen || {})
   };
 }
 
@@ -929,12 +951,18 @@ export function buyPerp(_token, parentPath, gestalt) {
       newGv = Object.assign({}, newGv, {
         ap_inc_value: levelInfo.ap_inc_value,
         ap_inc_interval: levelInfo.ap_inc_interval,
-        ap_max: levelInfo.ap_max
+        ap_max: levelInfo.ap_max,
+        // Refill AP on levelup so the player gets a fresh batch of actions —
+        // matches buyKarma/chargePerp behaviour. Without this, ap_snapshot
+        // stayed at the previous level's value while ap_max grew, so the AP
+        // bar visibly under-filled after a buyPerp-triggered level.
+        ap_snapshot: levelInfo.ap_max
       });
     }
   }
 
   var missionResult = _advanceBuyPerpMissions(state, gestalt);
+  newGv = _applyRewardsToGv(newGv, missionResult.rewards);
 
   // profile_set for project*/contact*/city* gestalts:
   // initial data batch pushed to db_queue; city-buy path also read by Game.js:3816.
@@ -981,6 +1009,206 @@ export function buyPerp(_token, parentPath, gestalt) {
   return Promise.resolve({ result: payload });
 }
 
+function _findMissionDef(ruleset, gestalt) {
+  if (!ruleset || !ruleset.missions || !gestalt) return null;
+  for (var i = 0; i < ruleset.missions.length; i++) {
+    var def = ruleset.missions[i];
+    if (def && def.type_data && def.type_data.gestalt === gestalt) return def;
+  }
+  return null;
+}
+
+// Canonical mission-goal row shape. One source so adding a field touches one place.
+function _seedGoalRow(missionGestalt, g) {
+  return {
+    mission: missionGestalt,
+    workflow: g.workflow,
+    target: g.target,
+    amount: g.amount,
+    position: g.position,
+    current_amount: 0,
+    complete: false
+  };
+}
+
+// Without this, fresh games (or saves activated by legacy code) have empty
+// mission_goals and progression handlers find nothing to advance.
+function _seedMissionGoals(state) {
+  var activeMissions = state.active_missions || [];
+  if (!activeMissions.length) return state;
+  var ruleset = _getRuleset();
+  if (!ruleset || !ruleset.missions) return state;
+
+  var existingGoals = state.mission_goals || [];
+  var existingByMission = {};
+  existingGoals.forEach(function (g) {
+    existingByMission[g.mission] = true;
+  });
+
+  var newGoals = existingGoals.slice();
+  var added = false;
+  activeMissions.forEach(function (mGestalt) {
+    if (existingByMission[mGestalt]) return;
+    var mDef = _findMissionDef(ruleset, mGestalt);
+    if (!mDef || !mDef.type_data || !mDef.type_data.goals) return;
+    mDef.type_data.goals.forEach(function (g) {
+      newGoals.push(_seedGoalRow(mGestalt, g));
+      added = true;
+    });
+  });
+
+  if (!added) return state;
+  return Object.assign({}, state, { mission_goals: newGoals });
+}
+
+// current_amount math mirrors TokenPerp.setAmount → DBTokensAbsolute
+// (Game.js:5439) so the LocalEngine and UI agree on completion.
+function _advanceIntegrateProfilesMissions(state, profilesValue, nodes) {
+  var goals = state.mission_goals || [];
+  var activeMissions = state.active_missions || [];
+  if (!goals.length || !activeMissions.length) {
+    return { missions: null, mission_goals: goals, active_missions: activeMissions };
+  }
+
+  var amountByGestalt = {};
+  (nodes || []).forEach(function (n) {
+    if (n.game_type === 'TokenPerp' && n.gestalt && n.instance_data) {
+      amountByGestalt[n.gestalt] = n.instance_data.amount || 0;
+    }
+  });
+
+  var changed = false;
+  var updatedGoals = goals.map(function (goal) {
+    if (goal.workflow !== 'integrate_profiles' || goal.complete) return goal;
+    if (activeMissions.indexOf(goal.mission) === -1) return goal;
+    var pct = amountByGestalt[goal.target] || 0;
+    var absoluteAmount = Math.floor((profilesValue * pct) / 100);
+    // Monotonic — never let a later integrate roll back progress (e.g. if
+    // profiles_value drops or coverage decays, mission progress sticks).
+    var newAmount = Math.max(goal.current_amount || 0, Math.min(absoluteAmount, goal.amount));
+    if (newAmount === goal.current_amount) return goal;
+    changed = true;
+    return Object.assign({}, goal, {
+      current_amount: newAmount,
+      complete: newAmount >= goal.amount
+    });
+  });
+
+  if (!changed) {
+    return { missions: null, mission_goals: goals, active_missions: activeMissions };
+  }
+
+  return _completeMissionsIfReady(updatedGoals, activeMissions);
+}
+
+function _advanceCollectProfilesMissions(state, contactGestalt, profilesCollected) {
+  var goals = state.mission_goals || [];
+  var activeMissions = state.active_missions || [];
+  if (!goals.length || !activeMissions.length || !profilesCollected || !contactGestalt) {
+    return { missions: null, mission_goals: goals, active_missions: activeMissions };
+  }
+
+  var changed = false;
+  var updatedGoals = goals.map(function (goal) {
+    if (goal.workflow !== 'collect_profiles' || goal.complete) return goal;
+    if (goal.target !== contactGestalt) return goal;
+    if (activeMissions.indexOf(goal.mission) === -1) return goal;
+    var newAmount = Math.min((goal.current_amount || 0) + profilesCollected, goal.amount);
+    if (newAmount === goal.current_amount) return goal;
+    changed = true;
+    return Object.assign({}, goal, {
+      current_amount: newAmount,
+      complete: newAmount >= goal.amount
+    });
+  });
+
+  if (!changed) {
+    return { missions: null, mission_goals: goals, active_missions: activeMissions };
+  }
+
+  return _completeMissionsIfReady(updatedGoals, activeMissions);
+}
+
+function _completeMissionsIfReady(updatedGoals, activeMissions) {
+  var ruleset = _getRuleset();
+  var completed = [];
+  var stillActive = activeMissions.filter(function (mGestalt) {
+    var goals = updatedGoals.filter(function (g) { return g.mission === mGestalt; });
+    if (!goals.length) return true;
+    if (goals.every(function (g) { return g.complete; })) {
+      completed.push(mGestalt);
+      return false;
+    }
+    return true;
+  });
+
+  var newActive = stillActive.slice();
+  if (ruleset && ruleset.missions && completed.length) {
+    ruleset.missions.forEach(function (def) {
+      if (!def || !def.type_data) return;
+      var req = def.type_data.required_mission;
+      var gestalt = def.type_data.gestalt;
+      if (!req || !gestalt || newActive.indexOf(gestalt) !== -1) return;
+      if (completed.indexOf(req) === -1) return;
+      newActive.push(gestalt);
+      (def.type_data.goals || []).forEach(function (g) {
+        updatedGoals = updatedGoals.concat([_seedGoalRow(gestalt, g)]);
+      });
+    });
+  }
+
+  var updatedMissions = activeMissions.filter(function (m) {
+    var goals = updatedGoals.filter(function (g) { return g.mission === m; });
+    return goals.some(function (g) { return g.current_amount > 0 || g.complete; });
+  });
+
+  return {
+    missions: {
+      complete_missions: completed,
+      updated_missions: updatedMissions,
+      mission_data: {
+        active_missions: newActive,
+        mission_goals: updatedGoals
+      }
+    },
+    rewards: _collectMissionRewards(ruleset, completed),
+    mission_goals: updatedGoals,
+    active_missions: newActive
+  };
+}
+
+// Sums up cash / xp / karma rewards across the just-completed missions so
+// the caller can fold them into the new game_values. Without this, mission
+// completion notifications fire but the player never sees the payout.
+function _collectMissionRewards(ruleset, completedGestalts) {
+  var totals = { cash_value: 0, xp_value: 0, karma_value: 0, profiles_max: 0 };
+  if (!completedGestalts.length || !ruleset || !ruleset.missions) return totals;
+  completedGestalts.forEach(function (mGestalt) {
+    var def = _findMissionDef(ruleset, mGestalt);
+    var rewards = (def && def.type_data && def.type_data.rewards) || [];
+    rewards.forEach(function (r) {
+      if (!r || typeof r.amount !== 'number') return;
+      if (Object.prototype.hasOwnProperty.call(totals, r.target)) {
+        totals[r.target] += r.amount;
+      }
+    });
+  });
+  return totals;
+}
+
+// Folds reward totals into a fresh game_values object, clamping karma to
+// [-100, 100] to match the integrate/karmalizer math.
+function _applyRewardsToGv(gv, rewards) {
+  if (!rewards) return gv;
+  return Object.assign({}, gv, {
+    cash_value:   (gv.cash_value   || 0) + (rewards.cash_value   || 0),
+    xp_value:     (gv.xp_value     || 0) + (rewards.xp_value     || 0),
+    karma_value:  Math.max(-100, Math.min(100,
+                  (gv.karma_value  || 0) + (rewards.karma_value || 0))),
+    profiles_max: (gv.profiles_max || 0) + (rewards.profiles_max || 0)
+  });
+}
+
 /**
  * Advance any active mission goals that have workflow==='buy_perp' and
  * target===gestalt.  Pure; does not mutate state.
@@ -1006,33 +1234,7 @@ function _advanceBuyPerpMissions(state, gestalt) {
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
   }
 
-  var updatedMissionIds = [];
-  var completedMissionIds = [];
-  activeMissions.forEach(function (mGestalt) {
-    var goals = updatedGoals.filter(function (g) { return g.mission === mGestalt; });
-    if (!goals.length) { return; }
-    updatedMissionIds.push(mGestalt);
-    if (goals.every(function (g) { return g.complete; })) {
-      completedMissionIds.push(mGestalt);
-    }
-  });
-
-  var newActiveMissions = activeMissions.filter(function (m) {
-    return completedMissionIds.indexOf(m) === -1;
-  });
-
-  return {
-    missions: {
-      complete_missions: completedMissionIds,
-      updated_missions: updatedMissionIds,
-      mission_data: {
-        active_missions: newActiveMissions,
-        mission_goals: updatedGoals
-      }
-    },
-    mission_goals: updatedGoals,
-    active_missions: newActiveMissions
-  };
+  return _completeMissionsIfReady(updatedGoals, activeMissions);
 }
 
 // ---------------------------------------------------------------------------
@@ -1040,9 +1242,16 @@ function _advanceBuyPerpMissions(state, gestalt) {
 // ---------------------------------------------------------------------------
 
 export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
-  var state   = getState();
-  var now     = clockNow();
-  var ruleset = _getRuleset();
+  var rawState = getState();
+  var now      = clockNow();
+  var ruleset  = _getRuleset();
+
+  // Materialize before reading game_values so AP regen ticks accumulated
+  // since the last handler call are visible. Without this, the UI's
+  // APTicker can show 1 AP while state.ap_snapshot still says 0, and
+  // chargePerp would refuse the action despite the visible bar.
+  var mat   = materialize(rawState, now);
+  var state = mat.state;
 
   var nodes   = state.nodes || [];
   var nodeIdx = -1;
@@ -1074,9 +1283,14 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
   if ((gv.ap_snapshot || 0) < 1)           return Promise.resolve({ result: { error: 1 } });
   if ((gv.cash_value  || 0) < chargeCost)  return Promise.resolve({ result: { error: 1 } });
 
+  // ClientPerps don't carry collect_amount in the ruleset — they ship
+  // income_base / income_factor instead. Fall back so charging the car
+  // company actually pays out when collected. (Income_factor / consumed-
+  // tokens scaling is a separate enhancement; this gives the base payout.)
   var baseAmount = typeof instanceData.collect_amount === 'number'
     ? instanceData.collect_amount
-    : (typeof typeData.collect_amount === 'number' ? typeData.collect_amount : 0);
+    : (typeof typeData.collect_amount === 'number' ? typeData.collect_amount
+      : (typeof typeData.income_base   === 'number' ? typeData.income_base   : 0));
   var chargeResult = { amount: _getVariatedAmount(baseAmount, now, path) };
 
   var durationMs  = typeData.charge_time;
@@ -1107,6 +1321,22 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
     ap_snapshot: Math.max(0, (gv.ap_snapshot || 0) - 1),
   });
 
+  // Advance xp_level if the new XP crossed a threshold. The legacy port
+  // omitted this for chargePerp specifically (collectPerp / integrateCollected
+  // / buyKarma all do compute it), so the player's XP could drift past
+  // xp_level.xp_max — visible as a status-bar overflow on screen.
+  var oldLevelNum = gv.xp_level || 1;
+  var newLevelNum = _getLevelByXP(newGv.xp_value);
+  var levelup = newLevelNum > oldLevelNum;
+  if (levelup) {
+    var levels = _getRuleset().levels;
+    var newLevelInfo = levels[newLevelNum - 1] || levels[levels.length - 1];
+    newGv = Object.assign({}, newGv, {
+      xp_level: newLevelNum,
+      ap_snapshot: newLevelInfo.ap_max,
+    });
+  }
+
   setState(Object.assign({}, state, {
     nodes:          newNodes,
     nodes_charging: charging.concat([chargeEntry]),
@@ -1122,9 +1352,61 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
     ts:     now,
   });
 
+  // Live-tick: nothing in the page periodically calls materialize(), so
+  // without this the charge ripens silently — the perp's UI blinks at zero
+  // but no node_ready fires until the player reloads (which runs materialize
+  // on cold-start). Schedule a one-shot materialize at exactly charge_end.
+  _scheduleChargeReady(chargeEntry.charge_end, chargeEntry.path);
+
   return Promise.resolve({
-    result: { game_values: newGv, duration: durationMs, levelup: false, missions: {} },
+    result: { game_values: newGv, duration: durationMs, levelup: levelup, missions: {} },
   });
+}
+
+// Active charge-ready timers, keyed by path. Tracking lets us clear stale
+// handles before re-scheduling — e.g. when loadGame replays history we
+// re-arm every in-flight charge, and without cleanup duplicate timers fire
+// duplicate node_ready events for the same charge.
+var _chargeReadyTimers = {};
+
+function _clearChargeReady(path) {
+  if (!path || !_chargeReadyTimers[path]) return;
+  clearTimeout(_chargeReadyTimers[path]);
+  delete _chargeReadyTimers[path];
+}
+
+function _clearAllChargeReady() {
+  Object.keys(_chargeReadyTimers).forEach(function (p) {
+    clearTimeout(_chargeReadyTimers[p]);
+  });
+  _chargeReadyTimers = {};
+}
+
+// One-shot per charge: at charge_end, run materialize() to transition the
+// charging entry into nodes_collect and emit node_ready. Tests stub
+// setTimeout via the override clock; we use the host setTimeout directly so
+// production play actually fires.
+function _scheduleChargeReady(chargeEnd, path) {
+  if (typeof setTimeout !== 'function') return;
+  _clearChargeReady(path);
+  var msUntil = Math.max(0, chargeEnd - clockNow());
+  var handle = setTimeout(function () {
+    if (path) delete _chargeReadyTimers[path];
+    var s = getState();
+    if (!s) return;
+    // Skip if the charge no longer exists (cancelled / already collected).
+    if (path) {
+      var stillCharging = (s.nodes_charging || []).some(function (c) { return c.path === path; });
+      if (!stillCharging) return;
+    }
+    var mat = materialize(s, clockNow());
+    setState(mat.state);
+    var events = mat.events || [];
+    for (var i = 0; i < events.length; i++) {
+      _emit(events[i].ev, events[i].pl);
+    }
+  }, msUntil);
+  if (path) _chargeReadyTimers[path] = handle;
 }
 
 // ---------------------------------------------------------------------------
@@ -1248,7 +1530,17 @@ export function collectPerp(_token, gperpPath) {
 
   if (gameType === 'ContactPerp' || gameType === 'ProjectPerp') {
     var collectId = _generateId();
-    var profileSet = { profiles_value: cr.amount || 0, tokens_map: {} };
+    // ContactPerps store yielded token-types under `tokens`; TokenPerps
+    // (super-token decomposition) under `contained_tokens` — accept either.
+    var tokensMap = {};
+    var contained = (typeData && (typeData.tokens || typeData.contained_tokens)) || [];
+    for (var ct = 0; ct < contained.length; ct++) {
+      var ctEntry = contained[ct];
+      if (ctEntry && ctEntry.gestalt) {
+        tokensMap[ctEntry.gestalt] = { amount: ctEntry.amount || 0 };
+      }
+    }
+    var profileSet = { profiles_value: cr.amount || 0, tokens_map: tokensMap };
     dbEntry = {
       origin:      gperpPath,
       collect_id:  collectId,
@@ -1293,9 +1585,16 @@ export function collectPerp(_token, gperpPath) {
   var oldLevel = (ms.game_values && ms.game_values.xp_level) || 1;
   var newLevel = _getLevelByXP(newGv.xp_value);
   var levelup  = newLevel > oldLevel;
-  if (levelup) newGv = Object.assign({}, newGv, { xp_level: newLevel });
+  if (levelup) {
+    var collectLevels = _getRuleset().levels;
+    var collectLevelInfo = collectLevels[newLevel - 1] || collectLevels[collectLevels.length - 1];
+    newGv = Object.assign({}, newGv, {
+      xp_level: newLevel,
+      ap_snapshot: collectLevelInfo.ap_max
+    });
+  }
 
-  var newState = Object.assign({}, ms, {
+  var preMissionState = Object.assign({}, ms, {
     nodes:         newNodes,
     nodes_collect: newCollect,
     db_queue:      newQueue,
@@ -1303,14 +1602,27 @@ export function collectPerp(_token, gperpPath) {
     last_seen_ts:  Math.max(now, ms.last_seen_ts || 0)
   });
 
-  var deltaResult = { game_values: newGv, path: gperpPath };
+  // Only ContactPerp collects feed collect_profiles goals; ProjectPerp /
+  // ClientPerp / TokenPerp paths skip mission progression.
+  var collectMissionResult = (gameType === 'ContactPerp')
+    ? _advanceCollectProfilesMissions(preMissionState, gestalt, cr.amount || 0)
+    : { missions: null, mission_goals: preMissionState.mission_goals,
+        active_missions: preMissionState.active_missions };
+  newGv = _applyRewardsToGv(newGv, collectMissionResult.rewards);
+  var newState = Object.assign({}, preMissionState, {
+    game_values: newGv,
+    mission_goals: collectMissionResult.mission_goals,
+    active_missions: collectMissionResult.active_missions
+  });
+
+  var deltaResult = { game_values: newGv, path: gperpPath, missions: collectMissionResult.missions };
   if (dbEntry)     deltaResult.db_entry     = dbEntry;
   if (tokenUpdate) deltaResult.token_update = tokenUpdate;
   _commitDelta(newState, state.addr, 'collectPerp', [gperpPath], deltaResult);
 
   var response = Object.assign(
     { result: innerResult, game_values: newGv, levelup: levelup,
-      missions: { complete_missions: [], updated_missions: [] } },
+      missions: collectMissionResult.missions || { complete_missions: [], updated_missions: [] } },
     incident ? { karma_incident: incident.gestalt } : {}
   );
 
@@ -1345,10 +1657,18 @@ export function collectPerp(_token, gperpPath) {
  *
  * Error codes:
  *   0 — collect_id not in db_queue (already integrated or never collected)
+ *   1 — insufficient AP (parity with chargePerp)
  */
 export function integrateCollected(_token, collectId) {
-  var state = getState();
+  var rawState = getState();
   var now = clockNow();
+  // Materialize so the AP regen ticks accumulated since the last call are
+  // visible — same contract as collectPerp / chargePerp.
+  var state = materialize(rawState, now).state;
+
+  if ((state.game_values && state.game_values.ap_snapshot || 0) < 1) {
+    return Promise.resolve({ result: { error: 1 } });
+  }
 
   // $pull db_queue entry.
   var entry = null;
@@ -1374,33 +1694,78 @@ export function integrateCollected(_token, collectId) {
     xp_value:       (state.game_values.xp_value    || 0) + xpGain,
     karma_value: Math.max(-100, Math.min(100,
       (state.game_values.karma_value || 0) + karmaGain)),
-    profiles_value: (state.game_values.profiles_value || 0) + increment
+    profiles_value: (state.game_values.profiles_value || 0) + increment,
+    ap_snapshot:    Math.max(0, (state.game_values.ap_snapshot || 0) - 1)
   });
 
+  var ruleset = _getRuleset();
   var tokensMap = ps.tokens_map || {};
   var updatedNodes = [];
+  var seenGestalts = {};
   var newNodes = (state.nodes || []).map(function (n) {
     var tok = tokensMap[n.gestalt];
     if (!tok) return n;
-    var newAmount = ((n.instance_data && n.instance_data.amount) || 0) + (tok.amount || 0);
+    seenGestalts[n.gestalt] = true;
+    // amount is a percentage [0,100]; cap so the bar (width = amount/100*60px)
+    // doesn't overflow and so absoluteAmount = profiles*amount/100 stays sane.
+    var newAmount = Math.min(100, ((n.instance_data && n.instance_data.amount) || 0) + (tok.amount || 0));
     var updated = Object.assign({}, n, {
       instance_data: Object.assign({}, n.instance_data, { amount: newAmount })
     });
     updatedNodes.push({
       game_id:       updated.game_id,
       gestalt:       updated.gestalt,
+      game_type:     updated.game_type,
+      full_type:     updated.full_type,
       full_path:     updated.full_path,
       instance_data: updated.instance_data
     });
     return updated;
   });
 
+  // First-time integration of a token type: append a new TokenPerp node
+  // under Database.<gestalt>. Without this, DBTokens stays empty, the
+  // Database tab stays blank, and integrate_profiles missions never tick.
+  // Seed without x/y so the UI's setRandomPosition (Render.js:2393) places
+  // the new tile with collision avoidance around (1024,800), then
+  // saveCoordsQueue persists the resolved position. Pre-seeding x/y
+  // bypassed that and made every new token stack at a single hashed point.
+  Object.keys(tokensMap).forEach(function (gestalt) {
+    if (seenGestalts[gestalt]) return;
+    if (!ruleset.tokens || !ruleset.tokens[gestalt]) return;
+    var tok = tokensMap[gestalt];
+    var newNode = {
+      game_id:    gestalt,
+      gestalt:    gestalt,
+      game_type:  'TokenPerp',
+      full_type:  'TokenPerp:' + gestalt,
+      full_path:  'Database.' + gestalt,
+      instance_data: { amount: Math.min(100, tok.amount || 0) }
+    };
+    newNodes = newNodes.concat([newNode]);
+    updatedNodes.push({
+      game_id:       newNode.game_id,
+      gestalt:       newNode.gestalt,
+      game_type:     newNode.game_type,
+      full_type:     newNode.full_type,
+      full_path:     newNode.full_path,
+      instance_data: newNode.instance_data
+    });
+  });
+
   var oldLevel = (state.game_values && state.game_values.xp_level) || 1;
   var newLevel = _getLevelByXP(newGv.xp_value);
   var levelup  = newLevel > oldLevel;
-  if (levelup) newGv = Object.assign({}, newGv, { xp_level: newLevel });
+  if (levelup) {
+    var integrateLevels = _getRuleset().levels;
+    var integrateLevelInfo = integrateLevels[newLevel - 1] || integrateLevels[integrateLevels.length - 1];
+    newGv = Object.assign({}, newGv, {
+      xp_level: newLevel,
+      ap_snapshot: integrateLevelInfo.ap_max
+    });
+  }
 
-  var newState = Object.assign({}, state, {
+  var preMissionState = Object.assign({}, state, {
     db_queue:       newQueue,
     nodes:          newNodes,
     game_values:    newGv,
@@ -1408,15 +1773,27 @@ export function integrateCollected(_token, collectId) {
     last_seen_ts:   Math.max(now, state.last_seen_ts || 0)
   });
 
+  // Advance integrate_profiles goals against the new TokenPerp amounts.
+  var missionResult = _advanceIntegrateProfilesMissions(
+    preMissionState, newGv.profiles_value || 0, newNodes
+  );
+  newGv = _applyRewardsToGv(newGv, missionResult.rewards);
+  var newState = Object.assign({}, preMissionState, {
+    game_values: newGv,
+    mission_goals: missionResult.mission_goals,
+    active_missions: missionResult.active_missions
+  });
+
   // Persist delta for webxdc replay; result carries full state for the reducer.
   _commitDelta(newState, state.addr, 'integrateCollected', [collectId],
-    { increment: increment, dup: dup, game_values: newGv, nodes: updatedNodes });
+    { increment: increment, dup: dup, game_values: newGv, nodes: updatedNodes,
+      missions: missionResult.missions });
 
   var response = {
     result: { nodes: updatedNodes, increment: increment, dup: dup },
     game_values: newGv,
     levelup: levelup,
-    missions: { complete_missions: [], updated_missions: [] }
+    missions: missionResult.missions || { complete_missions: [], updated_missions: [] }
   };
 
   if (levelup) {
@@ -1426,6 +1803,41 @@ export function integrateCollected(_token, collectId) {
   }
 
   return Promise.resolve({ result: response });
+}
+
+// ---------------------------------------------------------------------------
+// dismissMissionBriefing(token, gestalt) — record that the player has closed
+// the briefing popup for a given mission so we don't re-open it on reload.
+// ---------------------------------------------------------------------------
+
+export function markTokenSeen(_token, gestalt) {
+  if (typeof gestalt !== 'string' || !gestalt) {
+    return Promise.resolve({ result: { error: 0 } });
+  }
+  var state = getState();
+  var seen = state.tokens_seen || {};
+  if (seen[gestalt]) {
+    return Promise.resolve({ result: { ok: true } });
+  }
+  var newSeen = Object.assign({}, seen, { [gestalt]: true });
+  var newState = Object.assign({}, state, { tokens_seen: newSeen });
+  _commitDelta(newState, state.addr, 'markTokenSeen', [gestalt], { gestalt: gestalt });
+  return Promise.resolve({ result: { ok: true } });
+}
+
+export function dismissMissionBriefing(_token, gestalt) {
+  if (typeof gestalt !== 'string' || !gestalt) {
+    return Promise.resolve({ result: { error: 0 } });
+  }
+  var state = getState();
+  var seen = state.mission_briefings_seen || {};
+  if (seen[gestalt]) {
+    return Promise.resolve({ result: { ok: true } });
+  }
+  var newSeen = Object.assign({}, seen, { [gestalt]: true });
+  var newState = Object.assign({}, state, { mission_briefings_seen: newSeen });
+  _commitDelta(newState, state.addr, 'dismissMissionBriefing', [gestalt], { gestalt: gestalt });
+  return Promise.resolve({ result: { ok: true } });
 }
 
 // ---------------------------------------------------------------------------
@@ -1465,6 +1877,8 @@ var LocalEngine = Object.assign({
   chargePerp:         chargePerp,
   collectPerp:        collectPerp,
   integrateCollected: integrateCollected,
+  dismissMissionBriefing: dismissMissionBriefing,
+  markTokenSeen:      markTokenSeen,
   setEmitter:         setEmitter,
   setSendDelta:       setSendDelta,
   setPrngSeed:        setPrngSeed,

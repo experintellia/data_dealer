@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   getToken, ping, getSessionLocale, setLocale, loadGame, getRanking, setEmitter,
   setDisplayName, setPerpCoordinates, buyKarma,
-  buyPowerup, sellPowerup, buySlots, buyPerp
+  buyPowerup, sellPowerup, buySlots, buyPerp,
+  dismissMissionBriefing, markTokenSeen
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
@@ -446,6 +447,26 @@ describe('materialization on boot', () => {
 
     expect(emitted).toHaveLength(0);
   });
+
+  it('AP regen survives reload — first loadGame seeds the clock, second ticks', async () => {
+    setOverride(FIXED_NOW);
+    setState(mkState({
+      game_values: Object.assign({}, freshState('test@local').game_values, {
+        ap_snapshot: 0, ap_update: null
+      })
+    }));
+
+    // First load seeds ap_update without granting any ticks.
+    await loadGame('tok');
+    expect(getState().game_values.ap_update).toBe(FIXED_NOW);
+    expect(getState().game_values.ap_snapshot).toBe(0);
+
+    // Two minutes later (one ap_inc_interval at level 1) → +1 AP.
+    setOverride(FIXED_NOW + 120000);
+    await loadGame('tok');
+    expect(getState().game_values.ap_snapshot).toBe(1);
+    expect(getState().game_values.ap_update).toBe(FIXED_NOW + 120000);
+  });
 });
 
 // ── setDisplayName ────────────────────────────────────────────────────────────
@@ -594,7 +615,7 @@ var PROJECT_NODE = {
   }
 };
 
-// State with enough cash for any normal purchase (default seed: 300).
+// State with enough cash for any normal purchase (default seed: 270).
 function mkProjectState(overrides) {
   var base = freshState('test@local');
   return Object.assign({}, base, { nodes: [PROJECT_NODE] }, overrides || {});
@@ -661,7 +682,7 @@ describe('buyPowerup — happy path', () => {
     await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
     const s = getState();
     expect(s.nodes[0].instance_data.powerups).toHaveLength(1);
-    expect(s.game_values.cash_value).toBe(300 - 90);
+    expect(s.game_values.cash_value).toBe(270 - 90);
   });
 });
 
@@ -1045,6 +1066,38 @@ describe('buyPerp — failure: unknown gestalt', () => {
   });
 });
 
+// ── level-up: buyPerp's xp_inc crosses a threshold ─────────────────────────
+//
+// contact001 requires level 3 (xp_min=31, xp_max=54), xp_inc=1. Setting
+// xp_value=54, xp_level=3 means the next 1-XP buy lands the player at
+// xp=55 = level 4 (xp_min=55, xp_max=80, ap_max=14).
+
+describe('buyPerp — level-up refills ap_snapshot', () => {
+  beforeEach(() => {
+    setState(Object.assign(mkBuyPerpState(), {
+      game_values: {
+        xp_value: 54, xp_level: 3,
+        cash_value: 10000, cash_spent: 0,
+        karma_value: 0, profiles_value: 0, profiles_max: 1,
+        ap_snapshot: 1, ap_update: null
+      }
+    }));
+  });
+
+  it('returns levelup=true', async () => {
+    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    expect(result.error).toBeUndefined();
+    expect(result.levelup).toBe(true);
+  });
+
+  it('advances xp_level and refills AP to the new level\'s ap_max', async () => {
+    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    expect(result.game_values.xp_level).toBe(4);
+    expect(result.game_values.ap_snapshot).toBe(14);
+    expect(result.game_values.ap_max).toBe(14);
+  });
+});
+
 // ── setLocale ────────────────────────────────────────────────────────────────
 
 describe('setLocale', () => {
@@ -1107,5 +1160,106 @@ describe('getSessionLocale — persisted locale', () => {
     setState(mkState());
     const data = await getSessionLocale();
     expect(data.result).toBe('de');
+  });
+});
+
+// ── dismissMissionBriefing ──────────────────────────────────────────────────
+
+describe('dismissMissionBriefing — happy path', () => {
+  beforeEach(() => setState(mkState()));
+
+  it('resolves to {result: {ok: true}}', async () => {
+    const data = await dismissMissionBriefing('tok', 'mission002');
+    expect(data).toEqual({ result: { ok: true } });
+  });
+
+  it('records the gestalt under state.mission_briefings_seen', async () => {
+    await dismissMissionBriefing('tok', 'mission002');
+    expect(getState().mission_briefings_seen).toEqual({ mission002: true });
+  });
+
+  it('is idempotent — re-dispatching the same gestalt does not throw', async () => {
+    await dismissMissionBriefing('tok', 'mission002');
+    const data = await dismissMissionBriefing('tok', 'mission002');
+    expect(data).toEqual({ result: { ok: true } });
+    expect(getState().mission_briefings_seen).toEqual({ mission002: true });
+  });
+
+  it('accumulates multiple dismissals', async () => {
+    await dismissMissionBriefing('tok', 'mission002');
+    await dismissMissionBriefing('tok', 'mission003');
+    expect(getState().mission_briefings_seen).toEqual({
+      mission002: true,
+      mission003: true
+    });
+  });
+});
+
+describe('dismissMissionBriefing — failure modes', () => {
+  beforeEach(() => setState(mkState()));
+
+  it('returns error 0 for empty string gestalt', async () => {
+    const data = await dismissMissionBriefing('tok', '');
+    expect(data).toEqual({ result: { error: 0 } });
+    expect(getState().mission_briefings_seen).toEqual({});
+  });
+
+  it('returns error 0 for non-string gestalt', async () => {
+    const data = await dismissMissionBriefing('tok', 42);
+    expect(data).toEqual({ result: { error: 0 } });
+  });
+
+  it('returns error 0 for undefined gestalt', async () => {
+    const data = await dismissMissionBriefing('tok');
+    expect(data).toEqual({ result: { error: 0 } });
+  });
+});
+
+// ── markTokenSeen ───────────────────────────────────────────────────────────
+
+describe('markTokenSeen — happy path', () => {
+  beforeEach(() => setState(mkState()));
+
+  it('resolves to {result: {ok: true}}', async () => {
+    const data = await markTokenSeen('tok', 'token008');
+    expect(data).toEqual({ result: { ok: true } });
+  });
+
+  it('records the gestalt under state.tokens_seen', async () => {
+    await markTokenSeen('tok', 'token008');
+    expect(getState().tokens_seen).toEqual({ token008: true });
+  });
+
+  it('is idempotent', async () => {
+    await markTokenSeen('tok', 'token008');
+    const data = await markTokenSeen('tok', 'token008');
+    expect(data).toEqual({ result: { ok: true } });
+    expect(getState().tokens_seen).toEqual({ token008: true });
+  });
+
+  it('accumulates multiple gestalts', async () => {
+    await markTokenSeen('tok', 'token001');
+    await markTokenSeen('tok', 'token008');
+    expect(getState().tokens_seen).toEqual({ token001: true, token008: true });
+  });
+});
+
+describe('markTokenSeen — failure modes', () => {
+  beforeEach(() => setState(mkState()));
+
+  it('returns error 0 for empty string gestalt', async () => {
+    const data = await markTokenSeen('tok', '');
+    expect(data).toEqual({ result: { error: 0 } });
+    expect(getState().tokens_seen).toEqual({});
+  });
+
+  it('returns error 0 for non-string gestalt', async () => {
+    const data = await markTokenSeen('tok', 42);
+    expect(data).toEqual({ result: { error: 0 } });
+  });
+
+  it('returns error 0 for undefined gestalt', async () => {
+    const data = await markTokenSeen('tok');
+    expect(data).toEqual({ result: { error: 0 } });
   });
 });

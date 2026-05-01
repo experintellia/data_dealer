@@ -7,9 +7,11 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  collectPerp, integrateCollected, setEmitter, setPrngSeed
+  collectPerp, integrateCollected, chargePerp, buyPerp, loadGame,
+  setEmitter, setPrngSeed
 } from '../../scripts/LocalEngine.js';
-import { setState } from '../../scripts/boot.js';
+import { setState, getState } from '../../scripts/boot.js';
+import { materialize } from '../../scripts/materializer.js';
 import { freshState } from '../../scripts/state.js';
 import { setOverride, clearOverride, advance } from '../../scripts/clock.js';
 
@@ -89,7 +91,9 @@ describe('full flow: ContactPerp charge → collect → integrate', () => {
 
     const data = await collectPerp('tok', PATH);
     expect(data.result.error).toBeUndefined();
-    expect(data.result.result.profile_set).toEqual({ profiles_value: 5, tokens_map: {} });
+    expect(data.result.result.profile_set.profiles_value).toBe(5);
+    // contact001's `tokens` list populates tokens_map (percentage * profiles).
+    expect(typeof data.result.result.profile_set.tokens_map).toBe('object');
     expect(data.result.result.origin).toBe(PATH);
     expect(typeof data.result.result.collect_id).toBe('string');
     expect(data.result.result.collect_id.length).toBeGreaterThan(0);
@@ -223,7 +227,6 @@ describe('collectPerp — ContactPerp', () => {
 
 describe('collectPerp — ProjectPerp', () => {
   const PATH = 'Imperium.City.project001';
-  const PS = { profiles_value: 10, tokens_map: {} };
 
   beforeEach(() => setOverride(FIXED_NOW));
   afterEach(() => clearOverride());
@@ -235,7 +238,8 @@ describe('collectPerp — ProjectPerp', () => {
     }));
 
     const { result } = await collectPerp('tok', PATH);
-    expect(result.result.profile_set).toEqual(PS);
+    expect(result.result.profile_set.profiles_value).toBe(10);
+    expect(typeof result.result.profile_set.tokens_map).toBe('object');
     expect(result.result.origin).toBe(PATH);
     expect(result.result.collect_id).toBeTruthy();
   });
@@ -252,7 +256,8 @@ describe('collectPerp — ProjectPerp', () => {
     expect(s.db_queue).toHaveLength(1);
     const q = s.db_queue[0];
     expect(q.collect_id).toBe(result.result.collect_id);
-    expect(q.profile_set).toEqual(PS);
+    expect(q.profile_set.profiles_value).toBe(10);
+    expect(typeof q.profile_set.tokens_map).toBe('object');
     expect(q.origin).toBe(PATH);
     expect(typeof q.collect_dt).toBe('number');
   });
@@ -470,6 +475,39 @@ describe('integrateCollected — token node updates', () => {
     expect(result.game_values.profiles_value).toBe(4);
   });
 
+  it('caps instance_data.amount at 100 — bar width = amount/100*60px must not overflow', async () => {
+    const tokenNode = mkNode('TokenPerp', TOKEN_PATH, { amount: 90 });
+    tokenNode.gestalt = 'token_a';
+    setState(mkState({
+      nodes: [tokenNode],
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 4, tokens_map: { token_a: { amount: 50 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.result.nodes[0].instance_data.amount).toBe(100);
+  });
+
+  it('caps a fresh-seeded TokenPerp at 100 too', async () => {
+    setState(mkState({
+      locale: 'en',
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 50, tokens_map: { token008: { amount: 250 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const seeded = result.result.nodes.find(n => n.gestalt === 'token008');
+    expect(seeded.instance_data.amount).toBe(100);
+  });
+
   it('returns game_values, levelup, and missions for server parity', async () => {
     setState(mkState({
       db_queue: [{
@@ -499,5 +537,674 @@ describe('integrateCollected — token node updates', () => {
     await integrateCollected('tok', COLLECT_ID);
     const { getState } = await import('../../scripts/boot.js');
     expect(getState().db_queue).toHaveLength(0);
+  });
+
+  it('appends a new TokenPerp node the first time a token type is integrated', async () => {
+    // token008 is a real ruleset entry (mission002 targets it). State has no
+    // node for it yet — integrateCollected must seed one under Database/.
+    setState(mkState({
+      locale: 'en',
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 50, tokens_map: { token008: { amount: 25 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const newEntry = result.result.nodes.find(function (n) { return n.gestalt === 'token008'; });
+    expect(newEntry).toBeDefined();
+    expect(newEntry.game_type).toBe('TokenPerp');
+    expect(newEntry.full_path).toBe('Database.token008');
+    expect(newEntry.instance_data.amount).toBe(25);
+
+    const { getState } = await import('../../scripts/boot.js');
+    const persisted = getState().nodes.find(function (n) { return n.gestalt === 'token008'; });
+    expect(persisted).toBeDefined();
+    expect(persisted.full_path).toBe('Database.token008');
+  });
+
+  it('does not seed a node for a gestalt that is not in ruleset.tokens', async () => {
+    setState(mkState({
+      locale: 'en',
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 5, tokens_map: { not_a_real_token: { amount: 9 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.result.nodes).toHaveLength(0);
+  });
+});
+
+// ── level-up refills AP across collect/integrate paths ──────────────────────
+//
+// Level 1 (de + en): xp_min=0,  xp_max=10, ap_max=6
+// Level 2 (de + en): xp_min=11, xp_max=30, ap_max=8
+
+describe('collectPerp — level-up refills ap_snapshot to the new ap_max', () => {
+  const PATH = 'Imperium.City.Agent0.contact001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('crossing the xp_max threshold returns levelup=true and ap_snapshot=8', async () => {
+    setState(mkState({
+      // xp_value=10 + xp_inc=1 (contact001) = 11 → level 2.
+      game_values: Object.assign({}, mkGv(), {
+        xp_value: 10, xp_level: 1, ap_snapshot: 0, ap_max: 6
+      }),
+      nodes: [{
+        game_id: 'node_contact001', game_type: 'ContactPerp',
+        full_type: 'ContactPerp:contact001', gestalt: 'contact001',
+        full_path: PATH, instance_data: {}
+      }],
+      nodes_collect: [{ path: PATH, result: { amount: 5 } }]
+    }));
+
+    const { result } = await collectPerp('tok', PATH);
+    expect(result.levelup).toBe(true);
+    expect(result.game_values.xp_level).toBe(2);
+    expect(result.game_values.ap_snapshot).toBe(8);
+  });
+});
+
+describe('integrateCollected — ap cost', () => {
+  const COLLECT_ID = 'ap-cost-001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('decrements ap_snapshot by 1', async () => {
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), { ap_snapshot: 5, ap_max: 6 }),
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 1, tokens_map: {} },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.game_values.ap_snapshot).toBe(4);
+  });
+
+  it('returns error 1 when ap_snapshot is 0 (parity with chargePerp)', async () => {
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), { ap_snapshot: 0, ap_max: 6 }),
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 1, tokens_map: {} },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const data = await integrateCollected('tok', COLLECT_ID);
+    expect(data.result.error).toBe(1);
+  });
+
+  it('level-up refill overrides the AP cost — full ap_max after crossing threshold', async () => {
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), {
+        xp_value: 10, xp_level: 1, ap_snapshot: 3, ap_max: 6
+      }),
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 1, tokens_map: {}, xp_gain: 10 },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.levelup).toBe(true);
+    expect(result.game_values.xp_level).toBe(2);
+    expect(result.game_values.ap_snapshot).toBe(8); // level 2 ap_max, not 3-1=2
+  });
+});
+
+describe('integrateCollected — level-up refills ap_snapshot to the new ap_max', () => {
+  const COLLECT_ID = 'lvlup-integrate-001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('crossing xp_max via xp_gain returns levelup=true and full AP', async () => {
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), {
+        xp_value: 5, xp_level: 1, ap_snapshot: 1, ap_max: 6
+      }),
+      db_queue: [{
+        origin: 'Imperium.City.contact001',
+        collect_id: COLLECT_ID,
+        // xp_gain on the profile_set drives xp gain on integrate.
+        profile_set: { profiles_value: 4, tokens_map: {}, xp_gain: 10, karma_gain: 0 },
+        collect_dt: FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.levelup).toBe(true);
+    expect(result.game_values.xp_level).toBe(2);
+    expect(result.game_values.ap_snapshot).toBe(8);
+  });
+});
+
+// ── tokens_map populated from typeData.tokens ──────────────────────────────
+//
+// Contacts list yielded token types under `tokens`; each entry's `amount`
+// is a percentage of profiles_value. Without a populated tokens_map,
+// integrate_profiles missions can't advance.
+
+describe('collectPerp — tokens_map population from typeData.tokens', () => {
+  // contact001 (Nurse Helen) has 12 tokens, each at 100%.
+  const PATH = 'Imperium.City.Agent0.contact001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('tokens_map carries an entry for every gestalt in typeData.tokens', async () => {
+    setState(mkState({
+      nodes:         [mkNode('ContactPerp', PATH)],
+      nodes_collect: [{ path: PATH, result: { amount: 10 } }]
+    }));
+
+    const { result } = await collectPerp('tok', PATH);
+    const tm = result.result.profile_set.tokens_map;
+    // contact001 lists token001, token002, ..., token018, origin012 — 12 in total.
+    expect(Object.keys(tm).sort()).toEqual([
+      'origin012',
+      'token001', 'token002', 'token003', 'token004', 'token005',
+      'token006', 'token007', 'token014', 'token015', 'token017',
+      'token018'
+    ].sort());
+  });
+
+  it('amount is the raw ruleset percentage (passed through unchanged)', async () => {
+    setState(mkState({
+      nodes:         [mkNode('ContactPerp', PATH)],
+      nodes_collect: [{ path: PATH, result: { amount: 10 } }]
+    }));
+
+    const { result } = await collectPerp('tok', PATH);
+    expect(result.result.profile_set.tokens_map.token001).toEqual({ amount: 100 });
+    expect(result.result.profile_set.tokens_map.token008).toBeUndefined(); // not in contact001's list
+  });
+
+  it('Jessica (contact035) yields token008 from her tokens list — unblocks mission002', async () => {
+    const JPATH = 'Imperium.CityVienna.Agent0.contact035';
+    setState(mkState({
+      nodes:         [mkNode('ContactPerp', JPATH)],
+      nodes_collect: [{ path: JPATH, result: { amount: 1100 } }]
+    }));
+
+    const { result } = await collectPerp('tok', JPATH);
+    // Jessica lists token008 at 100%; downstream absoluteAmount =
+    // profiles_value * amount / 100 = 1100, which exceeds mission002's 900 target.
+    expect(result.result.profile_set.tokens_map.token008).toEqual({ amount: 100 });
+  });
+
+  it('tokens_map stays empty when typeData.tokens is missing', async () => {
+    // contact002 is not in the ruleset → typeData undefined → tokens_map empty.
+    const FPATH = 'Imperium.City.Agent0.contact002';
+    setState(mkState({
+      nodes:         [mkNode('ContactPerp', FPATH)],
+      nodes_collect: [{ path: FPATH, result: { amount: 5 } }]
+    }));
+
+    const { result } = await collectPerp('tok', FPATH);
+    expect(result.result.profile_set.tokens_map).toEqual({});
+  });
+});
+
+// ── integrateCollected payload shape ────────────────────────────────────────
+//
+// Newly seeded TokenPerp nodes must carry game_type and full_type so the
+// applyDelta reducer can append them on cold-start replay.
+
+describe('integrateCollected — payload shape for newly seeded TokenPerps', () => {
+  const COLLECT_ID = 'shape-001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('new node entries carry game_type=TokenPerp and full_type=TokenPerp:<gestalt>', async () => {
+    setState(mkState({
+      locale: 'en',
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 50, tokens_map: { token008: { amount: 25 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const newEntry = result.result.nodes.find(function (n) { return n.gestalt === 'token008'; });
+    expect(newEntry).toBeDefined();
+    expect(newEntry.game_type).toBe('TokenPerp');
+    expect(newEntry.full_type).toBe('TokenPerp:token008');
+    expect(newEntry.full_path).toBe('Database.token008');
+    expect(newEntry.game_id).toBe('token008');
+  });
+
+  it('seeded entries replay correctly through applyDelta', async () => {
+    setState(mkState({
+      locale: 'en',
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 50, tokens_map: { token008: { amount: 25 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    await integrateCollected('tok', COLLECT_ID);
+    const { getState } = await import('../../scripts/boot.js');
+    const persisted = getState().nodes.find(function (n) { return n.gestalt === 'token008'; });
+    expect(persisted.game_type).toBe('TokenPerp');
+    expect(persisted.full_type).toBe('TokenPerp:token008');
+  });
+});
+
+// ── Mission progression: collect_profiles + integrate_profiles ──────────────
+
+describe('mission progression — integrate_profiles flow', () => {
+  const JESSICA = 'Imperium.City.Agent0.contact035';
+  const COLLECT_ID = 'mission-progress-001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  function seedMission002Active() {
+    setState(mkState({
+      active_missions: ['mission002'],
+      mission_goals: [{
+        mission: 'mission002',
+        workflow: 'integrate_profiles',
+        target: 'token008',
+        amount: 900,
+        position: 1,
+        current_amount: 0,
+        complete: false
+      }],
+      db_queue: [{
+        origin:      JESSICA,
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 1100, tokens_map: { token008: { amount: 100 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+  }
+
+  it('integrating Jessica advances mission002.current_amount to the absoluteAmount', async () => {
+    seedMission002Active();
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const goal = getState().mission_goals.find(g => g.mission === 'mission002');
+    // profiles_value=1100, amount=100% → absolute=1100, capped at goal.amount=900.
+    expect(goal.current_amount).toBe(900);
+    expect(goal.complete).toBe(true);
+    // Response carries the same shape Game.js consumes.
+    expect(result.missions.complete_missions).toContain('mission002');
+  });
+
+  it('partial integrate (50% coverage) advances current_amount but stays incomplete', async () => {
+    setState(mkState({
+      active_missions: ['mission002'],
+      mission_goals: [{
+        mission: 'mission002',
+        workflow: 'integrate_profiles',
+        target: 'token008',
+        amount: 900,
+        position: 1,
+        current_amount: 0,
+        complete: false
+      }],
+      db_queue: [{
+        origin:      JESSICA,
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 1000, tokens_map: { token008: { amount: 50 } } },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    await integrateCollected('tok', COLLECT_ID);
+    const goal = getState().mission_goals.find(g => g.mission === 'mission002');
+    // profiles_value=1000, amount=50% → absolute=500.
+    expect(goal.current_amount).toBe(500);
+    expect(goal.complete).toBe(false);
+  });
+
+  it('completing mission002 activates mission003 (required_mission chain) with seeded goals', async () => {
+    seedMission002Active();
+    await integrateCollected('tok', COLLECT_ID);
+    const s = getState();
+    expect(s.active_missions).not.toContain('mission002');
+    expect(s.active_missions).toContain('mission003');
+    const m3goal = s.mission_goals.find(g => g.mission === 'mission003');
+    expect(m3goal).toBeDefined();
+    expect(m3goal.current_amount).toBe(0);
+    expect(m3goal.complete).toBe(false);
+  });
+
+  it('mission_goals delta replays cleanly through applyDelta', async () => {
+    seedMission002Active();
+    await integrateCollected('tok', COLLECT_ID);
+    // Cold-start replay: take the persisted state, run loadGame.
+    const s1 = getState();
+    setState(s1);
+    await loadGame('tok');
+    const goal = getState().mission_goals.find(g => g.mission === 'mission002');
+    expect(goal.current_amount).toBe(900);
+    expect(goal.complete).toBe(true);
+  });
+
+  it('progress is monotonic — a smaller integrate does not roll back current_amount', async () => {
+    // First integrate fills mission002 to 900 (Jessica 100% × 1100 profiles).
+    seedMission002Active();
+    await integrateCollected('tok', COLLECT_ID);
+
+    // Construct a hypothetical second integrate from a 50%-coverage contact
+    // that, naively, would compute a smaller absoluteAmount. Using
+    // _advanceIntegrateProfilesMissions directly via state setup: feed a
+    // db_queue entry whose profile_set has lower amount on token008, then
+    // assert mission002.current_amount stays at the high-water mark.
+    const s = getState();
+    s.mission_goals = s.mission_goals.map(g =>
+      g.mission === 'mission002'
+        ? Object.assign({}, g, { current_amount: 500, complete: false })
+        : g
+    );
+    s.active_missions = s.active_missions.concat(['mission002']);
+    s.db_queue = [{
+      origin: JESSICA, collect_id: 'second-integrate',
+      profile_set: { profiles_value: 100, tokens_map: { token008: { amount: 50 } } },
+      collect_dt: FIXED_NOW
+    }];
+    setState(s);
+
+    await integrateCollected('tok', 'second-integrate');
+    // 100 profiles × 50% = 50 absolute → would regress from 500 if not guarded.
+    const goal = getState().mission_goals.find(g => g.mission === 'mission002');
+    expect(goal.current_amount).toBeGreaterThanOrEqual(500);
+  });
+});
+
+describe('mission progression — collect_profiles flow', () => {
+  const JESSICA = 'Imperium.City.Agent0.contact035';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('collecting Jessica advances mission001.current_amount by the collected profile count', async () => {
+    setState(mkState({
+      nodes: [mkNode('ContactPerp', JESSICA)],
+      nodes_collect: [{ path: JESSICA, result: { amount: 600 } }],
+      active_missions: ['mission001'],
+      mission_goals: [{
+        mission: 'mission001',
+        workflow: 'collect_profiles',
+        target: 'contact035',
+        amount: 900,
+        position: 2,
+        current_amount: 0,
+        complete: false
+      }]
+    }));
+
+    await collectPerp('tok', JESSICA);
+    const goal = getState().mission_goals.find(g => g.mission === 'mission001');
+    expect(goal.current_amount).toBe(600);
+    expect(goal.complete).toBe(false);
+  });
+
+  it('two collects from Jessica complete mission001 (cumulative)', async () => {
+    setState(mkState({
+      nodes: [mkNode('ContactPerp', JESSICA)],
+      nodes_collect: [{ path: JESSICA, result: { amount: 600 } }],
+      active_missions: ['mission001'],
+      mission_goals: [{
+        mission: 'mission001',
+        workflow: 'collect_profiles',
+        target: 'contact035',
+        amount: 900,
+        position: 2,
+        current_amount: 0,
+        complete: false
+      }]
+    }));
+
+    await collectPerp('tok', JESSICA);
+    setState(Object.assign({}, getState(), {
+      nodes_collect: [{ path: JESSICA, result: { amount: 600 } }]
+    }));
+    const { result } = await collectPerp('tok', JESSICA);
+
+    const goal = getState().mission_goals.find(g => g.mission === 'mission001');
+    expect(goal.current_amount).toBe(900);
+    expect(goal.complete).toBe(true);
+    expect(result.missions.complete_missions).toContain('mission001');
+  });
+
+  it('collecting from a non-target contact does not advance mission001', async () => {
+    const HELEN = 'Imperium.City.Agent1.contact001';
+    setState(mkState({
+      nodes: [mkNode('ContactPerp', HELEN)],
+      nodes_collect: [{ path: HELEN, result: { amount: 1500 } }],
+      active_missions: ['mission001'],
+      mission_goals: [{
+        mission: 'mission001',
+        workflow: 'collect_profiles',
+        target: 'contact035',
+        amount: 900,
+        position: 2,
+        current_amount: 0,
+        complete: false
+      }]
+    }));
+
+    await collectPerp('tok', HELEN);
+    const goal = getState().mission_goals.find(g => g.mission === 'mission001');
+    expect(goal.current_amount).toBe(0);
+    expect(goal.complete).toBe(false);
+  });
+});
+
+describe('loadGame seeds mission_goals from active_missions', () => {
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('fresh game with mission001 active gets goals seeded from ruleset on first loadGame', async () => {
+    setState(mkState({
+      active_missions: ['mission001'],
+      mission_goals: []
+    }));
+
+    await loadGame('tok');
+
+    const goals = getState().mission_goals;
+    const m1 = goals.find(g => g.mission === 'mission001');
+    expect(m1).toBeDefined();
+    expect(m1.workflow).toBe('collect_profiles');
+    expect(m1.target).toBe('contact035');
+    expect(m1.amount).toBe(900);
+    expect(m1.current_amount).toBe(0);
+    expect(m1.complete).toBe(false);
+  });
+
+  it('idempotent — re-running loadGame does not duplicate goals', async () => {
+    setState(mkState({
+      active_missions: ['mission001'],
+      mission_goals: []
+    }));
+
+    await loadGame('tok');
+    const goalsAfterFirst = getState().mission_goals.length;
+    await loadGame('tok');
+    expect(getState().mission_goals.length).toBe(goalsAfterFirst);
+  });
+});
+
+// ── Cash invariants & mission rewards ───────────────────────────────────────
+
+describe('cash invariants — collect/integrate must not deduct cash', () => {
+  const PATH = 'Imperium.City.Agent0.contact001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('ContactPerp collect leaves cash_value unchanged', async () => {
+    const startCash = 270;
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), { cash_value: startCash }),
+      nodes: [mkNode('ContactPerp', PATH)],
+      nodes_collect: [{ path: PATH, result: { amount: 5 } }]
+    }));
+
+    const { result } = await collectPerp('tok', PATH);
+    expect(result.game_values.cash_value).toBe(startCash);
+    expect(getState().game_values.cash_value).toBe(startCash);
+  });
+
+  it('integrateCollected leaves cash_value unchanged when no rewards fire', async () => {
+    const startCash = 270;
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), { cash_value: startCash }),
+      db_queue: [{
+        origin: PATH, collect_id: 'no-rewards',
+        profile_set: { profiles_value: 1, tokens_map: {} },
+        collect_dt: FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', 'no-rewards');
+    expect(result.game_values.cash_value).toBe(startCash);
+  });
+});
+
+describe('mission rewards — apply on completion', () => {
+  const JESSICA = 'Imperium.City.Agent0.contact035';
+  const COLLECT_ID = 'rewards-001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); });
+
+  it('completing mission002 grants its 100 cash + 1 xp reward', async () => {
+    const startCash = 200;
+    const startXp = 0;
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), {
+        cash_value: startCash, xp_value: startXp
+      }),
+      active_missions: ['mission002'],
+      mission_goals: [{
+        mission: 'mission002',
+        workflow: 'integrate_profiles',
+        target: 'token008',
+        amount: 900,
+        position: 1,
+        current_amount: 0,
+        complete: false
+      }],
+      db_queue: [{
+        origin: JESSICA, collect_id: COLLECT_ID,
+        profile_set: { profiles_value: 1100, tokens_map: { token008: { amount: 100 } } },
+        collect_dt: FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.game_values.cash_value).toBe(startCash + 100);
+    expect(result.game_values.xp_value).toBeGreaterThanOrEqual(startXp + 1);
+  });
+
+  it('partial-progress integrate (no completion) yields no rewards', async () => {
+    const startCash = 200;
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), { cash_value: startCash }),
+      active_missions: ['mission002'],
+      mission_goals: [{
+        mission: 'mission002',
+        workflow: 'integrate_profiles',
+        target: 'token008',
+        amount: 900,
+        position: 1,
+        current_amount: 0,
+        complete: false
+      }],
+      db_queue: [{
+        origin: JESSICA, collect_id: COLLECT_ID,
+        profile_set: { profiles_value: 500, tokens_map: { token008: { amount: 50 } } },
+        collect_dt: FIXED_NOW
+      }]
+    }));
+
+    const { result } = await integrateCollected('tok', COLLECT_ID);
+    expect(result.game_values.cash_value).toBe(startCash);
+  });
+
+  it('end-to-end: charge car company → wait → collect adds ~584 cash', async () => {
+    const CAR_PATH = 'Imperium.City.Pusher0.client007';
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), {
+        cash_value: 100, ap_snapshot: 6, xp_level: 1
+      }),
+      nodes: [{
+        game_id: 'client007', game_type: 'ClientPerp',
+        full_type: 'ClientPerp:client007', gestalt: 'client007',
+        full_path: CAR_PATH,
+        instance_data: {}
+      }]
+    }));
+
+    const chargeRes = await chargePerp('tok', CAR_PATH);
+    expect(chargeRes.result.error).toBeUndefined();
+    expect(chargeRes.result.duration).toBe(60000); // car charge_time
+    const cashAfterCharge = getState().game_values.cash_value;
+    expect(cashAfterCharge).toBe(100); // car has no charge_cost
+
+    // Move clock past charge_end and materialize so the entry transitions.
+    setOverride(FIXED_NOW + 60001);
+    const matResult = materialize(getState(), FIXED_NOW + 60001);
+    setState(matResult.state);
+    expect(getState().nodes_collect).toHaveLength(1);
+    expect(getState().nodes_collect[0].path).toBe(CAR_PATH);
+
+    const collectRes = await collectPerp('tok', CAR_PATH);
+    expect(collectRes.result.error).toBeUndefined();
+    const finalCash = collectRes.result.game_values.cash_value;
+    // 584 ± 5% variation, rounded.
+    expect(finalCash - cashAfterCharge).toBeGreaterThanOrEqual(553);
+    expect(finalCash - cashAfterCharge).toBeLessThanOrEqual(614);
+    expect(getState().game_values.cash_value).toBe(finalCash);
+  });
+
+  it('completing mission001 grants its xp reward via collectPerp', async () => {
+    const startXp = 0;
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), { xp_value: startXp }),
+      nodes: [mkNode('ContactPerp', JESSICA)],
+      nodes_collect: [{ path: JESSICA, result: { amount: 1100 } }],
+      active_missions: ['mission001'],
+      mission_goals: [{
+        mission: 'mission001',
+        workflow: 'collect_profiles',
+        target: 'contact035',
+        amount: 900,
+        position: 2,
+        current_amount: 0,
+        complete: false
+      }]
+    }));
+
+    const { result } = await collectPerp('tok', JESSICA);
+    // contact035 xp_inc=1 + mission001 reward=2.
+    expect(result.game_values.xp_value).toBe(startXp + 1 + 2);
   });
 });

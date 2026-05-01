@@ -890,6 +890,10 @@ msgstr "Ok"
 msgid "Close"
 msgstr "Schliessen"
 
+#: views/mainmenu.html:8
+msgid "About"
+msgstr "Über"
+
 #: views/popup_agent.html:31
 msgid "agent_popup selector title"
 msgstr "Kontakte anwerben"

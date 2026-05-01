@@ -584,6 +584,17 @@
   background-position: -315px -703px;
 }
 
+.ZoomControls div.disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  cursor: default;
+}
+.ZoomControls div.disabled:hover {
+  -webkit-transform: none;
+  -moz-transform: none;
+  transform: none;
+}
+
 .ZoomControls div:hover {
   -webkit-transform: scale(1.1,1.1);
   -moz-transform: scale(1.1,1.1);
@@ -2003,6 +2014,17 @@
   left: 180px;
   width: 400px;
   text-align: left;
+}
+
+/* About dialog: long text body would otherwise scroll under the absolute
+   PopupButtons strip at bottom:-10px. Make the tab content scroll inside
+   .PopupContent and reserve room for the buttons. */
+.PopupBody.User .PopupContent {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.PopupBody.User .PopupTab {
+  padding-bottom: 56px;
 }
 
 .SubpopContainer {

@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-  chargePerp, setSendDelta, setEmitter,
+  chargePerp, loadGame, setSendDelta, setEmitter,
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
@@ -38,7 +38,10 @@ var BASE_GV = {
   cash_spent:      0,
   xp_value:        0,
   ap_snapshot:     3,
-  ap_update:       0,
+  // ap_update at FIXED_NOW so the materialize-on-entry call regenerates
+  // zero ticks (elapsed = 0). Tests that exercise regen explicitly
+  // override this.
+  ap_update:       FIXED_NOW,
   ap_inc_value:    1,
   ap_inc_interval: 120_000,
   ap_max:          6,
@@ -386,5 +389,221 @@ describe('chargePerp — failure: non-chargeable node (no charge_time)', () => {
 
     const { result } = await chargePerp('tok', 'Imperium.story001');
     expect(result.error).toBe(1);
+  });
+});
+
+// ── level-up: chargePerp's xp_inc crosses the threshold ─────────────────────
+//
+// Level 1 (de + en): xp_min=0,  xp_max=10, ap_max=6
+// Level 2 (de + en): xp_min=11, xp_max=30, ap_max=8
+// chargePerp on contact035 awards xp_inc=1, so xp=10 → 11 crosses to lvl 2.
+
+describe('chargePerp — level-up refills AP and advances xp_level', () => {
+  beforeEach(() => {
+    setOverride(FIXED_NOW);
+    setState(mkState({
+      game_values: { xp_value: 10, xp_level: 1, ap_snapshot: 3, ap_max: 6 }
+    }));
+  });
+
+  it('returns levelup=true when xp_inc crosses the level threshold', async () => {
+    const { result } = await chargePerp('tok', NODE_PATH);
+    expect(result.levelup).toBe(true);
+  });
+
+  it('advances xp_level to the new level', async () => {
+    const { result } = await chargePerp('tok', NODE_PATH);
+    expect(result.game_values.xp_level).toBe(2);
+  });
+
+  it('refills ap_snapshot to the new level\'s ap_max (not -1 from charging)', async () => {
+    const { result } = await chargePerp('tok', NODE_PATH);
+    expect(result.game_values.ap_snapshot).toBe(8);
+  });
+});
+
+describe('chargePerp — no level-up keeps xp_level and decrements ap_snapshot', () => {
+  it('xp gain inside the same level reports levelup=false and AP-1', async () => {
+    setOverride(FIXED_NOW);
+    setState(mkState({
+      game_values: { xp_value: 5, xp_level: 1, ap_snapshot: 4, ap_max: 6 }
+    }));
+    const { result } = await chargePerp('tok', NODE_PATH);
+    expect(result.levelup).toBe(false);
+    expect(result.game_values.xp_level).toBe(1);
+    expect(result.game_values.ap_snapshot).toBe(3);
+  });
+});
+
+// ── live-tick: setTimeout fires materialize at charge_end ──────────────────
+//
+// chargePerp schedules a one-shot setTimeout per charge so the perp
+// transitions from nodes_charging → nodes_collect without requiring a page
+// reload. loadGame re-arms the timer for charges still in flight after a
+// cold start.
+
+describe('chargePerp — live-tick setTimeout', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    setOverride(FIXED_NOW);
+    setState(mkState());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    clearOverride();
+    setEmitter(null);
+  });
+
+  it('schedules a setTimeout for charge_time ms at the host clock', async () => {
+    const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+    await chargePerp('tok', NODE_PATH);
+    // contact035 charge_time = 30000 ms.
+    const matched = setTimeoutSpy.mock.calls.find(function (c) { return c[1] === CHARGE_TIME; });
+    expect(matched).toBeDefined();
+  });
+
+  it('emits node_ready when fake timers advance past charge_end', async () => {
+    var events = [];
+    setEmitter(function (ev, payload) { events.push({ ev: ev, payload: payload }); });
+
+    await chargePerp('tok', NODE_PATH);
+    // Advance the host wall clock that setTimeout reads, AND the injectable
+    // game clock that materialize() consults — both must cross charge_end.
+    setOverride(FIXED_NOW + CHARGE_TIME + 1);
+    vi.advanceTimersByTime(CHARGE_TIME + 1);
+
+    expect(events.some(function (e) { return e.ev === 'node_ready'; })).toBe(true);
+    const s = getState();
+    expect(s.nodes_charging.length).toBe(0);
+    expect(s.nodes_collect.length).toBe(1);
+    expect(s.nodes_collect[0].path).toBe(NODE_PATH);
+  });
+
+  it('loadGame re-arms timers for charges still in flight', async () => {
+    // Seed state with an active charge whose charge_end is 30s from now.
+    setState(mkState({
+      nodes_charging: [{
+        path:         NODE_PATH,
+        result:       { amount: 1100 },
+        charge_start: FIXED_NOW,
+        charge_end:   FIXED_NOW + CHARGE_TIME,
+        game_id:      'node-abc123',
+        game_type:    'ContactPerp'
+      }]
+    }));
+
+    var events = [];
+    setEmitter(function (ev, payload) { events.push({ ev: ev, payload: payload }); });
+
+    await loadGame('tok');
+    // Without rearm, advancing timers would not fire node_ready because no
+    // setTimeout was scheduled in this test session.
+    setOverride(FIXED_NOW + CHARGE_TIME + 1);
+    vi.advanceTimersByTime(CHARGE_TIME + 1);
+
+    expect(events.some(function (e) { return e.ev === 'node_ready'; })).toBe(true);
+  });
+
+  it('calling loadGame twice does not duplicate node_ready emits for one charge', async () => {
+    setState(mkState({
+      nodes_charging: [{
+        path:         NODE_PATH,
+        result:       { amount: 1100 },
+        charge_start: FIXED_NOW,
+        charge_end:   FIXED_NOW + CHARGE_TIME,
+        game_id:      'node-abc123',
+        game_type:    'ContactPerp'
+      }]
+    }));
+
+    var events = [];
+    setEmitter(function (ev, payload) {
+      if (ev === 'node_ready') events.push(payload);
+    });
+
+    await loadGame('tok');
+    await loadGame('tok');
+    setOverride(FIXED_NOW + CHARGE_TIME + 1);
+    vi.advanceTimersByTime(CHARGE_TIME + 1);
+
+    // Without _clearAllChargeReady, two timers would queue and fire twice.
+    expect(events.length).toBe(1);
+  });
+});
+
+// ── AP regen visibility ─────────────────────────────────────────────────────
+//
+// Without materialize-on-entry, state.ap_snapshot stays at the last
+// handler's value while the UI's APTicker shows a higher number, and
+// chargePerp refuses despite the visible AP bar.
+
+describe('chargePerp — sees AP regen since the last materialize', () => {
+  beforeEach(() => {
+    setOverride(FIXED_NOW);
+    setState(mkState({
+      // ap_snapshot=0, ap_update set 2 minutes ago → one full tick ready.
+      game_values: Object.assign({}, BASE_GV, {
+        ap_snapshot: 0,
+        ap_update: FIXED_NOW - 120_000,
+        ap_inc_value: 1,
+        ap_inc_interval: 120_000,
+        ap_max: 6
+      })
+    }));
+  });
+
+  afterEach(() => {
+    clearOverride();
+    setSendDelta(null);
+    setEmitter(null);
+  });
+
+  it('charges successfully because materialize regenerates the queued AP tick', async () => {
+    const { result } = await chargePerp('tok', NODE_PATH);
+    expect(result.error).toBeUndefined();
+    expect(result.duration).toBe(CHARGE_TIME);
+  });
+});
+
+// ── ClientPerp income payout end-to-end ─────────────────────────────────────
+//
+// chargePerp on a ClientPerp must base chargeResult.amount on income_base
+// when typeData has no collect_amount. Without this, cr.amount stays 0 and
+// collectPerp's ClientPerp branch adds zero cash — the car company appears
+// to do nothing.
+
+describe('chargePerp — ClientPerp uses income_base when collect_amount is missing', () => {
+  const CAR_PATH = 'Imperium.City.Pusher0.client007';
+
+  beforeEach(() => {
+    setOverride(FIXED_NOW);
+    setState(Object.assign({}, freshState('test@local'), {
+      nodes: [{
+        game_id: 'node_client007',
+        game_type: 'ClientPerp',
+        full_type: 'ClientPerp:client007',
+        gestalt: 'client007',
+        full_path: CAR_PATH,
+        instance_data: {}
+      }],
+      game_values: Object.assign({}, BASE_GV, { cash_value: 300, ap_snapshot: 6 })
+    }));
+  });
+
+  afterEach(() => {
+    clearOverride();
+    setSendDelta(null);
+    setEmitter(null);
+  });
+
+  it('chargeEntry.result.amount is roughly income_base (584 ± 5%)', async () => {
+    await chargePerp('tok', CAR_PATH);
+    const charging = getState().nodes_charging;
+    expect(charging).toHaveLength(1);
+    const amount = charging[0].result.amount;
+    // ±5% variation, round() can nudge boundary by 1.
+    expect(amount).toBeGreaterThanOrEqual(553);
+    expect(amount).toBeLessThanOrEqual(614);
   });
 });

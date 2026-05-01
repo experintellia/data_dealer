@@ -157,6 +157,28 @@ describe('AP regen rule', () => {
     });
     expect(materialize(s, 3000).state.game_values.ap_snapshot).toBe(10);
   });
+
+  it('null ap_update seeds the regen clock from now (no immediate ticks)', () => {
+    const s = baseState({
+      game_values: { ap_snapshot: 5, ap_update: null,
+                     ap_inc_value: 1, ap_inc_interval: 1000, ap_max: 20 }
+    });
+    const r = materialize(s, 7000);
+    expect(r.state.game_values.ap_snapshot).toBe(5); // no time has passed since seed
+    expect(r.state.game_values.ap_update).toBe(7000);
+  });
+
+  it('seeded clock ticks correctly on subsequent materialize', () => {
+    const seed = baseState({
+      game_values: { ap_snapshot: 0, ap_update: null,
+                     ap_inc_value: 1, ap_inc_interval: 1000, ap_max: 20 }
+    });
+    const s1 = materialize(seed, 1000).state;
+    expect(s1.game_values.ap_update).toBe(1000);
+    const s2 = materialize(s1, 4500).state;
+    expect(s2.game_values.ap_snapshot).toBe(3);    // 3 full ticks
+    expect(s2.game_values.ap_update).toBe(4000);   // last full-tick boundary
+  });
 });
 
 // ── idempotence ──────────────────────────────────────────────────────────────
