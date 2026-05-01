@@ -80,7 +80,6 @@ var RenderTest = function(){
   var perp = new Render.Perp({
     x:50,
     y:333,
-    frameSrc:"img/sprites_100x100.png",
     frameMap: {
       normal: { "x": 884, "y": 1, "width": 82, "height": 82, "pivotx": 41, "pivoty": 41 },
       hover:  { "x": 966, "y": 1, "width": 82, "height": 82, "pivotx": 41, "pivoty": 41 },
