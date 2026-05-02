@@ -1339,8 +1339,10 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
     ? instanceData.charge_cost
     : (typeof typeData.charge_cost === 'number' ? typeData.charge_cost : 0);
 
+  // Error codes: 1 = insufficient AP, 2 = already charging, 3 = insufficient cash.
+  // Using distinct codes lets Game.js show the correct feedback animation.
   if ((gv.ap_snapshot || 0) < 1)           return Promise.resolve({ result: { error: 1 } });
-  if ((gv.cash_value  || 0) < chargeCost)  return Promise.resolve({ result: { error: 1 } });
+  if ((gv.cash_value  || 0) < chargeCost)  return Promise.resolve({ result: { error: 3 } });
 
   // ClientPerps don't carry collect_amount in the ruleset — they ship
   // income_base / income_factor instead. Fall back so charging the car

@@ -5004,6 +5004,10 @@ class CollectableClient(CollectablePerpBase):
       app.remote.buyPowerup(app.token, gnode.path, bslot, bgestalt).done(function(data) {
         if (data.result) {
           if (data.result.error !== undefined) {
+            // error 0 = node/type not found, error 1 = slot occupied, error 3 = insufficient cash
+            var buyErrors = { 0: 'node or powerup type not found', 1: 'slot already occupied', 3: 'insufficient cash' };
+            console.log('[BuyPowerup] failed:', buyErrors[data.result.error] || ('unknown error ' + data.result.error),
+              '| path:', gnode.path, '| slot:', bslot, '| gestalt:', bgestalt, data);
             if (data.result.error === 3) {
               gnode.NoCash();
             } else {
@@ -5079,7 +5083,10 @@ class CollectableClient(CollectablePerpBase):
       app.remote.buySlots(app.token, gnode.path, pcat, num).done(function(data) {
         if (data.result) {
           if (data.result.error !== undefined) {
-            // Probably no cash
+            // error 0 = node/type not found, error 3 = insufficient cash
+            var slotErrors = { 0: 'node or slot type not found', 3: 'insufficient cash' };
+            console.log('[BuySlots] failed:', slotErrors[data.result.error] || ('unknown error ' + data.result.error),
+              '| path:', gnode.path, '| type:', pcat, '| num:', num, data);
             gnode.NoCash();
             return;
           }
@@ -5191,9 +5198,9 @@ class CollectableClient(CollectablePerpBase):
     ProjectPerp.prototype.Charge = function() {
       var gnode = this;
       var groot = this.GameRoot;
-      // No request when not enough cash
+      // Client-side pre-checks before issuing the engine call.
       if (gnode.data.charge_cost > groot.cash_value) {
-        // No cash
+        console.log('[Charge] blocked: insufficient cash (have ' + groot.cash_value + ', need ' + gnode.data.charge_cost + ')');
         if (gnode.renderPopup && gnode.renderPopup.open) {
           gnode.renderPopup.trigger('no_cash');
         } else {
@@ -5201,16 +5208,27 @@ class CollectableClient(CollectablePerpBase):
         }
         return;
       }
+      if (groot.ap_value < 1) {
+        console.log('[Charge] blocked: insufficient AP (have ' + groot.ap_value + ')');
+        gnode.NoAP();
+        return;
+      }
       if (!gnode.states.chargeRunning && gnode.states.idle) {
         // FIXME: rename Remote Call
         app.remote.chargePerp(app.token, gnode.path).done(function(data) {
           if (data.result) {
-            if (data.result.error) {
-              // No cash
-              if (gnode.renderPopup && gnode.renderPopup.open) {
-                gnode.renderPopup.trigger('no_cash');
-              } else {
-                gnode.renderNode.FXNoCash();
+            if (data.result.error !== undefined) {
+              // error 1 = insufficient AP, error 2 = already charging, error 3 = insufficient cash
+              var chargeErrors = { 1: 'insufficient AP', 2: 'already charging', 3: 'insufficient cash' };
+              console.log('[Charge] failed:', chargeErrors[data.result.error] || ('unknown error ' + data.result.error), data);
+              if (data.result.error === 3) {
+                if (gnode.renderPopup && gnode.renderPopup.open) {
+                  gnode.renderPopup.trigger('no_cash');
+                } else {
+                  gnode.renderNode.FXNoCash();
+                }
+              } else if (data.result.error === 1) {
+                gnode.NoAP();
               }
               return;
             }

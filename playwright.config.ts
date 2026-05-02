@@ -18,7 +18,12 @@ export default defineConfig({
     {
       // webxdc runtimes are Chromium-based — no need to run on other engines.
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+        },
+      },
     },
   ],
 

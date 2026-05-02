@@ -295,12 +295,12 @@ describe('chargePerp — materialization integration', () => {
 // ── failure modes ─────────────────────────────────────────────────────────────
 
 describe('chargePerp — failure: insufficient cash', () => {
-  it('returns error when cash_value < charge_cost', async () => {
+  it('returns error 3 when cash_value < charge_cost', async () => {
     setOverride(FIXED_NOW);
     setState(mkState({ game_values: { cash_value: CHARGE_COST - 1, ap_snapshot: 3 } }));
 
     const { result } = await chargePerp('tok', NODE_PATH);
-    expect(result.error).toBeDefined();
+    expect(result.error).toBe(3);
   });
 
   it('does not push onto nodes_charging on cash failure', async () => {
@@ -323,12 +323,12 @@ describe('chargePerp — failure: insufficient cash', () => {
 });
 
 describe('chargePerp — failure: insufficient AP', () => {
-  it('returns error when ap_snapshot < 1', async () => {
+  it('returns error 1 when ap_snapshot < 1', async () => {
     setOverride(FIXED_NOW);
     setState(mkState({ game_values: { cash_value: 500, ap_snapshot: 0 } }));
 
     const { result } = await chargePerp('tok', NODE_PATH);
-    expect(result.error).toBeDefined();
+    expect(result.error).toBe(1);
   });
 
   it('does not push onto nodes_charging on AP failure', async () => {
