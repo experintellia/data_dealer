@@ -4,7 +4,13 @@
 //   1. state = freshState(selfAddr) — selfAddr seeded BEFORE listener
 //      registration so applyDelta's addr guards never see an empty state.addr
 //      during boot replay (closes #117).
-//   2. webxdc.setUpdateListener(cb, 0)  — replays full update history.
+//   2. webxdc.setUpdateListener(cb, 0) — replays full update history.
+//      The webxdc spec returns a Promise that resolves once every update
+//      from `serial` up to the messenger's max_serial-at-registration has
+//      been delivered to `cb`. boot() awaits that promise so the engine
+//      is fully replayed before materializer / onReady fires; bootstrap.js
+//      can then swap the loader for the game UI without flickering through
+//      a partially-replayed state.
 //      The callback is the SOLE setState site in production: it routes both
 //      own-echoes (from sendUpdate) and remote peer deltas through the same
 //      applyDelta path. Handlers in scripts/LocalEngine.js never call
@@ -22,17 +28,30 @@
 import { freshState, applyDelta } from './state.js';
 
 var _currentState = null;
+var _bootPromise  = null;
+
+// Replay progress is updated on every listener callback during initial replay.
+// Polled by bootstrap.js to drive the <progress id="loader"> element. The
+// max_serial can grow if peers push new updates while we're catching up; the
+// listener promise still resolves when the messenger's snapshot-at-
+// registration max_serial is reached, so the bar may not visually fill — by
+// design, since the game can start while later peer updates land live.
+var _replayProgress = { serial: 0, max_serial: 0, done: false };
 
 /**
- * boot(options)
+ * boot(options) → Promise<LocalState>
+ *
+ * Idempotent: subsequent calls return the in-flight promise.
  *
  * options:
- *   selfAddr     — override webxdc.selfAddr (useful for simulator / tests)
- *   defaultGame  — override the default seed (object matching default_game.json shape)
- *   materializer — function(state) called once after replay quiesces (#11 hook)
- *   onReady      — function(state) called when the engine is ready
+ *   selfAddr          — override webxdc.selfAddr (useful for simulator / tests)
+ *   defaultGame       — override the default seed (object matching default_game.json shape)
+ *   materializer      — function(state) called once after replay quiesces (#11 hook)
+ *   onReady           — function(state) called when the engine is ready
+ *   onReplayProgress  — function(serial, max_serial) called per replayed update
  */
 export function boot(options) {
+  if (_bootPromise) return _bootPromise;
   options = options || {};
 
   var selfAddr = options.selfAddr != null
@@ -46,25 +65,56 @@ export function boot(options) {
   // the braces.
   _currentState = freshState(selfAddr, options.defaultGame);
 
-  // Replay full update history from serial 0.  Delta Chat core delivers all
-  // historical updates synchronously before returning, so the code below the
-  // setUpdateListener call runs after replay is complete.
-  // The listener body is the SOLE production setState site (issue #120).
-  webxdc.setUpdateListener(function (update) {  // eslint-disable-line no-undef
-    _currentState = applyDelta(_currentState, update.payload);
-  }, 0);
-
-  // Integration point for issue #11 (Thread N — materializer).
-  // The real materializer will advance time-based progress (charge timers,
-  // AP regen, etc.) against the replayed state.  For now this is a noop.
-  if (typeof options.materializer === 'function') {
-    options.materializer(_currentState);
+  var listenerPromise = null;
+  // eslint-disable-next-line no-undef
+  if (typeof webxdc !== 'undefined') {
+    // eslint-disable-next-line no-undef
+    listenerPromise = webxdc.setUpdateListener(function (update) {
+      _currentState = applyDelta(_currentState, update.payload);
+      var s = (typeof update.serial     === 'number') ? update.serial     : 0;
+      var m = (typeof update.max_serial === 'number') ? update.max_serial : s;
+      if (s > _replayProgress.serial)     _replayProgress.serial     = s;
+      if (m > _replayProgress.max_serial) _replayProgress.max_serial = m;
+      if (typeof options.onReplayProgress === 'function') {
+        try { options.onReplayProgress(_replayProgress.serial, _replayProgress.max_serial); }
+        catch (_) { /* never let the UI hook break replay */ }
+      }
+    }, 0);
   }
 
-  // Engine ready.
-  if (typeof options.onReady === 'function') {
-    options.onReady(_currentState);
-  }
+  // Promise.resolve handles three shapes uniformly:
+  //   - real webxdc returns a Promise → awaited
+  //   - dev shim (webxdc-shim.js) returns undefined → already resolved
+  //   - typeof webxdc === 'undefined' (node) → already resolved
+  _bootPromise = Promise.resolve(listenerPromise).then(function () {
+    _replayProgress.done = true;
+    if (typeof options.materializer === 'function') options.materializer(_currentState);
+    if (typeof options.onReady === 'function') options.onReady(_currentState);
+    return _currentState;
+  });
+  return _bootPromise;
+}
+
+/**
+ * getBootPromise() → Promise<LocalState> | null
+ * Returns the in-flight (or resolved) boot() promise, or null if boot()
+ * has not been invoked yet. Bootstrap.js polls this to gate UI hand-off.
+ */
+export function getBootPromise() {
+  return _bootPromise;
+}
+
+/**
+ * getReplayProgress() → { serial, max_serial, done }
+ * Snapshot of the current replay progress. `done` flips to true once the
+ * setUpdateListener promise resolves and materializer / onReady have run.
+ */
+export function getReplayProgress() {
+  return {
+    serial:     _replayProgress.serial,
+    max_serial: _replayProgress.max_serial,
+    done:       _replayProgress.done
+  };
 }
 
 /**
