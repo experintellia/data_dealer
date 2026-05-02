@@ -5004,9 +5004,9 @@ class CollectableClient(CollectablePerpBase):
       app.remote.buyPowerup(app.token, gnode.path, bslot, bgestalt).done(function(data) {
         if (data.result) {
           if (data.result.error !== undefined) {
-            // error 0 = node/type not found, error 1 = slot occupied, error 3 = insufficient cash
             var buyErrors = { 0: 'node or powerup type not found', 1: 'slot already occupied', 3: 'insufficient cash' };
-            console.log('[BuyPowerup] failed:', buyErrors[data.result.error] || ('unknown error ' + data.result.error),
+            var buyDetail = (data.result.error === 3) ? ' (cash: ' + groot.cash_value + ')' : '';
+            console.log('[BuyPowerup] failed:', (buyErrors[data.result.error] || ('unknown error ' + data.result.error)) + buyDetail,
               '| path:', gnode.path, '| slot:', bslot, '| gestalt:', bgestalt, data);
             if (data.result.error === 3) {
               gnode.NoCash();
@@ -5079,15 +5079,34 @@ class CollectableClient(CollectablePerpBase):
 
       var gnode = this;
       var groot = this.GameRoot;
-      
+
+      var slotKey = pcat + '_slots';
+      var maxKey  = 'max_' + pcat + '_slots';
+      var currentSlots = gnode.data[slotKey] || 0;
+      var maxSlots = gnode.data[maxKey];
+      if (maxSlots != null && currentSlots + num > maxSlots) {
+        console.log('[BuySlots] blocked: max slots reached (have ' + currentSlots + ', max ' + maxSlots + ', tried to add ' + num + ')');
+        gnode.Error('Max slots reached', {});
+        return;
+      }
+
       app.remote.buySlots(app.token, gnode.path, pcat, num).done(function(data) {
         if (data.result) {
           if (data.result.error !== undefined) {
-            // error 0 = node/type not found, error 3 = insufficient cash
-            var slotErrors = { 0: 'node or slot type not found', 3: 'insufficient cash' };
-            console.log('[BuySlots] failed:', slotErrors[data.result.error] || ('unknown error ' + data.result.error),
+            var slotErrors = { 0: 'node or slot type not found', 2: 'max slots already reached', 3: 'insufficient cash' };
+            var detail = '';
+            if (data.result.error === 2) {
+              detail = ' (have ' + currentSlots + ', max ' + maxSlots + ', tried to add ' + num + ')';
+            } else if (data.result.error === 3) {
+              detail = ' (cash: ' + groot.cash_value + ')';
+            }
+            console.log('[BuySlots] failed:', (slotErrors[data.result.error] || ('unknown error ' + data.result.error)) + detail,
               '| path:', gnode.path, '| type:', pcat, '| num:', num, data);
-            gnode.NoCash();
+            if (data.result.error === 2) {
+              gnode.Error('Max slots reached', data);
+            } else {
+              gnode.NoCash();
+            }
             return;
           }
           groot.updateGameValues(data.result.game_values,data.result.levelup,data.result.missions);
@@ -5218,9 +5237,11 @@ class CollectableClient(CollectablePerpBase):
         app.remote.chargePerp(app.token, gnode.path).done(function(data) {
           if (data.result) {
             if (data.result.error !== undefined) {
-              // error 1 = insufficient AP, error 2 = already charging, error 3 = insufficient cash
               var chargeErrors = { 1: 'insufficient AP', 2: 'already charging', 3: 'insufficient cash' };
-              console.log('[Charge] failed:', chargeErrors[data.result.error] || ('unknown error ' + data.result.error), data);
+              var chargeDetail = '';
+              if (data.result.error === 1) chargeDetail = ' (AP: ' + groot.ap_value + ')';
+              else if (data.result.error === 3) chargeDetail = ' (cash: ' + groot.cash_value + ', need: ' + gnode.data.charge_cost + ')';
+              console.log('[Charge] failed:', (chargeErrors[data.result.error] || ('unknown error ' + data.result.error)) + chargeDetail, data);
               if (data.result.error === 3) {
                 if (gnode.renderPopup && gnode.renderPopup.open) {
                   gnode.renderPopup.trigger('no_cash');
