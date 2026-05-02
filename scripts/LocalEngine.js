@@ -642,8 +642,12 @@ export function buyPowerup(token, perpPath, slot, gestalt) {
   if (!puDef) return Promise.resolve({ result: { error: 0 } });
 
   var powerups = node.instance_data.powerups || [];
+  var puGameType = puDef.full_type ? puDef.full_type.split(':')[0] : '';
   for (var i = 0; i < powerups.length; i++) {
-    if (powerups[i].slot === slot) return Promise.resolve({ result: { error: 1 } });
+    var existingGameType = powerups[i].full_type ? powerups[i].full_type.split(':')[0] : '';
+    if (powerups[i].slot === slot && existingGameType === puGameType) {
+      return Promise.resolve({ result: { error: 1 } });
+    }
   }
 
   var price = puDef.price || 0;
