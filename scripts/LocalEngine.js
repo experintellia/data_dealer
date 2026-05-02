@@ -770,6 +770,7 @@ export function sellPowerup(token, perpPath, slot, gestalt) {
  * Returns: { node, game_values, levelup }
  */
 export function buySlots(token, perpPath, slotType, num) {
+  num = parseInt(num, 10) || 1;
   var r = _resolveNode(perpPath);
   if (!r) return Promise.resolve({ result: { error: 0 } });
   var state = r.state, nodeIdx = r.nodeIdx, node = r.node, perpTypeData = r.perpTypeData;

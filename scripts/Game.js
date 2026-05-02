@@ -5076,6 +5076,7 @@ class CollectableClient(CollectablePerpBase):
 
     ProjectPerp.prototype.BuySlots = function(num,bgestalt) {
       var pcat = convertPowerupType(bgestalt.split(':')[1]);
+      num = parseInt(num, 10) || 1;
 
       var gnode = this;
       var groot = this.GameRoot;
