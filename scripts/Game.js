@@ -5095,13 +5095,11 @@ class CollectableClient(CollectablePerpBase):
         if (data.result) {
           if (data.result.error !== undefined) {
             var slotErrors = { 0: 'node or slot type not found', 2: 'max slots already reached', 3: 'insufficient cash' };
-            var detail = '';
-            if (data.result.error === 2) {
-              detail = ' (have ' + currentSlots + ', max ' + maxSlots + ', tried to add ' + num + ')';
-            } else if (data.result.error === 3) {
-              detail = ' (cash: ' + groot.cash_value + ')';
-            }
-            console.log('[BuySlots] failed:', (slotErrors[data.result.error] || ('unknown error ' + data.result.error)) + detail,
+            var slotDetails = {
+              2: ' (have ' + currentSlots + ', max ' + maxSlots + ', tried to add ' + num + ')',
+              3: ' (cash: ' + groot.cash_value + ')'
+            };
+            console.log('[BuySlots] failed:', (slotErrors[data.result.error] || ('unknown error ' + data.result.error)) + (slotDetails[data.result.error] || ''),
               '| path:', gnode.path, '| type:', pcat, '| num:', num, data);
             if (data.result.error === 2) {
               gnode.Error('Max slots reached', data);

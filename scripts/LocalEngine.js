@@ -64,6 +64,12 @@ function _gestaltFrom(fullType) {
   return idx >= 0 ? fullType.slice(idx + 1) : null;
 }
 
+function _gameTypeFrom(fullType) {
+  if (!fullType) return '';
+  var idx = fullType.indexOf(':');
+  return idx >= 0 ? fullType.slice(0, idx) : fullType;
+}
+
 function _isProvidable(gestalt, ruleset, playerLevel, ownedGestalts) {
   var def = ruleset.perps[gestalt];
   if (!def) return false;
@@ -642,10 +648,9 @@ export function buyPowerup(token, perpPath, slot, gestalt) {
   if (!puDef) return Promise.resolve({ result: { error: 0 } });
 
   var powerups = node.instance_data.powerups || [];
-  var puGameType = puDef.full_type ? puDef.full_type.split(':')[0] : '';
+  var puGameType = _gameTypeFrom(puDef.full_type);
   for (var i = 0; i < powerups.length; i++) {
-    var existingGameType = powerups[i].full_type ? powerups[i].full_type.split(':')[0] : '';
-    if (powerups[i].slot === slot && existingGameType === puGameType) {
+    if (powerups[i].slot === slot && _gameTypeFrom(powerups[i].full_type) === puGameType) {
       return Promise.resolve({ result: { error: 1 } });
     }
   }
@@ -1344,8 +1349,7 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
     ? instanceData.charge_cost
     : (typeof typeData.charge_cost === 'number' ? typeData.charge_cost : 0);
 
-  // Error codes: 1 = insufficient AP, 2 = already charging, 3 = insufficient cash.
-  // Using distinct codes lets Game.js show the correct feedback animation.
+  // Distinct codes (1=AP, 3=cash) let Game.js show the correct feedback animation.
   if ((gv.ap_snapshot || 0) < 1)           return Promise.resolve({ result: { error: 1 } });
   if ((gv.cash_value  || 0) < chargeCost)  return Promise.resolve({ result: { error: 3 } });
 
