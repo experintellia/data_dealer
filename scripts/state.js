@@ -179,6 +179,10 @@ function _missionDataFromResult(state, r) {
   };
 }
 
+function _filterByPath(arr, path) {
+  return (arr || []).filter(function (e) { return e.path !== path; });
+}
+
 reducers.setDisplayName = function setDisplayNameReducer(state, delta) {
   var args = delta.args || [];
   var dname = args[0];
@@ -292,11 +296,12 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
 
   var mp = _missionDataFromResult(state, r);
 
-  // Each buyPerp creates exactly one node, so the counter advances by 1 on
-  // every replayed delta.  (The handler in LocalEngine does the same; we
-  // can't read the value off newNode.game_id any more since it now equals
-  // the gestalt instead of an encoded counter.)
-  var counter = (state.node_counter || 0) + 1;
+  // Snapshot pattern: the handler emits the post-mutation node_counter in
+  // r.node_counter so listener echo is idempotent. Fallback to incremental
+  // for legacy pre-fix deltas (one buyPerp creates exactly one node).
+  var counter = (typeof r.node_counter === 'number')
+    ? r.node_counter
+    : (state.node_counter || 0) + 1;
 
   return Object.assign({}, state, {
     nodes: nodes,
@@ -313,10 +318,7 @@ reducers.chargePerp = function chargePerpReducer(state, delta) {
   var chargeEntry = r.chargeEntry;
   if (!chargeEntry || typeof r.nodeIdx !== 'number') return state;
 
-  var nodeIdx   = r.nodeIdx;
-  var cashDelta = typeof r.cashDelta === 'number' ? r.cashDelta : 0;
-  var xpInc     = typeof r.xpInc    === 'number' ? r.xpInc    : 0;
-
+  var nodeIdx = r.nodeIdx;
   var nodes    = state.nodes || [];
   var newNodes = nodes.map(function(n, i) {
     if (i !== nodeIdx) return n;
@@ -327,17 +329,26 @@ reducers.chargePerp = function chargePerpReducer(state, delta) {
     });
   });
 
-  var stillCharging = (state.nodes_charging || []).filter(function(c) {
-    return c.path !== chargeEntry.path;
-  });
+  var stillCharging = _filterByPath(state.nodes_charging, chargeEntry.path);
 
+  // Snapshot pattern (#119/#120): the handler emits the post-mutation
+  // game_values in r.game_values; applying it via Object.assign is idempotent
+  // under self-echo. The incremental form below remains as a fallback for
+  // already-persisted pre-fix deltas so they still replay correctly.
   var gv    = state.game_values || {};
-  var newGv = Object.assign({}, gv, {
-    cash_value:  (gv.cash_value  || 0) - cashDelta,
-    cash_spent:  (gv.cash_spent  || 0) + cashDelta,
-    xp_value:    (gv.xp_value   || 0) + xpInc,
-    ap_snapshot: Math.max(0, (gv.ap_snapshot || 0) - 1),
-  });
+  var newGv;
+  if (r.game_values) {
+    newGv = Object.assign({}, gv, r.game_values);
+  } else {
+    var cashDelta = typeof r.cashDelta === 'number' ? r.cashDelta : 0;
+    var xpInc     = typeof r.xpInc    === 'number' ? r.xpInc    : 0;
+    newGv = Object.assign({}, gv, {
+      cash_value:  (gv.cash_value  || 0) - cashDelta,
+      cash_spent:  (gv.cash_spent  || 0) + cashDelta,
+      xp_value:    (gv.xp_value   || 0) + xpInc,
+      ap_snapshot: Math.max(0, (gv.ap_snapshot || 0) - 1),
+    });
+  }
 
   var mp = _missionDataFromResult(state, r);
   return Object.assign({}, state, {
@@ -354,9 +365,13 @@ reducers.collectPerp = function collectPerpReducer(state, delta) {
   var r = delta.result;
   var path = delta.args && delta.args[0];
 
-  var newCollect = (state.nodes_collect || []).filter(function (e) {
-    return e.path !== path;
-  });
+  var newCollect = _filterByPath(state.nodes_collect, path);
+  // Closes #114: also strip the nodes_charging entry by path so replay
+  // produces the same shape as the live materializer-then-collect flow.
+  // Without this, replay-from-zero leaves the stale charging entry, then
+  // materialize() re-promotes the path back to nodes_collect — perp
+  // appears collectable again after reload.
+  var newCharging = _filterByPath(state.nodes_charging, path);
 
   var newGv = r.game_values
     ? Object.assign({}, state.game_values, r.game_values)
@@ -380,11 +395,12 @@ reducers.collectPerp = function collectPerpReducer(state, delta) {
 
   var mp = _missionDataFromResult(state, r);
   return Object.assign({}, state, {
-    nodes_collect: newCollect,
-    game_values:   newGv,
-    db_queue:      newQueue,
-    nodes:         newNodes,
-    mission_goals: mp.mission_goals,
+    nodes_collect:  newCollect,
+    nodes_charging: newCharging,
+    game_values:    newGv,
+    db_queue:       newQueue,
+    nodes:          newNodes,
+    mission_goals:  mp.mission_goals,
     active_missions: mp.active_missions
   });
 };
@@ -494,6 +510,15 @@ export function applyDelta(state, delta) {
   // Guard 2: schema version mismatch — reset rather than crash
   if (state.schema_version !== SCHEMA_VERSION) {
     return freshState(state.addr);
+  }
+
+  // Guard 2b (closes #117): auto-seed state.addr from the first delta
+  // when state.addr is empty. This guarantees every reducer runs with
+  // state.addr set, even if boot replay starts before webxdc.selfAddr
+  // has propagated. Without this, the addr filter on subsequent peers
+  // can silently drop deltas during boot.
+  if (!state.addr && delta.addr) {
+    state = Object.assign({}, state, { addr: delta.addr });
   }
 
   // Guard 3: ignore other peers' deltas (multi-device: only own addr mutates)

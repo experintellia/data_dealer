@@ -3010,10 +3010,9 @@ define(function(require) {
         if (popup.notificationMission) {
           var gestalt = popup.notificationMission;
           popup.notificationMission = null;
-          if (groot.raw_data) {
-            groot.raw_data.mission_briefings_seen = groot.raw_data.mission_briefings_seen || {};
-            groot.raw_data.mission_briefings_seen[gestalt] = true;
-          }
+          // No optimistic raw_data write: dismissMissionBriefing emits a
+          // delta whose listener echo lands synchronously in this tick
+          // (closes #116 race window under the #120 architectural fix).
           if (app.remote && app.remote.dismissMissionBriefing) {
             app.remote.dismissMissionBriefing(app.token, gestalt);
           }
@@ -3053,9 +3052,11 @@ define(function(require) {
       popup.on('popup_token_seen',function(e,gestalt) {
         e.stopPropagation();
         if (!gestalt) { return; }
-        groot.raw_data.tokens_seen = groot.raw_data.tokens_seen || {};
-        if (groot.raw_data.tokens_seen[gestalt]) { return; }
-        groot.raw_data.tokens_seen[gestalt] = true;
+        // No optimistic raw_data write: markTokenSeen emits a delta whose
+        // listener echo lands synchronously (closes #116 race window
+        // under the #120 architectural fix). The handler itself short-
+        // circuits when the gestalt is already in tokens_seen, so calling
+        // it twice is a no-op delta.
         if (app.remote && app.remote.markTokenSeen) {
           app.remote.markTokenSeen(app.token, gestalt);
         }

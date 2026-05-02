@@ -321,3 +321,30 @@ describe('applyDelta — markTokenSeen reducer', () => {
   });
 
 });
+
+// ---------------------------------------------------------------------------
+// #117 — applyDelta silently drops deltas when state.addr is unset
+// ---------------------------------------------------------------------------
+
+describe('applyDelta — addr guard does not silently drop deltas pre-boot (#117)', () => {
+  // Closed by #120's applyDelta auto-seed: when a non-empty history replays
+  // before state.addr is populated, the reducer now seeds state.addr from
+  // the first delta's addr so the addr filter never drops deltas during
+  // pre-boot replay.
+
+  it('a non-empty history replayed before state.addr is set still produces correct state', () => {
+    // Start with a state whose addr is empty (simulates pre-boot).
+    var s = freshState('');
+    expect(s.addr).toBe('');
+    var deltas = [
+      { kind: 'delta', addr: 'alice@local', op: 'markTokenSeen', args: ['token008'], ts: 1 },
+      { kind: 'delta', addr: 'alice@local', op: 'markTokenSeen', args: ['token001'], ts: 2 },
+    ];
+    var replayed = deltas.reduce(applyDelta, s);
+    // After the architectural fix, state.addr is unconditionally seeded from
+    // the first delta's addr (or set before replay), so the guard never
+    // drops deltas during pre-boot replay.
+    expect(replayed.addr).toBe('alice@local');
+    expect(replayed.tokens_seen).toEqual({ token008: true, token001: true });
+  });
+});

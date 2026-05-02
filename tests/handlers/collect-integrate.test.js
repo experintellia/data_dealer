@@ -2127,3 +2127,90 @@ describe('cold-start replay — buyPowerup mission progress survives applyDelta'
     expect(replayed.active_missions).toContain('mission006');
   });
 });
+
+// ── Issue #114 regression: collectPerp leaves orphan nodes_charging on replay ─
+// During live operation the materializer strips the nodes_charging entry
+// in-memory before the collectPerp delta is committed, so post-handler state
+// looks clean. But on cold-start replay-from-zero the chargePerp reducer adds
+// to nodes_charging, the collectPerp reducer removes from nodes_collect but
+// does NOT touch nodes_charging, and a subsequent materialize() with
+// now >= charge_end re-promotes the orphan back into nodes_collect — so the
+// UI shows the perp as collectable again after a reload.
+//
+// SKIPPED: the architectural fix is tracked in #120. Unskip these tests when
+// the collectPerp reducer (scripts/state.js ~line 352) is taught to drop the
+// matching nodes_charging entry.
+
+describe('collectPerp — replay from zero leaves no orphan nodes_charging', () => {
+  const C007 = 'Imperium.City.Pusher0.client007';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setEmitter(null); setSendDelta(null); });
+
+  it('replay(chargePerp) + replay(collectPerp) + materialize does not leak into nodes_collect', async () => {
+    // ── Setup: build a starting state with the node seeded ────────────────
+    const initialState = mkState({
+      game_values: mkHighGv(),
+      nodes:       [mkClientNode2('client007', C007)]
+    });
+    setState(initialState);
+
+    // ── Capture deltas for chargePerp and collectPerp via setSendDelta ────
+    const captured = [];
+    setSendDelta(function (d) { captured.push(d); });
+
+    // 1) Charge — produces a delta that adds a nodes_charging entry.
+    const chargeRes = await chargePerp('tok', C007);
+    expect(chargeRes.result.error).toBeUndefined();
+
+    // 2) Advance the clock past charge_end so collectPerp succeeds.
+    const liveState = getState();
+    const chargeEntry = (liveState.nodes_charging || []).find(c => c.path === C007)
+                     || (liveState.nodes_collect  || []).find(c => c.path === C007);
+    // After the live materialize step the entry has moved to nodes_collect;
+    // we still want a clock value strictly past charge_end for replay's
+    // materialize call to fire Rule 1 unambiguously.
+    const chargeEnd = chargeEntry && typeof chargeEntry.charge_end === 'number'
+      ? chargeEntry.charge_end
+      : FIXED_NOW + 60_000;
+    setOverride(chargeEnd + 1000);
+
+    // 3) Collect — produces a delta that drains nodes_collect.
+    const collectRes = await collectPerp('tok', C007);
+    expect(collectRes.result.error).toBeUndefined();
+
+    expect(captured.length).toBeGreaterThanOrEqual(2);
+
+    // ── Sanity: live (post-handler) state is clean ───────────────────────
+    // The materializer strips nodes_charging in-memory before the
+    // collectPerp delta is built, so the live committed state has no orphan.
+    const liveAfter = getState();
+    const liveCharging = (liveAfter.nodes_charging || []).filter(c => c.path === C007);
+    const liveCollect  = (liveAfter.nodes_collect  || []).filter(c => c.path === C007);
+    expect(liveCharging).toHaveLength(0);
+    expect(liveCollect).toHaveLength(0);
+
+    // ── Replay-from-zero: apply each captured delta to a fresh state ─────
+    // This simulates a cold start where boot.js replays the persisted delta
+    // log without the in-memory materialize step that the live path does.
+    let replayed = mkState({
+      game_values: mkHighGv(),
+      nodes:       [mkClientNode2('client007', C007)]
+    });
+    for (var i = 0; i < captured.length; i++) {
+      replayed = applyDelta(replayed, captured[i]);
+    }
+
+    // After replay, materialize at a clock well past charge_end — exactly
+    // what boot.js does after replaying the delta log.
+    const mat = materialize(replayed, FIXED_NOW + 1_000_000);
+
+    // ── The bug: nodes_charging still holds the entry, and materialize
+    //    re-promotes it into nodes_collect, so the UI marks the perp as
+    //    collectable again after a reload.
+    const orphanCharging = (mat.state.nodes_charging || []).filter(c => c.path === C007);
+    const orphanCollect  = (mat.state.nodes_collect  || []).filter(c => c.path === C007);
+    expect(orphanCharging).toHaveLength(0);
+    expect(orphanCollect).toHaveLength(0);
+  });
+});
