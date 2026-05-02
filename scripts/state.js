@@ -108,6 +108,7 @@ export function freshState(selfAddr, seed) {
     integrated_ids: {},
     mission_briefings_seen: {},
     tokens_seen: {},
+    peers: {},
   };
 }
 
@@ -486,6 +487,45 @@ OP_NAMES.forEach(function (op) {
 });
 
 // ---------------------------------------------------------------------------
+// Peer aggregator
+// ---------------------------------------------------------------------------
+
+// Updates state.peers[delta.addr] from every inbound delta (own or foreign).
+// Only reads delta.result.game_values and delta.op/args/ts — never touches the
+// per-self reducer targets (display_name on state, tokens_seen, etc.).
+function _applyPeerDelta(state, delta) {
+  var addr = delta.addr;
+  if (!addr) return state;
+
+  var peers = state.peers || {};
+  var existing = peers[addr] || {};
+  var peer = Object.assign({}, existing);
+
+  var gv = delta.result && delta.result.game_values;
+  if (gv) {
+    if (typeof gv.cash_value     === 'number') peer.cash     = gv.cash_value;
+    if (typeof gv.profiles_value === 'number') peer.profiles = gv.profiles_value;
+    if (typeof gv.xp_value       === 'number') peer.xp       = gv.xp_value;
+    if (typeof gv.xp_level       === 'number') peer.level    = gv.xp_level;
+  }
+
+  if (delta.op === 'setDisplayName') {
+    var args = delta.args || [];
+    var dname = args[0];
+    if (typeof dname === 'string' && dname.length > 0) {
+      peer.display_name = dname;
+    }
+  }
+
+  if (typeof delta.ts === 'number') peer.last_seen_ts = delta.ts;
+  if (!('last_seen_serial' in peer)) peer.last_seen_serial = null;
+
+  var newPeers = Object.assign({}, peers);
+  newPeers[addr] = peer;
+  return Object.assign({}, state, { peers: newPeers });
+}
+
+// ---------------------------------------------------------------------------
 // applyDelta
 // ---------------------------------------------------------------------------
 
@@ -520,6 +560,13 @@ export function applyDelta(state, delta) {
   if (!state.addr && delta.addr) {
     state = Object.assign({}, state, { addr: delta.addr });
   }
+
+  // Peer aggregator: runs for every delta regardless of addr.  Updates
+  // state.peers[delta.addr] from game_values snapshot + display_name.
+  // Separated from the per-self reducer path so the addr guard below
+  // can still block other-peer deltas from mutating own state (e.g.
+  // mission_briefings_seen, tokens_seen per #105).
+  state = _applyPeerDelta(state, delta);
 
   // Guard 3: ignore other peers' deltas (multi-device: only own addr mutates)
   if (state.addr && delta.addr && delta.addr !== state.addr) {

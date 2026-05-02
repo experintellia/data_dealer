@@ -369,23 +369,41 @@ export function getPowerups(_token, projectGestalt /*, version */) {
 // getRanking
 // ---------------------------------------------------------------------------
 
-// TODO(#29): Replace with multi-peer aggregation in Phase 6.
+// Supported sort fields and their key in state.peers[addr].
+// Matches val_type strings from docs/handler-map.md and the call site at
+// Game.js:3352 (Topscore.fetchScore).
+var _RANKING_FIELDS = { cash: 1, profiles: 1, xp: 1, level: 1 };
+
 export function getRanking(_token, type) {
   var state = getState();
-  var gv = (state && state.game_values) || {};
-  var fieldMap = {
-    cash:     gv.cash_value,
-    profiles: gv.profiles_value,
-    xp:       gv.xp_value,
-    spent:    gv.cash_spent
-  };
-  var value = fieldMap[type] !== undefined ? fieldMap[type] : 0;
-  return Promise.resolve({
-    result: {
-      top: [{ display_name: (state && state.display_name) || '', value: value, self: true }],
-      user_rank: 1
-    }
+  var selfAddr = (state && state.addr) || '';
+  var peers = (state && state.peers) || {};
+
+  var field = _RANKING_FIELDS[type] ? type : 'xp';
+
+  var rows = Object.keys(peers).map(function (addr) {
+    var p = peers[addr];
+    return {
+      display_name: p.display_name || addr,
+      value: typeof p[field] === 'number' ? p[field] : 0,
+      self: addr === selfAddr,
+    };
   });
+
+  rows.sort(function (a, b) { return b.value - a.value; });
+
+  var selfIdx = -1;
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].self) { selfIdx = i; break; }
+  }
+
+  var n = rows.length;
+  var userRank = n === 0 ? 0
+    : selfIdx < 0 ? 0
+    : n === 1 ? 1
+    : 1 - selfIdx / (n - 1);
+
+  return Promise.resolve({ result: { top: rows, user_rank: userRank } });
 }
 
 // ---------------------------------------------------------------------------
