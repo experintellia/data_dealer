@@ -38,9 +38,9 @@
  *                         via Object.assign({}, state.game_values, res.game_values).
  *                         Echo-safe. Regression guard.
  *
- * Every describe is `describe(...)` so CI stays green. Once Phase 2 of
- * #120 lands the snapshot-based delta convention across all handlers, these
- * tests should be unskipped to lock in the invariant.
+ * Originally landed `describe.skip(...)` ahead of the architectural fix;
+ * unskipped in #120 Phase 2 once the snapshot-based delta convention was
+ * applied to every handler. Now the regression suite for the bug class.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {

@@ -327,14 +327,10 @@ describe('applyDelta — markTokenSeen reducer', () => {
 // ---------------------------------------------------------------------------
 
 describe('applyDelta — addr guard does not silently drop deltas pre-boot (#117)', () => {
-  // Reproduces #117: when a non-empty history replays before state.addr
-  // is populated (e.g. boot ordering races where the listener fires before
-  // state.addr = webxdc.selfAddr is set), deltas can be silently dropped
-  // or misrouted by the addr filter at scripts/state.js:500-502.
-  //
-  // Skipped until #120's Phase 3 fix lands — the architectural fix should
-  // unconditionally seed state.addr from the first delta's addr (or set it
-  // before replay) so the guard never drops deltas during pre-boot replay.
+  // Closed by #120's applyDelta auto-seed: when a non-empty history replays
+  // before state.addr is populated, the reducer now seeds state.addr from
+  // the first delta's addr so the addr filter never drops deltas during
+  // pre-boot replay.
 
   it('a non-empty history replayed before state.addr is set still produces correct state', () => {
     // Start with a state whose addr is empty (simulates pre-boot).
