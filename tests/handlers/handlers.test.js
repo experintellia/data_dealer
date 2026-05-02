@@ -687,13 +687,23 @@ describe('buyPowerup — happy path', () => {
 });
 
 describe('buyPowerup — failure: slot occupied', () => {
-  it('returns error:1 when the requested slot already holds a powerup', async () => {
+  it('returns error:1 when the requested slot already holds a powerup of the same type', async () => {
     const occupiedNode = Object.assign({}, PROJECT_NODE, {
       instance_data: { powerups: [{ slot: 0, gestalt: 'ad002', full_type: 'AdPowerup:ad002' }] }
     });
     setState(Object.assign({}, freshState('test@local'), { nodes: [occupiedNode] }));
     const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad003');
     expect(result.error).toBe(1);
+  });
+
+  it('does NOT block slot 0 for a different powerup type even if same slot index is taken', async () => {
+    // Ad slot 0 is occupied; upgrade slot 0 is independent and must remain free.
+    const occupiedNode = Object.assign({}, PROJECT_NODE, {
+      instance_data: { powerups: [{ slot: 0, gestalt: 'ad002', full_type: 'AdPowerup:ad002' }] }
+    });
+    setState(Object.assign({}, freshState('test@local'), { nodes: [occupiedNode] }));
+    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'upgrade001');
+    expect(result).not.toHaveProperty('error');
   });
 });
 

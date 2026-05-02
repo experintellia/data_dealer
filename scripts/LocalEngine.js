@@ -64,6 +64,12 @@ function _gestaltFrom(fullType) {
   return idx >= 0 ? fullType.slice(idx + 1) : null;
 }
 
+function _gameTypeFrom(fullType) {
+  if (!fullType) return '';
+  var idx = fullType.indexOf(':');
+  return idx >= 0 ? fullType.slice(0, idx) : fullType;
+}
+
 function _isProvidable(gestalt, ruleset, playerLevel, ownedGestalts) {
   var def = ruleset.perps[gestalt];
   if (!def) return false;
@@ -642,8 +648,11 @@ export function buyPowerup(token, perpPath, slot, gestalt) {
   if (!puDef) return Promise.resolve({ result: { error: 0 } });
 
   var powerups = node.instance_data.powerups || [];
+  var puGameType = _gameTypeFrom(puDef.full_type);
   for (var i = 0; i < powerups.length; i++) {
-    if (powerups[i].slot === slot) return Promise.resolve({ result: { error: 1 } });
+    if (powerups[i].slot === slot && _gameTypeFrom(powerups[i].full_type) === puGameType) {
+      return Promise.resolve({ result: { error: 1 } });
+    }
   }
 
   var price = puDef.price || 0;
@@ -766,6 +775,7 @@ export function sellPowerup(token, perpPath, slot, gestalt) {
  * Returns: { node, game_values, levelup }
  */
 export function buySlots(token, perpPath, slotType, num) {
+  num = parseInt(num, 10) || 1;
   var r = _resolveNode(perpPath);
   if (!r) return Promise.resolve({ result: { error: 0 } });
   var state = r.state, nodeIdx = r.nodeIdx, node = r.node, perpTypeData = r.perpTypeData;
@@ -1339,8 +1349,9 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
     ? instanceData.charge_cost
     : (typeof typeData.charge_cost === 'number' ? typeData.charge_cost : 0);
 
+  // Distinct codes (1=AP, 3=cash) let Game.js show the correct feedback animation.
   if ((gv.ap_snapshot || 0) < 1)           return Promise.resolve({ result: { error: 1 } });
-  if ((gv.cash_value  || 0) < chargeCost)  return Promise.resolve({ result: { error: 1 } });
+  if ((gv.cash_value  || 0) < chargeCost)  return Promise.resolve({ result: { error: 3 } });
 
   // ClientPerps don't carry collect_amount in the ruleset — they ship
   // income_base / income_factor instead. Fall back so charging the car
