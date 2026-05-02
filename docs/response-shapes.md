@@ -40,7 +40,10 @@ handler-map.md is fixed in this document.
   profiles_value?: number,
   cash_value?: number,
   ap_increment?: number,
-  ap_snapshot?: number,        // only read when levelup === true
+  ap_snapshot?: number,        // synced into the visible AP whenever it
+                               //   differs from the local ap_value (so the
+                               //   bar tracks engine state after every
+                               //   AP-consuming handler, not only on levelup)
   karma_value?: number,
   xp_value?: number
 }

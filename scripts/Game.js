@@ -1873,13 +1873,18 @@ define(function(require) {
       if (gv.xp_value !== undefined) {
         groot.setXP(gv.xp_value,silent);
       }
-      // levelup
-      if (gv.ap_snapshot !== undefined && levelup === true) {
+      // ap_snapshot is the authoritative engine AP — sync the visible
+      // ap_value whenever it differs, not only on levelup. Without this,
+      // the statusbar AP bar shows stale text after every chargePerp /
+      // integrateCollected (handlers decrement ap_snapshot but Game.js
+      // never reapplied it pre-#120 follow-up).
+      if (gv.ap_snapshot !== undefined && gv.ap_snapshot !== groot.ap_value) {
         groot.setAP(gv.ap_snapshot,silent);
-        if (!silent) {
-          groot.getDatabase().checkNotifications();
-          groot.makeNotifications({levelup: groot.xp_level.number});
-        }
+      }
+      // levelup-only side effects.
+      if (gv.ap_snapshot !== undefined && levelup === true && !silent) {
+        groot.getDatabase().checkNotifications();
+        groot.makeNotifications({levelup: groot.xp_level.number});
       }
     };
 
