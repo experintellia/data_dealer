@@ -179,6 +179,10 @@ function _missionDataFromResult(state, r) {
   };
 }
 
+function _filterByPath(arr, path) {
+  return (arr || []).filter(function (e) { return e.path !== path; });
+}
+
 reducers.setDisplayName = function setDisplayNameReducer(state, delta) {
   var args = delta.args || [];
   var dname = args[0];
@@ -325,9 +329,7 @@ reducers.chargePerp = function chargePerpReducer(state, delta) {
     });
   });
 
-  var stillCharging = (state.nodes_charging || []).filter(function(c) {
-    return c.path !== chargeEntry.path;
-  });
+  var stillCharging = _filterByPath(state.nodes_charging, chargeEntry.path);
 
   // Snapshot pattern (#119/#120): the handler emits the post-mutation
   // game_values in r.game_values; applying it via Object.assign is idempotent
@@ -363,18 +365,13 @@ reducers.collectPerp = function collectPerpReducer(state, delta) {
   var r = delta.result;
   var path = delta.args && delta.args[0];
 
-  var newCollect = (state.nodes_collect || []).filter(function (e) {
-    return e.path !== path;
-  });
-
+  var newCollect = _filterByPath(state.nodes_collect, path);
   // Closes #114: also strip the nodes_charging entry by path so replay
   // produces the same shape as the live materializer-then-collect flow.
   // Without this, replay-from-zero leaves the stale charging entry, then
   // materialize() re-promotes the path back to nodes_collect — perp
   // appears collectable again after reload.
-  var newCharging = (state.nodes_charging || []).filter(function (e) {
-    return e.path !== path;
-  });
+  var newCharging = _filterByPath(state.nodes_charging, path);
 
   var newGv = r.game_values
     ? Object.assign({}, state.game_values, r.game_values)

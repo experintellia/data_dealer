@@ -176,8 +176,6 @@ export function setLocale(localeCode) {
   }
 
   var state = getState();
-  // _persistDelta handles state mutation via the listener (production) or its
-  // synchronous emulation (Node/tests).  Handler does not setState directly.
   _persistDelta({
     kind: 'delta',
     op: 'setLocale',
@@ -469,8 +467,6 @@ export function setPerpCoordinates(/* token, */ _, updates) {
     coordMap[path] = pos;
   }
 
-  // Coordinate updates are pure args → reducer; no need to recompute nodes here.
-  // The reducer in state.js mirrors this map-and-merge.
   _persistDelta(_mkDelta(state.addr, 'setPerpCoordinates', [updates], {}));
 
   return Promise.resolve({ result: 1 });
