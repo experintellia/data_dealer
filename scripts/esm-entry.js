@@ -19,13 +19,15 @@ export { default as LocalEngine } from './LocalEngine.js';
 // any future AMD consumers can call require(['boot']).getState().
 export * as boot from './boot.js';
 
-// Bring the engine online before any AMD module can call into it.  Runs
-// synchronously: webxdc.js is loaded earlier in index.html so window.webxdc
-// is defined, and the messenger replays update history synchronously inside
-// setUpdateListener.  Without this, getState() returns null and the first
-// loadGame() call throws, taking app.start() with it and tripping the
-// `location.href = "/"` reload-on-failure handler in bootstrap.js — which
-// was producing the boot loop you were seeing.
+// Bring the engine online before any AMD module can call into it.
+// boot() returns a Promise that resolves once setUpdateListener has
+// replayed the full history. bootstrap.js fetches the promise via the
+// AMD bridge (require('boot').getBootPromise()) and gates app.start()
+// on its resolution so the UI never sees a partially-replayed state.
+// boot() itself runs the synchronous part (freshState + listener
+// registration) before returning, so getState() / sendUpdate() are safe
+// to call from AMD modules at any point — they just see fresh state
+// until replay catches up.
 if (typeof webxdc !== 'undefined') {
   boot();
 }
