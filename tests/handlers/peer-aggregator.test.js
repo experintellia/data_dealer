@@ -225,6 +225,82 @@ describe('state.peers — convergence (arrival-order independence)', () => {
   });
 });
 
+// ── convergence with multiple deltas per address ─────────────────────────────
+//
+// When the same address sends more than one delta (normal gameplay: charge,
+// collect, integrate, …), replaying those deltas in any order must converge
+// to the same final peers map.  The timestamp-LWW guard means that only the
+// highest-ts snapshot survives for each address, regardless of arrival order.
+// Uses 4 deltas across 2 addresses (alice × 2, bob × 2) in all 4! = 24
+// permutations.
+
+describe('state.peers — convergence with 4 deltas from 2 addresses', () => {
+  const SELF = 'alice@test';
+
+  // alice sends two deltas at ts=1000 and ts=3000; bob sends two at ts=2000 and ts=4000.
+  const d_alice_1 = mkDelta('alice@test', 'chargePerp',  { cash_value: 50,  xp_value: 5,  xp_level: 1 }, 1000);
+  const d_alice_2 = mkDelta('alice@test', 'collectPerp', { cash_value: 120, xp_value: 12, xp_level: 1 }, 3000);
+  const d_bob_1   = mkDelta('bob@test',   'chargePerp',  { cash_value: 80,  xp_value: 8,  xp_level: 1 }, 2000);
+  const d_bob_2   = mkDelta('bob@test',   'collectPerp', { cash_value: 200, xp_value: 20, xp_level: 2 }, 4000);
+
+  const allFour = [d_alice_1, d_alice_2, d_bob_1, d_bob_2];
+
+  // Generate all 4! permutations of four elements.
+  function permutations4(arr) {
+    var result = [];
+    for (var a = 0; a < 4; a++) {
+      for (var b = 0; b < 4; b++) {
+        if (b === a) continue;
+        for (var c = 0; c < 4; c++) {
+          if (c === a || c === b) continue;
+          var d = [0, 1, 2, 3].find(function (x) { return x !== a && x !== b && x !== c; });
+          result.push([arr[a], arr[b], arr[c], arr[d]]);
+        }
+      }
+    }
+    return result;
+  }
+
+  it('final peers.alice is the highest-ts alice snapshot regardless of delta order', () => {
+    permutations4(allFour).forEach(function (perm) {
+      var s = replay(SELF, perm);
+      // alice's latest delta is ts=3000 (cash=120, xp=12).
+      expect(s.peers['alice@test']).toMatchObject({ cash: 120, xp: 12, last_seen_ts: 3000 });
+    });
+  });
+
+  it('final peers.bob is the highest-ts bob snapshot regardless of delta order', () => {
+    permutations4(allFour).forEach(function (perm) {
+      var s = replay(SELF, perm);
+      // bob's latest delta is ts=4000 (cash=200, xp=20, level=2).
+      expect(s.peers['bob@test']).toMatchObject({ cash: 200, xp: 20, level: 2, last_seen_ts: 4000 });
+    });
+  });
+
+  it('all 24 permutations produce identical peers maps', () => {
+    var perms = permutations4(allFour);
+    var reference = replay(SELF, perms[0]).peers;
+    perms.slice(1).forEach(function (perm) {
+      expect(replay(SELF, perm).peers).toEqual(reference);
+    });
+  });
+
+  it('getRanking after all-permutation replay agrees on final scores', async () => {
+    var perms = permutations4(allFour);
+    // Spot-check: first and last permutations produce same getRanking result.
+    setState(Object.assign(freshState(SELF), { peers: replay(SELF, perms[0]).peers }));
+    const r1 = await getRanking('xp');
+
+    setState(Object.assign(freshState(SELF), { peers: replay(SELF, perms[perms.length - 1]).peers }));
+    const r2 = await getRanking('xp');
+
+    expect(r1.result.top.map(function (r) { return r.addr; }).sort())
+      .toEqual(r2.result.top.map(function (r) { return r.addr; }).sort());
+    expect(r1.result.top.map(function (r) { return r.value; }).sort(function (a, b) { return b - a; }))
+      .toEqual(r2.result.top.map(function (r) { return r.value; }).sort(function (a, b) { return b - a; }));
+  });
+});
+
 // ── getRanking ────────────────────────────────────────────────────────────────
 
 describe('getRanking with multi-peer state', () => {

@@ -303,6 +303,114 @@ describe('composability', () => {
   });
 });
 
+// ── idempotence under stress: 50+ completed charges ─────────────────────────
+//
+// Verifies de-dup-by-path and "node_ready fires exactly once per charge"
+// at scale.  This exercises the inCollect path-set guard (materializer.js §1).
+//
+// Note on orphan nodes_charging leak (#114): the state.js collectPerp reducer
+// leaves the entry in nodes_charging when it removes it from nodes_collect,
+// so on cold-start replay the entry is re-promoted.  The E2E regression for
+// this is in tests/e2e/collect-after-reload.spec.ts (skipped pending #120).
+// There is no additional unit-level coverage needed here because the
+// materializer itself is correct — the leak is in the state reducer, not the
+// materializer rule.
+
+describe('idempotence under stress — 50+ completed charges', () => {
+  it('all 52 completed charges move to nodes_collect without duplicates', () => {
+    var NUM = 52;
+    var charges = [];
+    for (var i = 0; i < NUM; i++) {
+      charges.push({ path: 'p.' + i, result: { value: i }, charge_start: 0, charge_end: 1000,
+                     game_id: 'id' + i, game_type: 'ContactPerp' });
+    }
+    const r = materialize(baseState({ nodes_charging: charges }), 2000);
+    expect(r.state.nodes_charging).toHaveLength(0);
+    expect(r.state.nodes_collect).toHaveLength(NUM);
+    var paths = r.state.nodes_collect.map(function (e) { return e.path; });
+    expect(new Set(paths).size).toBe(NUM);
+  });
+
+  it('repeated materialize() at same timestamp on 52 charges emits no events the second time', () => {
+    var NUM = 52;
+    var charges = [];
+    for (var i = 0; i < NUM; i++) {
+      charges.push({ path: 'p.' + i, result: { value: i }, charge_start: 0, charge_end: 1000,
+                     game_id: 'id' + i, game_type: 'ContactPerp' });
+    }
+    const t = 2000;
+    const r1 = materialize(baseState({ nodes_charging: charges }), t);
+    expect(r1.events).toHaveLength(NUM);
+
+    const r2 = materialize(r1.state, t);
+    expect(r2.events).toHaveLength(0);
+    expect(r2.state.nodes_collect).toHaveLength(NUM);
+  });
+
+  it('node_ready fires exactly once per path across two materialize calls', () => {
+    var NUM = 55;
+    var charges = [];
+    for (var i = 0; i < NUM; i++) {
+      charges.push({ path: 'p.' + i, result: { value: i }, charge_start: 0, charge_end: 1000,
+                     game_id: 'id' + i, game_type: 'ContactPerp' });
+    }
+    const r1 = materialize(baseState({ nodes_charging: charges }), 2000);
+    const r2 = materialize(r1.state, 2000);
+
+    const allEvents = r1.events.concat(r2.events);
+    expect(allEvents).toHaveLength(NUM);  // exactly once per charge, none on second call
+    var eventPaths = allEvents.map(function (e) { return e.pl.path; });
+    expect(new Set(eventPaths).size).toBe(NUM);
+  });
+
+  it('path-set de-dup prevents double-add when path is already in nodes_collect', () => {
+    // Pre-populate 2 paths in nodes_collect, then try to complete them again via nodes_charging.
+    var existing = [
+      { path: 'p.0', result: { value: 0 } },
+      { path: 'p.1', result: { value: 1 } },
+    ];
+    var charges = existing.map(function (e, idx) {
+      return { path: e.path, result: e.result, charge_start: 0, charge_end: 1000,
+               game_id: 'id' + idx, game_type: 'ContactPerp' };
+    });
+    for (var i = 2; i < 52; i++) {
+      charges.push({ path: 'p.' + i, result: { value: i }, charge_start: 0, charge_end: 1000,
+                     game_id: 'id' + i, game_type: 'ContactPerp' });
+    }
+
+    const r = materialize(baseState({ nodes_charging: charges, nodes_collect: existing }), 2000);
+    expect(r.state.nodes_collect).toHaveLength(52);  // 50 new + 2 pre-existing, no double-adds
+    var paths = r.state.nodes_collect.map(function (e) { return e.path; });
+    expect(new Set(paths).size).toBe(52);
+  });
+});
+
+// ── AP regen: ap_snapshot > ap_max invariant ─────────────────────────────────
+//
+// Defensive test: even if a persisted state has ap_snapshot above ap_max
+// (e.g. due to a replay-order anomaly or an ap_max reduction after level-down),
+// every materialize() call must clamp ap_snapshot ≤ ap_max.
+
+describe('AP regen — ap_snapshot > ap_max invariant', () => {
+  it('clamps ap_snapshot to ap_max when snapshot starts above cap (no elapsed time)', () => {
+    const s = baseState({
+      game_values: { ap_snapshot: 10, ap_update: 0,
+                     ap_inc_value: 1, ap_inc_interval: 1000, ap_max: 6 }
+    });
+    // now == ap_update → 0 ticks; Math.min(6, 10 + 0) = 6
+    expect(materialize(s, 0).state.game_values.ap_snapshot).toBe(6);
+  });
+
+  it('clamps even when additional regen ticks would push it further over cap', () => {
+    const s = baseState({
+      game_values: { ap_snapshot: 10, ap_update: 0,
+                     ap_inc_value: 2, ap_inc_interval: 1000, ap_max: 6 }
+    });
+    // 5 ticks × 2 = 10 added to already-excessive 10 → still capped at 6
+    expect(materialize(s, 5000).state.game_values.ap_snapshot).toBe(6);
+  });
+});
+
 // ── property: random delta sequences ────────────────────────────────────────
 //
 // For any sequence of non-decreasing timestamps t0 ≤ t1 ≤ … ≤ tN,
