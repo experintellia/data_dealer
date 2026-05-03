@@ -2087,6 +2087,69 @@ describe('cold-start replay — buyPowerup mission progress survives applyDelta'
   });
 });
 
+// ── Level-up during collectPerp: AP refills to new ap_max ────────────────────
+//
+// When the XP gained from collectPerp crosses a level boundary, ap_snapshot
+// must be set to the NEW level's ap_max (a refill), not decremented or left
+// at the old value.
+//
+// Level 1: xp_min=0, xp_max=10, ap_max=6
+// Level 2: xp_min=11, xp_max=30, ap_max=8
+//
+// Starting state: xp_value=10, xp_level=1, ap_snapshot=3
+// After collect with xp_inc=1: xp=11 → crosses into level 2, ap_max=8
+// Expected ap_snapshot: 8 (refilled), NOT 3 (old value) or 3-0=3.
+
+describe('collectPerp — level-up refills AP to new ap_max', () => {
+  const PATH = 'Imperium.City.Agent0.contact001';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => { clearOverride(); setSendDelta(null); setEmitter(null); });
+
+  it('ap_snapshot refills to new level ap_max when XP crosses level boundary', async () => {
+    setState(mkState({
+      game_values: mkGv({ xp_value: 10, xp_level: 1, ap_snapshot: 3, ap_max: 6 }),
+      nodes:        [mkNode('ContactPerp', PATH)],
+      nodes_collect: [{ path: PATH, result: { amount: 5 } }]
+    }));
+
+    const data = await collectPerp(PATH);
+
+    // contact001 xp_inc=1: 10+1=11 → level 2
+    // collectPerp returns { result: { result: innerResult, game_values, levelup, … } }
+    expect(data.result.levelup).toBe(true);
+    expect(data.result.game_values.xp_level).toBe(2);
+    expect(data.result.game_values.ap_snapshot).toBe(8);  // level 2 ap_max
+  });
+
+  it('ap_snapshot is NOT decremented when level-up occurs (override, not cost subtract)', async () => {
+    setState(mkState({
+      game_values: mkGv({ xp_value: 10, xp_level: 1, ap_snapshot: 3, ap_max: 6 }),
+      nodes:        [mkNode('ContactPerp', PATH)],
+      nodes_collect: [{ path: PATH, result: { amount: 5 } }]
+    }));
+
+    const data = await collectPerp(PATH);
+    // ap_snapshot must be the new ap_max (8), not the old value (3)
+    // and not anything derived by subtracting from 3.
+    expect(data.result.game_values.ap_snapshot).toBeGreaterThan(3);
+    expect(data.result.game_values.ap_snapshot).toBe(8);
+  });
+
+  it('no level-up: ap_snapshot is unchanged when XP stays within same level', async () => {
+    setState(mkState({
+      game_values: mkGv({ xp_value: 5, xp_level: 1, ap_snapshot: 3, ap_max: 6 }),
+      nodes:        [mkNode('ContactPerp', PATH)],
+      nodes_collect: [{ path: PATH, result: { amount: 5 } }]
+    }));
+
+    const data = await collectPerp(PATH);
+    // contact001 xp_inc=1: 5+1=6 → still level 1 (xp_max=10)
+    expect(data.result.levelup).toBe(false);
+    expect(data.result.game_values.ap_snapshot).toBe(3);  // unchanged
+  });
+});
+
 // ── Issue #114 regression: collectPerp leaves orphan nodes_charging on replay ─
 // During live operation the materializer strips the nodes_charging entry
 // in-memory before the collectPerp delta is committed, so post-handler state

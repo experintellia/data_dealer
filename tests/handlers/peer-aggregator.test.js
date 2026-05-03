@@ -225,6 +225,108 @@ describe('state.peers — convergence (arrival-order independence)', () => {
   });
 });
 
+// ── convergence with multiple deltas per address ─────────────────────────────
+//
+// When the same address sends more than one delta (normal gameplay: charge,
+// collect, integrate, …), replaying those deltas in any order must converge
+// to the same final peers map.  The timestamp-LWW guard means that only the
+// highest-ts snapshot survives for each address, regardless of arrival order.
+// Uses 4 deltas across 2 addresses (alice × 2, bob × 2) in all 4! = 24
+// permutations.
+
+describe('state.peers — convergence with 4 deltas from 2 addresses', () => {
+  const SELF = 'alice@test';
+
+  // alice sends two deltas at ts=1000 and ts=3000; bob sends two at ts=2000 and ts=4000.
+  const d_alice_1 = mkDelta('alice@test', 'chargePerp',  { cash_value: 50,  xp_value: 5,  xp_level: 1 }, 1000);
+  const d_alice_2 = mkDelta('alice@test', 'collectPerp', { cash_value: 120, xp_value: 12, xp_level: 1 }, 3000);
+  const d_bob_1   = mkDelta('bob@test',   'chargePerp',  { cash_value: 80,  xp_value: 8,  xp_level: 1 }, 2000);
+  const d_bob_2   = mkDelta('bob@test',   'collectPerp', { cash_value: 200, xp_value: 20, xp_level: 2 }, 4000);
+
+  const allFour = [d_alice_1, d_alice_2, d_bob_1, d_bob_2];
+
+  // All 4! = 24 arrival-order permutations, computed once for the whole block.
+  const allPerms = (function () {
+    var result = [];
+    for (var a = 0; a < 4; a++) {
+      for (var b = 0; b < 4; b++) {
+        if (b === a) continue;
+        for (var c = 0; c < 4; c++) {
+          if (c === a || c === b) continue;
+          var d = [0, 1, 2, 3].find(function (x) { return x !== a && x !== b && x !== c; });
+          result.push([allFour[a], allFour[b], allFour[c], allFour[d]]);
+        }
+      }
+    }
+    return result;
+  }());
+
+  it('final peers.alice is the highest-ts alice snapshot regardless of delta order', () => {
+    allPerms.forEach(function (perm) {
+      var s = replay(SELF, perm);
+      // alice's latest delta is ts=3000 (cash=120, xp=12).
+      expect(s.peers['alice@test']).toMatchObject({ cash: 120, xp: 12, last_seen_ts: 3000 });
+    });
+  });
+
+  it('final peers.bob is the highest-ts bob snapshot regardless of delta order', () => {
+    allPerms.forEach(function (perm) {
+      var s = replay(SELF, perm);
+      // bob's latest delta is ts=4000 (cash=200, xp=20, level=2).
+      expect(s.peers['bob@test']).toMatchObject({ cash: 200, xp: 20, level: 2, last_seen_ts: 4000 });
+    });
+  });
+
+  it('all 24 permutations produce identical peers maps', () => {
+    var reference = replay(SELF, allPerms[0]).peers;
+    allPerms.slice(1).forEach(function (perm) {
+      expect(replay(SELF, perm).peers).toEqual(reference);
+    });
+  });
+
+  it('getRanking after all-permutation replay agrees on final scores', async () => {
+    var perms = allPerms;
+    // Spot-check: first and last permutations produce same getRanking result.
+    setState(Object.assign(freshState(SELF), { peers: replay(SELF, perms[0]).peers }));
+    const r1 = await getRanking('xp');
+
+    setState(Object.assign(freshState(SELF), { peers: replay(SELF, perms[perms.length - 1]).peers }));
+    const r2 = await getRanking('xp');
+
+    expect(r1.result.top.map(function (r) { return r.addr; }).sort())
+      .toEqual(r2.result.top.map(function (r) { return r.addr; }).sort());
+    expect(r1.result.top.map(function (r) { return r.value; }).sort(function (a, b) { return b - a; }))
+      .toEqual(r2.result.top.map(function (r) { return r.value; }).sort(function (a, b) { return b - a; }));
+  });
+
+  it('tie (same-ts): last-processed delta wins for alice when both have ts=3000', () => {
+    // Both alice deltas share ts=3000; LWW allows overwrite at equal ts.
+    // The second delta processed is the one that sticks.
+    const d_tie_1 = mkDelta('alice@test', 'chargePerp',  { cash_value: 50,  xp_value: 5,  xp_level: 1 }, 3000);
+    const d_tie_2 = mkDelta('alice@test', 'collectPerp', { cash_value: 120, xp_value: 12, xp_level: 1 }, 3000);
+
+    var s1 = replay('alice@test', [d_tie_1, d_tie_2]);
+    var s2 = replay('alice@test', [d_tie_2, d_tie_1]);
+
+    // Each order sticks the last-applied delta — they may differ, but neither crashes.
+    expect(s1.peers['alice@test'].last_seen_ts).toBe(3000);
+    expect(s2.peers['alice@test'].last_seen_ts).toBe(3000);
+    // The two orderings produce different cash because neither is stale.
+    expect(s1.peers['alice@test'].cash).toBe(120);
+    expect(s2.peers['alice@test'].cash).toBe(50);
+  });
+
+  it('stale-overrides-fresh is blocked: older delta after newer never clobbers', () => {
+    // Deliver alice's ts=3000 delta first, then her ts=1000 delta.
+    // The ts=1000 delta is stale and must not overwrite the ts=3000 snapshot.
+    var s = replay('alice@test', [
+      mkDelta('alice@test', 'collectPerp', { cash_value: 120, xp_value: 12, xp_level: 1 }, 3000),
+      mkDelta('alice@test', 'chargePerp',  { cash_value: 50,  xp_value: 5,  xp_level: 1 }, 1000),
+    ]);
+    expect(s.peers['alice@test']).toMatchObject({ cash: 120, xp: 12, last_seen_ts: 3000 });
+  });
+});
+
 // ── getRanking ────────────────────────────────────────────────────────────────
 
 describe('getRanking with multi-peer state', () => {

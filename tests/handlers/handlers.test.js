@@ -1431,3 +1431,82 @@ describe('markTokenSeen — failure modes', () => {
     expect(data).toEqual({ result: { error: 0 } });
   });
 });
+
+// ── error edge cases ──────────────────────────────────────────────────────────
+//
+// Boundary and error-path tests not covered by the per-handler suites above.
+// Each case targets exactly one coin/AP/slot short of the required threshold
+// so the guard triggers reliably.
+
+describe('buyPowerup — error: exactly one coin short of powerup price', () => {
+  it('returns error:3 when cash_value is price − 1 (ad002 price=90, cash=89)', async () => {
+    // ad002 price = 90; state has 89 — one coin short.
+    const oneCoinShort = mkProjectState({
+      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 89 })
+    });
+    setState(oneCoinShort);
+    const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.error).toBe(3);
+  });
+
+  it('does not mutate state on partial-funds failure', async () => {
+    const oneCoinShort = mkProjectState({
+      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 89 })
+    });
+    setState(oneCoinShort);
+    const before = getState().game_values.cash_value;
+    await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
+    expect(getState().game_values.cash_value).toBe(before);
+    expect(getState().nodes[0].instance_data.powerups || []).toHaveLength(0);
+  });
+});
+
+describe('buySlots — error: exactly one coin short of slot cost', () => {
+  // First ad slot cost = slot_cost(10) + slot_cost_modifier(1) × current_slots(3) = 13.
+  // cash=12 is one coin short.
+  it('returns error:3 when cash_value is slot cost − 1', async () => {
+    const oneCoinShort = mkProjectState({
+      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 12 })
+    });
+    setState(oneCoinShort);
+    const { result } = await buySlots(PROJECT_NODE.full_path, 'ad', 1);
+    expect(result.error).toBe(3);
+  });
+
+  it('does not mutate state on partial-funds failure', async () => {
+    const oneCoinShort = mkProjectState({
+      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 12 })
+    });
+    setState(oneCoinShort);
+    const before = getState().game_values.cash_value;
+    await buySlots(PROJECT_NODE.full_path, 'ad', 1);
+    expect(getState().game_values.cash_value).toBe(before);
+  });
+});
+
+describe('buyPerp — current behaviour (regression-only, not endorsement): ProxyPerp slot check skipped when parent absent', () => {
+  // TODO: The bypass of the ProxyPerp slot check when parentNode is absent
+  // is a known bug.  The desired behaviour is an explicit error code (e.g.
+  // error:5 "parent not found") instead of a silent success.  These tests
+  // document the *current* (buggy) behaviour and will need to be updated when
+  // the bug is fixed.  See issue #150 (filed from PR #149 review).
+  //
+  // When the parent path is not 'Imperium' or 'Database' and doesn't exist in
+  // state.nodes, the ProxyPerp slot check is bypassed (parentNode = null).
+  it('succeeds and creates the node when a non-root parent is absent from state.nodes', async () => {
+    setState(mkBuyPerpState());
+    // 'Imperium.missingProxy' is not in state.nodes.
+    const { result } = await buyPerp('Imperium.missingProxy', 'contact001');
+    // Level + cash guards pass (level 3, 10000 cash); parent lookup skips ProxyPerp check.
+    expect(result.error).toBeUndefined();
+    expect(result.node.full_path).toBe('Imperium.missingProxy.contact001');
+  });
+
+  it('does not enforce ProxyPerp slot limits when the ProxyPerp parent is absent from state.nodes', async () => {
+    // A ProxyPerp with max_slots=3, but removed from state.nodes before the call.
+    // Because parentNode is null, max_slots enforcement is skipped and the buy succeeds.
+    setState(mkBuyPerpState());
+    const { result } = await buyPerp('Imperium.proxy001', 'project001');
+    expect(result.error).toBeUndefined();
+  });
+});

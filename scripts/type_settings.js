@@ -260,6 +260,7 @@ define(function(require) {
           "goals_texts": {
             "buy_perp": _._("goal Buy Perp %s"),
             "buy_powerup": _._("goal Buy %s in Project %s"),
+            "charge_perp": _._("goal Charge Perp %s"),
             "collect_cash": _._("goal Collect $%s from %s"),
             "collect_profiles": _._("goal Collect %s Profiles from %s"),
             "integrate_profiles": _._("goal Integrate %s x %s"),

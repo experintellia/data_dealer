@@ -221,6 +221,10 @@
     null,
     "Besorg dir %s bei %s"
   ],
+  "goal Charge Perp %s": [
+    null,
+    "Mach einen Deal mit: %s"
+  ],
   "goal Collect $%s from %s": [
     null,
     "Kassiere $%s von %s"

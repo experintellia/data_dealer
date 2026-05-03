@@ -221,6 +221,10 @@
     null,
     "Buy %s for %s venture"
   ],
+  "goal Charge Perp %s": [
+    null,
+    "Make a deal with %s"
+  ],
   "goal Collect $%s from %s": [
     null,
     "Collect %s from %s"
