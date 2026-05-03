@@ -864,7 +864,7 @@ define(function(require) {
     };
 
     GameRoot.prototype.refresh = function() {
-      // Reload the game data and reinit the whole Game (like page reload but with less requests) ;)
+      // Reload the game data and reinit the whole Game (like a page reload).
       var groot = this;
       groot.retryDelay = groot.retryDelay || 2000;
 

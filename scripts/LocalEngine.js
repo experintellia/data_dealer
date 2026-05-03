@@ -140,8 +140,7 @@ function _getVariatedAmount(baseAmount, ts, path) {
 
 /**
  * getToken() → Promise<{result: string}>
- * Returns webxdc.selfAddr as the local session identifier.  Retained for
- * compatibility with code paths that still want a stable string id.
+ * Returns webxdc.selfAddr (or 'local' in non-webxdc environments).
  */
 export function getToken() {
   // eslint-disable-next-line no-undef

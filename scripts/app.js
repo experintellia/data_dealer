@@ -101,52 +101,25 @@ define(function(require) {
       }
     };
 
-    // Build app.remote: a thin facade that delegates each call to LocalEngine
-    // and wraps the returned native Promise in a jQuery Deferred so existing
-    // .done()/.fail() chains in Game.js keep working.
-    function _wrapHandler(name) {
-      return function() {
-        var fn = LocalEngine[name];
-        var d = $.Deferred();
-        if (typeof fn !== 'function') {
-          return d.reject('NotImplemented: ' + name).promise();
-        }
-        var result = fn.apply(LocalEngine, arguments);
-        if (result && typeof result.then === 'function') {
-          result.then(function(v) { d.resolve(v); }, function(e) { d.reject(e); });
-        } else {
-          d.resolve(result);
-        }
-        return d.promise();
-      };
-    }
-
-    var REMOTE_METHODS = [
-      'buyPowerup', 'chargePerp', 'collectPerp', 'integrateCollected',
-      'getPowerups', 'getProvidedPerps', 'getSessionLocale', 'setLocale',
-      'buyKarma', 'buyPerp', 'buySlots', 'getToken', 'loadGame',
-      'setDisplayName', 'getRanking', 'ping', 'sellPowerup',
-      'setPerpCoordinates', 'dismissMissionBriefing', 'markTokenSeen'
-    ];
-
+    // Wrap each LocalEngine handler so callers get a jQuery Deferred —
+    // Game.js still uses .done()/.fail() chains.  $.when adopts the native
+    // Promise returned by the handler.
+    var INTERNAL_API = { setEmitter: 1, setSendDelta: 1, setPrngSeed: 1 };
     app.remote = {};
-    for (var i = 0; i < REMOTE_METHODS.length; i++) {
-      app.remote[REMOTE_METHODS[i]] = _wrapHandler(REMOTE_METHODS[i]);
-    }
+    Object.keys(LocalEngine).forEach(function (name) {
+      if (INTERNAL_API[name]) return;
+      var fn = LocalEngine[name];
+      if (typeof fn !== 'function') return;
+      app.remote[name] = function () {
+        return $.when(fn.apply(LocalEngine, arguments));
+      };
+    });
 
-    // This method initializes the application.
     app.start = function() {
-      // Wire LocalEngine's event emitter onto $(document) so node_ready /
-      // new_items events from materialisation reach the handlers registered
-      // by GameRoot.
-      if (typeof LocalEngine.setEmitter === 'function') {
-        LocalEngine.setEmitter(function(ev, pl) {
-          $(document).trigger(ev, [pl]);
-        });
-      }
+      LocalEngine.setEmitter(function(ev, pl) {
+        $(document).trigger(ev, [pl]);
+      });
 
-      // All handlers resolve synchronously now (no network), but we keep the
-      // jQuery Deferred chain so bootstrap.js's .fail() handler still works.
       $('#loadertext').text('Loading saved game');
       return app.remote.getSessionLocale().then(function(data) {
         var locale = data.result === 'de' ? 'de_AT' : 'en_US';
@@ -171,12 +144,6 @@ define(function(require) {
           });
         });
       });
-    };
-
-    // Calling this method restores the original HTML as of the time of loading.
-    app.reset = function() {
-      // FIXME: Currently three-o
-      //$('body').html(app.renderView('main'));
     };
 
     // Extending Underscore with some helpers for easier templating.
