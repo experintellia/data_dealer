@@ -4,6 +4,8 @@
  * To turn this into a proper Node/vitest mock: drop the localStorage calls and
  * export window.webxdc as a module so tests can import and reset it between runs.
  */
+import type { SendingStatusUpdate, ReceivedStatusUpdate } from "@webxdc/types";
+
 (function () {
   'use strict';
 
@@ -12,8 +14,8 @@
   console.log('[webxdc-shim] dev mode');
 
   const STORAGE_KEY = 'webxdc-shim-updates';
-  let _updates: ReceivedUpdate[] = [];
-  let _listeners: Array<(u: ReceivedUpdate) => void> = [];
+  let _updates: ReceivedStatusUpdate<any>[] = [];
+  let _listeners: Array<(u: ReceivedStatusUpdate<any>) => void> = [];
 
   // Restore persisted history so a page reload replays prior updates.
   try {
@@ -25,13 +27,17 @@
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(_updates)); } catch (_) {}
   }
 
-  window.webxdc = {
+  // Cast via `any` — this is a minimal dev scaffold, not a full Webxdc
+  // implementation; the real messenger provides all fields at runtime.
+  (window as any).webxdc = {
     selfAddr: 'dev@local',
     selfName: 'Dev',
 
-    sendUpdate(update: WebxdcSendUpdate, _descr?: string): void {
+    sendUpdate(update: SendingStatusUpdate<any>, _descr: ""): void {
       const serial = _updates.length + 1;
-      const entry: ReceivedUpdate = { serial };
+      // payload and other fields are copied in from `update` below; cast
+      // to satisfy the required-payload shape before the loop fills it in.
+      const entry = { serial, max_serial: serial } as ReceivedStatusUpdate<any>;
       // Shallow-copy payload fields, then stamp serial on top.
       if (update && typeof update === 'object') {
         Object.keys(update).forEach(function (k) {
@@ -44,7 +50,7 @@
       _listeners.forEach(function (cb) { cb(entry); });
     },
 
-    setUpdateListener(cb: (u: ReceivedUpdate) => void, serial?: number): Promise<void> {
+    setUpdateListener(cb: (u: ReceivedStatusUpdate<any>) => void, serial?: number): Promise<void> {
       const after = (typeof serial === 'number') ? serial : 0;
       // Replay history that arrived before this listener was registered.
       _updates.forEach(function (u) {

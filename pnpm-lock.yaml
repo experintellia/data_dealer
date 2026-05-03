@@ -17,6 +17,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^3.0.0
         version: 3.2.4(vitest@3.2.4(@types/node@22.19.17)(lightningcss@1.32.0)(terser@5.46.2)(yaml@2.8.3))
+      '@webxdc/types':
+        specifier: ^2.1.2
+        version: 2.1.2
       '@webxdc/vite-plugins':
         specifier: ^1.6.0
         version: 1.6.0(terser@5.46.2)(vite@8.0.10(@types/node@22.19.17)(esbuild@0.27.7)(terser@5.46.2)(yaml@2.8.3))
@@ -1045,6 +1048,9 @@ packages:
 
   '@vitest/utils@3.2.4':
     resolution: {integrity: sha512-fB2V0JFrQSMsCo9HiSq3Ezpdv4iYaXRG1Sx8edX3MwxfyNn83mKiGzOcH+Fkxt4MHxr3y42fQi1oeAInqgX2QA==}
+
+  '@webxdc/types@2.1.2':
+    resolution: {integrity: sha512-oklcyHvUXqCS5JwbPVaN8tt7nSB8ffRmyrUlVt0HeSn4kDyNE46oKSbw3KtrDzl530KHnm67LfcK/AjWbBoXUA==}
 
   '@webxdc/vite-plugins@1.6.0':
     resolution: {integrity: sha512-mjh2M2JGUJmYJrr789mhwgKEWhYcFcz0T3EKZ8VBesDlWmm2KCw8j063stVTb3riRDVLM+0m+UCBWuV8S2+7qg==}
@@ -2939,6 +2945,8 @@ snapshots:
       '@vitest/pretty-format': 3.2.4
       loupe: 3.2.1
       tinyrainbow: 2.0.0
+
+  '@webxdc/types@2.1.2': {}
 
   '@webxdc/vite-plugins@1.6.0(terser@5.46.2)(vite@8.0.10(@types/node@22.19.17)(esbuild@0.27.7)(terser@5.46.2)(yaml@2.8.3))':
     dependencies:
