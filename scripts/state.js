@@ -562,8 +562,12 @@ export function applyDelta(state, delta) {
     return state;
   }
 
-  // Guard 2: schema version mismatch — reset rather than crash
-  if (state.schema_version !== SCHEMA_VERSION) {
+  // Guard 2: schema version mismatch — reset rather than crash.
+  // Deferred when state.addr is empty: addr has not been seeded yet, so
+  // resetting now would produce a fresh state that also has addr='' which
+  // Guard 3 then uses to block all subsequent own-addr deltas.  The reset
+  // fires on the first delta after boot() seeds the real addr.
+  if (state.addr && state.schema_version !== SCHEMA_VERSION) {
     return freshState(state.addr);
   }
 

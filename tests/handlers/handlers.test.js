@@ -346,6 +346,19 @@ describe('buyKarma — happy path', () => {
     const { result } = await buyKarma(KARMA_GESTALT);
     expect(result.game_values.karma_value).toBe(100);
   });
+
+  it('clamps karma_value at -100 when already below the floor', async () => {
+    setState(mkState({
+      game_values: {
+        xp_value: 1, xp_level: 1, cash_value: 9999, cash_spent: 0,
+        karma_value: -106, profiles_value: 0, profiles_max: 1,
+        ap_snapshot: 6, ap_update: null
+      }
+    }));
+    // karma001 karma_points=5; -106+5=-101 → clamped to -100
+    const { result } = await buyKarma(KARMA_GESTALT);
+    expect(result.game_values.karma_value).toBe(-100);
+  });
 });
 
 describe('buyKarma — failure: insufficient cash', () => {
