@@ -175,6 +175,20 @@ describe('applyDelta — other-peer filter', () => {
     expect(result).not.toBe(s);
     expect(result.schema_version).toBe(SCHEMA_VERSION);
   });
+
+  // Regression test for #130: a foreign delta arriving before selfAddr is
+  // established must not seed state.addr and must be dropped from own state.
+  it('empty state.addr + foreign delta: state.addr stays empty, delta dropped', () => {
+    const s = freshState(); // state.addr === ''
+    const foreignDelta = makeDelta('bob@example.com', 'ping', 1000);
+    const result = applyDelta(s, foreignDelta);
+    expect(result.addr).toBe('');
+    // Per-self fields unchanged (delta was dropped from own state).
+    expect(result.game_values).toEqual(s.game_values);
+    expect(result.nodes).toBe(s.nodes);
+    // Peer aggregator still ran.
+    expect(result.peers['bob@example.com']).toBeDefined();
+  });
 });
 
 describe('applyDelta — malformed delta guard', () => {
@@ -358,28 +372,33 @@ describe('applyDelta — markTokenSeen reducer', () => {
 });
 
 // ---------------------------------------------------------------------------
-// #117 — applyDelta silently drops deltas when state.addr is unset
+// #117 / #130 — addr guard and pre-boot replay
 // ---------------------------------------------------------------------------
 
-describe('applyDelta — addr guard does not silently drop deltas pre-boot (#117)', () => {
-  // Closed by #120's applyDelta auto-seed: when a non-empty history replays
-  // before state.addr is populated, the reducer now seeds state.addr from
-  // the first delta's addr so the addr filter never drops deltas during
-  // pre-boot replay.
+describe('applyDelta — addr guard and pre-boot replay (#117 / #130)', () => {
+  // #117 is closed by boot.js seeding state.addr from webxdc.selfAddr BEFORE
+  // the listener is registered.  #130 removes the unsafe Guard 2b that seeded
+  // state.addr from the first inbound delta (which could be a peer delta).
 
-  it('a non-empty history replayed before state.addr is set still produces correct state', () => {
-    // Start with a state whose addr is empty (simulates pre-boot).
-    var s = freshState('');
-    expect(s.addr).toBe('');
+  it('replays own deltas correctly when selfAddr is set before replay starts', () => {
+    // The correct usage: always pass selfAddr to freshState (as boot.js does).
     var deltas = [
       { kind: 'delta', addr: 'alice@local', op: 'markTokenSeen', args: ['token008'], ts: 1 },
       { kind: 'delta', addr: 'alice@local', op: 'markTokenSeen', args: ['token001'], ts: 2 },
     ];
-    var replayed = deltas.reduce(applyDelta, s);
-    // After the architectural fix, state.addr is unconditionally seeded from
-    // the first delta's addr (or set before replay), so the guard never
-    // drops deltas during pre-boot replay.
+    var replayed = deltas.reduce(applyDelta, freshState('alice@local'));
     expect(replayed.addr).toBe('alice@local');
     expect(replayed.tokens_seen).toEqual({ token008: true, token001: true });
+  });
+
+  it('empty state.addr + own-addr delta is dropped (not seeded) — use boot.js pattern instead', () => {
+    // Without selfAddr set upfront, even own-addr deltas cannot be processed
+    // because state.addr is unknown.  This reinforces that boot.js MUST seed
+    // selfAddr before replay (closes #130: foreign deltas must not do it).
+    var s = freshState('');
+    var delta = { kind: 'delta', addr: 'alice@local', op: 'markTokenSeen', args: ['token008'], ts: 1 };
+    var result = applyDelta(s, delta);
+    expect(result.addr).toBe('');
+    expect(result.tokens_seen).toEqual({});
   });
 });
