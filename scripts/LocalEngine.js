@@ -1795,7 +1795,8 @@ export function integrateCollected(_token, collectId) {
   // visible — same contract as collectPerp / chargePerp.
   var state = materialize(rawState, now).state;
 
-  if ((state.game_values && state.game_values.ap_snapshot || 0) < 1) {
+  var ap = (state.game_values && state.game_values.ap_snapshot) || 0;
+  if (ap < 1) {
     return Promise.resolve({ result: { error: 1 } });
   }
 

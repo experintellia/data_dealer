@@ -713,6 +713,25 @@ describe('integrateCollected — ap cost', () => {
     expect(data.result.error).toBe(1);
   });
 
+  it('regression #132: does not error 1 when ap_snapshot is well above 1', async () => {
+    // The AP gate must not return error 1 when there's plenty of AP. The
+    // operator-precedence trap in the previous expression
+    // `(gv && gv.ap_snapshot || 0) < 1` is replaced with a clearer two-step
+    // form; this test pins down the happy-path so the gate stays correct.
+    setState(mkState({
+      game_values: Object.assign({}, mkGv(), { ap_snapshot: 6, ap_max: 6 }),
+      db_queue: [{
+        origin:      'Imperium.City.contact001',
+        collect_id:  COLLECT_ID,
+        profile_set: { profiles_value: 1, tokens_map: {} },
+        collect_dt:  FIXED_NOW
+      }]
+    }));
+
+    const data = await integrateCollected('tok', COLLECT_ID);
+    expect(data.result.error).not.toBe(1);
+  });
+
   it('level-up refill overrides the AP cost — full ap_max after crossing threshold', async () => {
     setState(mkState({
       game_values: Object.assign({}, mkGv(), {
