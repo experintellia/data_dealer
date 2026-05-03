@@ -6,10 +6,9 @@ import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
 import { setOverride, clearOverride } from '../../scripts/clock.js';
 import { materialize } from '../../scripts/materializer.js';
+import { FIXED_NOW, mkNode as _mkNode, mkState as _mkBaseState } from './_fixtures.js';
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
-
-const FIXED_NOW = 1_700_000_000_000;
 
 // contact035 from ruleset_3.de.json:
 //   charge_time:     30000  (30 s)
@@ -22,17 +21,8 @@ const CHARGE_TIME = 30_000;
 const CHARGE_COST = 60;
 const NODE_PATH   = 'Imperium.CityVienna.Agent0.contact035';
 
-function mkNode(instanceOverrides) {
-  return {
-    game_id:       'node-abc123',
-    game_type:     'ContactPerp',
-    full_path:     NODE_PATH,
-    full_type:     'ContactPerp:' + GESTALT,
-    gestalt:       GESTALT,
-    instance_data: Object.assign({}, instanceOverrides || {}),
-  };
-}
-
+// chargePerp-specific game_values: lower starting cash (500) and AP (3) so
+// tests can exercise deduction and AP failure without extra overrides.
 var BASE_GV = {
   cash_value:      500,
   cash_spent:      0,
@@ -49,10 +39,9 @@ var BASE_GV = {
 
 function mkState(overrides) {
   overrides = overrides || {};
-  var base = freshState('test@local');
   // Deep-merge game_values so partial overrides don't drop AP regen fields.
-  var gv = Object.assign({}, base.game_values, BASE_GV, overrides.game_values || {});
-  return Object.assign({}, base, { nodes: [mkNode()] }, overrides, { game_values: gv });
+  var gv = Object.assign({}, BASE_GV, overrides.game_values || {});
+  return _mkBaseState(Object.assign({ nodes: [_mkNode('ContactPerp', NODE_PATH)] }, overrides, { game_values: gv }));
 }
 
 // Reset injectable hooks after each test.
@@ -378,8 +367,7 @@ describe('chargePerp — failure: non-chargeable node (no charge_time)', () => {
   it('returns error: 1 for a node type without charge_time in ruleset', async () => {
     setOverride(FIXED_NOW);
     // Use a StoryPerp gestalt (no charge_time in type_data)
-    var nonChargeable = mkNode({});
-    nonChargeable = Object.assign({}, nonChargeable, {
+    var nonChargeable = Object.assign({}, _mkNode('ContactPerp', NODE_PATH), {
       full_path:  'Imperium.story001',
       full_type:  'StoryPerp:13fee24f6edc8f796903e5b1fad001d3000',
       gestalt:    '13fee24f6edc8f796903e5b1fad001d3000',

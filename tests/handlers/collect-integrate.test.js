@@ -13,54 +13,13 @@ import {
 import { setState, getState } from '../../scripts/boot.js';
 import { materialize } from '../../scripts/materializer.js';
 import { applyDelta } from '../../scripts/state.js';
-import { freshState } from '../../scripts/state.js';
 import { setOverride, clearOverride, advance } from '../../scripts/clock.js';
+import { FIXED_NOW, mkGv, mkState, mkNode, mkChargingEntry } from './_fixtures.js';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
-const FIXED_NOW  = 1_700_000_000_000;          // stable reference epoch
 const CHARGE_DUR = 120_000;                    // 2 min charge
 const CHARGE_END = FIXED_NOW + CHARGE_DUR;
-
-function mkGv(overrides) {
-  return Object.assign({
-    xp_value: 5, xp_level: 1,
-    karma_value: 50, cash_value: 300,
-    profiles_value: 0, profiles_max: 1,
-    ap_snapshot: 6, ap_update: FIXED_NOW,
-    ap_inc_value: 1, ap_inc_interval: 120000, ap_max: 6
-  }, overrides || {});
-}
-
-function mkState(overrides) {
-  return Object.assign(freshState('test@local'), { game_values: mkGv() }, overrides || {});
-}
-
-function mkNode(gameType, path, instData) {
-  var parts = path.split('.');
-  var gestalt = parts[parts.length - 1];
-  return {
-    game_id:       'node_' + gestalt,
-    game_type:     gameType,
-    full_type:     gameType + ':' + gestalt,
-    gestalt:       gestalt,
-    full_path:     path,
-    instance_data: instData || {}
-  };
-}
-
-function mkChargingEntry(path, result, gameType) {
-  var parts = path.split('.');
-  var gestalt = parts[parts.length - 1];
-  return {
-    path:         path,
-    result:       result,
-    charge_start: FIXED_NOW - CHARGE_DUR,
-    charge_end:   CHARGE_END,
-    game_id:      'node_' + gestalt,
-    game_type:    gameType
-  };
-}
 
 // ── Full flow: charge → advance clock → collect → integrate ──────────────────
 

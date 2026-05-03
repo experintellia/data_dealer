@@ -52,10 +52,9 @@ import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
 import { setOverride, clearOverride } from '../../scripts/clock.js';
 import { materialize } from '../../scripts/materializer.js';
+import { FIXED_NOW, mkGv, mkState, mkNode, mkChargingEntry } from './_fixtures.js';
 
 // ── shared fixtures ─────────────────────────────────────────────────────────
-
-const FIXED_NOW = 1_700_000_000_000;
 
 const ECONOMY_FIELDS = [
   'cash_value', 'cash_spent', 'xp_value',
@@ -112,9 +111,8 @@ const CHARGE_BASE_GV = {
 
 function mkChargeState(overrides) {
   overrides = overrides || {};
-  var base = freshState('test@local');
-  var gv = Object.assign({}, base.game_values, CHARGE_BASE_GV, overrides.game_values || {});
-  return Object.assign({}, base, { nodes: [mkChargeNode()] }, overrides, { game_values: gv });
+  var gv = Object.assign({}, CHARGE_BASE_GV, overrides.game_values || {});
+  return mkState(Object.assign({ nodes: [mkChargeNode()] }, overrides, { game_values: gv }));
 }
 
 describe('chargePerp — listener echo idempotence', () => {
@@ -315,49 +313,12 @@ const COLLECT_PATH    = 'Imperium.City.Agent0.contact001';
 const COLLECT_DUR     = 120_000;
 const COLLECT_END     = FIXED_NOW + COLLECT_DUR;
 
-function mkCollectGv(overrides) {
-  return Object.assign({
-    xp_value: 5, xp_level: 1,
-    karma_value: 50, cash_value: 300, cash_spent: 0,
-    profiles_value: 0, profiles_max: 1,
-    ap_snapshot: 6, ap_update: FIXED_NOW,
-    ap_inc_value: 1, ap_inc_interval: 120000, ap_max: 6
-  }, overrides || {});
-}
-
-function mkCollectNode(gameType, path) {
-  var parts   = path.split('.');
-  var gestalt = parts[parts.length - 1];
-  return {
-    game_id:       'node_' + gestalt,
-    game_type:     gameType,
-    full_type:     gameType + ':' + gestalt,
-    gestalt:       gestalt,
-    full_path:     path,
-    instance_data: {}
-  };
-}
-
-function mkChargingEntry(path, result, gameType) {
-  var parts   = path.split('.');
-  var gestalt = parts[parts.length - 1];
-  return {
-    path:         path,
-    result:       result,
-    charge_start: FIXED_NOW - COLLECT_DUR,
-    charge_end:   COLLECT_END,
-    game_id:      'node_' + gestalt,
-    game_type:    gameType
-  };
-}
-
 describe('collectPerp — listener echo idempotence (regression guard)', () => {
   beforeEach(() => setOverride(FIXED_NOW));
 
   function setupCharged() {
-    var s = Object.assign(freshState('test@local'), {
-      game_values:    mkCollectGv(),
-      nodes:          [mkCollectNode('ContactPerp', COLLECT_PATH)],
+    var s = mkState({
+      nodes:          [mkNode('ContactPerp', COLLECT_PATH)],
       nodes_charging: [mkChargingEntry(COLLECT_PATH, { amount: 5 }, 'ContactPerp')]
     });
     setState(s);
@@ -425,9 +386,8 @@ describe('integrateCollected — listener echo idempotence (regression guard)', 
   beforeEach(() => setOverride(FIXED_NOW));
 
   async function chargeCollectAndCapture() {
-    var s = Object.assign(freshState('test@local'), {
-      game_values:    mkCollectGv(),
-      nodes:          [mkCollectNode('ContactPerp', COLLECT_PATH)],
+    var s = mkState({
+      nodes:          [mkNode('ContactPerp', COLLECT_PATH)],
       nodes_charging: [mkChargingEntry(COLLECT_PATH, { amount: 5 }, 'ContactPerp')]
     });
     setState(s);
