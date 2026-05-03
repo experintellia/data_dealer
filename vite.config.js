@@ -130,7 +130,7 @@ function bundleEsmDev() {
         server.config.logger.error('[esm-bundle-dev] initial build failed: ' + err.message);
       });
       server.watcher.on('change', (file) => {
-        if (file.includes('/scripts/') && file.endsWith('.js')) {
+        if (file.includes('/scripts/') && (file.endsWith('.js') || file.endsWith('.ts'))) {
           rebuild().catch((err) => {
             server.config.logger.error('[esm-bundle-dev] rebuild failed: ' + err.message);
           });
