@@ -68,10 +68,9 @@ export function boot(options) {
     : (typeof webxdc !== 'undefined' ? webxdc.selfAddr : '');  // eslint-disable-line no-undef
 
   // selfAddr MUST be set before the listener is registered.  applyDelta's
-  // addr filter relies on state.addr to route between own-echoes and peer
-  // deltas; an empty state.addr at boot would let pre-fix deltas mis-route.
-  // The auto-seed in applyDelta (state.js, closes #117) is a belt; this is
-  // the braces.
+  // addr guard rejects any delta whose addr differs from state.addr, including
+  // when state.addr is empty (closes #130); seeding it here ensures replayed
+  // own-echoes are never dropped.
   _currentState = freshState(selfAddr, options.defaultGame);
 
   var listenerPromise = null;

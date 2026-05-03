@@ -564,15 +564,6 @@ export function applyDelta(state, delta) {
     return freshState(state.addr);
   }
 
-  // Guard 2b (closes #117): auto-seed state.addr from the first delta
-  // when state.addr is empty. This guarantees every reducer runs with
-  // state.addr set, even if boot replay starts before webxdc.selfAddr
-  // has propagated. Without this, the addr filter on subsequent peers
-  // can silently drop deltas during boot.
-  if (!state.addr && delta.addr) {
-    state = Object.assign({}, state, { addr: delta.addr });
-  }
-
   // Peer aggregator: runs for every delta regardless of addr.  Updates
   // state.peers[delta.addr] from game_values snapshot + display_name.
   // Separated from the per-self reducer path so the addr guard below
@@ -580,8 +571,10 @@ export function applyDelta(state, delta) {
   // mission_briefings_seen, tokens_seen per #105).
   state = _applyPeerDelta(state, delta);
 
-  // Guard 3: ignore other peers' deltas (multi-device: only own addr mutates)
-  if (state.addr && delta.addr && delta.addr !== state.addr) {
+  // Guard 3: ignore other peers' deltas (multi-device: only own addr mutates).
+  // Runs before any state.addr mutation; also fires when state.addr is empty
+  // so a foreign delta can never seed our identity (closes #130).
+  if (delta.addr && delta.addr !== state.addr) {
     return state;
   }
 
