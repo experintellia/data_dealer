@@ -1132,6 +1132,94 @@ describe('buyPerp — level-up refills ap_snapshot', () => {
   });
 });
 
+// ── buyPerp — stuck mission repair ───────────────────────────────────────────
+
+const NURSE_NODE = {
+  game_id:       'contact001',
+  game_type:     'ContactPerp',
+  full_type:     'ContactPerp:contact001',
+  gestalt:       'contact001',
+  full_path:     'Imperium.contact001',
+  instance_data: {}
+};
+
+describe('buyPerp — loadGame repairs stuck buy_perp goal', () => {
+  it('marks buy_perp goal complete when target node is already owned at load time', async () => {
+    setState(Object.assign(mkBuyPerpState(), {
+      active_missions: ['mission007'],
+      mission_goals: [{
+        mission:        'mission007',
+        workflow:       'buy_perp',
+        target:         'contact001',
+        amount:         null,
+        position:       1,
+        current_amount: 0,
+        complete:       false
+      }],
+      nodes: mkBuyPerpState().nodes.concat([NURSE_NODE])
+    }));
+
+    await loadGame('tok');
+
+    const goal = getState().mission_goals.find(
+      (g) => g.mission === 'mission007' && g.workflow === 'buy_perp'
+    );
+    expect(goal).toBeDefined();
+    expect(goal.complete).toBe(true);
+  });
+
+  it('does not alter buy_perp goals when the target is not yet owned', async () => {
+    setState(Object.assign(mkBuyPerpState(), {
+      active_missions: ['mission007'],
+      mission_goals: [{
+        mission:        'mission007',
+        workflow:       'buy_perp',
+        target:         'contact001',
+        amount:         null,
+        position:       1,
+        current_amount: 0,
+        complete:       false
+      }]
+    }));
+
+    await loadGame('tok');
+
+    const goal = getState().mission_goals.find(
+      (g) => g.mission === 'mission007' && g.workflow === 'buy_perp'
+    );
+    expect(goal).toBeDefined();
+    expect(goal.complete).toBe(false);
+  });
+});
+
+describe('buyPerp — mission activating after nurse already owned seeds goal as complete', () => {
+  beforeEach(() => {
+    setState(Object.assign(mkBuyPerpState(), {
+      active_missions: ['mission006'],
+      mission_goals: [
+        { mission: 'mission006', workflow: 'buy_powerup', target: 'upgrade001',    amount: null, position: 1, current_amount: 1, complete: true  },
+        { mission: 'mission006', workflow: 'buy_powerup', target: 'ad002',         amount: null, position: 2, current_amount: 1, complete: true  },
+        { mission: 'mission006', workflow: 'buy_powerup', target: 'teammember020', amount: null, position: 3, current_amount: 0, complete: false }
+      ],
+      nodes: mkBuyPerpState().nodes.concat([PROJECT_NODE, NURSE_NODE])
+    }));
+  });
+
+  it('mission007 is added to active_missions after buying the final mission006 powerup', async () => {
+    await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'teammember020');
+    expect(getState().active_missions).toContain('mission007');
+  });
+
+  it('mission007 buy_perp goal is complete because nurse is already owned', async () => {
+    await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'teammember020');
+    const goal = getState().mission_goals.find(
+      (g) => g.mission === 'mission007' && g.workflow === 'buy_perp'
+    );
+    expect(goal).toBeDefined();
+    expect(goal.complete).toBe(true);
+  });
+});
+
 // ── setLocale ────────────────────────────────────────────────────────────────
 
 describe('setLocale', () => {

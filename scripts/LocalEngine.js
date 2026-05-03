@@ -1022,6 +1022,24 @@ function _seedGoalRow(missionGestalt, g) {
   };
 }
 
+function _completeGoal(goal) {
+  return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
+}
+
+// Returns the same array reference when nothing changed so callers can use
+// reference equality to detect whether any repairs were made.
+function _autoCompleteBuyPerpGoals(goals, nodes) {
+  var owned = {};
+  (nodes || []).forEach(function (n) { if (n.gestalt) owned[n.gestalt] = true; });
+  var changed = false;
+  var result = goals.map(function (g) {
+    if (g.workflow !== 'buy_perp' || g.complete || !owned[g.target]) return g;
+    changed = true;
+    return _completeGoal(g);
+  });
+  return changed ? result : goals;
+}
+
 // Without this, fresh games (or saves activated by legacy code) have empty
 // mission_goals and progression handlers find nothing to advance.
 function _seedMissionGoals(state) {
@@ -1048,8 +1066,11 @@ function _seedMissionGoals(state) {
     });
   });
 
-  if (!added) return state;
-  return Object.assign({}, state, { mission_goals: newGoals });
+  // Repair stuck buy_perp goals for items the player already owns — covers
+  // both newly seeded goals and goals seeded before a prior session ended.
+  var repairedGoals = _autoCompleteBuyPerpGoals(newGoals, state.nodes);
+  if (!added && repairedGoals === newGoals) return state;
+  return Object.assign({}, state, { mission_goals: repairedGoals });
 }
 
 // current_amount math mirrors TokenPerp.setAmount → DBTokensAbsolute
@@ -1146,6 +1167,9 @@ function _completeMissionsIfReady(updatedGoals, activeMissions) {
         updatedGoals = updatedGoals.concat([_seedGoalRow(gestalt, g)]);
       });
     });
+    // Auto-complete buy_perp goals for items the player already owns so a
+    // mission that unlocks after the item was bought doesn't get stuck.
+    updatedGoals = _autoCompleteBuyPerpGoals(updatedGoals, getState().nodes);
   }
 
   var updatedMissions = activeMissions.filter(function (m) {
@@ -1214,7 +1238,7 @@ function _advanceChargePerpMissions(state, gestalt) {
     if (goal.target !== gestalt) return goal;
     if (activeMissions.indexOf(goal.mission) === -1) return goal;
     changed = true;
-    return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
+    return _completeGoal(goal);
   });
 
   if (!changed) {
@@ -1238,7 +1262,7 @@ function _advanceBuyPowerupMissions(state, powerupGestalt) {
     if (goal.target !== powerupGestalt) return goal;
     if (activeMissions.indexOf(goal.mission) === -1) return goal;
     changed = true;
-    return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
+    return _completeGoal(goal);
   });
 
   if (!changed) {
@@ -1262,7 +1286,7 @@ function _advanceUpgradeTokenMissions(state, tokenGestalt) {
     if (goal.target !== tokenGestalt) return goal;
     if (activeMissions.indexOf(goal.mission) === -1) return goal;
     changed = true;
-    return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
+    return _completeGoal(goal);
   });
 
   if (!changed) {
@@ -1288,7 +1312,7 @@ function _advanceBuyPerpMissions(state, gestalt) {
   var updatedGoals = missionGoals.map(function (goal) {
     if (goal.workflow === 'buy_perp' && goal.target === gestalt && !goal.complete) {
       changed = true;
-      return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
+      return _completeGoal(goal);
     }
     return goal;
   });
