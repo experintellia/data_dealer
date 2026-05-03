@@ -2008,22 +2008,44 @@
   animation: AniJump 6s linear infinite normal;
 }
 
-.PopupBody.User .PopupMenu {
+.AboutDialogLogo,
+.AboutDialogLogo.en_US {
+  display: block;
+  background-image: url(../img/MainSprites.png);
+  width: 222px;
+  height: 40px;
+  background-position: -1px -819px;
+  margin: 16px 0 6px 12px;
+}
+.AboutDialogLogo.de_AT {
+  background-position: -225px -819px;
+}
+
+.AboutDialogDesc {
+  margin-left: 12px;
+  font-size: 16px;
+}
+
+.PopupBody.About .PopupHeader {
+  height: 90px;
+}
+
+.PopupBody.About .PopupMenu {
   position: absolute;
-  top: 152px;
-  left: 180px;
-  width: 400px;
+  top: 88px;
+  left: 12px;
+  width: 564px;
   text-align: left;
 }
 
 /* About dialog: long text body would otherwise scroll under the absolute
    PopupButtons strip at bottom:-10px. Make the tab content scroll inside
    .PopupContent and reserve room for the buttons. */
-.PopupBody.User .PopupContent {
+.PopupBody.About .PopupContent {
   overflow-y: auto;
   overflow-x: hidden;
 }
-.PopupBody.User .PopupTab {
+.PopupBody.About .PopupTab {
   padding-bottom: 56px;
 }
 
