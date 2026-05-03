@@ -16,7 +16,6 @@ define(function(require) {
     var setup = require('setup');
     var extend = require('util').extend;
     var Render = require('Render').getRender();
-    var RpcQueue = require('RpcQueue');
     var typeSettings = require('type_settings').getTypeSettings();
     var webxdcIdentity = require('webxdcIdentity');
     // ESM bridge: boot exposes subscribePeersChanged so the Topscores view
@@ -78,13 +77,6 @@ define(function(require) {
       app.game.loadGame(data);
       return app.game;
     };
-
-    var rpcQueue = new RpcQueue({
-      callback: function() {
-        return true;
-      }
-    });
-
 
     ////////////////////////////////
     // The Set
@@ -871,61 +863,25 @@ define(function(require) {
       //this.renderNode.jdomelem.find('*').off();
     };
 
-    GameRoot.prototype.lostSocket = function() {
-      var groot = this;
-      groot.makeNotifications({
-        error: {
-          title: _._("lostsocket title"),
-          subtitle: _._("lostsocket subtitle"),
-          description: _._('lostsocket sorry, bla bla will retry or refresh')
-        }
-      });
-
-      /*
-      groot.lock();
-      groot.openGenericPopup({
-        data: {
-          title: _._("lostsocket title"),
-          subtitle: _._("lostsocket subtitle"),
-          description: _._('lostsocket sorry, bla bla will retry or refresh')
-        },
-        template:'lost_socket.html'
-      });
-      */
-    };
-
     GameRoot.prototype.refresh = function() {
-      // Reload the game data and reinit the whole Game (like page reload but with less requests) ;)
+      // Reload the game data and reinit the whole Game (like a page reload).
       var groot = this;
       groot.retryDelay = groot.retryDelay || 2000;
 
       groot.lock();
 
-      return app.remote.getToken().then(function(data) {
-        var token = data.result;
-        if (token) {
-          // Store the token in our app container, for good.
-          app.token = token;
-          // Set the locale.
-          return app.remote.getSessionLocale().then(function(data) {
-            var i18n = require('i18n');
-            var locale = data.result === 'de' ? 'de_AT' : 'en_US';
-            i18n.setLocale(locale);
-            // Now connect to the server via websocket.
-            return app.initSocket(token).then(function() {
-              // When handshake is complete, load game data and initialize the game engine.
-              var html = app.renderView('game.html');
-              $('#dd-control').html(html);
-              // Carefullly approaching async hell with deferred superpowers!
-              return app.remote.loadGame(app.token).then(function(data) {
-                var Game = require('Game').getGame();
-                var gameData = data.result;
-                app.version = gameData.version;
-                Game.init(gameData);
-              });
-            });
-          });
-        }
+      return app.remote.getSessionLocale().then(function(data) {
+        var i18n = require('i18n');
+        var locale = data.result === 'de' ? 'de_AT' : 'en_US';
+        i18n.setLocale(locale);
+        var html = app.renderView('game.html');
+        $('#dd-control').html(html);
+        return app.remote.loadGame().then(function(data) {
+          var Game = require('Game').getGame();
+          var gameData = data.result;
+          app.version = gameData.version;
+          Game.init(gameData);
+        });
       })
       .fail(function(data){
         if (groot.notificationPopup) {
@@ -1017,13 +973,10 @@ define(function(require) {
 
       // FIXME: This event should be renamed as we are out of the test phase – or are we?
       gnode.on('saveCoordsQueue', function(e,path,pos) {
-        rpcQueue.addCall('setPerpCoordinates', path, [path, pos], function(data) {
-          //console.log('queue called setPerpCoordinates, got', data.result);
-        });
+        app.remote.setPerpCoordinates([[path, pos]]);
       });
       gnode.on('saveCoords', function(e, path, pos) {
-       // FIXME: non queued saving returns result 1 still fails to save for some reason
-       app.remote.setPerpCoordinates(app.token, [[path, pos]]);
+        app.remote.setPerpCoordinates([[path, pos]]);
       });
 
 
@@ -1167,27 +1120,6 @@ define(function(require) {
       var groot = this;
       var speed = 1;
       if (setup.debug) { speed = 0 }
-      // Perp Notifications
-      if (data.error) {
-        var n = {};
-        n.game_type = "Error";
-        n.title = data.error.title;
-        n.subtitle = data.error.subtitle;
-        n.description = data.error.description;
-        n.config = {
-          template: 'lost_socket.html',
-          extendClass: 'Alert',
-          delay:0
-        };
-        gnode.cueNotification(n);
-        /*
-        //n.nonblocking = 2000;
-        n.scriptedEvents = [];
-        n.scriptedEvents.push(function(){
-        });
-        */
-      }
-
       if (data.mission_complete) {
         var mission = groot.Missions.getMission(data.mission_complete);
         var n = mergeData({},mission.data);
@@ -1557,7 +1489,7 @@ define(function(require) {
       var gnode = this;
       var groot = this;
       
-      app.remote.buyKarma(app.token, bgestalt).done(function(data) {
+      app.remote.buyKarma(bgestalt).done(function(data) {
         if (data.result) {
           if (data.result.error !== undefined) {
             // Probably no cash
@@ -2030,7 +1962,7 @@ define(function(require) {
       // reducer produces a fresh state instead of corrupting the live reference.
       var newSelfName = webxdcIdentity.getMessengerDisplayNameChange(this.data.user);
       if (newSelfName) {
-        app.remote.setDisplayName(app.token, newSelfName);
+        app.remote.setDisplayName(newSelfName);
       }
 
       this.initGameValues();
@@ -2188,8 +2120,6 @@ define(function(require) {
       game.fitToWindow();
       $(window).off('resize.gameFit').on('resize.gameFit',
         _.debounce(function() { game.fitToWindow(); }, 100));
-
-      app.socket.queue.start();
 
       return game;
     };
@@ -2476,7 +2406,7 @@ define(function(require) {
       // Buy Supertokens
       var gnode = this;
       var groot = this.GameRoot;
-      app.remote.buyPerp(app.token, gnode.path, bgestalt).done(function(data) {
+      app.remote.buyPerp(gnode.path, bgestalt).done(function(data) {
         if (data.result) {
           if (data.result.error !== undefined) {
             // Probably no cash
@@ -2614,7 +2544,7 @@ define(function(require) {
         return;
       }
 
-      app.remote.integrateCollected(app.token, psid).done(function(data) {
+      app.remote.integrateCollected(psid).done(function(data) {
         if (data.result) {
           // FIXME returned error 0
           if (data.result.error !== undefined) {
@@ -3026,7 +2956,7 @@ define(function(require) {
           // delta whose listener echo lands synchronously in this tick
           // (closes #116 race window under the #120 architectural fix).
           if (app.remote && app.remote.dismissMissionBriefing) {
-            app.remote.dismissMissionBriefing(app.token, gestalt);
+            app.remote.dismissMissionBriefing(gestalt);
           }
         }
         if (gnode.highlightTabs) {
@@ -3070,7 +3000,7 @@ define(function(require) {
         // circuits when the gestalt is already in tokens_seen, so calling
         // it twice is a no-op delta.
         if (app.remote && app.remote.markTokenSeen) {
-          app.remote.markTokenSeen(app.token, gestalt);
+          app.remote.markTokenSeen(gestalt);
         }
       });
 
@@ -3151,7 +3081,7 @@ define(function(require) {
       var gnode = this;
       var groot = this.GameRoot;
       // TODO: backendcall and do purchase...
-      app.remote.buyPerp(app.token, gnode.path, bgestalt).done(function(data) {
+      app.remote.buyPerp(gnode.path, bgestalt).done(function(data) {
         if (data.result) {
           if (data.result.error !== undefined) {
             // Probably no cash
@@ -3364,7 +3294,7 @@ define(function(require) {
         gnode.renderNode.jdomelem.removeClass('loading');
         return;
       }
-      app.remote.getRanking(app.token,type).done(function(data){
+      app.remote.getRanking(type).done(function(data){
         if (data.result && data.result.error === undefined) {
           gnode.data = mergeData(gnode.data, data.result);
           gnode.data.user_in_top = _.findWhere(gnode.data.top, {self:true}) !== undefined;
@@ -3798,7 +3728,7 @@ define(function(require) {
     DatabasePerp.prototype.BuyCity = function(bgestalt, placePos) {
       var gnode = this;
       var groot = this.GameRoot;
-      app.remote.buyPerp(app.token, gnode.path, bgestalt).done(function(data) {
+      app.remote.buyPerp(gnode.path, bgestalt).done(function(data) {
         if (data.result) {
           if (data.result.error !== undefined) {
             // Probably no cash
@@ -4017,7 +3947,7 @@ define(function(require) {
         gnode.popupTemplateData.loading = true;
       }
 
-      app.remote.getProvidedPerps(app.token,gnode.path)
+      app.remote.getProvidedPerps(gnode.path)
       .done(function(data){
         if (data.result && data.result.buyable) {
           gnode.data.buyablePerps = data.result.buyable;
@@ -4245,7 +4175,7 @@ define(function(require) {
         return;
       }
       if (!gnode.states.chargeRunning && gnode.states.idle) {
-        app.remote.chargePerp(app.token, gnode.path).done(function(data) {
+        app.remote.chargePerp(gnode.path).done(function(data) {
           if (data.result) {
             if (data.result.error) {
               // No cash
@@ -4295,7 +4225,7 @@ define(function(require) {
       deco.setFrame('active');
       deco.FXPulse();
       //var amount = _.toKSNum(Math.round(Math.random()*100000));
-      app.remote.collectPerp(app.token, gperp.path).done(function(data) {
+      app.remote.collectPerp(gperp.path).done(function(data) {
         // FIXME: It would be better if data.result was in a predefined state to prevent testing for both, undefined _and_ null...
         if (data.result && data.result.result) {
           var amount = data.result.result.profile_set.profiles_value;
@@ -4574,7 +4504,7 @@ class CollectableClient(CollectablePerpBase):
       deco.setFrame('active');
       deco.FXPulse();
       //var amount = _.toKSNum(Math.round(Math.random()*100000));
-      app.remote.collectPerp(app.token, gperp.path).done(function(data) {
+      app.remote.collectPerp(gperp.path).done(function(data) {
         // FIXME: It would be better if data.result was in a predefined state to prevent testing for both, undefined _and_ null...
         if (data.result && data.result.result) {
           var amount = data.result.result.cash;
@@ -4658,7 +4588,7 @@ class CollectableClient(CollectablePerpBase):
         return;
       }
       if (!gnode.states.chargeRunning && gnode.states.idle) {
-        app.remote.chargePerp(app.token, gnode.path).done(function(data) {
+        app.remote.chargePerp(gnode.path).done(function(data) {
           if (data.result) {
             if (data.result.error) {
               // No AP
@@ -4813,7 +4743,7 @@ class CollectableClient(CollectablePerpBase):
       var gnode = this;
         // Register Powerups in typeRegistry if opend for the first time move this to compilePowerupsa
         if (!gnode.data.powerups_compiled) {
-          app.remote.getPowerups(app.token,gnode.gestalt,app.version)
+          app.remote.getPowerups(gnode.gestalt,app.version)
           .done(function(data){
             _.each(data.result,function(v,k){
               gnode.addType(v.game_gestalt, v);
@@ -4837,7 +4767,7 @@ class CollectableClient(CollectablePerpBase):
       var gnode = getByGestalt(project_gestalt);
       // Register Powerups in typeRegistry
       if (gnode && !gnode.data.powerupsCached) {
-        app.remote.getPowerups(app.token,project_gestalt,app.version)
+        app.remote.getPowerups(project_gestalt,app.version)
         .done(function(data){
           _.each(data.result,function(v,k){
             groot.addSubType(project_gestalt, v.game_gestalt, v);
@@ -4853,7 +4783,7 @@ class CollectableClient(CollectablePerpBase):
         gnode.renderPopup.templateData.cached = true;
         if (cb) { cb(); }
       } else {
-        app.remote.getPowerups(app.token,project_gestalt,app.version)
+        app.remote.getPowerups(project_gestalt,app.version)
         .done(function(data){
           _.each(data.result,function(v,k){
             groot.addSubType(project_gestalt, v.game_gestalt, v);
@@ -5021,7 +4951,7 @@ class CollectableClient(CollectablePerpBase):
         gnode.BuySlots(bslot,bgestalt);
         return;
       }
-      app.remote.buyPowerup(app.token, gnode.path, bslot, bgestalt).done(function(data) {
+      app.remote.buyPowerup(gnode.path, bslot, bgestalt).done(function(data) {
         if (data.result) {
           if (data.result.error !== undefined) {
             var buyErrors = { 0: 'node or powerup type not found', 1: 'slot already occupied', 3: 'insufficient cash' };
@@ -5064,7 +4994,7 @@ class CollectableClient(CollectablePerpBase):
       var groot = this.GameRoot;
       // TODO: backendcall and do purchase...
 
-      app.remote.sellPowerup(app.token, gnode.path, parseInt(bslot), bgestalt).done(function(data) {
+      app.remote.sellPowerup(gnode.path, parseInt(bslot), bgestalt).done(function(data) {
         if (data.result) {
           if (data.result.error !== undefined) {
             gnode.Error('The computer says NOOOO',data);
@@ -5111,7 +5041,7 @@ class CollectableClient(CollectablePerpBase):
         return;
       }
 
-      app.remote.buySlots(app.token, gnode.path, pcat, num).done(function(data) {
+      app.remote.buySlots(gnode.path, pcat, num).done(function(data) {
         if (data.result) {
           if (data.result.error !== undefined) {
             var slotErrors = { 0: 'node or slot type not found', 2: 'max slots already reached', 3: 'insufficient cash' };
@@ -5253,7 +5183,7 @@ class CollectableClient(CollectablePerpBase):
       }
       if (!gnode.states.chargeRunning && gnode.states.idle) {
         // FIXME: rename Remote Call
-        app.remote.chargePerp(app.token, gnode.path).done(function(data) {
+        app.remote.chargePerp(gnode.path).done(function(data) {
           if (data.result) {
             if (data.result.error !== undefined) {
               var chargeErrors = { 1: 'insufficient AP', 2: 'already charging', 3: 'insufficient cash' };
@@ -5311,7 +5241,7 @@ class CollectableClient(CollectablePerpBase):
       deco.setClickable(false);
       deco.setFrame('active');
       deco.FXPulse();
-      app.remote.collectPerp(app.token, gperp.path).done(function(data) {
+      app.remote.collectPerp(gperp.path).done(function(data) {
         // FIXME: It would be better if data.result was in a predefined state to prevent testing for both, undefined _and_ null...
         if (data.result && data.result.result) {
           var amount = data.result.result.profile_set.profiles_value;
@@ -5548,7 +5478,7 @@ class CollectableClient(CollectablePerpBase):
       if (!gnode.states.chargeRunning && gnode.states.idle && !gnode.states.zeroresult) {
 
         //console.log('charge');
-        app.remote.chargePerp(app.token, gnode.path).done(function(data) {
+        app.remote.chargePerp(gnode.path).done(function(data) {
           if (data.result) {
             if (data.result.error) {
               // No AP
@@ -5613,7 +5543,7 @@ class CollectableClient(CollectablePerpBase):
       deco.setFrame('active');
       deco.FXPulse();
 
-      app.remote.collectPerp(app.token, gperp.path).done(function(data) {
+      app.remote.collectPerp(gperp.path).done(function(data) {
         if (data.result && data.result.result) {
 
           if (popup) { popup.trigger('popup_close'); }

@@ -125,7 +125,7 @@ describe('chargePerp — listener echo idempotence', () => {
     setSendDelta(d => captured.push(d));
     setState(mkChargeState());
 
-    await chargePerp('tok', CHARGE_PATH);
+    await chargePerp(CHARGE_PATH);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -137,7 +137,7 @@ describe('chargePerp — listener echo idempotence', () => {
     setSendDelta(d => captured.push(d));
     setState(mkChargeState());
 
-    await chargePerp('tok', CHARGE_PATH);
+    await chargePerp(CHARGE_PATH);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -149,7 +149,7 @@ describe('chargePerp — listener echo idempotence', () => {
     setSendDelta(d => captured.push(d));
     setState(mkChargeState());
 
-    await chargePerp('tok', CHARGE_PATH);
+    await chargePerp(CHARGE_PATH);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -161,7 +161,7 @@ describe('chargePerp — listener echo idempotence', () => {
     setSendDelta(d => captured.push(d));
     setState(mkChargeState());
 
-    await chargePerp('tok', CHARGE_PATH);
+    await chargePerp(CHARGE_PATH);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -173,7 +173,7 @@ describe('chargePerp — listener echo idempotence', () => {
     setSendDelta(d => captured.push(d));
     setState(mkChargeState());
 
-    await chargePerp('tok', CHARGE_PATH);
+    await chargePerp(CHARGE_PATH);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -204,7 +204,7 @@ describe('buyKarma — listener echo idempotence (regression guard)', () => {
     setSendDelta(d => captured.push(d));
     setState(mkKarmaState());
 
-    await buyKarma('tok', KARMA_GESTALT);
+    await buyKarma(KARMA_GESTALT);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -217,7 +217,7 @@ describe('buyKarma — listener echo idempotence (regression guard)', () => {
     setSendDelta(d => captured.push(d));
     setState(mkKarmaState());
 
-    await buyKarma('tok', KARMA_GESTALT);
+    await buyKarma(KARMA_GESTALT);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -229,7 +229,7 @@ describe('buyKarma — listener echo idempotence (regression guard)', () => {
     setSendDelta(d => captured.push(d));
     setState(mkKarmaState());
 
-    await buyKarma('tok', KARMA_GESTALT);
+    await buyKarma(KARMA_GESTALT);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -261,7 +261,7 @@ describe('buyPerp — listener echo idempotence (regression guard)', () => {
     setSendDelta(d => captured.push(d));
     setState(mkBuyPerpState());
 
-    await buyPerp('tok', 'Imperium', 'contact001');
+    await buyPerp('Imperium', 'contact001');
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -275,7 +275,7 @@ describe('buyPerp — listener echo idempotence (regression guard)', () => {
     setSendDelta(d => captured.push(d));
     setState(mkBuyPerpState());
 
-    await buyPerp('tok', 'Imperium', 'contact001');
+    await buyPerp('Imperium', 'contact001');
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -287,7 +287,7 @@ describe('buyPerp — listener echo idempotence (regression guard)', () => {
     setSendDelta(d => captured.push(d));
     setState(mkBuyPerpState());
 
-    await buyPerp('tok', 'Imperium', 'contact001');
+    await buyPerp('Imperium', 'contact001');
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -299,7 +299,7 @@ describe('buyPerp — listener echo idempotence (regression guard)', () => {
     setSendDelta(d => captured.push(d));
     setState(mkBuyPerpState());
 
-    await buyPerp('tok', 'Imperium', 'contact001');
+    await buyPerp('Imperium', 'contact001');
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -372,7 +372,7 @@ describe('collectPerp — listener echo idempotence (regression guard)', () => {
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await collectPerp('tok', COLLECT_PATH);
+    await collectPerp(COLLECT_PATH);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -385,7 +385,7 @@ describe('collectPerp — listener echo idempotence (regression guard)', () => {
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await collectPerp('tok', COLLECT_PATH);
+    await collectPerp(COLLECT_PATH);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -397,7 +397,7 @@ describe('collectPerp — listener echo idempotence (regression guard)', () => {
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await collectPerp('tok', COLLECT_PATH);
+    await collectPerp(COLLECT_PATH);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -409,7 +409,7 @@ describe('collectPerp — listener echo idempotence (regression guard)', () => {
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await collectPerp('tok', COLLECT_PATH);
+    await collectPerp(COLLECT_PATH);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -435,7 +435,7 @@ describe('integrateCollected — listener echo idempotence (regression guard)', 
     var mat = materialize(getState(), COLLECT_END + 1000);
     setState(mat.state);
 
-    const colRes = await collectPerp('tok', COLLECT_PATH);
+    const colRes = await collectPerp(COLLECT_PATH);
     return colRes.result.result.collect_id;
   }
 
@@ -444,7 +444,7 @@ describe('integrateCollected — listener echo idempotence (regression guard)', 
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await integrateCollected('tok', collectId);
+    await integrateCollected(collectId);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -457,7 +457,7 @@ describe('integrateCollected — listener echo idempotence (regression guard)', 
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await integrateCollected('tok', collectId);
+    await integrateCollected(collectId);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -469,7 +469,7 @@ describe('integrateCollected — listener echo idempotence (regression guard)', 
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await integrateCollected('tok', collectId);
+    await integrateCollected(collectId);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -481,7 +481,7 @@ describe('integrateCollected — listener echo idempotence (regression guard)', 
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await integrateCollected('tok', collectId);
+    await integrateCollected(collectId);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -529,7 +529,7 @@ describe('buyPowerup — listener echo idempotence (regression guard)', () => {
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -542,7 +542,7 @@ describe('buyPowerup — listener echo idempotence (regression guard)', () => {
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -555,7 +555,7 @@ describe('buyPowerup — listener echo idempotence (regression guard)', () => {
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -571,7 +571,7 @@ describe('sellPowerup — listener echo idempotence (regression guard)', () => {
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -583,7 +583,7 @@ describe('sellPowerup — listener echo idempotence (regression guard)', () => {
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -595,7 +595,7 @@ describe('sellPowerup — listener echo idempotence (regression guard)', () => {
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -611,7 +611,7 @@ describe('buySlots — listener echo idempotence (regression guard)', () => {
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    await buySlots(PROJECT_NODE.full_path, 'ad', 1);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -624,7 +624,7 @@ describe('buySlots — listener echo idempotence (regression guard)', () => {
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    await buySlots(PROJECT_NODE.full_path, 'ad', 1);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
@@ -636,7 +636,7 @@ describe('buySlots — listener echo idempotence (regression guard)', () => {
     const captured = [];
     setSendDelta(d => captured.push(d));
 
-    await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    await buySlots(PROJECT_NODE.full_path, 'ad', 1);
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 

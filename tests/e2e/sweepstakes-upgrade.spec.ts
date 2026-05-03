@@ -53,7 +53,7 @@ test('sweepstakes: buyPowerup succeeds with sufficient cash after buying project
     const eng = await new Promise<any>((res, rej) =>
       (window as any).require(['LocalEngine'], res, rej),
     );
-    return eng.buyPerp('tok', 'Imperium', 'project001');
+    return eng.buyPerp('Imperium', 'project001');
   });
 
   expect(buyPerpResult.result).not.toHaveProperty('error');
@@ -67,7 +67,7 @@ test('sweepstakes: buyPowerup succeeds with sufficient cash after buying project
     );
     // slot is intentionally passed as a string, matching what the browser UI
     // sends via data-button-data attributes.
-    return eng.buyPowerup('tok', 'Imperium.project001', '0', 'upgrade001');
+    return eng.buyPowerup('Imperium.project001', '0', 'upgrade001');
   });
 
   // Must succeed — no error property in result.
@@ -112,7 +112,7 @@ test('sweepstakes: buyPowerup returns error 3 when cash is insufficient', async 
     const eng = await new Promise<any>((res, rej) =>
       (window as any).require(['LocalEngine'], res, rej),
     );
-    return eng.buyPerp('tok', 'Imperium', 'project001');
+    return eng.buyPerp('Imperium', 'project001');
   });
   expect(buyPerpResult.result).not.toHaveProperty('error');
   expect(buyPerpResult.result.game_values.cash_value).toBe(0);
@@ -122,7 +122,7 @@ test('sweepstakes: buyPowerup returns error 3 when cash is insufficient', async 
     const eng = await new Promise<any>((res, rej) =>
       (window as any).require(['LocalEngine'], res, rej),
     );
-    return eng.buyPowerup('tok', 'Imperium.project001', '0', 'upgrade001');
+    return eng.buyPowerup('Imperium.project001', '0', 'upgrade001');
   });
   expect(buyPowerupResult.result).toMatchObject({ error: 3 });
 });
@@ -138,7 +138,7 @@ test('sweepstakes: buyPowerup returns error 0 when node does not exist', async (
     const eng = await new Promise<any>((res, rej) =>
       (window as any).require(['LocalEngine'], res, rej),
     );
-    return eng.buyPowerup('tok', 'Imperium.project001', '0', 'upgrade001');
+    return eng.buyPowerup('Imperium.project001', '0', 'upgrade001');
   });
   // error 0 = node/type not found
   expect(result.result).toMatchObject({ error: 0 });

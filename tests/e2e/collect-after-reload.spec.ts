@@ -58,7 +58,7 @@ test.skip('collect-after-reload: collected perp does not reappear as collectable
     const eng = await new Promise<any>((res, rej) =>
       (window as any).require(['LocalEngine'], res, rej),
     );
-    await eng.buyPerp('tok', 'Imperium', gestalt);
+    await eng.buyPerp('Imperium', gestalt);
   }, GESTALT);
 
   // ── 2. Charge it ─────────────────────────────────────────────────────────
@@ -66,7 +66,7 @@ test.skip('collect-after-reload: collected perp does not reappear as collectable
     const eng = await new Promise<any>((res, rej) =>
       (window as any).require(['LocalEngine'], res, rej),
     );
-    await eng.chargePerp('tok', path);
+    await eng.chargePerp(path);
   }, PATH);
 
   // ── 3. Skip the charge timer via injectable clock ────────────────────────
@@ -79,7 +79,7 @@ test.skip('collect-after-reload: collected perp does not reappear as collectable
     const eng = await new Promise<any>((res, rej) =>
       (window as any).require(['LocalEngine'], res, rej),
     );
-    await eng.collectPerp('tok', path);
+    await eng.collectPerp(path);
   }, PATH);
 
   // ── 5. Reload — webxdc dev-mode mock persists deltas in localStorage,

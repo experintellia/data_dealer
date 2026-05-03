@@ -66,8 +66,8 @@ test('integrate dilutes untouched token shares + crosssum stays under 100', asyn
     state.integrated_ids = {};
     boot.setState(state);
 
-    await eng.integrateCollected('tok', 'cq_test_a');
-    await eng.integrateCollected('tok', 'cq_test_b');
+    await eng.integrateCollected('cq_test_a');
+    await eng.integrateCollected('cq_test_b');
 
     const finalNodes = boot.getState().nodes.filter(
       (n: any) => n.game_type === 'TokenPerp',
@@ -133,7 +133,7 @@ test('integrating the same profileset twice does not change shares (N = 0 dup re
     state.integrated_ids = {};
     boot.setState(state);
 
-    await eng.integrateCollected('tok', 'cq_dup_test');
+    await eng.integrateCollected('cq_dup_test');
     const afterFirst = boot.getState();
     const shareAfterFirst =
       afterFirst.nodes.find((n: any) => n.gestalt === 'token008')?.instance_data
@@ -153,7 +153,7 @@ test('integrating the same profileset twice does not change shares (N = 0 dup re
     }];
     boot.setState(replayState);
 
-    await eng.integrateCollected('tok', 'cq_dup_test');
+    await eng.integrateCollected('cq_dup_test');
     const afterReplay = boot.getState();
     const shareAfterReplay =
       afterReplay.nodes.find((n: any) => n.gestalt === 'token008')?.instance_data
