@@ -2025,9 +2025,12 @@ define(function(require) {
       this.init(config);
 
       // Seed display_name from webxdc.selfName on first boot; persisted as a delta
-      // so the name survives reloads without prompting the user again.
-      if (webxdcIdentity.applyWebxdcIdentity(this.data.user)) {
-        app.remote.setDisplayName(app.token, this.data.user.display_name);
+      // so the name survives reloads without prompting the user again. The helper
+      // is non-mutating — we route the new name through setDisplayName so the
+      // reducer produces a fresh state instead of corrupting the live reference.
+      var newSelfName = webxdcIdentity.getMessengerDisplayNameChange(this.data.user);
+      if (newSelfName) {
+        app.remote.setDisplayName(app.token, newSelfName);
       }
 
       this.initGameValues();
