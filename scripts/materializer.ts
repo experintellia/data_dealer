@@ -5,11 +5,40 @@
 //
 // Source authority for each rule: docs/async-map.md.
 
+import type { LocalState, ChargingEntry, CollectEntry, GameValues } from './state.js';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** A synthetic socket event emitted when a charge completes. */
+export interface NodeReadyEvent {
+  ev: 'node_ready';
+  pl: {
+    id: string;
+    type: string;
+    path: string;
+    result: any;
+  };
+}
+
+/** Return value of materialize(). */
+export interface MaterializeResult {
+  /** New state with completed charges moved and AP advanced. */
+  state: LocalState;
+  /**
+   * Synthetic node_ready events in temporal order (earliest charge_end
+   * first).  Empty array when called with the same `now` value twice
+   * (idempotent after the first call).
+   */
+  events: NodeReadyEvent[];
+}
+
 // ── materialize ────────────────────────────────────────────────────────────
 /**
  * Apply all time-based progression rules to `state` up to clock value `now`.
  *
- * @param {object} state  - Immutable game-state snapshot.
+ * @param state  - Immutable game-state snapshot.
  *   Relevant fields (all optional; missing fields are treated as empty/absent):
  *     nodes_charging: Array<{
  *       path: string,
@@ -31,10 +60,10 @@
  *   (not in the original Mongo schema) so the materializer can build the
  *   node_ready payload without a second nodes lookup.
  *
- * @param {number} now  - Current wall-clock epoch-ms supplied by the caller.
- *                        Never call Date.now() inside this function.
+ * @param now  - Current wall-clock epoch-ms supplied by the caller.
+ *               Never call Date.now() inside this function.
  *
- * @returns {{ state: object, events: Array }}
+ * @returns MaterializeResult
  *   state  — New state object (shallow-cloned; input is never mutated).
  *             Completed charges are moved from nodes_charging to nodes_collect.
  *             AP snapshot is advanced to `now`.
@@ -45,8 +74,8 @@
  *             a second call with the same `now` emits no events (idempotent
  *             state, empty event array).
  */
-function materialize(state, now) {
-  var events = [];
+export function materialize(state: LocalState, now: number): MaterializeResult {
+  var events: NodeReadyEvent[] = [];
 
   // ── Rule 1: chargePerpReady (docs/async-map.md §1) ──────────────────────
   // For every nodes_charging entry where now >= charge_end:
@@ -56,17 +85,17 @@ function materialize(state, now) {
   //
   // Bounded accumulation: each charge is discrete and never auto-restarts,
   // so no cap is needed — we just move every completed entry.
-  var charging = state.nodes_charging || [];
-  var collect = (state.nodes_collect || []).slice();
+  var charging: ChargingEntry[] = state.nodes_charging || [];
+  var collect: CollectEntry[] = (state.nodes_collect || []).slice();
 
   // Build a path-set for O(1) duplicate detection.
-  var inCollect = Object.create(null);
+  var inCollect: Record<string, boolean> = Object.create(null);
   for (var i = 0; i < collect.length; i++) {
     inCollect[collect[i].path] = true;
   }
 
-  var stillCharging = [];
-  var newlyReady = [];
+  var stillCharging: ChargingEntry[] = [];
+  var newlyReady: ChargingEntry[] = [];
   for (var j = 0; j < charging.length; j++) {
     var c = charging[j];
     if (now >= c.charge_end) {
@@ -102,8 +131,8 @@ function materialize(state, now) {
   // Advance the ap_snapshot to `now` so that every downstream read gets the
   // current AP without re-running the calculation.
   // Mirrors dd_app/helpers.py::calculateAP.
-  var gv = state.game_values || {};
-  var newGv = Object.assign({}, gv);
+  var gv: GameValues = state.game_values || {};
+  var newGv: GameValues = Object.assign({}, gv);
   if (
     typeof gv.ap_snapshot    === 'number' &&
     typeof gv.ap_inc_value   === 'number' &&
@@ -117,12 +146,12 @@ function materialize(state, now) {
     // on every reload.
     var apUpdate = (typeof gv.ap_update === 'number') ? gv.ap_update : now;
     var elapsed  = Math.max(0, now - apUpdate);
-    var ticks    = Math.floor(elapsed / gv.ap_inc_interval);
+    var ticks    = Math.floor(elapsed / gv.ap_inc_interval!);
     newGv = Object.assign({}, gv, {
       ap_snapshot: Math.min(gv.ap_max, gv.ap_snapshot + ticks * gv.ap_inc_value),
       // Advance ap_update only to the last full-tick boundary so the
       // fractional remainder is preserved across stepwise materializations.
-      ap_update: apUpdate + ticks * gv.ap_inc_interval,
+      ap_update: apUpdate + ticks * gv.ap_inc_interval!,
     });
   }
 
@@ -144,5 +173,3 @@ function materialize(state, now) {
     events: events
   };
 }
-
-export { materialize };

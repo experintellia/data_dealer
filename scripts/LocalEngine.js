@@ -1,3 +1,4 @@
+// @ts-check
 // In-process gameplay handlers (formerly the JSON-RPC service).
 // ESM exports — consumed by app.js via the AMD bridge in esm-bundle.js.
 // No DOM globals in handler bodies; safe to import from Node for tests.
@@ -9,6 +10,13 @@
 //   chargePerp (#16), collectPerp, integrateCollected (#17).
 // resetGame is intentionally absent — in webxdc, reset = re-share the .xdc.
 // Remaining handlers are stubs that return a rejected Promise.
+//
+// Type references (see types/ and scripts/state.ts for full definitions):
+/** @typedef {import('./state.js').LocalState} LocalState */
+/** @typedef {import('./state.js').Delta} Delta */
+/** @typedef {import('./state.js').GameValues} GameValues */
+/** @typedef {import('./state.js').GameNode} GameNode */
+/** @typedef {import('./materializer.js').MaterializeResult} MaterializeResult */
 
 import { getState, setState } from './boot.js';
 import { applyDelta } from './state.js';
@@ -25,6 +33,10 @@ import i18nEn from '../i18n/en_US.json' with { type: 'json' };
 // ---------------------------------------------------------------------------
 var _emitter = null;
 
+/**
+ * Inject the event emitter.  Call before gameplay begins.
+ * @param {(ev: string, pl: unknown) => void} fn
+ */
 export function setEmitter(fn) {
   _emitter = fn;
 }
@@ -90,6 +102,11 @@ function _isProvidable(gestalt, ruleset, playerLevel, ownedGestalts) {
 // ---------------------------------------------------------------------------
 var _sendDelta = null;
 
+/**
+ * Inject the delta persistence function (tests use this to capture deltas).
+ * In production, boot.js wires this to webxdc.sendUpdate via the listener.
+ * @param {(delta: Delta) => void} fn
+ */
 export function setSendDelta(fn) {
   _sendDelta = fn;
 }
@@ -457,6 +474,14 @@ export function getRanking(type) {
 // Build a canonical delta envelope.  Always paired with _persistDelta — never
 // pass the result anywhere else.  Kept as a tiny helper so handler call sites
 // don't repeat the kind/ts boilerplate.
+/**
+ * Build a persisted delta object.
+ * @param {string} addr
+ * @param {string} op
+ * @param {any[]} args
+ * @param {any} result
+ * @returns {Delta}
+ */
 function _mkDelta(addr, op, args, result) {
   return {
     kind:   'delta',
@@ -1657,6 +1682,11 @@ function _scheduleChargeReady(chargeEnd, path) {
 // ---------------------------------------------------------------------------
 var _prngSeed = 0xDEADBEEF;
 
+/**
+ * Seed the deterministic PRNG used for charge-amount jitter.
+ * Call in tests before any chargePerp invocation to get repeatable results.
+ * @param {number} seed
+ */
 export function setPrngSeed(seed) {
   _prngSeed = seed >>> 0;
 }
@@ -1939,6 +1969,7 @@ export function integrateCollected(collectId) {
   }
 
   // $pull db_queue entry.
+  /** @type {import('./state.js').DbQueueEntry | null} */
   var entry = null;
   var newQueue = (state.db_queue || []).filter(function (q) {
     if (q.collect_id === collectId) { entry = q; return false; }
@@ -2179,6 +2210,11 @@ _STUBS.forEach(function (name) {
 // ---------------------------------------------------------------------------
 // Default export — object consumed by app.js via require('LocalEngine').
 // Includes setEmitter so app.js can wire the DOM event bus after jQuery loads.
+//
+// Handler signature contract (all async handlers):
+//   (args...) => Promise<{ result: HandlerResult } | { result: { error: number } }>
+//
+// HandlerResult shapes are documented in docs/response-shapes.md.
 // ---------------------------------------------------------------------------
 var LocalEngine = Object.assign({
   getToken:           getToken,
