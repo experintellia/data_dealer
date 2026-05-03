@@ -299,6 +299,33 @@ describe('state.peers — convergence with 4 deltas from 2 addresses', () => {
     expect(r1.result.top.map(function (r) { return r.value; }).sort(function (a, b) { return b - a; }))
       .toEqual(r2.result.top.map(function (r) { return r.value; }).sort(function (a, b) { return b - a; }));
   });
+
+  it('tie (same-ts): last-processed delta wins for alice when both have ts=3000', () => {
+    // Both alice deltas share ts=3000; LWW allows overwrite at equal ts.
+    // The second delta processed is the one that sticks.
+    const d_tie_1 = mkDelta('alice@test', 'chargePerp',  { cash_value: 50,  xp_value: 5,  xp_level: 1 }, 3000);
+    const d_tie_2 = mkDelta('alice@test', 'collectPerp', { cash_value: 120, xp_value: 12, xp_level: 1 }, 3000);
+
+    var s1 = replay('alice@test', [d_tie_1, d_tie_2]);
+    var s2 = replay('alice@test', [d_tie_2, d_tie_1]);
+
+    // Each order sticks the last-applied delta — they may differ, but neither crashes.
+    expect(s1.peers['alice@test'].last_seen_ts).toBe(3000);
+    expect(s2.peers['alice@test'].last_seen_ts).toBe(3000);
+    // The two orderings produce different cash because neither is stale.
+    expect(s1.peers['alice@test'].cash).toBe(120);
+    expect(s2.peers['alice@test'].cash).toBe(50);
+  });
+
+  it('stale-overrides-fresh is blocked: older delta after newer never clobbers', () => {
+    // Deliver alice's ts=3000 delta first, then her ts=1000 delta.
+    // The ts=1000 delta is stale and must not overwrite the ts=3000 snapshot.
+    var s = replay('alice@test', [
+      mkDelta('alice@test', 'collectPerp', { cash_value: 120, xp_value: 12, xp_level: 1 }, 3000),
+      mkDelta('alice@test', 'chargePerp',  { cash_value: 50,  xp_value: 5,  xp_level: 1 }, 1000),
+    ]);
+    expect(s.peers['alice@test']).toMatchObject({ cash: 120, xp: 12, last_seen_ts: 3000 });
+  });
 });
 
 // ── getRanking ────────────────────────────────────────────────────────────────

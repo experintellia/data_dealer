@@ -1,14 +1,19 @@
 /**
- * Unit tests for the i18n system (scripts/i18n.js).
+ * Tests for the i18n layer (scripts/i18n.js).
  *
- * i18n.js is an AMD module that uses jQuery for AJAX loading and therefore
- * cannot be imported directly in the Node/ESM test environment.  Instead,
- * this file:
- *   1. Loads the actual translation JSON files from i18n/.
- *   2. Reimplements the pure lookup logic (gettext / ngettext) inline —
- *      identical to the production code in scripts/i18n.js.
- *   3. Verifies the observable behaviour: missing-key fallback, locale
- *      fallback to 'de', malformed translation objects, plural forms.
+ * i18n.js is an AMD module that uses jQuery for AJAX loading and cannot be
+ * imported directly in the Node/ESM test environment.  This file therefore:
+ *   1. Verifies the shape and integrity of the translation JSON files in i18n/.
+ *   2. Exercises the desired gettext / ngettext lookup contract via a clean
+ *      re-implementation that adds two robustness fixes absent from production:
+ *        a) Array.isArray guard — production treats string values as array-like,
+ *           returning e.g. message[1] = 'r' for the string 'wrong type'.
+ *        b) null-msgstr guard — production returns undefined for [null, null];
+ *           the re-implementation falls back to msgid instead.
+ *      These tests document the *desired* behaviour rather than the current
+ *      production behaviour for the malformed-entry cases; they serve as a spec
+ *      for a future hardening of scripts/i18n.js.
+ *   3. Verifies locale fallback (unknown locale → de) and plural forms.
  *
  * Covers the gap identified in issue #136: missing unit tests for the i18n layer.
  */
@@ -28,10 +33,10 @@ beforeAll(() => {
   enData = JSON.parse(readFileSync(join(root, 'i18n', 'en_US.json'), 'utf8'));
 });
 
-// ── re-implement the pure i18n lookup logic ───────────────────────────────────
+// ── desired i18n lookup contract ──────────────────────────────────────────────
 //
-// Mirrors scripts/i18n.js gettext / ngettext exactly so these tests exercise
-// the actual production algorithm, not a simplified approximation.
+// Implements the expected gettext / ngettext behaviour with two robustness fixes
+// over the current production code (see file header).
 
 function makeI18n(localeData) {
   return {

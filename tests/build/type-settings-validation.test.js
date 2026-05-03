@@ -21,12 +21,13 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 // ── load fixtures ─────────────────────────────────────────────────────────────
 
-let rulesetDe, rulesetEn, typeSettingsSrc;
+let rulesetDe, rulesetEn, typeSettingsSrc, localEngineSrc;
 
 beforeAll(() => {
   rulesetDe      = JSON.parse(readFileSync(join(root, 'data', 'ruleset_3.de.json'), 'utf8'));
   rulesetEn      = JSON.parse(readFileSync(join(root, 'data', 'ruleset_3.en.json'), 'utf8'));
   typeSettingsSrc = readFileSync(join(root, 'scripts', 'type_settings.js'), 'utf8');
+  localEngineSrc  = readFileSync(join(root, 'scripts', 'LocalEngine.js'), 'utf8');
 });
 
 // ── helper: extract goals_texts workflow keys from type_settings.js source ───
@@ -46,20 +47,27 @@ function extractGoalsTextWorkflows(src) {
   return keys;
 }
 
-// ── known handlers that back mission-goal workflows ───────────────────────────
+// ── helpers: derive handler workflows from LocalEngine.js source ──────────────
 //
-// These are the workflow identifiers that LocalEngine.js handles.  A workflow
-// in the ruleset that is NOT in this set would silently no-op in the engine.
+// Instead of a hand-maintained constant, we extract the workflow string
+// literals that LocalEngine.js actually compares against goal.workflow so
+// that removing a handler branch automatically fails the test.
 
-const KNOWN_HANDLER_WORKFLOWS = new Set([
-  'buy_perp',
-  'buy_powerup',
-  'charge_perp',
-  'collect_cash',
-  'collect_profiles',
-  'integrate_profiles',
-  'upgrade_token',
-]);
+function extractHandlerWorkflows(src) {
+  // Matches: goal.workflow !== 'foo'  OR  goal.workflow === 'foo'
+  var re = /goal\.workflow\s*[!=]==\s*'([^']+)'/g;
+  var found = new Set();
+  var m;
+  while ((m = re.exec(src)) !== null) {
+    found.add(m[1]);
+  }
+  return found;
+}
+
+// Resolved after beforeAll; used as a lazy getter in tests.
+function getKnownHandlerWorkflows() {
+  return extractHandlerWorkflows(localEngineSrc);
+}
 
 // ── collect all mission goals from the ruleset ────────────────────────────────
 
@@ -75,6 +83,20 @@ function allGoals(ruleset) {
 
 // ── tests ─────────────────────────────────────────────────────────────────────
 
+describe('LocalEngine.js — handler workflow extraction', () => {
+  it('extracts at least 7 workflow handlers from LocalEngine.js', () => {
+    var known = getKnownHandlerWorkflows();
+    expect(known.size).toBeGreaterThanOrEqual(7);
+  });
+
+  it('contains the core workflows that have always existed', () => {
+    var known = getKnownHandlerWorkflows();
+    ['buy_perp', 'charge_perp', 'collect_profiles', 'integrate_profiles', 'collect_cash'].forEach(function (w) {
+      expect(known.has(w)).toBe(true);
+    });
+  });
+});
+
 describe('type_settings.js — goals_texts workflow coverage', () => {
   it('goals_texts block is present in type_settings.js', () => {
     var workflows = extractGoalsTextWorkflows(typeSettingsSrc);
@@ -83,7 +105,8 @@ describe('type_settings.js — goals_texts workflow coverage', () => {
 
   it('every goals_texts workflow key is a known handler workflow', () => {
     var workflows = extractGoalsTextWorkflows(typeSettingsSrc);
-    var unknown = workflows.filter(function (w) { return !KNOWN_HANDLER_WORKFLOWS.has(w); });
+    var known = getKnownHandlerWorkflows();
+    var unknown = workflows.filter(function (w) { return !known.has(w); });
     expect(unknown).toEqual([]);
   });
 
@@ -114,10 +137,11 @@ describe('type_settings.js — goals_texts workflow coverage', () => {
 
 describe('ruleset (de) — mission-goal workflow validity', () => {
   it('every mission-goal workflow is a recognised handler workflow', () => {
+    var known = getKnownHandlerWorkflows();
     var invalid = [];
     allGoals(rulesetDe).forEach(function (entry) {
       var w = entry.goal.workflow;
-      if (w && !KNOWN_HANDLER_WORKFLOWS.has(w)) {
+      if (w && !known.has(w)) {
         invalid.push({ mission: entry.mission, workflow: w });
       }
     });

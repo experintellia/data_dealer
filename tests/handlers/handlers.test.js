@@ -1485,10 +1485,14 @@ describe('buySlots — error: exactly one coin short of slot cost', () => {
 });
 
 describe('buyPerp — error: parent path not in state.nodes (non-root, non-existing)', () => {
+  // TODO: The bypass of the ProxyPerp slot check when parentNode is absent
+  // is a known bug.  The desired behaviour is an explicit error code (e.g.
+  // error:5 "parent not found") instead of a silent success.  These tests
+  // document the *current* (buggy) behaviour and will need to be updated when
+  // the bug is fixed.  See issue #150 (filed from PR #149 review).
+  //
   // When the parent path is not 'Imperium' or 'Database' and doesn't exist in
   // state.nodes, the ProxyPerp slot check is bypassed (parentNode = null).
-  // This documents the current behaviour: the buy proceeds and creates the node
-  // at <missingPath>.<gestalt>.
   it('succeeds and creates the node when a non-root parent is absent from state.nodes', async () => {
     setState(mkBuyPerpState());
     // 'Imperium.missingProxy' is not in state.nodes.

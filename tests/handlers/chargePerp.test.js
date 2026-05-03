@@ -753,3 +753,79 @@ describe('chargePerp — mixed-duration charges: events in ascending charge_end 
     expect(mat.state.nodes_collect[2].path).toBe('Imperium.long');
   });
 });
+
+// ── charge_perp mission-goal progression (end-to-end) ────────────────────────
+//
+// This guards the bug class found in PR #149: mission003 has a charge_perp
+// goal targeting client007, but the goals_texts display string for
+// 'charge_perp' was missing.  The test below verifies the full path:
+// chargePerp(client007 path) → _advanceChargePerpMissions → goal.complete.
+
+describe('chargePerp — mission003 charge_perp goal completion (end-to-end)', () => {
+  const CLIENT_PATH = 'Imperium.city002.pusher004.client007';
+
+  function mkClientNode() {
+    return {
+      game_id:       'node-client007',
+      game_type:     'ClientPerp',
+      full_path:     CLIENT_PATH,
+      full_type:     'ClientPerp:client007',
+      gestalt:       'client007',
+      instance_data: {},
+    };
+  }
+
+  beforeEach(() => setOverride(FIXED_NOW));
+
+  it('charging client007 completes the mission003 charge_perp goal', async () => {
+    setState(mkState({
+      nodes: [_mkNode('ContactPerp', NODE_PATH), mkClientNode()],
+      active_missions: ['mission003'],
+      mission_goals: [{
+        mission:        'mission003',
+        workflow:       'charge_perp',
+        target:         'client007',
+        amount:         null,
+        position:       1,
+        current_amount: 0,
+        complete:       false,
+      }],
+    }));
+
+    const { result } = await chargePerp(CLIENT_PATH);
+
+    expect(result.error).toBeUndefined();
+    expect(result.missions).toBeDefined();
+    expect(result.missions.complete_missions).toContain('mission003');
+
+    const goal = getState().mission_goals.find(function (g) { return g.mission === 'mission003'; });
+    expect(goal).toBeDefined();
+    expect(goal.complete).toBe(true);
+  });
+
+  it('charging a different perp does NOT complete the mission003 goal', async () => {
+    setState(mkState({
+      nodes: [_mkNode('ContactPerp', NODE_PATH)],  // contact035, not client007
+      active_missions: ['mission003'],
+      mission_goals: [{
+        mission:        'mission003',
+        workflow:       'charge_perp',
+        target:         'client007',
+        amount:         null,
+        position:       1,
+        current_amount: 0,
+        complete:       false,
+      }],
+    }));
+
+    const { result } = await chargePerp(NODE_PATH);  // charges contact035
+
+    expect(result.error).toBeUndefined();
+    // No mission completion — wrong target.
+    const missions = result.missions;
+    expect(!missions || !missions.complete_missions || missions.complete_missions.length === 0).toBe(true);
+
+    const goal = getState().mission_goals.find(function (g) { return g.mission === 'mission003'; });
+    expect(goal.complete).toBe(false);
+  });
+});
