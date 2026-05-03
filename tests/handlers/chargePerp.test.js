@@ -39,7 +39,6 @@ var BASE_GV = {
 
 function mkState(overrides) {
   overrides = overrides || {};
-  // Deep-merge game_values so partial overrides don't drop AP regen fields.
   var gv = Object.assign({}, BASE_GV, overrides.game_values || {});
   return _mkBaseState(Object.assign({ nodes: [_mkNode('ContactPerp', NODE_PATH)] }, overrides, { game_values: gv }));
 }
@@ -367,10 +366,9 @@ describe('chargePerp — failure: non-chargeable node (no charge_time)', () => {
   it('returns error: 1 for a node type without charge_time in ruleset', async () => {
     setOverride(FIXED_NOW);
     // Use a StoryPerp gestalt (no charge_time in type_data)
-    var nonChargeable = Object.assign({}, _mkNode('ContactPerp', NODE_PATH), {
-      full_path:  'Imperium.story001',
-      full_type:  'StoryPerp:13fee24f6edc8f796903e5b1fad001d3000',
-      gestalt:    '13fee24f6edc8f796903e5b1fad001d3000',
+    var nonChargeable = Object.assign({}, _mkNode('StoryPerp', 'Imperium.story001'), {
+      full_type: 'StoryPerp:13fee24f6edc8f796903e5b1fad001d3000',
+      gestalt:   '13fee24f6edc8f796903e5b1fad001d3000',
     });
     var s = mkState({ nodes: [nonChargeable] });
     setState(s);
@@ -476,7 +474,7 @@ describe('chargePerp — live-tick setTimeout', () => {
         result:       { amount: 1100 },
         charge_start: FIXED_NOW,
         charge_end:   FIXED_NOW + CHARGE_TIME,
-        game_id:      'node-abc123',
+        game_id:      'node_contact035',
         game_type:    'ContactPerp'
       }]
     }));
@@ -500,7 +498,7 @@ describe('chargePerp — live-tick setTimeout', () => {
         result:       { amount: 1100 },
         charge_start: FIXED_NOW,
         charge_end:   FIXED_NOW + CHARGE_TIME,
-        game_id:      'node-abc123',
+        game_id:      'node_contact035',
         game_type:    'ContactPerp'
       }]
     }));

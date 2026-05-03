@@ -2,7 +2,7 @@
  * Shared fixture builders for tests/handlers/*.test.js
  *
  * Centralises the four helpers that every handler test file re-implemented
- * locally. Import from here instead of copying.
+ * locally.
  */
 import { freshState } from '../../scripts/state.js';
 
