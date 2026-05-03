@@ -69,6 +69,13 @@ describe('advance()', () => {
     advance(86_400_000);
     expect(now()).toBe(1_000_000_000 + 86_400_000);
   });
+
+  it('throws RangeError on a negative deltaMs (forward-only contract)', () => {
+    setOverride(1_000_000);
+    expect(() => advance(-1)).toThrow(RangeError);
+    // Clock must not have moved.
+    expect(now()).toBe(1_000_000);
+  });
 });
 
 // ── clock-skew guard (state.js integration) ──────────────────────────────────
