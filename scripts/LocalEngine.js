@@ -376,6 +376,11 @@ export function getPowerups(_token, projectGestalt /*, version */) {
 // forward-facing field. Unknown types fall back to 'xp' with a console.warn.
 var _RANKING_FIELDS = { cash: 1, profiles: 1, xp: 1, level: 1, spent: 1 };
 
+// A peer that hasn't pushed a delta in this many ms is rendered "stale" —
+// the UI dims the row via the dd-leaderboard-row--stale class.  Threshold
+// is shared with the row template through the row.stale flag.
+var STALE_PEER_MS = 7 * 24 * 3600 * 1000;
+
 export function getRanking(_token, type) {
   var state = getState();
   var selfAddr = (state && state.addr) || '';
@@ -386,12 +391,17 @@ export function getRanking(_token, type) {
   }
   var field = _RANKING_FIELDS[type] ? type : 'xp';
 
+  var now = clockNow();
   var rows = Object.keys(peers).map(function (addr) {
     var p = peers[addr];
+    var lastTs = typeof p.last_seen_ts === 'number' ? p.last_seen_ts : 0;
     return {
+      addr: addr,
       display_name: p.display_name || addr,
       value: typeof p[field] === 'number' ? p[field] : 0,
       self: addr === selfAddr,
+      last_seen_ts: lastTs,
+      stale: lastTs > 0 && (now - lastTs) > STALE_PEER_MS,
     };
   });
 

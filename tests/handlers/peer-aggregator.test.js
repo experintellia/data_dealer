@@ -305,6 +305,28 @@ describe('getRanking with multi-peer state', () => {
     expect(result.user_rank).toBe(1);
   });
 
+  it('emits addr on every row so the testid template can target peers', async () => {
+    const { result } = await getRanking('tok', 'cash');
+    const addrs = result.top.map(r => r.addr).sort();
+    expect(addrs).toEqual(['alice@test', 'bob@test', 'carol@test']);
+  });
+
+  it('flags rows whose last_seen_ts is older than the stale threshold', async () => {
+    // last_seen_ts well below now (Date.now() ≫ 0) → stale = true on all rows.
+    const { result } = await getRanking('tok', 'cash');
+    expect(result.top.every(r => r.stale === true)).toBe(true);
+  });
+
+  it('does not flag rows whose last_seen_ts is recent', async () => {
+    setState(Object.assign(freshState('alice@test'), {
+      peers: {
+        'alice@test': { display_name: 'Alice', cash: 1, last_seen_ts: Date.now(), last_seen_serial: null },
+      },
+    }));
+    const { result } = await getRanking('tok', 'cash');
+    expect(result.top[0].stale).toBe(false);
+  });
+
   it('user_rank is 0 when self is last', async () => {
     setState(Object.assign(freshState('alice@test'), {
       peers: {

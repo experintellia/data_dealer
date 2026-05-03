@@ -9,11 +9,15 @@
   }
 %>
 
-    <% 
+    <%
       _.each(data.top, function(score, k){
         var is_user = (score.self === true);
+        var testid = score.addr || score.address || score.id || (is_user ? 'self' : 'rank_' + (k+1));
+        var classes = 'TopscoreRow';
+        if (is_user) classes += ' user';
+        if (score.stale) classes += ' dd-leaderboard-row--stale';
         %>
-        <div class="TopscoreRow<%= (is_user) ? " user" : "" %>" data-testid="dd-leaderboard-row-<%= score.address || score.id || (is_user ? 'self' : 'rank_' + (k+1)) %>">
+        <div class="<%= classes %>" data-testid="dd-leaderboard-row-<%= testid %>">
           <div class="TopscoreNum"><%= k+1 %></div>
           <div class="TopscoreDisplayname"><%= score.display_name %></div>
           <div class="TopscoreValue"><%= icon_map[D.type] %><%= _.toKSNum(score.value) %></div>

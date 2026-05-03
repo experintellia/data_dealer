@@ -19,6 +19,10 @@ define(function(require) {
     var RpcQueue = require('RpcQueue');
     var typeSettings = require('type_settings').getTypeSettings();
     var webxdcIdentity = require('webxdcIdentity');
+    // ESM bridge: boot exposes subscribePeersChanged so the Topscores view
+    // can refresh on remote peer deltas without polling. require() is safe
+    // because esm-entry.js define()s 'boot' before bootstrap fires.
+    var bootMod = require('boot');
 
     //////////////////////////////////////////
     //
@@ -3297,6 +3301,26 @@ define(function(require) {
       });
     };
 
+    // Invalidate the per-tab 30s fetch cache and re-fetch the visible tab.
+    // Hidden tabs are left to refetch on next viewtab_selected — they'd hit
+    // a stale fetchScore cache otherwise and silently no-op.
+    Topscores.prototype.refreshFromPeers = function(){
+      var anyForced = false;
+      this.children.each(function(score){
+        score.lastFetch = null;
+        if (score.renderNode && !score.renderNode.hidden) {
+          score.fetchScore(score.scoretype, true);
+          anyForced = true;
+        }
+      });
+      // If no tab is visible yet (initial load), refresh the first one so
+      // the user sees fresh data the first time they switch tabs anyway.
+      if (!anyForced) {
+        var first = this.children.set[0];
+        if (first) first.fetchScore(first.scoretype, true);
+      }
+    };
+
     Topscores.prototype.extendEventHandlers = function() {
       var gnode = this;
       var groot = this.GameRoot;
@@ -3326,6 +3350,19 @@ define(function(require) {
         score.fetchScore();
       });
 
+      // Live leaderboard refresh: subscribe to state.peers identity changes.
+      // Fires on remote peer deltas applied through the listener AND on own
+      // deltas via setState (boot.js). Refresh strategy refreshFromPeers
+      // bypasses the per-Topscore 30s fetch cache.
+      if (bootMod && typeof bootMod.subscribePeersChanged === 'function') {
+        var unsub = bootMod.subscribePeersChanged(function () {
+          gnode.refreshFromPeers();
+        });
+        // Hold onto the unsubscribe so a future GameNode.remove can call it.
+        // (Topscores currently lives for the page lifetime, so this is
+        // belt-and-braces — no leak in practice.)
+        gnode._unsubscribePeers = unsub;
+      }
     };
 
 

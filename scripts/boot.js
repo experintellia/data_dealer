@@ -30,6 +30,13 @@ import { freshState, applyDelta } from './state.js';
 var _currentState = null;
 var _bootPromise  = null;
 
+// Subscribers to state.peers reference-identity changes.  Fired by the
+// listener whenever applyDelta produces a state whose .peers object differs
+// (by reference) from the previous one — i.e. the peer aggregator added or
+// updated an entry.  Used by the Topscores view to refresh the leaderboard
+// without polling.  No event-bus dependency: this stays ESM-pure.
+var _peersChangedSubs = [];
+
 // Replay progress is updated on every listener callback during initial replay.
 // Polled by bootstrap.js to drive the <progress id="loader"> element. The
 // max_serial can grow if peers push new updates while we're catching up; the
@@ -70,7 +77,11 @@ export function boot(options) {
   if (typeof webxdc !== 'undefined') {
     // eslint-disable-next-line no-undef
     listenerPromise = webxdc.setUpdateListener(function (update) {
+      var prevPeers = _currentState && _currentState.peers;
       _currentState = applyDelta(_currentState, update.payload);
+      if (_currentState && _currentState.peers !== prevPeers) {
+        _notifyPeersChanged();
+      }
       var s = (typeof update.serial     === 'number') ? update.serial     : 0;
       var m = (typeof update.max_serial === 'number') ? update.max_serial : s;
       if (s > _replayProgress.serial)     _replayProgress.serial     = s;
@@ -129,7 +140,41 @@ export function getState() {
  * setState(newState) — replace the in-memory state.
  * Called by LocalEngine after materializer runs to persist the advanced state.
  * Also useful in tests to seed state before exercising handlers.
+ *
+ * Fires peers-changed subscribers when newState.peers differs by reference
+ * from the previous state, so handler-driven echoes (chargePerp, buyKarma,
+ * etc.) propagate to the Topscores view via the same channel as remote
+ * peer deltas applied through the listener.
  */
 export function setState(newState) {
+  var prevPeers = _currentState && _currentState.peers;
   _currentState = newState;
+  if (newState && newState.peers !== prevPeers) {
+    _notifyPeersChanged();
+  }
+}
+
+/**
+ * subscribePeersChanged(fn) → unsubscribe()
+ *
+ * Registers fn(state) to be invoked whenever the in-memory state.peers
+ * object identity changes.  Returns an unsubscribe function.  The legacy
+ * Topscores view (scripts/Game.js) calls this from its event-handler init
+ * to refresh the leaderboard when remote peer deltas land or own deltas
+ * mutate the self peer entry.
+ */
+export function subscribePeersChanged(fn) {
+  if (typeof fn !== 'function') return function noop() {};
+  _peersChangedSubs.push(fn);
+  return function unsubscribe() {
+    var i = _peersChangedSubs.indexOf(fn);
+    if (i >= 0) _peersChangedSubs.splice(i, 1);
+  };
+}
+
+function _notifyPeersChanged() {
+  for (var i = 0; i < _peersChangedSubs.length; i++) {
+    try { _peersChangedSubs[i](_currentState); }
+    catch (_) { /* never let one subscriber break the listener */ }
+  }
 }
