@@ -155,10 +155,12 @@ function bundleEsmDev() {
 
 const amdScripts = [
   'Game.js', 'Render.js', 'app.js', 'bootstrap.js',
-  'i18n.js', 'util.js', 'setup.js', 'setup_local.js',
-  'type_settings.js', 'require.config.js',
-  // LocalEngine.js is ESM — bundled into esm-bundle.js and registered via
-  // the AMD bridge footer; do NOT copy the raw file alongside AMD modules.
+  'require.config.js',
+  // The following are ESM as of issue #58 and reach AMD callers through the
+  // bridge footer in esm-bundle.js; do NOT copy the raw files:
+  //   util.js, setup.js, setup_local.js, i18n.js, type_settings.js,
+  //   LocalEngine.js, boot.js, state.ts, clock.ts, materializer.ts,
+  //   webxdc-identity.js, devtools.js.
 ].map(f => ({ src: `scripts/${f}`, dest: '' }));
 
 
