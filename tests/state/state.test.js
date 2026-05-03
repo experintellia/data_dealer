@@ -126,11 +126,19 @@ describe('applyDelta — schema-version mismatch (acceptance criterion B)', () =
 });
 
 describe('applyDelta — other-peer filter', () => {
-  it('ignores deltas whose addr differs from state.addr', () => {
+  // Phase 6: foreign deltas now update state.peers[foreignAddr] (peer
+  // aggregator runs for all deltas) while still blocking per-self mutations.
+  it('does not mutate per-self state for a foreign delta', () => {
     const s = freshState('alice@example.com');
     const foreignDelta = makeDelta('bob@example.com', 'buyKarma', 1000);
     const result = applyDelta(s, foreignDelta);
-    expect(result).toBe(s);
+    // Per-self fields unchanged.
+    expect(result.game_values).toEqual(s.game_values);
+    expect(result.display_name).toBe(s.display_name);
+    expect(result.nodes).toBe(s.nodes);
+    // Peer aggregator DID add a peers entry for the foreign addr.
+    expect(result.peers['bob@example.com']).toBeDefined();
+    expect(result.peers['bob@example.com'].last_seen_ts).toBe(1000);
   });
 
   it('processes own-addr deltas normally', () => {

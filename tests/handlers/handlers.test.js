@@ -17,16 +17,35 @@ function mkState(overrides) {
 
 // ── getRanking ───────────────────────────────────────────────────────────────
 
+// mkRankingState populates state.peers for the self addr so getRanking
+// (which now reads state.peers, not state.game_values directly) returns a
+// well-formed single-row leaderboard.  The peers entry mirrors the game_values
+// set below so the two sources stay consistent.  Includes `spent` (cash_spent)
+// to cover the Investor tab registered in type_settings.js.
 function mkRankingState() {
-  var base = mkState();
+  var base = mkState();  // freshState('test@local')
+  var selfAddr = 'test@local';
   return Object.assign({}, base, {
     display_name: 'TestUser',
     game_values: Object.assign({}, base.game_values, {
       xp_value: 77,
       cash_value: 200,
       profiles_value: 3,
-      cash_spent: 50
-    })
+      cash_spent: 50,
+      xp_level: 5,
+    }),
+    peers: {
+      [selfAddr]: {
+        display_name: 'TestUser',
+        cash: 200,
+        profiles: 3,
+        xp: 77,
+        level: 5,
+        spent: 50,
+        last_seen_ts: 0,
+        last_seen_serial: null,
+      },
+    },
   });
 }
 
@@ -41,24 +60,29 @@ describe('getRanking', () => {
     expect(result.top[0]).toMatchObject({ display_name: 'TestUser', self: true });
   });
 
-  it('xp type returns game_values.xp_value', async () => {
+  it('xp type returns xp from peers', async () => {
     const { result } = await getRanking('tok', 'xp');
     expect(result.top[0].value).toBe(77);
   });
 
-  it('cash type returns game_values.cash_value', async () => {
+  it('cash type returns cash from peers', async () => {
     const { result } = await getRanking('tok', 'cash');
     expect(result.top[0].value).toBe(200);
   });
 
-  it('profiles type returns game_values.profiles_value', async () => {
+  it('profiles type returns profiles from peers', async () => {
     const { result } = await getRanking('tok', 'profiles');
     expect(result.top[0].value).toBe(3);
   });
 
-  it('spent type returns game_values.cash_spent', async () => {
+  it('spent type returns cash_spent from peers (Investor tab)', async () => {
     const { result } = await getRanking('tok', 'spent');
     expect(result.top[0].value).toBe(50);
+  });
+
+  it('level type returns xp_level from peers', async () => {
+    const { result } = await getRanking('tok', 'level');
+    expect(result.top[0].value).toBe(5);
   });
 });
 
