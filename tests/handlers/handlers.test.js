@@ -8,12 +8,7 @@ import {
 import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
 import { setOverride, clearOverride } from '../../scripts/clock.js';
-
-// ── fixtures ─────────────────────────────────────────────────────────────────
-
-function mkState(overrides) {
-  return Object.assign(freshState('test@local'), overrides || {});
-}
+import { FIXED_NOW, mkState } from './_fixtures.js';
 
 // ── getRanking ───────────────────────────────────────────────────────────────
 
@@ -394,8 +389,6 @@ describe('buyKarma — failure: unknown karmalauter', () => {
 });
 
 // ── materialization on boot ───────────────────────────────────────────────────
-
-const FIXED_NOW = 1_700_000_000_000; // 2023-11-14 — stable reference epoch
 
 describe('materialization on boot', () => {
   beforeEach(() => setOverride(FIXED_NOW));
