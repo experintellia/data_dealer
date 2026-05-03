@@ -16,7 +16,7 @@ import { getRanking } from '../../scripts/LocalEngine.js';
 
 function mkGv(overrides) {
   return Object.assign(
-    { cash_value: 0, profiles_value: 0, xp_value: 0, xp_level: 1 },
+    { cash_value: 0, profiles_value: 0, xp_value: 0, xp_level: 1, cash_spent: 0 },
     overrides || {}
   );
 }
@@ -84,6 +84,49 @@ describe('state.peers — aggregation from own deltas', () => {
       mkDelta('alice@test', 'collectPerp', { cash_value: 150, xp_value: 15, xp_level: 2 }, 2000),
     ]);
     expect(s.peers['alice@test']).toMatchObject({ cash: 150, xp: 15, level: 2, last_seen_ts: 2000 });
+  });
+
+  it('tracks cash_spent as peer.spent', () => {
+    const s = replay('alice@test', [
+      mkDelta('alice@test', 'chargePerp', { cash_value: 100, xp_value: 5, xp_level: 1, cash_spent: 40 }, 1000),
+    ]);
+    expect(s.peers['alice@test'].spent).toBe(40);
+  });
+});
+
+describe('state.peers — timestamp-LWW stale-delta guard', () => {
+  // webxdc delivers per-sender messages in order, so a stale delta (ts <
+  // last_seen_ts) should only arise from re-delivered echoes or hypothetical
+  // multi-device races.  The guard makes the aggregator timestamp-LWW:
+  // newer-ts values win regardless of replay insertion order.
+
+  it('does not overwrite a newer snapshot with a stale one', () => {
+    // Replay newer delta first, then an older one — stale should be ignored.
+    const s = replay('alice@test', [
+      mkDelta('alice@test', 'collectPerp', { cash_value: 200, xp_value: 20, xp_level: 2 }, 2000),
+      mkDelta('alice@test', 'chargePerp',  { cash_value:  50, xp_value:  5, xp_level: 1 }, 1000),
+    ]);
+    // Stale delta (ts=1000) must not clobber the newer snapshot (ts=2000).
+    expect(s.peers['alice@test']).toMatchObject({ cash: 200, xp: 20, level: 2, last_seen_ts: 2000 });
+  });
+
+  it('accepts a delta with ts equal to last_seen_ts (idempotent re-delivery)', () => {
+    const s = replay('alice@test', [
+      mkDelta('alice@test', 'chargePerp',  { cash_value: 100, xp_value: 10, xp_level: 1 }, 1000),
+      mkDelta('alice@test', 'collectPerp', { cash_value: 150, xp_value: 15, xp_level: 2 }, 1000),
+    ]);
+    // Same ts — second delta is NOT stale, so it is processed.
+    expect(s.peers['alice@test'].cash).toBe(150);
+    expect(s.peers['alice@test'].last_seen_ts).toBe(1000);
+  });
+
+  it('does not suppress foreign peer stale deltas', () => {
+    // The ts guard is per-peer, so a stale bob delta is independent of alice.
+    const s = replay('alice@test', [
+      mkDelta('bob@test', 'collectPerp', { cash_value: 200, xp_value: 20, xp_level: 2 }, 2000),
+      mkDelta('bob@test', 'chargePerp',  { cash_value:  50, xp_value:  5, xp_level: 1 }, 1000),
+    ]);
+    expect(s.peers['bob@test']).toMatchObject({ cash: 200, xp: 20, level: 2, last_seen_ts: 2000 });
   });
 });
 
@@ -190,9 +233,9 @@ describe('getRanking with multi-peer state', () => {
     setState(Object.assign(freshState('alice@test'), {
       display_name: 'Alice',
       peers: {
-        'alice@test': { display_name: 'Alice', cash: 100, profiles:  5, xp: 10, level: 1, last_seen_ts: 1000, last_seen_serial: null },
-        'bob@test':   { display_name: 'Bob',   cash: 200, profiles: 15, xp: 30, level: 3, last_seen_ts: 2000, last_seen_serial: null },
-        'carol@test': { display_name: 'Carol', cash:  50, profiles: 20, xp: 20, level: 2, last_seen_ts: 3000, last_seen_serial: null },
+        'alice@test': { display_name: 'Alice', cash: 100, profiles:  5, xp: 10, level: 1, spent:  20, last_seen_ts: 1000, last_seen_serial: null },
+        'bob@test':   { display_name: 'Bob',   cash: 200, profiles: 15, xp: 30, level: 3, spent: 150, last_seen_ts: 2000, last_seen_serial: null },
+        'carol@test': { display_name: 'Carol', cash:  50, profiles: 20, xp: 20, level: 2, spent:  80, last_seen_ts: 3000, last_seen_serial: null },
       },
     }));
   });
@@ -216,6 +259,12 @@ describe('getRanking with multi-peer state', () => {
   it('sorts by level descending', async () => {
     const { result } = await getRanking('tok', 'level');
     expect(result.top.map(r => r.display_name)).toEqual(['Bob', 'Carol', 'Alice']);
+  });
+
+  it('sorts by spent descending (Investor tab — cash_spent)', async () => {
+    const { result } = await getRanking('tok', 'spent');
+    expect(result.top.map(r => r.display_name)).toEqual(['Bob', 'Carol', 'Alice']);
+    expect(result.top.map(r => r.value)).toEqual([150, 80, 20]);
   });
 
   it('tags the self row with self: true', async () => {

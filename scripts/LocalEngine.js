@@ -370,15 +370,20 @@ export function getPowerups(_token, projectGestalt /*, version */) {
 // ---------------------------------------------------------------------------
 
 // Supported sort fields and their key in state.peers[addr].
-// Matches val_type strings from docs/handler-map.md and the call site at
-// Game.js:3352 (Topscore.fetchScore).
-var _RANKING_FIELDS = { cash: 1, profiles: 1, xp: 1, level: 1 };
+// Matches val_type strings from docs/handler-map.md §getRanking and the call
+// site at Game.js:3352 (Topscore.fetchScore). Includes `spent` (cash_spent)
+// for the Investor tab registered in type_settings.js, and `level` as a
+// forward-facing field. Unknown types fall back to 'xp' with a console.warn.
+var _RANKING_FIELDS = { cash: 1, profiles: 1, xp: 1, level: 1, spent: 1 };
 
 export function getRanking(_token, type) {
   var state = getState();
   var selfAddr = (state && state.addr) || '';
   var peers = (state && state.peers) || {};
 
+  if (!_RANKING_FIELDS[type]) {
+    console.warn('[getRanking] unknown type "' + type + '", falling back to xp');
+  }
   var field = _RANKING_FIELDS[type] ? type : 'xp';
 
   var rows = Object.keys(peers).map(function (addr) {

@@ -493,12 +493,23 @@ OP_NAMES.forEach(function (op) {
 // Updates state.peers[delta.addr] from every inbound delta (own or foreign).
 // Only reads delta.result.game_values and delta.op/args/ts — never touches the
 // per-self reducer targets (display_name on state, tokens_seen, etc.).
+//
+// LWW policy: a delta whose ts is strictly less than the peer's last_seen_ts
+// is silently skipped.  webxdc delivers per-sender messages in order, so this
+// only fires when a stale delta arrives out-of-band (e.g. a re-delivered echo
+// with an old timestamp, or a hypothetical multi-device race).  It makes the
+// aggregator timestamp-LWW rather than insertion-order-LWW.
 function _applyPeerDelta(state, delta) {
   var addr = delta.addr;
   if (!addr) return state;
 
   var peers = state.peers || {};
   var existing = peers[addr] || {};
+
+  // Stale-delta guard: skip if this delta is older than the last we recorded.
+  var prevTs = typeof existing.last_seen_ts === 'number' ? existing.last_seen_ts : -Infinity;
+  if (typeof delta.ts === 'number' && delta.ts < prevTs) return state;
+
   var peer = Object.assign({}, existing);
 
   var gv = delta.result && delta.result.game_values;
@@ -507,6 +518,7 @@ function _applyPeerDelta(state, delta) {
     if (typeof gv.profiles_value === 'number') peer.profiles = gv.profiles_value;
     if (typeof gv.xp_value       === 'number') peer.xp       = gv.xp_value;
     if (typeof gv.xp_level       === 'number') peer.level    = gv.xp_level;
+    if (typeof gv.cash_spent     === 'number') peer.spent    = gv.cash_spent;
   }
 
   if (delta.op === 'setDisplayName') {

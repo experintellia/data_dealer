@@ -20,7 +20,8 @@ function mkState(overrides) {
 // mkRankingState populates state.peers for the self addr so getRanking
 // (which now reads state.peers, not state.game_values directly) returns a
 // well-formed single-row leaderboard.  The peers entry mirrors the game_values
-// set below so the two sources stay consistent.
+// set below so the two sources stay consistent.  Includes `spent` (cash_spent)
+// to cover the Investor tab registered in type_settings.js.
 function mkRankingState() {
   var base = mkState();  // freshState('test@local')
   var selfAddr = 'test@local';
@@ -30,6 +31,7 @@ function mkRankingState() {
       xp_value: 77,
       cash_value: 200,
       profiles_value: 3,
+      cash_spent: 50,
       xp_level: 5,
     }),
     peers: {
@@ -39,6 +41,7 @@ function mkRankingState() {
         profiles: 3,
         xp: 77,
         level: 5,
+        spent: 50,
         last_seen_ts: 0,
         last_seen_serial: null,
       },
@@ -70,6 +73,11 @@ describe('getRanking', () => {
   it('profiles type returns profiles from peers', async () => {
     const { result } = await getRanking('tok', 'profiles');
     expect(result.top[0].value).toBe(3);
+  });
+
+  it('spent type returns cash_spent from peers (Investor tab)', async () => {
+    const { result } = await getRanking('tok', 'spent');
+    expect(result.top[0].value).toBe(50);
   });
 
   it('level type returns xp_level from peers', async () => {
