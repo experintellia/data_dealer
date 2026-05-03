@@ -125,6 +125,33 @@ describe('applyDelta — schema-version mismatch (acceptance criterion B)', () =
 
 });
 
+describe('applyDelta — chargePerp keys nodes by path', () => {
+  const addr = 'alice@example.com';
+
+  it('charges the node matching chargeEntry.path even when nodes are reordered', () => {
+    const base = freshState(addr);
+    const nodeA = { game_id: 'a', game_type: 'ContactPerp', full_path: 'Imperium.A', gestalt: 'a', instance_data: {} };
+    const nodeB = { game_id: 'b', game_type: 'ContactPerp', full_path: 'Imperium.B', gestalt: 'b', instance_data: {} };
+    const state = Object.assign({}, base, { nodes: [nodeA, nodeB] });
+
+    const delta = {
+      kind: 'delta', addr, op: 'chargePerp', args: ['Imperium.B'], ts: 1000,
+      result: {
+        chargeEntry: { path: 'Imperium.B', charge_start: 1000, charge_end: 31000, result: { amount: 100 } },
+        cashDelta: 60, xpInc: 1,
+      },
+    };
+    const out = applyDelta(state, delta);
+
+    const a = out.nodes.find((n) => n.full_path === 'Imperium.A');
+    const b = out.nodes.find((n) => n.full_path === 'Imperium.B');
+    expect(b.instance_data.charge_start).toBe(1000);
+    expect(a.instance_data.charge_start).toBeUndefined();
+    expect(out.nodes_charging).toHaveLength(1);
+    expect(out.nodes_charging[0].path).toBe('Imperium.B');
+  });
+});
+
 describe('applyDelta — other-peer filter', () => {
   // Phase 6: foreign deltas now update state.peers[foreignAddr] (peer
   // aggregator runs for all deltas) while still blocking per-self mutations.

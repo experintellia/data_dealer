@@ -317,12 +317,15 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
 reducers.chargePerp = function chargePerpReducer(state, delta) {
   var r           = delta.result || {};
   var chargeEntry = r.chargeEntry;
-  if (!chargeEntry || typeof r.nodeIdx !== 'number') return state;
+  if (!chargeEntry || !chargeEntry.path) return state;
 
-  var nodeIdx = r.nodeIdx;
+  // Key by path, not positional index: cold-start replay can reorder
+  // state.nodes between the handler and the reducer, so a stale index
+  // would charge the wrong perp.
+  var path     = chargeEntry.path;
   var nodes    = state.nodes || [];
-  var newNodes = nodes.map(function(n, i) {
-    if (i !== nodeIdx) return n;
+  var newNodes = nodes.map(function(n) {
+    if (n.full_path !== path) return n;
     return Object.assign({}, n, {
       instance_data: Object.assign({}, n.instance_data, {
         charge_start: chargeEntry.charge_start
