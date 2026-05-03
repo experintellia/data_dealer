@@ -245,8 +245,8 @@ describe('state.peers — convergence with 4 deltas from 2 addresses', () => {
 
   const allFour = [d_alice_1, d_alice_2, d_bob_1, d_bob_2];
 
-  // Generate all 4! permutations of four elements.
-  function permutations4(arr) {
+  // All 4! = 24 arrival-order permutations, computed once for the whole block.
+  const allPerms = (function () {
     var result = [];
     for (var a = 0; a < 4; a++) {
       for (var b = 0; b < 4; b++) {
@@ -254,15 +254,15 @@ describe('state.peers — convergence with 4 deltas from 2 addresses', () => {
         for (var c = 0; c < 4; c++) {
           if (c === a || c === b) continue;
           var d = [0, 1, 2, 3].find(function (x) { return x !== a && x !== b && x !== c; });
-          result.push([arr[a], arr[b], arr[c], arr[d]]);
+          result.push([allFour[a], allFour[b], allFour[c], allFour[d]]);
         }
       }
     }
     return result;
-  }
+  }());
 
   it('final peers.alice is the highest-ts alice snapshot regardless of delta order', () => {
-    permutations4(allFour).forEach(function (perm) {
+    allPerms.forEach(function (perm) {
       var s = replay(SELF, perm);
       // alice's latest delta is ts=3000 (cash=120, xp=12).
       expect(s.peers['alice@test']).toMatchObject({ cash: 120, xp: 12, last_seen_ts: 3000 });
@@ -270,7 +270,7 @@ describe('state.peers — convergence with 4 deltas from 2 addresses', () => {
   });
 
   it('final peers.bob is the highest-ts bob snapshot regardless of delta order', () => {
-    permutations4(allFour).forEach(function (perm) {
+    allPerms.forEach(function (perm) {
       var s = replay(SELF, perm);
       // bob's latest delta is ts=4000 (cash=200, xp=20, level=2).
       expect(s.peers['bob@test']).toMatchObject({ cash: 200, xp: 20, level: 2, last_seen_ts: 4000 });
@@ -278,15 +278,14 @@ describe('state.peers — convergence with 4 deltas from 2 addresses', () => {
   });
 
   it('all 24 permutations produce identical peers maps', () => {
-    var perms = permutations4(allFour);
-    var reference = replay(SELF, perms[0]).peers;
-    perms.slice(1).forEach(function (perm) {
+    var reference = replay(SELF, allPerms[0]).peers;
+    allPerms.slice(1).forEach(function (perm) {
       expect(replay(SELF, perm).peers).toEqual(reference);
     });
   });
 
   it('getRanking after all-permutation replay agrees on final scores', async () => {
-    var perms = permutations4(allFour);
+    var perms = allPerms;
     // Spot-check: first and last permutations produce same getRanking result.
     setState(Object.assign(freshState(SELF), { peers: replay(SELF, perms[0]).peers }));
     const r1 = await getRanking('xp');

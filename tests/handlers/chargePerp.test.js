@@ -764,22 +764,11 @@ describe('chargePerp — mixed-duration charges: events in ascending charge_end 
 describe('chargePerp — mission003 charge_perp goal completion (end-to-end)', () => {
   const CLIENT_PATH = 'Imperium.city002.pusher004.client007';
 
-  function mkClientNode() {
-    return {
-      game_id:       'node-client007',
-      game_type:     'ClientPerp',
-      full_path:     CLIENT_PATH,
-      full_type:     'ClientPerp:client007',
-      gestalt:       'client007',
-      instance_data: {},
-    };
-  }
-
   beforeEach(() => setOverride(FIXED_NOW));
 
   it('charging client007 completes the mission003 charge_perp goal', async () => {
     setState(mkState({
-      nodes: [_mkNode('ContactPerp', NODE_PATH), mkClientNode()],
+      nodes: [_mkNode('ContactPerp', NODE_PATH), _mkNode('ClientPerp', CLIENT_PATH)],
       active_missions: ['mission003'],
       mission_goals: [{
         mission:        'mission003',

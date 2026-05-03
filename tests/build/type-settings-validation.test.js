@@ -21,15 +21,20 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 // ── load fixtures ─────────────────────────────────────────────────────────────
 
-let rulesetDe, rulesetEn, typeSettingsSrc, localEngineSrc, localeDe, localeEn;
+let rulesetDe, rulesetEn, localeDe, localeEn;
+let goalsTextWorkflows, goalsTextMsgids, knownHandlerWorkflows;
 
 beforeAll(() => {
   rulesetDe      = JSON.parse(readFileSync(join(root, 'data', 'ruleset_3.de.json'), 'utf8'));
   rulesetEn      = JSON.parse(readFileSync(join(root, 'data', 'ruleset_3.en.json'), 'utf8'));
-  typeSettingsSrc = readFileSync(join(root, 'scripts', 'type_settings.js'), 'utf8');
-  localEngineSrc  = readFileSync(join(root, 'scripts', 'LocalEngine.js'), 'utf8');
-  localeDe        = JSON.parse(readFileSync(join(root, 'i18n', 'de_AT.json'), 'utf8'));
-  localeEn        = JSON.parse(readFileSync(join(root, 'i18n', 'en_US.json'), 'utf8'));
+  localeDe       = JSON.parse(readFileSync(join(root, 'i18n', 'de_AT.json'), 'utf8'));
+  localeEn       = JSON.parse(readFileSync(join(root, 'i18n', 'en_US.json'), 'utf8'));
+
+  var typeSettingsSrc = readFileSync(join(root, 'scripts', 'type_settings.js'), 'utf8');
+  var localEngineSrc  = readFileSync(join(root, 'scripts', 'LocalEngine.js'), 'utf8');
+  goalsTextWorkflows     = extractGoalsTextWorkflows(typeSettingsSrc);
+  goalsTextMsgids        = extractGoalsTextMsgids(typeSettingsSrc);
+  knownHandlerWorkflows  = extractHandlerWorkflows(localEngineSrc);
 });
 
 // ── helper: extract goals_texts workflow keys from type_settings.js source ───
@@ -93,11 +98,6 @@ function extractHandlerWorkflows(src) {
   return found;
 }
 
-// Resolved after beforeAll; used as a lazy getter in tests.
-function getKnownHandlerWorkflows() {
-  return extractHandlerWorkflows(localEngineSrc);
-}
-
 // ── collect all mission goals from the ruleset ────────────────────────────────
 
 function allGoals(ruleset) {
@@ -114,33 +114,28 @@ function allGoals(ruleset) {
 
 describe('LocalEngine.js — handler workflow extraction', () => {
   it('extracts at least 7 workflow handlers from LocalEngine.js', () => {
-    var known = getKnownHandlerWorkflows();
-    expect(known.size).toBeGreaterThanOrEqual(7);
+    expect(knownHandlerWorkflows.size).toBeGreaterThanOrEqual(7);
   });
 
   it('contains the core workflows that have always existed', () => {
-    var known = getKnownHandlerWorkflows();
     ['buy_perp', 'charge_perp', 'collect_profiles', 'integrate_profiles', 'collect_cash'].forEach(function (w) {
-      expect(known.has(w)).toBe(true);
+      expect(knownHandlerWorkflows.has(w)).toBe(true);
     });
   });
 });
 
 describe('type_settings.js — goals_texts workflow coverage', () => {
   it('goals_texts block is present in type_settings.js', () => {
-    var workflows = extractGoalsTextWorkflows(typeSettingsSrc);
-    expect(workflows.length).toBeGreaterThan(0);
+    expect(goalsTextWorkflows.length).toBeGreaterThan(0);
   });
 
   it('every goals_texts workflow key is a known handler workflow', () => {
-    var workflows = extractGoalsTextWorkflows(typeSettingsSrc);
-    var known = getKnownHandlerWorkflows();
-    var unknown = workflows.filter(function (w) { return !known.has(w); });
+    var unknown = goalsTextWorkflows.filter(function (w) { return !knownHandlerWorkflows.has(w); });
     expect(unknown).toEqual([]);
   });
 
   it('every ruleset (de) mission-goal workflow has a display string in goals_texts', () => {
-    var definedWorkflows = new Set(extractGoalsTextWorkflows(typeSettingsSrc));
+    var definedWorkflows = new Set(goalsTextWorkflows);
     var missing = [];
     allGoals(rulesetDe).forEach(function (entry) {
       var w = entry.goal.workflow;
@@ -152,7 +147,7 @@ describe('type_settings.js — goals_texts workflow coverage', () => {
   });
 
   it('every ruleset (en) mission-goal workflow has a display string in goals_texts', () => {
-    var definedWorkflows = new Set(extractGoalsTextWorkflows(typeSettingsSrc));
+    var definedWorkflows = new Set(goalsTextWorkflows);
     var missing = [];
     allGoals(rulesetEn).forEach(function (entry) {
       var w = entry.goal.workflow;
@@ -166,11 +161,10 @@ describe('type_settings.js — goals_texts workflow coverage', () => {
 
 describe('ruleset (de) — mission-goal workflow validity', () => {
   it('every mission-goal workflow is a recognised handler workflow', () => {
-    var known = getKnownHandlerWorkflows();
     var invalid = [];
     allGoals(rulesetDe).forEach(function (entry) {
       var w = entry.goal.workflow;
-      if (w && !known.has(w)) {
+      if (w && !knownHandlerWorkflows.has(w)) {
         invalid.push({ mission: entry.mission, workflow: w });
       }
     });
@@ -249,16 +243,14 @@ describe('goals_texts display strings — locale file coverage', () => {
   // "goal Charge Perp %s" entry that was the root bug in issue #136.
 
   it('every goals_texts display string has a German translation in de_AT.json', () => {
-    var msgids = extractGoalsTextMsgids(typeSettingsSrc);
-    expect(msgids.length).toBeGreaterThan(0);
-    var missing = msgids.filter(function (id) { return !hasMsgstr(localeDe, id); });
+    expect(goalsTextMsgids.length).toBeGreaterThan(0);
+    var missing = goalsTextMsgids.filter(function (id) { return !hasMsgstr(localeDe, id); });
     expect(missing).toEqual([]);
   });
 
   it('every goals_texts display string has an English translation in en_US.json', () => {
-    var msgids = extractGoalsTextMsgids(typeSettingsSrc);
-    expect(msgids.length).toBeGreaterThan(0);
-    var missing = msgids.filter(function (id) { return !hasMsgstr(localeEn, id); });
+    expect(goalsTextMsgids.length).toBeGreaterThan(0);
+    var missing = goalsTextMsgids.filter(function (id) { return !hasMsgstr(localeEn, id); });
     expect(missing).toEqual([]);
   });
 });
