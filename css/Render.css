@@ -2008,40 +2008,30 @@
   animation: AniJump 6s linear infinite normal;
 }
 
-.PopupBody.About .PopupHeader {
-  height: 76px;
-  border-bottom: none;
-  border-radius: 12px 12px 0 0;
-  box-shadow: none;
-}
-.PopupBody.About .PopupHeader .MainMenuLogo {
+.PopupBody.About .MainMenuLogo {
   position: relative;
   top: auto;
   left: auto;
-  margin: 14px 0 0 12px;
+  display: block;
   width: 266px;
   height: 48px;
   background-size: 1152px 1229px;
   background-position: -1px -983px;
+  margin: 20px auto 16px;
 }
-.PopupBody.About .PopupHeader .MainMenuLogo.de_AT {
+.PopupBody.About .MainMenuLogo.de_AT {
   background-position: -270px -983px;
 }
 .PopupBody.About .PopupMenu {
   position: absolute;
-  top: 78px;
+  top: 6px;
   left: 12px;
   width: 564px;
   text-align: left;
 }
-
-/* About dialog: merge header and content into one visual box, and let
-   long text scroll inside .PopupContent rather than overflow. */
+/* Single unified scroll area: takes the space of the old header + content */
 .PopupBody.About .PopupContent {
-  margin-top: 0;
-  border-top: none;
-  border-radius: 0 0 12px 12px;
-  box-shadow: none;
+  height: 398px;
   overflow-y: auto;
   overflow-x: hidden;
 }

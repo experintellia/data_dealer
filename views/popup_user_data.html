@@ -5,20 +5,18 @@
   var game = _.game();
 %>
 <div class="PopupBody About">
-  <div class="PopupHeader">
-    <div class="PopupClose">X</div>
-    <div class="RenderSprite MainMenuLogo <%= game.setup.locale %>"></div>
-    <% if (game.setup.userdebug) { %>
-    <div class="PopupMenu">
-      <div class="PopupMenuButton active" data-tab="settings">About</div>
-      <div class="PopupMenuButton" data-tab="debug"><% print(_._('userdebug tab')); %></div>
-    </div>
-    <% } %>
+  <div class="PopupClose">X</div>
+  <% if (game.setup.userdebug) { %>
+  <div class="PopupMenu">
+    <div class="PopupMenuButton active" data-tab="settings">About</div>
+    <div class="PopupMenuButton" data-tab="debug"><% print(_._('userdebug tab')); %></div>
   </div>
+  <% } %>
   <div class="PopupContent">
     <div class="PopupTab" data-tab="settings">
       <div class="SubpopContainer">
       </div>
+      <div class="RenderSprite MainMenuLogo <%= game.setup.locale %>"></div>
       <div class="PopupContentText">
         <div class="PopupTitle">About this fork</div>
         <div class="PopupParagraph">
