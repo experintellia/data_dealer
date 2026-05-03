@@ -932,5 +932,29 @@
   "per deal": [
     null,
     "per deal"
+  ],
+  "achievement_mission_done": [
+    null,
+    "%s completed mission: %s"
+  ],
+  "achievement_levelup": [
+    null,
+    "%s reached level %s"
+  ],
+  "achievement_joined": [
+    null,
+    "%s joined the data dealer game"
+  ],
+  "achievement_profiles_milestone": [
+    null,
+    "%s has %s profiles in their database"
+  ],
+  "achievement_karma_saint": [
+    null,
+    "%s has achieved full saint status"
+  ],
+  "achievement_karma_devil": [
+    null,
+    "%s has achieved full devil status"
   ]
 }

@@ -932,5 +932,29 @@
   "per deal": [
     null,
     "Füttern"
+  ],
+  "achievement_mission_done": [
+    null,
+    "%s hat Mission abgeschlossen: %s"
+  ],
+  "achievement_levelup": [
+    null,
+    "%s hat Level %s erreicht"
+  ],
+  "achievement_joined": [
+    null,
+    "%s spielt jetzt Data Dealer"
+  ],
+  "achievement_profiles_milestone": [
+    null,
+    "%s hat %s Profile in der Datenbank"
+  ],
+  "achievement_karma_saint": [
+    null,
+    "%s hat den vollen Heiligenstatus erreicht"
+  ],
+  "achievement_karma_devil": [
+    null,
+    "%s hat den vollen Teufelsstatus erreicht"
   ]
 }

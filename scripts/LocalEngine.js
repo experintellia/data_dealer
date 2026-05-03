@@ -16,6 +16,8 @@ import { materialize } from './materializer.js';
 import { now as clockNow } from './clock.js';
 import rulesetDe from '../data/ruleset_3.de.json' with { type: 'json' };
 import rulesetEn from '../data/ruleset_3.en.json' with { type: 'json' };
+import i18nDe from '../i18n/de_AT.json' with { type: 'json' };
+import i18nEn from '../i18n/en_US.json' with { type: 'json' };
 
 // ---------------------------------------------------------------------------
 // Event emitter — injected by production boot (app.js); no-op in tests.
@@ -90,6 +92,47 @@ var _sendDelta = null;
 
 export function setSendDelta(fn) {
   _sendDelta = fn;
+}
+
+// ---------------------------------------------------------------------------
+// Achievement emit — fires info messages at action sites only.
+// setSendAchievement(fn) injects a spy in tests; production uses webxdc.
+// ---------------------------------------------------------------------------
+var _sendAchievementFn = null;
+
+export function setSendAchievement(fn) {
+  _sendAchievementFn = fn;
+}
+
+// Locale-aware format-string lookup.  Replaces %s tokens left-to-right.
+function _t(msgid) {
+  var state = getState();
+  var locale = (state && state.locale) || 'de';
+  var table = (locale === 'en') ? i18nEn : i18nDe;
+  var entry = table[msgid];
+  var tmpl = (entry && entry[1]) ? entry[1] : msgid;
+  for (var i = 1; i < arguments.length; i++) {
+    tmpl = tmpl.replace('%s', String(arguments[i]));
+  }
+  return tmpl;
+}
+
+// Fire an achievement info message.  Called only at handler action sites —
+// never from applyDelta or the materializer so replay never re-emits.
+function triggerAchievement(kind, info, extraPayload) {
+  var state = getState();
+  var addr = state ? state.addr : '';
+  var name = state ? (state.display_name || addr) : addr;
+  // kind: 'achievement' is the top-level discriminator for webxdc consumers.
+  // achievement_kind carries the subtype (mission_done, levelup, joined, …).
+  var payload = { kind: 'achievement', achievement_kind: kind, addr: addr, name: name, ts: clockNow() };
+  if (extraPayload) Object.assign(payload, extraPayload);
+  if (_sendAchievementFn) { _sendAchievementFn({ info: info, payload: payload }); }
+  // eslint-disable-next-line no-undef
+  if (typeof webxdc !== 'undefined') {
+    // eslint-disable-next-line no-undef
+    webxdc.sendUpdate({ info: info, payload: payload }, '');
+  }
 }
 
 // Single persistence path: capture for tests, then either fire the production
@@ -561,6 +604,20 @@ export function buyKarma(karmalauterGestalt) {
   _persistDelta(_mkDelta(state.addr, 'buyKarma', [karmalauterGestalt],
     { game_values: newGv }));
 
+  // Achievements
+  var _bkDisplayName = state.display_name || state.addr;
+  if (levelup) {
+    triggerAchievement('levelup',
+      _t('achievement_levelup', _bkDisplayName, String(newLevel.number)));
+  }
+  var _bkOldKarma = gv.karma_value || 0;
+  if (_bkOldKarma !== 100 && newKarma === 100) {
+    triggerAchievement('karma_saint', _t('achievement_karma_saint', _bkDisplayName));
+  }
+  if (_bkOldKarma !== -100 && newKarma === -100) {
+    triggerAchievement('karma_devil', _t('achievement_karma_devil', _bkDisplayName));
+  }
+
   var response = { game_values: newGv };
   if (levelup) response.levelup = true;
   return Promise.resolve({ result: response });
@@ -716,6 +773,26 @@ export function buyPowerup(perpPath, slot, gestalt) {
   _persistDelta(_mkDelta(state.addr, 'buyPowerup',
     [perpPath, slot, gestalt], result));
 
+  // Achievements
+  var _bpuDisplayName = state.display_name || state.addr;
+  if (levelup) {
+    triggerAchievement('levelup',
+      _t('achievement_levelup', _bpuDisplayName, String(newGameValues.xp_level)));
+  }
+  var _bpuCompletedMissions = puMissionResult.missions && puMissionResult.missions.complete_missions || [];
+  for (var _bpuMi = 0; _bpuMi < _bpuCompletedMissions.length; _bpuMi++) {
+    var _bpuMDef = _findMissionDef(_getRuleset(), _bpuCompletedMissions[_bpuMi]);
+    var _bpuMTitle = (_bpuMDef && _bpuMDef.type_data && _bpuMDef.type_data.title) || _bpuCompletedMissions[_bpuMi];
+    triggerAchievement('mission_done',
+      _t('achievement_mission_done', _bpuDisplayName, _bpuMTitle),
+      { mission: _bpuCompletedMissions[_bpuMi] });
+  }
+  var _bpuOldKarma = state.game_values.karma_value || 0;
+  var _bpuNewKarma = newGameValues.karma_value || 0;
+  if (_bpuOldKarma !== 100 && _bpuNewKarma === 100) {
+    triggerAchievement('karma_saint', _t('achievement_karma_saint', _bpuDisplayName));
+  }
+
   return Promise.resolve({ result: result });
 }
 
@@ -777,6 +854,12 @@ export function sellPowerup(perpPath, slot, gestalt) {
 
   _persistDelta(_mkDelta(state.addr, 'sellPowerup',
     [perpPath, slot, gestalt], result));
+
+  if (levelup) {
+    var _spDisplayName = state.display_name || state.addr;
+    triggerAchievement('levelup',
+      _t('achievement_levelup', _spDisplayName, String(newGameValues.xp_level)));
+  }
 
   return Promise.resolve({ result: result });
 }
@@ -841,6 +924,12 @@ export function buySlots(perpPath, slotType, num) {
 
   _persistDelta(_mkDelta(state.addr, 'buySlots',
     [perpPath, slotType, num], result));
+
+  if (levelup) {
+    var _bsDisplayName = state.display_name || state.addr;
+    triggerAchievement('levelup',
+      _t('achievement_levelup', _bsDisplayName, String(newGameValues.xp_level)));
+  }
 
   return Promise.resolve({ result: result });
 }
@@ -992,6 +1081,24 @@ export function buyPerp(parentPath, gestalt) {
   if (profileSetPayload) { payload.profile_set = profileSetPayload; }
 
   _persistDelta(_mkDelta(state.addr, 'buyPerp', [parentPath, gestalt], payload));
+
+  // Achievements
+  var _bpDisplayName = state.display_name || state.addr;
+  if (nodeCounter === 1) {
+    triggerAchievement('joined', _t('achievement_joined', _bpDisplayName));
+  }
+  if (levelup) {
+    triggerAchievement('levelup',
+      _t('achievement_levelup', _bpDisplayName, String(newGv.xp_level)));
+  }
+  var _bpCompletedMissions = missionResult.missions && missionResult.missions.complete_missions || [];
+  for (var _bpMi = 0; _bpMi < _bpCompletedMissions.length; _bpMi++) {
+    var _bpMDef = _findMissionDef(_getRuleset(), _bpCompletedMissions[_bpMi]);
+    var _bpMTitle = (_bpMDef && _bpMDef.type_data && _bpMDef.type_data.title) || _bpCompletedMissions[_bpMi];
+    triggerAchievement('mission_done',
+      _t('achievement_mission_done', _bpDisplayName, _bpMTitle),
+      { mission: _bpCompletedMissions[_bpMi] });
+  }
 
   return Promise.resolve({ result: payload });
 }
@@ -1480,6 +1587,21 @@ export function chargePerp(path) {
   // on cold-start). Schedule a one-shot materialize at exactly charge_end.
   _scheduleChargeReady(chargeEntry.charge_end, chargeEntry.path);
 
+  // Achievements
+  var _cpDisplayName = state.display_name || state.addr;
+  if (levelup) {
+    triggerAchievement('levelup',
+      _t('achievement_levelup', _cpDisplayName, String(newLevelNum)));
+  }
+  var _cpCompletedMissions = chargeMissionResult.missions && chargeMissionResult.missions.complete_missions || [];
+  for (var _cpMi = 0; _cpMi < _cpCompletedMissions.length; _cpMi++) {
+    var _cpMDef = _findMissionDef(_getRuleset(), _cpCompletedMissions[_cpMi]);
+    var _cpMTitle = (_cpMDef && _cpMDef.type_data && _cpMDef.type_data.title) || _cpCompletedMissions[_cpMi];
+    triggerAchievement('mission_done',
+      _t('achievement_mission_done', _cpDisplayName, _cpMTitle),
+      { mission: _cpCompletedMissions[_cpMi] });
+  }
+
   return Promise.resolve({
     result: { game_values: newGv, duration: durationMs, levelup: levelup,
               missions: chargeMissionResult.missions || {} },
@@ -1753,6 +1875,28 @@ export function collectPerp(gperpPath) {
     incident ? { karma_incident: incident.gestalt } : {}
   );
 
+  // Achievements
+  var _clpDisplayName = state.display_name || state.addr;
+  if (levelup) {
+    triggerAchievement('levelup',
+      _t('achievement_levelup', _clpDisplayName, String(newLevel)));
+  }
+  var _clpCompletedMissions = collectMissionResult.missions && collectMissionResult.missions.complete_missions || [];
+  for (var _clpMi = 0; _clpMi < _clpCompletedMissions.length; _clpMi++) {
+    var _clpMDef = _findMissionDef(_getRuleset(), _clpCompletedMissions[_clpMi]);
+    var _clpMTitle = (_clpMDef && _clpMDef.type_data && _clpMDef.type_data.title) || _clpCompletedMissions[_clpMi];
+    triggerAchievement('mission_done',
+      _t('achievement_mission_done', _clpDisplayName, _clpMTitle),
+      { mission: _clpCompletedMissions[_clpMi] });
+  }
+  var _clpOldKarma = (ms.game_values && ms.game_values.karma_value) || 0;
+  var _clpNewKarma = newGv.karma_value || 0;
+  if (incident) {
+    if (_clpOldKarma !== -100 && _clpNewKarma === -100) {
+      triggerAchievement('karma_devil', _t('achievement_karma_devil', _clpDisplayName));
+    }
+  }
+
   // Emit materializer events + optional levelup new_items after the caller's
   // microtask resolves (mirrors dd_app's deferred Celery notifyLevelupItems).
   var matEvents = mat.events;
@@ -1953,6 +2097,39 @@ export function integrateCollected(collectId) {
     });
   }
 
+  // Achievements
+  var _icDisplayName = state.display_name || state.addr;
+  if (levelup) {
+    triggerAchievement('levelup',
+      _t('achievement_levelup', _icDisplayName, String(newLevel)));
+  }
+  var _icCompletedMissions = missionResult.missions && missionResult.missions.complete_missions || [];
+  for (var _icMi = 0; _icMi < _icCompletedMissions.length; _icMi++) {
+    var _icMDef = _findMissionDef(_getRuleset(), _icCompletedMissions[_icMi]);
+    var _icMTitle = (_icMDef && _icMDef.type_data && _icMDef.type_data.title) || _icCompletedMissions[_icMi];
+    triggerAchievement('mission_done',
+      _t('achievement_mission_done', _icDisplayName, _icMTitle),
+      { mission: _icCompletedMissions[_icMi] });
+  }
+  var _icOldProfiles = (state.game_values && state.game_values.profiles_value) || 0;
+  var _icNewProfiles = newGv.profiles_value || 0;
+  var _icMilestones = [1000, 10000, 100000, 1000000];
+  for (var _icPi = 0; _icPi < _icMilestones.length; _icPi++) {
+    if (_icOldProfiles < _icMilestones[_icPi] && _icNewProfiles >= _icMilestones[_icPi]) {
+      triggerAchievement('profiles_milestone',
+        _t('achievement_profiles_milestone', _icDisplayName, String(_icMilestones[_icPi])),
+        { threshold: _icMilestones[_icPi] });
+    }
+  }
+  var _icOldKarma = (state.game_values && state.game_values.karma_value) || 0;
+  var _icNewKarma = newGv.karma_value || 0;
+  if (_icOldKarma !== 100 && _icNewKarma === 100) {
+    triggerAchievement('karma_saint', _t('achievement_karma_saint', _icDisplayName));
+  }
+  if (_icOldKarma !== -100 && _icNewKarma === -100) {
+    triggerAchievement('karma_devil', _t('achievement_karma_devil', _icDisplayName));
+  }
+
   return Promise.resolve({ result: response });
 }
 
@@ -2027,9 +2204,10 @@ var LocalEngine = Object.assign({
   integrateCollected: integrateCollected,
   dismissMissionBriefing: dismissMissionBriefing,
   markTokenSeen:      markTokenSeen,
-  setEmitter:         setEmitter,
-  setSendDelta:       setSendDelta,
-  setPrngSeed:        setPrngSeed,
+  setEmitter:           setEmitter,
+  setSendDelta:         setSendDelta,
+  setSendAchievement:   setSendAchievement,
+  setPrngSeed:          setPrngSeed,
 }, _stubHandlers);
 
 export default LocalEngine;
