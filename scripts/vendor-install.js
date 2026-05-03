@@ -25,7 +25,6 @@
 //   zynga-scroller:https://raw.githubusercontent.com/zynga/scroller/dadd850/src/Scroller.js
 //   sprintf:       https://raw.githubusercontent.com/alexei/sprintf.js/192bc60/src/sprintf.js
 //   json2:         https://raw.githubusercontent.com/douglascrockford/JSON-js/e39db4b/json2.js
-//   jquery-cookie: https://raw.githubusercontent.com/carhartl/jquery-cookie/v1.3.1/jquery.cookie.js
 //   jquery-mobile: https://code.jquery.com/mobile/1.3.2/jquery.mobile-1.3.2.min.js
 
 import { execSync } from 'child_process';
@@ -56,7 +55,7 @@ console.log('Installing npm-sourced vendor packages…');
 run(`npm init -y`);
 run([
   'npm install --save-exact',
-  'requirejs', 'jquery', 'jquery-migrate', 'jquery.cookie',
+  'requirejs', 'jquery', 'jquery-migrate',
   'underscore@1.5.1', 'numeral@1.4.5', 'requirejs-text', 'almond@0.2.5',
   'easeljs', 'tweenjs', 'preloadjs', 'soundjs',
   'sprintf-js', 'json2',
@@ -66,7 +65,6 @@ console.log('\nCopying to vendor/…');
 cp('requirejs/require.js',                       'requirejs.js');
 cp('jquery/dist/jquery.min.js',                  'jquery.js');
 cp('jquery-migrate/dist/jquery-migrate.min.js',  'jquery-migrate.js');
-cp('jquery.cookie/jquery.cookie.js',             'jquery-cookie.js');
 cp('underscore/underscore.js',                   'underscore.js');
 cp('numeral/numeral.js',                         'numeral.js');
 cp('numeral/languages/de-de.js',                 'numeral-de.js');
