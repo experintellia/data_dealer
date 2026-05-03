@@ -20,14 +20,23 @@ require([
   'app',
   'boot',
   'native-console',
-  // Game and Render are preloaded so app.start can reach them via the
-  // synchronous globalThis.require('Game') / require('Render') form.
-  // Their factory bodies do NOT run at preload — only at first
-  // getGame()/getRender() call inside app.start, after the locale has
-  // been set.  Pulling them in here also pre-walks their `define()`
-  // dep lists (zynga-scroller, createjs-easel/tween/sound, sprintf,
-  // type_settings, util, …) so every nested sync require resolves.
+  // sprintf must be preloaded because Game.js's factory body issues a
+  // synchronous globalThis.require('sprintf') for its window.sprintf
+  // side effect — formerly auto-discovered via RequireJS's CommonJS
+  // factory string-scan, which ESM modules do not get.
+  'sprintf',
+  // 'Game' is now ESM-bundled and registered through the AMD bridge,
+  // but RequireJS only resolves a bridged module — i.e. invokes its
+  // bridge-factory and caches the result — when something requires it.
+  // Listing it here forces resolution before app.start so the
+  // synchronous globalThis.require('Game').getGame() in app.js's
+  // start path finds it in cache.  Note: the inner Game()-factory
+  // body still does NOT run until getGame() is actually invoked.
   'Game',
+  // Render is still an AMD `define()` module; its factory body string-
+  // scans for zynga-scroller, zynga-animate, createjs-easel/tween/sound
+  // so preloading 'Render' transitively preloads them.  Once Render is
+  // ported (commit 4) those names will be added explicitly here.
   'Render',
   'tpl!../views/loader.html'
 ], function(require) {

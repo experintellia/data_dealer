@@ -1,10 +1,22 @@
-define(function(require) {
+// Game.js — ESM (issue #58).  Internal classes / prototype chain are
+// untouched; only the AMD `define()` wrapper, the dep block, and the
+// module-tail singleton glue have been ported.  Vendor libs ($, _, sprintf)
+// are still read from globals because RequireJS preloads them before
+// bootstrap.js calls app.start, which is what triggers the first getGame()
+// invocation that runs this factory body.
+import appModule from './app.js';
+import setup from './setup.js';
+import utilDefault from './util.js';
+import { getTypeSettings } from './type_settings.js';
+import webxdcIdentity from './webxdc-identity.js';
+import * as bootMod from './boot.js';
+import i18n from './i18n.js';
 
-  var Game = function() {
+var Game = function() {
 
-    var _ = require('underscore');
-    var $ = require('jquery');
-    require('sprintf'); // load the vendor file so window.sprintf is populated
+    var _ = globalThis._;
+    var $ = globalThis.jQuery || globalThis.$;
+    globalThis.require('sprintf'); // load the vendor file so window.sprintf is populated
     // vendor/sprintf.js has an anonymous define() that returns an object
     // ({sprintf, vsprintf}), which RequireJS treats as the module value and
     // overrides the `exports: 'sprintf'` shim — same JSON3-style trap as
@@ -12,16 +24,12 @@ define(function(require) {
     // function itself, so we read it from there.
     var sprintf = window.sprintf;
 
-    var app = require('app').getApplication();
-    var setup = require('setup');
-    var extend = require('util').extend;
-    var Render = require('Render').getRender();
-    var typeSettings = require('type_settings').getTypeSettings();
-    var webxdcIdentity = require('webxdcIdentity');
-    // ESM bridge: boot exposes subscribePeersChanged so the Topscores view
-    // can refresh on remote peer deltas without polling. require() is safe
-    // because esm-entry.js define()s 'boot' before bootstrap fires.
-    var bootMod = require('boot');
+    var app = appModule.getApplication();
+    var extend = utilDefault.extend;
+    // Render is still AMD; reach it through the bridge.  Once Render is
+    // ported this becomes a static import.
+    var Render = globalThis.require('Render').getRender();
+    var typeSettings = getTypeSettings();
 
     //////////////////////////////////////////
     //
@@ -871,13 +879,12 @@ define(function(require) {
       groot.lock();
 
       return app.remote.getSessionLocale().then(function(data) {
-        var i18n = require('i18n');
         var locale = data.result === 'de' ? 'de_AT' : 'en_US';
         i18n.setLocale(locale);
         var html = app.renderView('game.html');
         $('#dd-control').html(html);
         return app.remote.loadGame().then(function(data) {
-          var Game = require('Game').getGame();
+          var Game = getGame();
           var gameData = data.result;
           app.version = gameData.version;
           Game.init(gameData);
@@ -5689,15 +5696,13 @@ class CollectableClient(CollectablePerpBase):
     };
 
     return Game;
-  };
+};
 
-  var game;
+var game;
 
-  return {
-    getGame: function() {
-      game = game || Game();
-      return game;
-    }
-  };
+export function getGame() {
+  game = game || Game();
+  return game;
+}
 
-});
+export default { getGame };
