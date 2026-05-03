@@ -999,7 +999,10 @@ function _seedGoalRow(missionGestalt, g) {
   };
 }
 
-// Marks buy_perp goals complete when the player already owns the target node.
+function _completeGoal(goal) {
+  return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
+}
+
 // Returns the same array reference when nothing changed so callers can use
 // reference equality to detect whether any repairs were made.
 function _autoCompleteBuyPerpGoals(goals, nodes) {
@@ -1009,7 +1012,7 @@ function _autoCompleteBuyPerpGoals(goals, nodes) {
   var result = goals.map(function (g) {
     if (g.workflow !== 'buy_perp' || g.complete || !owned[g.target]) return g;
     changed = true;
-    return Object.assign({}, g, { complete: true, current_amount: g.amount || 1 });
+    return _completeGoal(g);
   });
   return changed ? result : goals;
 }
@@ -1212,7 +1215,7 @@ function _advanceChargePerpMissions(state, gestalt) {
     if (goal.target !== gestalt) return goal;
     if (activeMissions.indexOf(goal.mission) === -1) return goal;
     changed = true;
-    return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
+    return _completeGoal(goal);
   });
 
   if (!changed) {
@@ -1236,7 +1239,7 @@ function _advanceBuyPowerupMissions(state, powerupGestalt) {
     if (goal.target !== powerupGestalt) return goal;
     if (activeMissions.indexOf(goal.mission) === -1) return goal;
     changed = true;
-    return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
+    return _completeGoal(goal);
   });
 
   if (!changed) {
@@ -1260,7 +1263,7 @@ function _advanceUpgradeTokenMissions(state, tokenGestalt) {
     if (goal.target !== tokenGestalt) return goal;
     if (activeMissions.indexOf(goal.mission) === -1) return goal;
     changed = true;
-    return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
+    return _completeGoal(goal);
   });
 
   if (!changed) {
@@ -1286,7 +1289,7 @@ function _advanceBuyPerpMissions(state, gestalt) {
   var updatedGoals = missionGoals.map(function (goal) {
     if (goal.workflow === 'buy_perp' && goal.target === gestalt && !goal.complete) {
       changed = true;
-      return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
+      return _completeGoal(goal);
     }
     return goal;
   });
