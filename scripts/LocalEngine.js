@@ -1307,6 +1307,9 @@ function _advanceBuyPerpMissions(state, gestalt) {
   var changed = false;
   var updatedGoals = missionGoals.map(function (goal) {
     if (goal.workflow === 'buy_perp' && goal.target === gestalt && !goal.complete) {
+      // !goal.complete is not sufficient: completing a goal for a mission already
+      // removed from activeMissions leaves mission_goals in an inconsistent state.
+      if (activeMissions.indexOf(goal.mission) === -1) return goal;
       changed = true;
       return _completeGoal(goal);
     }
@@ -1838,8 +1841,8 @@ export function integrateCollected(collectId) {
   // collect_id replay → no share change). This preserves the absolute
   // count `profiles_value * share / 100`, so mission_goals' monotonic
   // current_amount keeps advancing. See docs/ui-meters.md.
-  var M = (state.game_values && state.game_values.profiles_value) || 0;
-  var N = increment;
+  var M = Math.max(0, (state.game_values && state.game_values.profiles_value) || 0);
+  var N = Math.max(0, increment);
   var denom = M + N;
   // denom === 0 only happens on a replay against an empty DB — every
   // share would round-trip to oldShare and no new tokens can be seeded
@@ -1854,7 +1857,7 @@ export function integrateCollected(collectId) {
     if (tok) seenGestalts[n.gestalt] = true;
     var psContrib = tok ? (tok.amount || 0) * N : 0;
     var newShare = Math.min(100, (oldShare * M + psContrib) / denom);
-    if (newShare === oldShare) return n;
+    if (Math.abs(newShare - oldShare) < 1e-9) return n;
     var updated = Object.assign({}, n, {
       instance_data: Object.assign({}, n.instance_data, { amount: newShare })
     });
