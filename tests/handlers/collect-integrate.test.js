@@ -77,7 +77,7 @@ describe('full flow: ContactPerp charge → collect → integrate', () => {
       nodes_charging: [mkChargingEntry(PATH, COLLECT_RESULT, 'ContactPerp')]
     }));
 
-    const data = await collectPerp('tok', PATH);
+    const data = await collectPerp(PATH);
     expect(data.result.error).toBe(1);
   });
 
@@ -90,7 +90,7 @@ describe('full flow: ContactPerp charge → collect → integrate', () => {
     // Advance past charge_end
     setOverride(CHARGE_END + 1000);
 
-    const data = await collectPerp('tok', PATH);
+    const data = await collectPerp(PATH);
     expect(data.result.error).toBeUndefined();
     expect(data.result.result.profile_set.profiles_value).toBe(5);
     // contact001's `tokens` list populates tokens_map (percentage * profiles).
@@ -107,7 +107,7 @@ describe('full flow: ContactPerp charge → collect → integrate', () => {
     }));
     setOverride(CHARGE_END + 1000);
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     const collectId = result.result.collect_id;
 
     // Now call loadGame to inspect persisted state
@@ -125,10 +125,10 @@ describe('full flow: ContactPerp charge → collect → integrate', () => {
     }));
     setOverride(CHARGE_END + 1000);
 
-    const { result: colRes } = await collectPerp('tok', PATH);
+    const { result: colRes } = await collectPerp(PATH);
     const collectId = colRes.result.collect_id;
 
-    const { result: intRes } = await integrateCollected('tok', collectId);
+    const { result: intRes } = await integrateCollected(collectId);
     expect(intRes.result.increment).toBe(5);
     expect(intRes.result.dup).toBe(0);
     expect(Array.isArray(intRes.result.nodes)).toBe(true);
@@ -142,11 +142,11 @@ describe('full flow: ContactPerp charge → collect → integrate', () => {
     }));
     setOverride(CHARGE_END + 1000);
 
-    const { result: colRes } = await collectPerp('tok', PATH);
+    const { result: colRes } = await collectPerp(PATH);
     const collectId = colRes.result.collect_id;
 
     // First integration.
-    await integrateCollected('tok', collectId);
+    await integrateCollected(collectId);
 
     // Manually re-insert the db_queue entry to simulate a retry.
     const { getState: gs, setState: ss } = await import('../../scripts/boot.js');
@@ -155,7 +155,7 @@ describe('full flow: ContactPerp charge → collect → integrate', () => {
       db_queue: [{ origin: PATH, collect_id: collectId, profile_set: { profiles_value: 5, tokens_map: {} }, collect_dt: FIXED_NOW }]
     }));
 
-    const { result: intRes2 } = await integrateCollected('tok', collectId);
+    const { result: intRes2 } = await integrateCollected(collectId);
     expect(intRes2.result.dup).toBe(5);
     expect(intRes2.result.increment).toBe(0);
   });
@@ -167,14 +167,14 @@ describe('full flow: ContactPerp charge → collect → integrate', () => {
     }));
     setOverride(CHARGE_END + 1000);
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     // base xp_value = 5, contact001 xp_inc = 1 → 6
     expect(result.game_values.xp_value).toBe(6);
   });
 
   it('integrateCollected errors with 0 for unknown collect_id', async () => {
     setState(mkState());
-    const data = await integrateCollected('tok', 'no-such-id');
+    const data = await integrateCollected('no-such-id');
     expect(data.result.error).toBe(0);
   });
 });
@@ -194,7 +194,7 @@ describe('collectPerp — ContactPerp', () => {
       nodes_collect: [{ path: PATH, result: { amount: 3 } }]
     }));
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     expect(result.result.profile_set).toEqual({ profiles_value: 3, tokens_map: {} });
     expect(result.result.origin).toBe(PATH);
     expect(typeof result.result.collect_id).toBe('string');
@@ -206,7 +206,7 @@ describe('collectPerp — ContactPerp', () => {
       nodes_collect: [{ path: PATH, result: { amount: 3 } }]
     }));
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     expect(result.result.cash).toBeUndefined();
     expect(result.result.token_upgraded_amount).toBeUndefined();
   });
@@ -217,7 +217,7 @@ describe('collectPerp — ContactPerp', () => {
       nodes_collect: [{ path: PATH, result: { amount: 3 } }]
     }));
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     expect(result.game_values).toBeDefined();
     expect(typeof result.levelup).toBe('boolean');
     expect(result.missions).toBeDefined();
@@ -238,7 +238,7 @@ describe('collectPerp — ProjectPerp', () => {
       nodes_collect: [{ path: PATH, result: { amount: 10 } }]
     }));
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     expect(result.result.profile_set.profiles_value).toBe(10);
     expect(typeof result.result.profile_set.tokens_map).toBe('object');
     expect(result.result.origin).toBe(PATH);
@@ -251,7 +251,7 @@ describe('collectPerp — ProjectPerp', () => {
       nodes_collect: [{ path: PATH, result: { amount: 10 } }]
     }));
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     const { getState } = await import('../../scripts/boot.js');
     const s = getState();
     expect(s.db_queue).toHaveLength(1);
@@ -279,7 +279,7 @@ describe('collectPerp — ClientPerp', () => {
       game_values:   mkGv({ cash_value: 300 })
     }));
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     expect(result.result.cash).toBe(400);
     expect(result.game_values.cash_value).toBe(400);
   });
@@ -290,7 +290,7 @@ describe('collectPerp — ClientPerp', () => {
       nodes_collect: [{ path: PATH, result: { amount: 50 } }]
     }));
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     expect(result.result.profile_set).toBeUndefined();
     expect(result.result.token_upgraded_amount).toBeUndefined();
   });
@@ -301,7 +301,7 @@ describe('collectPerp — ClientPerp', () => {
       nodes_collect: [{ path: PATH, result: { amount: 50 } }]
     }));
 
-    await collectPerp('tok', PATH);
+    await collectPerp(PATH);
     const { getState } = await import('../../scripts/boot.js');
     expect(getState().db_queue).toHaveLength(0);
   });
@@ -321,7 +321,7 @@ describe('collectPerp — TokenPerp', () => {
       nodes_collect: [{ path: PATH, result: { amount: 2 } }]
     }));
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     expect(result.result.token_upgraded_amount).toBe(5);
   });
 
@@ -331,7 +331,7 @@ describe('collectPerp — TokenPerp', () => {
       nodes_collect: [{ path: PATH, result: { amount: 2 } }]
     }));
 
-    await collectPerp('tok', PATH);
+    await collectPerp(PATH);
     const { getState } = await import('../../scripts/boot.js');
     const node = getState().nodes.find(n => n.full_path === PATH);
     expect(node.instance_data.amount).toBe(5);
@@ -343,7 +343,7 @@ describe('collectPerp — TokenPerp', () => {
       nodes_collect: [{ path: PATH, result: { amount: 4 } }]
     }));
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     expect(result.result.profile_set).toBeUndefined();
     expect(result.result.cash).toBeUndefined();
   });
@@ -357,7 +357,7 @@ describe('collectPerp — failure paths', () => {
 
   it('error 1 when path is not in nodes_collect', async () => {
     setState(mkState({ nodes: [mkNode('ContactPerp', 'Imperium.City.contact001')] }));
-    const data = await collectPerp('tok', 'Imperium.City.contact001');
+    const data = await collectPerp('Imperium.City.contact001');
     expect(data.result.error).toBe(1);
   });
 
@@ -370,7 +370,7 @@ describe('collectPerp — failure paths', () => {
                        { charge_end: FIXED_NOW + 600_000 })]
     }));
 
-    const data = await collectPerp('tok', PATH);
+    const data = await collectPerp(PATH);
     expect(data.result.error).toBe(1);
   });
 
@@ -380,7 +380,7 @@ describe('collectPerp — failure paths', () => {
       nodes:         [],   // no matching node
       nodes_collect: [{ path: PATH, result: { amount: 0 } }]
     }));
-    const data = await collectPerp('tok', PATH);
+    const data = await collectPerp(PATH);
     expect(data.result.error).toBe(2);
   });
 });
@@ -400,7 +400,7 @@ describe('collectPerp — karma_incident', () => {
       game_values:   mkGv({ karma_value: 50, xp_level: 5 })
     }));
     setPrngSeed(42);
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     expect(result.karma_incident).toBeUndefined();
   });
 
@@ -414,7 +414,7 @@ describe('collectPerp — karma_incident', () => {
     }));
     setPrngSeed(42);
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     expect(result.karma_incident).toBe('karma014');
   });
 
@@ -426,7 +426,7 @@ describe('collectPerp — karma_incident', () => {
     }));
     setPrngSeed(42);
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     expect(result.game_values.karma_value).toBeLessThan(-80);
     expect(result.game_values.karma_value).toBeGreaterThanOrEqual(-100);
   });
@@ -440,7 +440,7 @@ describe('collectPerp — karma_incident', () => {
     }));
     setPrngSeed(42);
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     // No eligible karmalizers → incident null → karma_incident absent.
     expect(result.karma_incident).toBeUndefined();
   });
@@ -473,7 +473,7 @@ describe('integrateCollected — token node updates', () => {
       }]
     }));
 
-    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const { result } = await integrateCollected(COLLECT_ID);
     expect(result.result.nodes).toHaveLength(1);
     expect(result.result.nodes[0].instance_data.amount).toBeCloseTo(2.4, 6);
     expect(result.result.increment).toBe(4);
@@ -499,7 +499,7 @@ describe('integrateCollected — token node updates', () => {
       }]
     }));
 
-    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const { result } = await integrateCollected(COLLECT_ID);
     expect(result.result.nodes[0].instance_data.amount).toBe(100);
   });
 
@@ -516,7 +516,7 @@ describe('integrateCollected — token node updates', () => {
       }]
     }));
 
-    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const { result } = await integrateCollected(COLLECT_ID);
     const seeded = result.result.nodes.find(n => n.gestalt === 'token008');
     expect(seeded.instance_data.amount).toBe(100);
   });
@@ -540,7 +540,7 @@ describe('integrateCollected — token node updates', () => {
       }]
     }));
 
-    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const { result } = await integrateCollected(COLLECT_ID);
     const updatedA = result.result.nodes.find(n => n.gestalt === 'token_a');
     expect(updatedA).toBeDefined();
     expect(updatedA.instance_data.amount).toBeCloseTo(40, 6);
@@ -565,7 +565,7 @@ describe('integrateCollected — token node updates', () => {
       }]
     }));
 
-    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const { result } = await integrateCollected(COLLECT_ID);
     expect(result.result.dup).toBe(10);
     expect(result.result.increment).toBe(0);
     // Share is unchanged because N (= increment) is 0; M+N = M, db share kept.
@@ -582,7 +582,7 @@ describe('integrateCollected — token node updates', () => {
       }]
     }));
 
-    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const { result } = await integrateCollected(COLLECT_ID);
     expect(result.game_values).toBeDefined();
     expect(typeof result.levelup).toBe('boolean');
     expect(result.missions).toBeDefined();
@@ -598,7 +598,7 @@ describe('integrateCollected — token node updates', () => {
       }]
     }));
 
-    await integrateCollected('tok', COLLECT_ID);
+    await integrateCollected(COLLECT_ID);
     const { getState } = await import('../../scripts/boot.js');
     expect(getState().db_queue).toHaveLength(0);
   });
@@ -616,7 +616,7 @@ describe('integrateCollected — token node updates', () => {
       }]
     }));
 
-    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const { result } = await integrateCollected(COLLECT_ID);
     const newEntry = result.result.nodes.find(function (n) { return n.gestalt === 'token008'; });
     expect(newEntry).toBeDefined();
     expect(newEntry.game_type).toBe('TokenPerp');
@@ -640,7 +640,7 @@ describe('integrateCollected — token node updates', () => {
       }]
     }));
 
-    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const { result } = await integrateCollected(COLLECT_ID);
     expect(result.result.nodes).toHaveLength(0);
   });
 });
@@ -670,7 +670,7 @@ describe('collectPerp — level-up refills ap_snapshot to the new ap_max', () =>
       nodes_collect: [{ path: PATH, result: { amount: 5 } }]
     }));
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     expect(result.levelup).toBe(true);
     expect(result.game_values.xp_level).toBe(2);
     expect(result.game_values.ap_snapshot).toBe(8);
@@ -694,7 +694,7 @@ describe('integrateCollected — ap cost', () => {
       }]
     }));
 
-    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const { result } = await integrateCollected(COLLECT_ID);
     expect(result.game_values.ap_snapshot).toBe(4);
   });
 
@@ -709,7 +709,7 @@ describe('integrateCollected — ap cost', () => {
       }]
     }));
 
-    const data = await integrateCollected('tok', COLLECT_ID);
+    const data = await integrateCollected(COLLECT_ID);
     expect(data.result.error).toBe(1);
   });
 
@@ -726,7 +726,7 @@ describe('integrateCollected — ap cost', () => {
       }]
     }));
 
-    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const { result } = await integrateCollected(COLLECT_ID);
     expect(result.levelup).toBe(true);
     expect(result.game_values.xp_level).toBe(2);
     expect(result.game_values.ap_snapshot).toBe(8); // level 2 ap_max, not 3-1=2
@@ -753,7 +753,7 @@ describe('integrateCollected — level-up refills ap_snapshot to the new ap_max'
       }]
     }));
 
-    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const { result } = await integrateCollected(COLLECT_ID);
     expect(result.levelup).toBe(true);
     expect(result.game_values.xp_level).toBe(2);
     expect(result.game_values.ap_snapshot).toBe(8);
@@ -779,7 +779,7 @@ describe('collectPerp — tokens_map population from typeData.tokens', () => {
       nodes_collect: [{ path: PATH, result: { amount: 10 } }]
     }));
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     const tm = result.result.profile_set.tokens_map;
     // contact001 lists token001, token002, ..., token018, origin012 — 12 in total.
     expect(Object.keys(tm).sort()).toEqual([
@@ -796,7 +796,7 @@ describe('collectPerp — tokens_map population from typeData.tokens', () => {
       nodes_collect: [{ path: PATH, result: { amount: 10 } }]
     }));
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     expect(result.result.profile_set.tokens_map.token001).toEqual({ amount: 100 });
     expect(result.result.profile_set.tokens_map.token008).toBeUndefined(); // not in contact001's list
   });
@@ -808,7 +808,7 @@ describe('collectPerp — tokens_map population from typeData.tokens', () => {
       nodes_collect: [{ path: JPATH, result: { amount: 1100 } }]
     }));
 
-    const { result } = await collectPerp('tok', JPATH);
+    const { result } = await collectPerp(JPATH);
     // Jessica lists token008 at 100%; downstream absoluteAmount =
     // profiles_value * amount / 100 = 1100, which exceeds mission002's 900 target.
     expect(result.result.profile_set.tokens_map.token008).toEqual({ amount: 100 });
@@ -822,7 +822,7 @@ describe('collectPerp — tokens_map population from typeData.tokens', () => {
       nodes_collect: [{ path: FPATH, result: { amount: 5 } }]
     }));
 
-    const { result } = await collectPerp('tok', FPATH);
+    const { result } = await collectPerp(FPATH);
     expect(result.result.profile_set.tokens_map).toEqual({});
   });
 });
@@ -849,7 +849,7 @@ describe('integrateCollected — payload shape for newly seeded TokenPerps', () 
       }]
     }));
 
-    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const { result } = await integrateCollected(COLLECT_ID);
     const newEntry = result.result.nodes.find(function (n) { return n.gestalt === 'token008'; });
     expect(newEntry).toBeDefined();
     expect(newEntry.game_type).toBe('TokenPerp');
@@ -869,7 +869,7 @@ describe('integrateCollected — payload shape for newly seeded TokenPerps', () 
       }]
     }));
 
-    await integrateCollected('tok', COLLECT_ID);
+    await integrateCollected(COLLECT_ID);
     const { getState } = await import('../../scripts/boot.js');
     const persisted = getState().nodes.find(function (n) { return n.gestalt === 'token008'; });
     expect(persisted.game_type).toBe('TokenPerp');
@@ -909,7 +909,7 @@ describe('mission progression — integrate_profiles flow', () => {
 
   it('integrating Jessica advances mission002.current_amount to the absoluteAmount', async () => {
     seedMission002Active();
-    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const { result } = await integrateCollected(COLLECT_ID);
     const goal = getState().mission_goals.find(g => g.mission === 'mission002');
     // profiles_value=1100, amount=100% → absolute=1100, capped at goal.amount=900.
     expect(goal.current_amount).toBe(900);
@@ -938,7 +938,7 @@ describe('mission progression — integrate_profiles flow', () => {
       }]
     }));
 
-    await integrateCollected('tok', COLLECT_ID);
+    await integrateCollected(COLLECT_ID);
     const goal = getState().mission_goals.find(g => g.mission === 'mission002');
     // profiles_value=1000, amount=50% → absolute=500.
     expect(goal.current_amount).toBe(500);
@@ -947,7 +947,7 @@ describe('mission progression — integrate_profiles flow', () => {
 
   it('completing mission002 activates mission003 (required_mission chain) with seeded goals', async () => {
     seedMission002Active();
-    await integrateCollected('tok', COLLECT_ID);
+    await integrateCollected(COLLECT_ID);
     const s = getState();
     expect(s.active_missions).not.toContain('mission002');
     expect(s.active_missions).toContain('mission003');
@@ -959,11 +959,11 @@ describe('mission progression — integrate_profiles flow', () => {
 
   it('mission_goals delta replays cleanly through applyDelta', async () => {
     seedMission002Active();
-    await integrateCollected('tok', COLLECT_ID);
+    await integrateCollected(COLLECT_ID);
     // Cold-start replay: take the persisted state, run loadGame.
     const s1 = getState();
     setState(s1);
-    await loadGame('tok');
+    await loadGame();
     const goal = getState().mission_goals.find(g => g.mission === 'mission002');
     expect(goal.current_amount).toBe(900);
     expect(goal.complete).toBe(true);
@@ -972,7 +972,7 @@ describe('mission progression — integrate_profiles flow', () => {
   it('progress is monotonic — a smaller integrate does not roll back current_amount', async () => {
     // First integrate fills mission002 to 900 (Jessica 100% × 1100 profiles).
     seedMission002Active();
-    await integrateCollected('tok', COLLECT_ID);
+    await integrateCollected(COLLECT_ID);
 
     // Construct a hypothetical second integrate from a 50%-coverage contact
     // that, naively, would compute a smaller absoluteAmount. Using
@@ -993,7 +993,7 @@ describe('mission progression — integrate_profiles flow', () => {
     }];
     setState(s);
 
-    await integrateCollected('tok', 'second-integrate');
+    await integrateCollected('second-integrate');
     // 100 profiles × 50% = 50 absolute → would regress from 500 if not guarded.
     const goal = getState().mission_goals.find(g => g.mission === 'mission002');
     expect(goal.current_amount).toBeGreaterThanOrEqual(500);
@@ -1022,7 +1022,7 @@ describe('mission progression — collect_profiles flow', () => {
       }]
     }));
 
-    await collectPerp('tok', JESSICA);
+    await collectPerp(JESSICA);
     const goal = getState().mission_goals.find(g => g.mission === 'mission001');
     expect(goal.current_amount).toBe(600);
     expect(goal.complete).toBe(false);
@@ -1044,11 +1044,11 @@ describe('mission progression — collect_profiles flow', () => {
       }]
     }));
 
-    await collectPerp('tok', JESSICA);
+    await collectPerp(JESSICA);
     setState(Object.assign({}, getState(), {
       nodes_collect: [{ path: JESSICA, result: { amount: 600 } }]
     }));
-    const { result } = await collectPerp('tok', JESSICA);
+    const { result } = await collectPerp(JESSICA);
 
     const goal = getState().mission_goals.find(g => g.mission === 'mission001');
     expect(goal.current_amount).toBe(900);
@@ -1073,7 +1073,7 @@ describe('mission progression — collect_profiles flow', () => {
       }]
     }));
 
-    await collectPerp('tok', HELEN);
+    await collectPerp(HELEN);
     const goal = getState().mission_goals.find(g => g.mission === 'mission001');
     expect(goal.current_amount).toBe(0);
     expect(goal.complete).toBe(false);
@@ -1090,7 +1090,7 @@ describe('loadGame seeds mission_goals from active_missions', () => {
       mission_goals: []
     }));
 
-    await loadGame('tok');
+    await loadGame();
 
     const goals = getState().mission_goals;
     const m1 = goals.find(g => g.mission === 'mission001');
@@ -1108,9 +1108,9 @@ describe('loadGame seeds mission_goals from active_missions', () => {
       mission_goals: []
     }));
 
-    await loadGame('tok');
+    await loadGame();
     const goalsAfterFirst = getState().mission_goals.length;
-    await loadGame('tok');
+    await loadGame();
     expect(getState().mission_goals.length).toBe(goalsAfterFirst);
   });
 });
@@ -1131,7 +1131,7 @@ describe('cash invariants — collect/integrate must not deduct cash', () => {
       nodes_collect: [{ path: PATH, result: { amount: 5 } }]
     }));
 
-    const { result } = await collectPerp('tok', PATH);
+    const { result } = await collectPerp(PATH);
     expect(result.game_values.cash_value).toBe(startCash);
     expect(getState().game_values.cash_value).toBe(startCash);
   });
@@ -1147,7 +1147,7 @@ describe('cash invariants — collect/integrate must not deduct cash', () => {
       }]
     }));
 
-    const { result } = await integrateCollected('tok', 'no-rewards');
+    const { result } = await integrateCollected('no-rewards');
     expect(result.game_values.cash_value).toBe(startCash);
   });
 });
@@ -1183,7 +1183,7 @@ describe('mission rewards — apply on completion', () => {
       }]
     }));
 
-    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const { result } = await integrateCollected(COLLECT_ID);
     expect(result.game_values.cash_value).toBe(startCash + 100);
     expect(result.game_values.xp_value).toBeGreaterThanOrEqual(startXp + 1);
   });
@@ -1209,7 +1209,7 @@ describe('mission rewards — apply on completion', () => {
       }]
     }));
 
-    const { result } = await integrateCollected('tok', COLLECT_ID);
+    const { result } = await integrateCollected(COLLECT_ID);
     expect(result.game_values.cash_value).toBe(startCash);
   });
 
@@ -1227,7 +1227,7 @@ describe('mission rewards — apply on completion', () => {
       }]
     }));
 
-    const chargeRes = await chargePerp('tok', CAR_PATH);
+    const chargeRes = await chargePerp(CAR_PATH);
     expect(chargeRes.result.error).toBeUndefined();
     expect(chargeRes.result.duration).toBe(60000); // car charge_time
     const cashAfterCharge = getState().game_values.cash_value;
@@ -1240,7 +1240,7 @@ describe('mission rewards — apply on completion', () => {
     expect(getState().nodes_collect).toHaveLength(1);
     expect(getState().nodes_collect[0].path).toBe(CAR_PATH);
 
-    const collectRes = await collectPerp('tok', CAR_PATH);
+    const collectRes = await collectPerp(CAR_PATH);
     expect(collectRes.result.error).toBeUndefined();
     const finalCash = collectRes.result.game_values.cash_value;
     // 584 ± 5% variation, rounded.
@@ -1267,7 +1267,7 @@ describe('mission rewards — apply on completion', () => {
       }]
     }));
 
-    const { result } = await collectPerp('tok', JESSICA);
+    const { result } = await collectPerp(JESSICA);
     // contact035 xp_inc=1 + mission001 reward=2.
     expect(result.game_values.xp_value).toBe(startXp + 1 + 2);
   });
@@ -1337,7 +1337,7 @@ describe('mission progression — mission003 Rookie Dealer (charge_perp)', () =>
     }));
     const startCash = getState().game_values.cash_value;
 
-    const { result } = await chargePerp('tok', C007);
+    const { result } = await chargePerp(C007);
     expect(result.error).toBeUndefined();
 
     const s = getState();
@@ -1376,7 +1376,7 @@ describe("mission progression — mission004 You're a winner! (buy_perp + charge
 
   it('buying project001 marks the buy_perp goal complete; mission stays active', async () => {
     seedM004();
-    await buyPerp('tok', 'Imperium', 'project001');
+    await buyPerp('Imperium', 'project001');
     const goals = getState().mission_goals.filter(g => g.mission === 'mission004');
     expect(goals.find(g => g.workflow === 'buy_perp').complete).toBe(true);
     expect(goals.find(g => g.workflow === 'charge_perp').complete).toBe(false);
@@ -1385,8 +1385,8 @@ describe("mission progression — mission004 You're a winner! (buy_perp + charge
 
   it('charging project001 after buying it completes mission004 and activates M_CASH_IN', async () => {
     seedM004();
-    await buyPerp('tok', 'Imperium', 'project001');
-    const { result } = await chargePerp('tok', P001);
+    await buyPerp('Imperium', 'project001');
+    const { result } = await chargePerp(P001);
     expect(result.error).toBeUndefined();
 
     const s = getState();
@@ -1417,7 +1417,7 @@ describe('mission progression — M_CASH_IN Cash in! (collect_cash)', () => {
       }]
     }));
 
-    await collectPerp('tok', C007);
+    await collectPerp(C007);
     const goal = getState().mission_goals.find(g => g.mission === M_CASH_IN);
     expect(goal.current_amount).toBe(200);
     expect(goal.complete).toBe(false);
@@ -1436,7 +1436,7 @@ describe('mission progression — M_CASH_IN Cash in! (collect_cash)', () => {
       }]
     }));
 
-    const { result } = await collectPerp('tok', C007);
+    const { result } = await collectPerp(C007);
     const s = getState();
     const goal = s.mission_goals.find(g => g.mission === M_CASH_IN);
     expect(goal.current_amount).toBe(500); // capped at goal.amount
@@ -1472,7 +1472,7 @@ describe('mission progression — mission006 Upgrade raffle (buy_powerup x3)', (
           amount: null, position: 3, current_amount: 0, complete: false }
       ]
     }));
-    await buyPowerup('tok', P001, 0, 'upgrade001');
+    await buyPowerup(P001, 0, 'upgrade001');
     const goals = getState().mission_goals.filter(g => g.mission === 'mission006');
     expect(goals.find(g => g.target === 'upgrade001').complete).toBe(true);
     expect(goals.find(g => g.target === 'ad002').complete).toBe(false);
@@ -1494,9 +1494,9 @@ describe('mission progression — mission006 Upgrade raffle (buy_powerup x3)', (
       ]
     }));
 
-    await buyPowerup('tok', P001, 0, 'upgrade001');
-    await buyPowerup('tok', P001, 1, 'ad002');
-    const { result } = await buyPowerup('tok', P001, 2, 'teammember020');
+    await buyPowerup(P001, 0, 'upgrade001');
+    await buyPowerup(P001, 1, 'ad002');
+    const { result } = await buyPowerup(P001, 2, 'teammember020');
 
     const s = getState();
     expect(s.mission_goals.filter(g => g.mission === 'mission006').every(g => g.complete)).toBe(true);
@@ -1533,7 +1533,7 @@ describe('mission progression — mission007 Nurse Helen (buy+collect+integrate)
 
   it('buying contact001 marks buy_perp goal complete; mission stays active', async () => {
     seedM007();
-    await buyPerp('tok', 'Imperium', 'contact001');
+    await buyPerp('Imperium', 'contact001');
     const goal = getState().mission_goals.find(
       g => g.mission === 'mission007' && g.workflow === 'buy_perp');
     expect(goal.complete).toBe(true);
@@ -1542,7 +1542,7 @@ describe('mission progression — mission007 Nurse Helen (buy+collect+integrate)
 
   it('full 3-step flow completes mission007 and activates M_DB_MACH', async () => {
     seedM007();
-    await buyPerp('tok', 'Imperium', 'contact001');
+    await buyPerp('Imperium', 'contact001');
 
     // Seed collect entry for the node buyPerp just created.
     const s1 = getState();
@@ -1550,10 +1550,10 @@ describe('mission progression — mission007 Nurse Helen (buy+collect+integrate)
       nodes_collect: [{ path: CT1, result: { amount: 3000 } }]
     }));
 
-    const { result: colRes } = await collectPerp('tok', CT1);
+    const { result: colRes } = await collectPerp(CT1);
     const collectId = colRes.result.collect_id;
 
-    const { result: intRes } = await integrateCollected('tok', collectId);
+    const { result: intRes } = await integrateCollected(collectId);
 
     const s = getState();
     expect(s.mission_goals.filter(g => g.mission === 'mission007').every(g => g.complete)).toBe(true);
@@ -1584,7 +1584,7 @@ describe('mission progression — M_DB_MACH Database machine (upgrade_token)', (
       }]
     }));
 
-    const { result } = await collectPerp('tok', T007);
+    const { result } = await collectPerp(T007);
     expect(result.error).toBeUndefined();
 
     const s = getState();
@@ -1623,9 +1623,9 @@ describe('mission progression — mission008 Sick World (buy+charge+buy)', () =>
 
   it('buying client002 then charging then buying contact019 completes mission008 + activates mission005', async () => {
     seedM008();
-    await buyPerp('tok', 'Imperium', 'client002');
-    await chargePerp('tok', C2);
-    const { result } = await buyPerp('tok', 'Imperium', 'contact019');
+    await buyPerp('Imperium', 'client002');
+    await chargePerp(C2);
+    const { result } = await buyPerp('Imperium', 'contact019');
 
     const s = getState();
     expect(s.mission_goals.filter(g => g.mission === 'mission008').every(g => g.complete)).toBe(true);
@@ -1678,7 +1678,7 @@ describe('mission progression — mission005 So green! (integrate_profiles + col
       }]
     }));
 
-    await integrateCollected('tok', COLL_ID);
+    await integrateCollected(COLL_ID);
     const goal = getState().mission_goals.find(
       g => g.mission === 'mission005' && g.workflow === 'integrate_profiles');
     expect(goal.current_amount).toBe(10000);
@@ -1700,7 +1700,7 @@ describe('mission progression — mission005 So green! (integrate_profiles + col
       ]
     }));
 
-    const { result } = await collectPerp('tok', C007);
+    const { result } = await collectPerp(C007);
     const s = getState();
     expect(s.mission_goals.filter(g => g.mission === 'mission005').every(g => g.complete)).toBe(true);
     expect(s.active_missions).not.toContain('mission005');
@@ -1735,9 +1735,9 @@ describe('mission progression — M_PSYCHO Psycho (buy_perp + buy_powerup + char
       ]
     }));
 
-    await buyPerp('tok', 'Imperium', 'project003');
-    await buyPowerup('tok', P3, 0, 'upgrade015');
-    const { result } = await chargePerp('tok', P3);
+    await buyPerp('Imperium', 'project003');
+    await buyPowerup(P3, 0, 'upgrade015');
+    const { result } = await chargePerp(P3);
     expect(result.error).toBeUndefined();
 
     const s = getState();
@@ -1782,7 +1782,7 @@ describe('mission progression — M_COUCH Couch Potato (collect+integrate+cash)'
     }));
 
     // Step 1: collect from contact019 — fills collect_profiles goal.
-    const { result: c19Res } = await collectPerp('tok', CT19);
+    const { result: c19Res } = await collectPerp(CT19);
     const collectId = c19Res.result.collect_id;
     const goal1 = getState().mission_goals.find(
       g => g.mission === M_COUCH && g.workflow === 'collect_profiles');
@@ -1790,13 +1790,13 @@ describe('mission progression — M_COUCH Couch Potato (collect+integrate+cash)'
     expect(goal1.complete).toBe(true);
 
     // Step 2: integrate — fills integrate_profiles goal via token088 in tokens_map.
-    await integrateCollected('tok', collectId);
+    await integrateCollected(collectId);
     const goal2 = getState().mission_goals.find(
       g => g.mission === M_COUCH && g.workflow === 'integrate_profiles');
     expect(goal2.complete).toBe(true);
 
     // Step 3: collect cash from client002.
-    const { result } = await collectPerp('tok', C2);
+    const { result } = await collectPerp(C2);
     const s = getState();
     expect(s.mission_goals.filter(g => g.mission === M_COUCH).every(g => g.complete)).toBe(true);
     expect(s.active_missions).not.toContain(M_COUCH);
@@ -1827,14 +1827,14 @@ describe('mission progression — M_EMPLOYEE Employee Monitoring (buy_perp + col
       ]
     }));
 
-    await buyPerp('tok', 'Imperium', 'client006');
+    await buyPerp('Imperium', 'client006');
     // Seed collect entry for the newly created node.
     const s1 = getState();
     setState(Object.assign({}, s1, {
       nodes_collect: [{ path: C6, result: { amount: 2500 } }]
     }));
 
-    const { result } = await collectPerp('tok', C6);
+    const { result } = await collectPerp(C6);
     const s = getState();
     const goals = s.mission_goals.filter(g => g.mission === M_EMPLOYEE);
     expect(goals.every(g => g.complete)).toBe(true);
@@ -1866,8 +1866,8 @@ describe('mission progression — M_IMAGE Improve your image (buy_powerup x2)', 
       ]
     }));
 
-    await buyPowerup('tok', P3, 0, 'teammember043');
-    const { result } = await buyPowerup('tok', P3, 1, 'ad006');
+    await buyPowerup(P3, 0, 'teammember043');
+    const { result } = await buyPowerup(P3, 1, 'ad006');
 
     const s = getState();
     expect(s.mission_goals.filter(g => g.mission === M_IMAGE).every(g => g.complete)).toBe(true);
@@ -1897,8 +1897,8 @@ describe('mission progression — M_COLLAB Unofficial collaboration (buy_perp x2
       ]
     }));
 
-    await buyPerp('tok', 'Imperium', 'agent004');
-    const { result } = await buyPerp('tok', 'Imperium', 'contact026');
+    await buyPerp('Imperium', 'agent004');
+    const { result } = await buyPerp('Imperium', 'contact026');
 
     const s = getState();
     expect(s.mission_goals.filter(g => g.mission === M_COLLAB).every(g => g.complete)).toBe(true);
@@ -1927,7 +1927,7 @@ describe('mission progression — M_ALFONSO Alfonso (buy_perp)', () => {
       }]
     }));
 
-    const { result } = await buyPerp('tok', 'Imperium', 'pusher003');
+    const { result } = await buyPerp('Imperium', 'pusher003');
     const s = getState();
     expect(s.mission_goals.find(g => g.mission === M_ALFONSO).complete).toBe(true);
     expect(s.active_missions).not.toContain(M_ALFONSO);
@@ -1957,7 +1957,7 @@ describe('mission progression — M_BOGUS Bogus company tangle (buy_perp)', () =
       }]
     }));
 
-    const { result } = await buyPerp('tok', 'Imperium', 'proxy004');
+    const { result } = await buyPerp('Imperium', 'proxy004');
     const s = getState();
     expect(s.mission_goals.find(g => g.mission === M_BOGUS).complete).toBe(true);
     expect(s.active_missions).not.toContain(M_BOGUS);
@@ -1993,7 +1993,7 @@ describe('mission progression — M_MULT Multiplication 101 (buy_perp + upgrade_
 
   it('buying token055 marks buy_perp goal complete; mission stays active', async () => {
     seedMMult();
-    await buyPerp('tok', 'Imperium', 'token055');
+    await buyPerp('Imperium', 'token055');
     const goal = getState().mission_goals.find(
       g => g.mission === M_MULT && g.workflow === 'buy_perp');
     expect(goal.complete).toBe(true);
@@ -2002,7 +2002,7 @@ describe('mission progression — M_MULT Multiplication 101 (buy_perp + upgrade_
 
   it('collecting from token055 after buying it completes M_MULT and activates M_BIGAPPLE', async () => {
     seedMMult();
-    await buyPerp('tok', 'Imperium', 'token055');
+    await buyPerp('Imperium', 'token055');
 
     // Seed collect entry for the TokenPerp node buyPerp created.
     const s1 = getState();
@@ -2010,7 +2010,7 @@ describe('mission progression — M_MULT Multiplication 101 (buy_perp + upgrade_
       nodes_collect: [{ path: T055, result: { amount: 0 } }]
     }));
 
-    const { result } = await collectPerp('tok', T055);
+    const { result } = await collectPerp(T055);
     const s = getState();
     expect(s.mission_goals.filter(g => g.mission === M_MULT).every(g => g.complete)).toBe(true);
     expect(s.active_missions).not.toContain(M_MULT);
@@ -2039,7 +2039,7 @@ describe('mission progression — M_BIGAPPLE Big Apple, Big Data! (buy_perp)', (
       }]
     }));
 
-    const { result } = await buyPerp('tok', 'Imperium', 'city004');
+    const { result } = await buyPerp('Imperium', 'city004');
     const s = getState();
     expect(s.mission_goals.find(g => g.mission === M_BIGAPPLE).complete).toBe(true);
     expect(s.active_missions).not.toContain(M_BIGAPPLE);
@@ -2076,7 +2076,7 @@ describe('cold-start replay — chargePerp mission progress survives applyDelta'
     var capturedDelta = null;
     setSendDelta(function (d) { capturedDelta = d; });
 
-    await chargePerp('tok', C007);
+    await chargePerp(C007);
     expect(capturedDelta).not.toBeNull();
 
     // Simulate cold-start: replay the delta against the state that existed
@@ -2115,7 +2115,7 @@ describe('cold-start replay — buyPowerup mission progress survives applyDelta'
     var capturedDelta = null;
     setSendDelta(function (d) { capturedDelta = d; });
 
-    await buyPowerup('tok', P001, 0, 'upgrade001');
+    await buyPowerup(P001, 0, 'upgrade001');
     expect(capturedDelta).not.toBeNull();
 
     // Replay the delta against the initial state (cold-start simulation).
@@ -2160,7 +2160,7 @@ describe('collectPerp — replay from zero leaves no orphan nodes_charging', () 
     setSendDelta(function (d) { captured.push(d); });
 
     // 1) Charge — produces a delta that adds a nodes_charging entry.
-    const chargeRes = await chargePerp('tok', C007);
+    const chargeRes = await chargePerp(C007);
     expect(chargeRes.result.error).toBeUndefined();
 
     // 2) Advance the clock past charge_end so collectPerp succeeds.
@@ -2176,7 +2176,7 @@ describe('collectPerp — replay from zero leaves no orphan nodes_charging', () 
     setOverride(chargeEnd + 1000);
 
     // 3) Collect — produces a delta that drains nodes_collect.
-    const collectRes = await collectPerp('tok', C007);
+    const collectRes = await collectPerp(C007);
     expect(collectRes.result.error).toBeUndefined();
 
     expect(captured.length).toBeGreaterThanOrEqual(2);

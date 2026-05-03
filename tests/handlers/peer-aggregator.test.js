@@ -241,52 +241,52 @@ describe('getRanking with multi-peer state', () => {
   });
 
   it('sorts by cash descending', async () => {
-    const { result } = await getRanking('tok', 'cash');
+    const { result } = await getRanking('cash');
     expect(result.top.map(r => r.display_name)).toEqual(['Bob', 'Alice', 'Carol']);
     expect(result.top.map(r => r.value)).toEqual([200, 100, 50]);
   });
 
   it('sorts by xp descending', async () => {
-    const { result } = await getRanking('tok', 'xp');
+    const { result } = await getRanking('xp');
     expect(result.top.map(r => r.display_name)).toEqual(['Bob', 'Carol', 'Alice']);
   });
 
   it('sorts by profiles descending', async () => {
-    const { result } = await getRanking('tok', 'profiles');
+    const { result } = await getRanking('profiles');
     expect(result.top.map(r => r.display_name)).toEqual(['Carol', 'Bob', 'Alice']);
   });
 
   it('sorts by level descending', async () => {
-    const { result } = await getRanking('tok', 'level');
+    const { result } = await getRanking('level');
     expect(result.top.map(r => r.display_name)).toEqual(['Bob', 'Carol', 'Alice']);
   });
 
   it('sorts by spent descending (Investor tab — cash_spent)', async () => {
-    const { result } = await getRanking('tok', 'spent');
+    const { result } = await getRanking('spent');
     expect(result.top.map(r => r.display_name)).toEqual(['Bob', 'Carol', 'Alice']);
     expect(result.top.map(r => r.value)).toEqual([150, 80, 20]);
   });
 
   it('tags the self row with self: true', async () => {
-    const { result } = await getRanking('tok', 'cash');
+    const { result } = await getRanking('cash');
     const selfRow = result.top.find(r => r.self === true);
     expect(selfRow).toBeDefined();
     expect(selfRow.display_name).toBe('Alice');
   });
 
   it('tags exactly one row as self', async () => {
-    const { result } = await getRanking('tok', 'cash');
+    const { result } = await getRanking('cash');
     expect(result.top.filter(r => r.self === true)).toHaveLength(1);
   });
 
   it('non-self rows have self falsy', async () => {
-    const { result } = await getRanking('tok', 'cash');
+    const { result } = await getRanking('cash');
     result.top.filter(r => r.display_name !== 'Alice')
       .forEach(r => expect(r.self).toBeFalsy());
   });
 
   it('returns top + user_rank shape', async () => {
-    const { result } = await getRanking('tok', 'xp');
+    const { result } = await getRanking('xp');
     expect(result).toHaveProperty('top');
     expect(Array.isArray(result.top)).toBe(true);
     expect(result).toHaveProperty('user_rank');
@@ -301,12 +301,12 @@ describe('getRanking with multi-peer state', () => {
         'bob@test':   { display_name: 'Bob',   cash:  50, xp:  50, profiles:  50, level: 1, last_seen_ts: 2, last_seen_serial: null },
       },
     }));
-    const { result } = await getRanking('tok', 'cash');
+    const { result } = await getRanking('cash');
     expect(result.user_rank).toBe(1);
   });
 
   it('emits addr on every row so the testid template can target peers', async () => {
-    const { result } = await getRanking('tok', 'cash');
+    const { result } = await getRanking('cash');
     const addrs = result.top.map(r => r.addr).sort();
     expect(addrs).toEqual(['alice@test', 'bob@test', 'carol@test']);
   });
@@ -318,7 +318,7 @@ describe('getRanking with multi-peer state', () => {
         'bob@test':   { display_name: 'Bob',   cash: 999, xp: 999, profiles: 999, level: 9, last_seen_ts: 2, last_seen_serial: null },
       },
     }));
-    const { result } = await getRanking('tok', 'cash');
+    const { result } = await getRanking('cash');
     expect(result.user_rank).toBe(0);
   });
 });

@@ -47,14 +47,14 @@ describe('getProvidedPerps — happy path', () => {
   });
 
   it('resolves to an object with result.buyable array', async () => {
-    const data = await getProvidedPerps('tok', AGENT_PATH);
+    const data = await getProvidedPerps(AGENT_PATH);
     expect(data).toHaveProperty('result');
     expect(Array.isArray(data.result.buyable)).toBe(true);
   });
 
   it('includes only gestalts whose required_level <= player xp_level', async () => {
     // xp_level: 1 — only contact035 (required_level 1) should pass
-    const { result } = await getProvidedPerps('tok', AGENT_PATH);
+    const { result } = await getProvidedPerps(AGENT_PATH);
     expect(result.buyable).toContain('contact035');
     expect(result.buyable).not.toContain('contact001');  // level 3
     expect(result.buyable).not.toContain('contact019');  // level 4
@@ -66,14 +66,14 @@ describe('getProvidedPerps — happy path', () => {
       nodes: [agentNode],
       game_values: { xp_level: 3 }
     }));
-    const { result } = await getProvidedPerps('tok', AGENT_PATH);
+    const { result } = await getProvidedPerps(AGENT_PATH);
     expect(result.buyable).toContain('contact035');
     expect(result.buyable).toContain('contact001');
     expect(result.buyable).not.toContain('contact019');  // level 4
   });
 
   it('result contains gestalt strings, not objects', async () => {
-    const { result } = await getProvidedPerps('tok', AGENT_PATH);
+    const { result } = await getProvidedPerps(AGENT_PATH);
     result.buyable.forEach(function (item) {
       expect(typeof item).toBe('string');
     });
@@ -88,7 +88,7 @@ describe('getProvidedPerps — prerequisite filtering', () => {
       nodes: [cityNode],
       game_values: { xp_level: 3 }
     }));
-    const { result } = await getProvidedPerps('tok', CITY_PATH);
+    const { result } = await getProvidedPerps(CITY_PATH);
     // pusher004 needs project002, contact035, etc. — none owned
     expect(result.buyable).not.toContain('pusher004');
     // pusher003 needs contact026, contact008 — none owned
@@ -105,7 +105,7 @@ describe('getProvidedPerps — prerequisite filtering', () => {
       ],
       game_values: { xp_level: 3 }
     }));
-    const { result } = await getProvidedPerps('tok', CITY_PATH);
+    const { result } = await getProvidedPerps(CITY_PATH);
     expect(result.buyable).toContain('pusher003');
   });
 });
@@ -115,14 +115,14 @@ describe('getProvidedPerps — prerequisite filtering', () => {
 describe('getProvidedPerps — edge cases', () => {
   it('returns {error: 0} for unknown path (node not in state)', async () => {
     setState(mkState({ nodes: [] }));
-    const data = await getProvidedPerps('tok', 'Imperium.NoSuchNode');
+    const data = await getProvidedPerps('Imperium.NoSuchNode');
     expect(data.result).toEqual({ error: 0 });
   });
 
   it('returns {error: 0} for node with gestalt absent from ruleset', async () => {
     const unknownNode = mkNode('nonexistent_gestalt', 'ContactPerp', 'Imperium.X');
     setState(mkState({ nodes: [unknownNode] }));
-    const data = await getProvidedPerps('tok', 'Imperium.X');
+    const data = await getProvidedPerps('Imperium.X');
     expect(data.result).toEqual({ error: 0 });
   });
 
@@ -133,7 +133,7 @@ describe('getProvidedPerps — edge cases', () => {
       nodes: [contactNode],
       game_values: { xp_level: 10 }
     }));
-    const { result } = await getProvidedPerps('tok', 'Imperium.City.contact001');
+    const { result } = await getProvidedPerps('Imperium.City.contact001');
     expect(result.buyable).toEqual([]);
   });
 
@@ -150,7 +150,7 @@ describe('getProvidedPerps — edge cases', () => {
       nodes: [nodeNoGestalt],
       game_values: { xp_level: 1 }
     }));
-    const { result } = await getProvidedPerps('tok', AGENT_PATH);
+    const { result } = await getProvidedPerps(AGENT_PATH);
     expect(Array.isArray(result.buyable)).toBe(true);
     expect(result.buyable).toContain('contact035');
   });
@@ -166,7 +166,7 @@ describe('getProvidedPerps — locale fallback', () => {
       game_values: { xp_level: 1 }
     }));
     // EN ruleset has same gesture structure; handler must not throw or error out
-    const data = await getProvidedPerps('tok', AGENT_PATH);
+    const data = await getProvidedPerps(AGENT_PATH);
     expect(Array.isArray(data.result.buyable)).toBe(true);
   });
 
@@ -176,7 +176,7 @@ describe('getProvidedPerps — locale fallback', () => {
       nodes: [agentNode],
       game_values: { xp_level: 1 }
     }));
-    const data = await getProvidedPerps('tok', AGENT_PATH);
+    const data = await getProvidedPerps(AGENT_PATH);
     expect(Array.isArray(data.result.buyable)).toBe(true);
     expect(data.result.buyable).toContain('contact035');
   });
@@ -188,14 +188,14 @@ describe('getPowerups — happy path', () => {
   beforeEach(() => setState(mkState()));
 
   it('resolves to an object with a result array', async () => {
-    const data = await getPowerups('tok', 'project001', '1');
+    const data = await getPowerups('project001', '1');
     expect(data).toHaveProperty('result');
     expect(Array.isArray(data.result)).toBe(true);
     expect(data.result.length).toBeGreaterThan(0);
   });
 
   it('each entry has game_gestalt, game_type, and type_data with gestalt', async () => {
-    const { result } = await getPowerups('tok', 'project001', '1');
+    const { result } = await getPowerups('project001', '1');
     result.forEach(function (item) {
       expect(typeof item.game_gestalt).toBe('string');
       expect(typeof item.game_type).toBe('string');
@@ -205,14 +205,14 @@ describe('getPowerups — happy path', () => {
   });
 
   it('game_gestalt matches type_data.gestalt', async () => {
-    const { result } = await getPowerups('tok', 'project001', '1');
+    const { result } = await getPowerups('project001', '1');
     result.forEach(function (item) {
       expect(item.game_gestalt).toBe(item.type_data.gestalt);
     });
   });
 
   it('type_data includes project-specific modifiers', async () => {
-    const { result } = await getPowerups('tok', 'project001', '1');
+    const { result } = await getPowerups('project001', '1');
     result.forEach(function (item) {
       expect(typeof item.type_data.price).toBe('number');
       expect(typeof item.type_data.charge_cost_modifier).toBe('number');
@@ -220,14 +220,14 @@ describe('getPowerups — happy path', () => {
   });
 
   it('type_data includes global powerup fields (label, popup_sprite)', async () => {
-    const { result } = await getPowerups('tok', 'project001', '1');
+    const { result } = await getPowerups('project001', '1');
     result.forEach(function (item) {
       expect(typeof item.type_data.label).toBe('string');
     });
   });
 
   it('result covers all three slot categories (ads + upgrades + teammembers)', async () => {
-    const { result } = await getPowerups('tok', 'project001', '1');
+    const { result } = await getPowerups('project001', '1');
     const types = result.map(function (item) { return item.game_type; });
     expect(types).toContain('AdPowerup');
     expect(types).toContain('UpgradePowerup');
@@ -235,8 +235,8 @@ describe('getPowerups — happy path', () => {
   });
 
   it('version argument is ignored — same result regardless of value', async () => {
-    const a = await getPowerups('tok', 'project001', '1');
-    const b = await getPowerups('tok', 'project001', '999');
+    const a = await getPowerups('project001', '1');
+    const b = await getPowerups('project001', '999');
     expect(a.result).toEqual(b.result);
   });
 });
@@ -247,18 +247,18 @@ describe('getPowerups — edge cases', () => {
   beforeEach(() => setState(mkState()));
 
   it('returns empty array for unknown projectGestalt', async () => {
-    const data = await getPowerups('tok', 'nonexistent_project', '1');
+    const data = await getPowerups('nonexistent_project', '1');
     expect(data).toEqual({ result: [] });
   });
 
   it('returns empty array for a perp type with no provided powerups (e.g. ContactPerp)', async () => {
-    const data = await getPowerups('tok', 'contact001', '1');
+    const data = await getPowerups('contact001', '1');
     expect(data.result).toEqual([]);
   });
 
   it('project with no provided_ads still returns upgrades and teammembers', async () => {
     // project005 has provided_ads: [] in the DE ruleset
-    const { result } = await getPowerups('tok', 'project005', '1');
+    const { result } = await getPowerups('project005', '1');
     expect(result.length).toBeGreaterThan(0);
     const types = result.map(function (i) { return i.game_type; });
     expect(types).not.toContain('AdPowerup');

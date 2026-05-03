@@ -53,7 +53,7 @@ describe('getRanking', () => {
   beforeEach(() => setState(mkRankingState()));
 
   it('returns the single-row shape with user_rank 1', async () => {
-    const { result } = await getRanking('tok', 'xp');
+    const { result } = await getRanking('xp');
     expect(result).toHaveProperty('top');
     expect(result).toHaveProperty('user_rank', 1);
     expect(result.top).toHaveLength(1);
@@ -61,27 +61,27 @@ describe('getRanking', () => {
   });
 
   it('xp type returns xp from peers', async () => {
-    const { result } = await getRanking('tok', 'xp');
+    const { result } = await getRanking('xp');
     expect(result.top[0].value).toBe(77);
   });
 
   it('cash type returns cash from peers', async () => {
-    const { result } = await getRanking('tok', 'cash');
+    const { result } = await getRanking('cash');
     expect(result.top[0].value).toBe(200);
   });
 
   it('profiles type returns profiles from peers', async () => {
-    const { result } = await getRanking('tok', 'profiles');
+    const { result } = await getRanking('profiles');
     expect(result.top[0].value).toBe(3);
   });
 
   it('spent type returns cash_spent from peers (Investor tab)', async () => {
-    const { result } = await getRanking('tok', 'spent');
+    const { result } = await getRanking('spent');
     expect(result.top[0].value).toBe(50);
   });
 
   it('level type returns xp_level from peers', async () => {
-    const { result } = await getRanking('tok', 'level');
+    const { result } = await getRanking('level');
     expect(result.top[0].value).toBe(5);
   });
 });
@@ -135,12 +135,12 @@ describe('loadGame — fresh state', () => {
   beforeEach(() => setState(mkState()));
 
   it('resolves to an object with a result property', async () => {
-    const data = await loadGame('tok');
+    const data = await loadGame();
     expect(data).toHaveProperty('result');
   });
 
   it('result carries all top-level fields Game.js:1876 reads', async () => {
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(result).toHaveProperty('version');
     expect(result).toHaveProperty('_id');
     expect(result).toHaveProperty('type_registry');
@@ -161,22 +161,22 @@ describe('loadGame — fresh state', () => {
   });
 
   it('version is a string', async () => {
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(typeof result.version).toBe('string');
   });
 
   it('_id is the selfAddr from state', async () => {
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(result._id).toBe('test@local');
   });
 
   it('user.auth_username is the selfAddr', async () => {
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(result.user.auth_username).toBe('test@local');
   });
 
   it('Imperium has required shape', async () => {
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(result.Imperium).toMatchObject({
       game_id: 'Imperium',
       full_path: 'Imperium',
@@ -186,7 +186,7 @@ describe('loadGame — fresh state', () => {
   });
 
   it('Database has required shape', async () => {
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(result.Database).toMatchObject({
       game_id: 'Database',
       full_path: 'Database',
@@ -196,32 +196,32 @@ describe('loadGame — fresh state', () => {
   });
 
   it('server_time is an ExtJSON date object', async () => {
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(result.server_time).toHaveProperty('$date');
     expect(typeof result.server_time.$date).toBe('number');
     expect(result.server_time.$date).toBeGreaterThan(0);
   });
 
   it('type_registry is a non-empty object', async () => {
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(typeof result.type_registry).toBe('object');
     expect(Object.keys(result.type_registry).length).toBeGreaterThan(0);
   });
 
   it('type_data includes levels array for getLevelByXP', async () => {
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(Array.isArray(result.type_data.levels)).toBe(true);
     expect(result.type_data.levels.length).toBeGreaterThan(0);
   });
 
   it('missions is an array', async () => {
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(Array.isArray(result.missions)).toBe(true);
     expect(result.missions.length).toBeGreaterThan(0);
   });
 
   it('karmalauters and karmalizers are non-empty arrays', async () => {
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(Array.isArray(result.karmalauters)).toBe(true);
     expect(result.karmalauters.length).toBeGreaterThan(0);
     expect(Array.isArray(result.karmalizers)).toBe(true);
@@ -229,17 +229,17 @@ describe('loadGame — fresh state', () => {
   });
 
   it('is_new_game is true for empty nodes array', async () => {
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(result.is_new_game).toBe(true);
   });
 
   it('nodes is an array (empty for fresh game)', async () => {
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(Array.isArray(result.nodes)).toBe(true);
   });
 
   it('game_values inside type_data has ap_initial and ap_offset', async () => {
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     const gv = result.type_data.game_values;
     expect(gv).toBeDefined();
     expect(typeof gv.ap_initial).toBe('number');
@@ -262,7 +262,7 @@ describe('loadGame — replayed state', () => {
     // The stub reducer returns state unchanged — but addr and schema_version persist.
     setState(evolved);
 
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(result._id).toBe('player@example');
     expect(result.version).toBeDefined();
   });
@@ -274,7 +274,7 @@ describe('loadGame — replayed state', () => {
     var s = Object.assign({}, freshState('p@x'), { node_counter: 1 });
     setState(s);
 
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(result.is_new_game).toBe(false);
   });
 });
@@ -298,43 +298,43 @@ describe('buyKarma — happy path', () => {
   });
 
   it('resolves to an object with a result property', async () => {
-    const data = await buyKarma('tok', KARMA_GESTALT);
+    const data = await buyKarma(KARMA_GESTALT);
     expect(data).toHaveProperty('result');
   });
 
   it('result has game_values but no error', async () => {
-    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    const { result } = await buyKarma(KARMA_GESTALT);
     expect(result.error).toBeUndefined();
     expect(result.game_values).toBeDefined();
   });
 
   it('deducts the price from cash_value', async () => {
-    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    const { result } = await buyKarma(KARMA_GESTALT);
     expect(result.game_values.cash_value).toBe(1000 - KARMA_PRICE);
   });
 
   it('adds the price to cash_spent', async () => {
-    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    const { result } = await buyKarma(KARMA_GESTALT);
     expect(result.game_values.cash_spent).toBe(KARMA_PRICE);
   });
 
   it('increments karma_value by karma_points', async () => {
-    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    const { result } = await buyKarma(KARMA_GESTALT);
     expect(result.game_values.karma_value).toBe(50 + KARMA_POINTS);
   });
 
   it('increments xp_value by karma_points', async () => {
-    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    const { result } = await buyKarma(KARMA_GESTALT);
     expect(result.game_values.xp_value).toBe(1 + KARMA_POINTS);
   });
 
   it('does not include a missions field', async () => {
-    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    const { result } = await buyKarma(KARMA_GESTALT);
     expect(result.missions).toBeUndefined();
   });
 
   it('persists game_values into state', async () => {
-    await buyKarma('tok', KARMA_GESTALT);
+    await buyKarma(KARMA_GESTALT);
     expect(getState().game_values.cash_value).toBe(1000 - KARMA_PRICE);
     expect(getState().game_values.karma_value).toBe(50 + KARMA_POINTS);
   });
@@ -348,7 +348,7 @@ describe('buyKarma — happy path', () => {
       }
     }));
     // karma001 karma_points=5; 98+5=103 → clamped to 100
-    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    const { result } = await buyKarma(KARMA_GESTALT);
     expect(result.game_values.karma_value).toBe(100);
   });
 });
@@ -365,13 +365,13 @@ describe('buyKarma — failure: insufficient cash', () => {
   });
 
   it('resolves with error when cash is below price', async () => {
-    const { result } = await buyKarma('tok', KARMA_GESTALT);
+    const { result } = await buyKarma(KARMA_GESTALT);
     expect(result.error).toBeDefined();
   });
 
   it('does not mutate state on cash failure', async () => {
     const before = getState().game_values.cash_value;
-    await buyKarma('tok', KARMA_GESTALT);
+    await buyKarma(KARMA_GESTALT);
     expect(getState().game_values.cash_value).toBe(before);
   });
 });
@@ -388,7 +388,7 @@ describe('buyKarma — failure: unknown karmalauter', () => {
   });
 
   it('resolves with error for an unknown gestalt', async () => {
-    const { result } = await buyKarma('tok', 'karma_does_not_exist');
+    const { result } = await buyKarma('karma_does_not_exist');
     expect(result.error).toBeDefined();
   });
 });
@@ -421,7 +421,7 @@ describe('materialization on boot', () => {
     });
     setState(s);
 
-    await loadGame('tok');
+    await loadGame();
 
     // queueMicrotask fires before the next await / assertion cycle.
     await Promise.resolve();
@@ -451,10 +451,10 @@ describe('materialization on boot', () => {
     });
     setState(s);
 
-    await loadGame('tok');
+    await loadGame();
 
     // After loadGame, the materialised state should have been persisted.
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     // Second call: charge already moved, no further changes expected.
     expect(result.nodes_charging).toHaveLength(0);
     expect(result.nodes_collect).toHaveLength(1);
@@ -466,7 +466,7 @@ describe('materialization on boot', () => {
     setEmitter(function(ev, pl) { emitted.push({ ev, pl }); });
 
     setState(mkState());
-    await loadGame('tok');
+    await loadGame();
     await Promise.resolve();
 
     expect(emitted).toHaveLength(0);
@@ -481,13 +481,13 @@ describe('materialization on boot', () => {
     }));
 
     // First load seeds ap_update without granting any ticks.
-    await loadGame('tok');
+    await loadGame();
     expect(getState().game_values.ap_update).toBe(FIXED_NOW);
     expect(getState().game_values.ap_snapshot).toBe(0);
 
     // Two minutes later (one ap_inc_interval at level 1) → +1 AP.
     setOverride(FIXED_NOW + 120000);
-    await loadGame('tok');
+    await loadGame();
     expect(getState().game_values.ap_snapshot).toBe(1);
     expect(getState().game_values.ap_update).toBe(FIXED_NOW + 120000);
   });
@@ -499,19 +499,19 @@ describe('setDisplayName — happy path', () => {
   beforeEach(() => setState(mkState()));
 
   it('returns {} (no error field) on a valid name', async () => {
-    const data = await setDisplayName('tok', 'Alice');
+    const data = await setDisplayName('Alice');
     expect(data).toEqual({ result: {} });
     expect(data.result.error).toBeUndefined();
   });
 
   it('persists display_name in in-memory state', async () => {
-    await setDisplayName('tok', 'Alice');
+    await setDisplayName('Alice');
     expect(getState().display_name).toBe('Alice');
   });
 
   it('accepts names up to 30 characters', async () => {
     const name30 = 'A'.repeat(30);
-    const data = await setDisplayName('tok', name30);
+    const data = await setDisplayName(name30);
     expect(data.result.error).toBeUndefined();
     expect(getState().display_name).toBe(name30);
   });
@@ -521,23 +521,23 @@ describe('setDisplayName — failure modes', () => {
   beforeEach(() => setState(mkState()));
 
   it('returns {error: 0} for an empty string', async () => {
-    const data = await setDisplayName('tok', '');
+    const data = await setDisplayName('');
     expect(data.result.error).toBe(0);
   });
 
   it('returns {error: 0} for a whitespace-only string', async () => {
-    const data = await setDisplayName('tok', '   ');
+    const data = await setDisplayName('   ');
     expect(data.result.error).toBe(0);
   });
 
   it('returns {error: 0} for a name exceeding 30 characters', async () => {
-    const data = await setDisplayName('tok', 'A'.repeat(31));
+    const data = await setDisplayName('A'.repeat(31));
     expect(data.result.error).toBe(0);
   });
 
   it('does not mutate state on invalid input', async () => {
     const before = getState().display_name;
-    await setDisplayName('tok', '');
+    await setDisplayName('');
     expect(getState().display_name).toBe(before);
   });
 });
@@ -567,14 +567,14 @@ describe('setPerpCoordinates — happy path', () => {
   beforeEach(() => setState(mkStateWithNodes()));
 
   it('returns {result: 1}', async () => {
-    const data = await setPerpCoordinates('tok', [
+    const data = await setPerpCoordinates([
       ['Imperium.City.Agent0', { x: 5, y: 7 }]
     ]);
     expect(data).toEqual({ result: 1 });
   });
 
   it('updates x/y on matched node', async () => {
-    await setPerpCoordinates('tok', [
+    await setPerpCoordinates([
       ['Imperium.City.Agent0', { x: 42, y: 99 }]
     ]);
     const node = getState().nodes.find(n => n.full_path === 'Imperium.City.Agent0');
@@ -583,7 +583,7 @@ describe('setPerpCoordinates — happy path', () => {
   });
 
   it('updates multiple nodes in a single call', async () => {
-    await setPerpCoordinates('tok', [
+    await setPerpCoordinates([
       ['Imperium.City.Agent0',   { x: 1, y: 2 }],
       ['Imperium.City.Project1', { x: 3, y: 4 }]
     ]);
@@ -599,12 +599,12 @@ describe('setPerpCoordinates — failure modes', () => {
   beforeEach(() => setState(mkStateWithNodes()));
 
   it('returns {result: 1} (not an error) for an empty updates array', async () => {
-    const data = await setPerpCoordinates('tok', []);
+    const data = await setPerpCoordinates([]);
     expect(data).toEqual({ result: 1 });
   });
 
   it('silently skips a malformed entry (non-array element)', async () => {
-    const data = await setPerpCoordinates('tok', [
+    const data = await setPerpCoordinates([
       'not-an-array',
       ['Imperium.City.Agent0', { x: 7, y: 8 }]
     ]);
@@ -614,7 +614,7 @@ describe('setPerpCoordinates — failure modes', () => {
   });
 
   it('leaves unmatched nodes unchanged', async () => {
-    await setPerpCoordinates('tok', [
+    await setPerpCoordinates([
       ['Imperium.City.NoSuchNode', { x: 99, y: 99 }]
     ]);
     const node = getState().nodes.find(n => n.full_path === 'Imperium.City.Agent0');
@@ -651,7 +651,7 @@ describe('buyPowerup — happy path', () => {
   beforeEach(() => setState(mkProjectState()));
 
   it('returns node, game_values, and levelup', async () => {
-    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     expect(result).not.toHaveProperty('error');
     expect(result).toHaveProperty('node');
     expect(result).toHaveProperty('game_values');
@@ -659,7 +659,7 @@ describe('buyPowerup — happy path', () => {
   });
 
   it('pushes the powerup into instance_data.powerups', async () => {
-    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     const powerups = result.node.instance_data.powerups;
     expect(powerups).toHaveLength(1);
     expect(powerups[0]).toMatchObject({ slot: 0, gestalt: 'ad002', full_type: 'AdPowerup:ad002' });
@@ -668,42 +668,42 @@ describe('buyPowerup — happy path', () => {
   it('deducts the powerup price from cash_value', async () => {
     // ad002 price = 90 (from project001 provided_ads)
     const before = getState().game_values.cash_value;
-    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     expect(result.game_values.cash_value).toBe(before - 90);
   });
 
   it('increments cash_spent by the powerup price', async () => {
     const before = getState().game_values.cash_spent;
-    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     expect(result.game_values.cash_spent).toBe(before + 90);
   });
 
   it('increments xp_value', async () => {
     const before = getState().game_values.xp_value;
-    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     expect(result.game_values.xp_value).toBeGreaterThan(before);
   });
 
   it('increments karma_value by 1', async () => {
     const before = getState().game_values.karma_value;
-    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     expect(result.game_values.karma_value).toBe(before + 1);
   });
 
   it('applies charge_cost_modifier to charge_cost', async () => {
     // project001 base charge_cost=190, ad002 modifier=35 → 225
-    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     expect(result.node.instance_data.charge_cost).toBe(225);
   });
 
   it('applies collect_amount_modifier', async () => {
     // base 3600 + 160 = 3760
-    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     expect(result.node.instance_data.collect_amount).toBe(3760);
   });
 
   it('persists updated state', async () => {
-    await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     const s = getState();
     expect(s.nodes[0].instance_data.powerups).toHaveLength(1);
     expect(s.game_values.cash_value).toBe(270 - 90);
@@ -716,7 +716,7 @@ describe('buyPowerup — failure: slot occupied', () => {
       instance_data: { powerups: [{ slot: 0, gestalt: 'ad002', full_type: 'AdPowerup:ad002' }] }
     });
     setState(Object.assign({}, freshState('test@local'), { nodes: [occupiedNode] }));
-    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad003');
+    const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad003');
     expect(result.error).toBe(1);
   });
 
@@ -726,7 +726,7 @@ describe('buyPowerup — failure: slot occupied', () => {
       instance_data: { powerups: [{ slot: 0, gestalt: 'ad002', full_type: 'AdPowerup:ad002' }] }
     });
     setState(Object.assign({}, freshState('test@local'), { nodes: [occupiedNode] }));
-    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'upgrade001');
+    const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'upgrade001');
     expect(result).not.toHaveProperty('error');
   });
 });
@@ -737,7 +737,7 @@ describe('buyPowerup — failure: insufficient cash', () => {
       game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 5 })
     });
     setState(broke);
-    const { result } = await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     expect(result.error).toBe(3);
   });
 });
@@ -762,7 +762,7 @@ describe('sellPowerup — happy path', () => {
   beforeEach(() => setState(mkStateWithPowerup()));
 
   it('returns node, game_values, and levelup', async () => {
-    const { result } = await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const { result } = await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     expect(result).not.toHaveProperty('error');
     expect(result).toHaveProperty('node');
     expect(result).toHaveProperty('game_values');
@@ -770,36 +770,36 @@ describe('sellPowerup — happy path', () => {
   });
 
   it('removes the powerup from instance_data.powerups', async () => {
-    const { result } = await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const { result } = await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     expect(result.node.instance_data.powerups).toHaveLength(0);
   });
 
   it('refunds 75% of the powerup price (floor)', async () => {
     // ad002 price=90, refund=floor(90*0.75)=67
     const before = getState().game_values.cash_value;
-    const { result } = await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const { result } = await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     expect(result.game_values.cash_value).toBe(before + 67);
   });
 
   it('increments xp_value', async () => {
     const before = getState().game_values.xp_value;
-    const { result } = await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const { result } = await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     expect(result.game_values.xp_value).toBeGreaterThan(before);
   });
 
   it('resets charge_cost to base value after powerup removed', async () => {
     // project001 base charge_cost = 190
-    const { result } = await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const { result } = await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     expect(result.node.instance_data.charge_cost).toBe(190);
   });
 
   it('resets collect_amount to base value', async () => {
-    const { result } = await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    const { result } = await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     expect(result.node.instance_data.collect_amount).toBe(3600);
   });
 
   it('persists updated state', async () => {
-    await sellPowerup('tok', PROJECT_NODE.full_path, 0, 'ad002');
+    await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     const s = getState();
     expect(s.nodes[0].instance_data.powerups).toHaveLength(0);
   });
@@ -808,7 +808,7 @@ describe('sellPowerup — happy path', () => {
 describe('sellPowerup — failure: slot empty', () => {
   it('returns error:1 when the slot has no powerup', async () => {
     setState(mkProjectState());
-    const { result } = await sellPowerup('tok', PROJECT_NODE.full_path, 99, 'ad002');
+    const { result } = await sellPowerup(PROJECT_NODE.full_path, 99, 'ad002');
     expect(result.error).toBe(1);
   });
 });
@@ -845,7 +845,7 @@ describe('buyPerp — happy path (contact gestalt)', () => {
     // contact001 requires level 3, price 400; state has level 3 and 10000 cash.
     // Parent is Imperium (root, always valid; contact001 not in Imperium provided_perps so
     // provided_perps check is skipped when parent type cannot be resolved).
-    const data = await buyPerp('tok', 'Imperium', 'contact001');
+    const data = await buyPerp('Imperium', 'contact001');
     expect(data.result).toBeDefined();
     expect(data.result.error).toBeUndefined();
     expect(data.result.node).toBeDefined();
@@ -854,7 +854,7 @@ describe('buyPerp — happy path (contact gestalt)', () => {
   });
 
   it('node has the correct shape', async () => {
-    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    const { result } = await buyPerp('Imperium', 'contact001');
     expect(result.node).toMatchObject({
       game_id: expect.any(String),
       game_type: 'ContactPerp',
@@ -867,26 +867,26 @@ describe('buyPerp — happy path (contact gestalt)', () => {
 
   it('deducts price from cash_value', async () => {
     // contact001 price = 400
-    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    const { result } = await buyPerp('Imperium', 'contact001');
     expect(result.game_values.cash_value).toBe(10000 - 400);
     expect(result.game_values.cash_spent).toBe(400);
   });
 
   it('increments xp_value by xp_inc', async () => {
     // contact001 xp_inc = 1
-    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    const { result } = await buyPerp('Imperium', 'contact001');
     expect(result.game_values.xp_value).toBe(15 + 1);
   });
 
   it('adds node to in-memory state', async () => {
-    await buyPerp('tok', 'Imperium', 'contact001');
+    await buyPerp('Imperium', 'contact001');
     const s = getState();
     // freshState already includes the seeded database001, so a buy adds a 2nd entry.
     expect(s.nodes.find((n) => n.full_path === 'Imperium.contact001')).toBeTruthy();
   });
 
   it('returns profile_set for contact* gestalt', async () => {
-    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    const { result } = await buyPerp('Imperium', 'contact001');
     expect(result.profile_set).toBeDefined();
     expect(result.profile_set).toHaveProperty('profile_set');
     expect(result.profile_set).toHaveProperty('origin', 'Imperium.contact001');
@@ -894,16 +894,16 @@ describe('buyPerp — happy path (contact gestalt)', () => {
   });
 
   it('pushes a db_queue entry for contact* gestalt', async () => {
-    await buyPerp('tok', 'Imperium', 'contact001');
+    await buyPerp('Imperium', 'contact001');
     const s = getState();
     expect(s.db_queue).toHaveLength(1);
     expect(s.db_queue[0].origin).toBe('Imperium.contact001');
   });
 
   it('game_id is stable and unique across two buys', async () => {
-    const r1 = await buyPerp('tok', 'Imperium', 'contact001');
+    const r1 = await buyPerp('Imperium', 'contact001');
     // city002: required_level 1, price 0 — always accessible
-    await buyPerp('tok', 'Imperium', 'city002');
+    await buyPerp('Imperium', 'city002');
     const s = getState();
     const ids = s.nodes.map(function(n) { return n.game_id; });
     expect(new Set(ids).size).toBe(ids.length);  // all unique (seed + 2 buys)
@@ -915,14 +915,14 @@ describe('buyPerp — happy path (city gestalt, profiles_max bump)', () => {
   beforeEach(() => setState(mkBuyPerpState()));
 
   it('city002 (price 0) succeeds and bumps profiles_max', async () => {
-    const { result } = await buyPerp('tok', 'Imperium', 'city002');
+    const { result } = await buyPerp('Imperium', 'city002');
     expect(result.error).toBeUndefined();
     // profiles_max += 2915918
     expect(result.game_values.profiles_max).toBe(1 + 2915918);
   });
 
   it('returns profile_set for city* gestalt', async () => {
-    const { result } = await buyPerp('tok', 'Imperium', 'city002');
+    const { result } = await buyPerp('Imperium', 'city002');
     expect(result.profile_set).toBeDefined();
     expect(result.profile_set.origin).toBe('Imperium.city002');
   });
@@ -933,7 +933,7 @@ describe('buyPerp — happy path delta replay (applyDelta roundtrip)', () => {
     const initialState = mkBuyPerpState();
     setState(initialState);
 
-    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    const { result } = await buyPerp('Imperium', 'contact001');
 
     // Construct the delta as LocalEngine emitted it and replay from scratch.
     const replayBase = freshState('buyer@local');
@@ -967,7 +967,7 @@ describe('buyPerp — failure: insufficient cash', () => {
       karma_value: 0, profiles_value: 0, profiles_max: 1,
       ap_snapshot: 6, ap_update: null
     }}));
-    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    const { result } = await buyPerp('Imperium', 'contact001');
     expect(result.error).toBe(2);
   });
 
@@ -978,7 +978,7 @@ describe('buyPerp — failure: insufficient cash', () => {
       karma_value: 0, profiles_value: 0, profiles_max: 1,
       ap_snapshot: 6, ap_update: null
     }}));
-    await buyPerp('tok', 'Imperium', 'contact001');
+    await buyPerp('Imperium', 'contact001');
     expect(getState().nodes.find((n) => n.gestalt === 'contact001')).toBeUndefined();
   });
 });
@@ -992,7 +992,7 @@ describe('buyPerp — failure: level too low', () => {
       karma_value: 0, profiles_value: 0, profiles_max: 1,
       ap_snapshot: 6, ap_update: null
     }}));
-    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    const { result } = await buyPerp('Imperium', 'contact001');
     expect(result.error).toBe(1);
   });
 });
@@ -1003,7 +1003,7 @@ describe('buySlots — happy path', () => {
   beforeEach(() => setState(mkProjectState()));
 
   it('returns node, game_values, and levelup', async () => {
-    const { result } = await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    const { result } = await buySlots(PROJECT_NODE.full_path, 'ad', 1);
     expect(result).not.toHaveProperty('error');
     expect(result).toHaveProperty('node');
     expect(result).toHaveProperty('game_values');
@@ -1012,31 +1012,31 @@ describe('buySlots — happy path', () => {
 
   it('increments the ad_slots count by num', async () => {
     // base ad_slots from type_data = 3; buy 1 → 4
-    const { result } = await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    const { result } = await buySlots(PROJECT_NODE.full_path, 'ad', 1);
     expect(result.node.instance_data.ad_slots).toBe(4);
   });
 
   it('deducts the correct cost from cash_value', async () => {
     // cost = slot_cost + slot_cost_modifier * currentSlots = 10 + 1*3 = 13
     const before = getState().game_values.cash_value;
-    const { result } = await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    const { result } = await buySlots(PROJECT_NODE.full_path, 'ad', 1);
     expect(result.game_values.cash_value).toBe(before - 13);
   });
 
   it('increments cash_spent by the slot cost', async () => {
     const before = getState().game_values.cash_spent;
-    const { result } = await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    const { result } = await buySlots(PROJECT_NODE.full_path, 'ad', 1);
     expect(result.game_values.cash_spent).toBe(before + 13);
   });
 
   it('increments xp_value', async () => {
     const before = getState().game_values.xp_value;
-    const { result } = await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    const { result } = await buySlots(PROJECT_NODE.full_path, 'ad', 1);
     expect(result.game_values.xp_value).toBeGreaterThan(before);
   });
 
   it('persists updated state', async () => {
-    await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    await buySlots(PROJECT_NODE.full_path, 'ad', 1);
     const s = getState();
     expect(s.nodes[0].instance_data.ad_slots).toBe(4);
   });
@@ -1048,7 +1048,7 @@ describe('buySlots — failure: insufficient cash', () => {
       game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 0 })
     });
     setState(broke);
-    const { result } = await buySlots('tok', PROJECT_NODE.full_path, 'ad', 1);
+    const { result } = await buySlots(PROJECT_NODE.full_path, 'ad', 1);
     expect(result.error).toBe(3);
   });
 });
@@ -1074,7 +1074,7 @@ describe('buyPerp — failure: ProxyPerp slot full', () => {
     setState(mkBuyPerpState({ nodes: [proxyNode].concat(childNodes), game_values: highLevelValues }));
 
     // Try to buy a 4th project (project005 is also in proxy001 provided_perps)
-    const { result } = await buyPerp('tok', 'Imperium.proxy001', 'project005');
+    const { result } = await buyPerp('Imperium.proxy001', 'project005');
     expect(result.error).toBe(3);
   });
 });
@@ -1087,7 +1087,7 @@ describe('buyPerp — failure: duplicate gestalt', () => {
       full_path: 'Imperium.contact001', instance_data: {}
     };
     setState(mkBuyPerpState({ nodes: [existing] }));
-    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    const { result } = await buyPerp('Imperium', 'contact001');
     expect(result.error).toBe(4);
   });
 });
@@ -1095,7 +1095,7 @@ describe('buyPerp — failure: duplicate gestalt', () => {
 describe('buyPerp — failure: unknown gestalt', () => {
   it('returns error 1 for a gestalt not in the ruleset', async () => {
     setState(mkBuyPerpState());
-    const { result } = await buyPerp('tok', 'Imperium', 'noSuchPerp');
+    const { result } = await buyPerp('Imperium', 'noSuchPerp');
     expect(result.error).toBe(1);
   });
 });
@@ -1119,13 +1119,13 @@ describe('buyPerp — level-up refills ap_snapshot', () => {
   });
 
   it('returns levelup=true', async () => {
-    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    const { result } = await buyPerp('Imperium', 'contact001');
     expect(result.error).toBeUndefined();
     expect(result.levelup).toBe(true);
   });
 
   it('advances xp_level and refills AP to the new level\'s ap_max', async () => {
-    const { result } = await buyPerp('tok', 'Imperium', 'contact001');
+    const { result } = await buyPerp('Imperium', 'contact001');
     expect(result.game_values.xp_level).toBe(4);
     expect(result.game_values.ap_snapshot).toBe(14);
     expect(result.game_values.ap_max).toBe(14);
@@ -1159,7 +1159,7 @@ describe('buyPerp — loadGame repairs stuck buy_perp goal', () => {
       nodes: mkBuyPerpState().nodes.concat([NURSE_NODE])
     }));
 
-    await loadGame('tok');
+    await loadGame();
 
     const goal = getState().mission_goals.find(
       (g) => g.mission === 'mission007' && g.workflow === 'buy_perp'
@@ -1182,7 +1182,7 @@ describe('buyPerp — loadGame repairs stuck buy_perp goal', () => {
       }]
     }));
 
-    await loadGame('tok');
+    await loadGame();
 
     const goal = getState().mission_goals.find(
       (g) => g.mission === 'mission007' && g.workflow === 'buy_perp'
@@ -1206,12 +1206,12 @@ describe('buyPerp — mission activating after nurse already owned seeds goal as
   });
 
   it('mission007 is added to active_missions after buying the final mission006 powerup', async () => {
-    await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'teammember020');
+    await buyPowerup(PROJECT_NODE.full_path, 0, 'teammember020');
     expect(getState().active_missions).toContain('mission007');
   });
 
   it('mission007 buy_perp goal is complete because nurse is already owned', async () => {
-    await buyPowerup('tok', PROJECT_NODE.full_path, 0, 'teammember020');
+    await buyPowerup(PROJECT_NODE.full_path, 0, 'teammember020');
     const goal = getState().mission_goals.find(
       (g) => g.mission === 'mission007' && g.workflow === 'buy_perp'
     );
@@ -1291,25 +1291,25 @@ describe('dismissMissionBriefing — happy path', () => {
   beforeEach(() => setState(mkState()));
 
   it('resolves to {result: {ok: true}}', async () => {
-    const data = await dismissMissionBriefing('tok', 'mission002');
+    const data = await dismissMissionBriefing('mission002');
     expect(data).toEqual({ result: { ok: true } });
   });
 
   it('records the gestalt under state.mission_briefings_seen', async () => {
-    await dismissMissionBriefing('tok', 'mission002');
+    await dismissMissionBriefing('mission002');
     expect(getState().mission_briefings_seen).toEqual({ mission002: true });
   });
 
   it('is idempotent — re-dispatching the same gestalt does not throw', async () => {
-    await dismissMissionBriefing('tok', 'mission002');
-    const data = await dismissMissionBriefing('tok', 'mission002');
+    await dismissMissionBriefing('mission002');
+    const data = await dismissMissionBriefing('mission002');
     expect(data).toEqual({ result: { ok: true } });
     expect(getState().mission_briefings_seen).toEqual({ mission002: true });
   });
 
   it('accumulates multiple dismissals', async () => {
-    await dismissMissionBriefing('tok', 'mission002');
-    await dismissMissionBriefing('tok', 'mission003');
+    await dismissMissionBriefing('mission002');
+    await dismissMissionBriefing('mission003');
     expect(getState().mission_briefings_seen).toEqual({
       mission002: true,
       mission003: true
@@ -1321,18 +1321,18 @@ describe('dismissMissionBriefing — failure modes', () => {
   beforeEach(() => setState(mkState()));
 
   it('returns error 0 for empty string gestalt', async () => {
-    const data = await dismissMissionBriefing('tok', '');
+    const data = await dismissMissionBriefing('');
     expect(data).toEqual({ result: { error: 0 } });
     expect(getState().mission_briefings_seen).toEqual({});
   });
 
   it('returns error 0 for non-string gestalt', async () => {
-    const data = await dismissMissionBriefing('tok', 42);
+    const data = await dismissMissionBriefing(42);
     expect(data).toEqual({ result: { error: 0 } });
   });
 
   it('returns error 0 for undefined gestalt', async () => {
-    const data = await dismissMissionBriefing('tok');
+    const data = await dismissMissionBriefing();
     expect(data).toEqual({ result: { error: 0 } });
   });
 });
@@ -1344,8 +1344,8 @@ describe('dismissMissionBriefing — reload guard (issue #83)', () => {
   // makeNotifications' seenBriefings guard returns false (don't show).
   it('loadGame response includes mission_briefings_seen after dismiss', async () => {
     setState(mkState());
-    await dismissMissionBriefing('tok', 'mission001');
-    const { result } = await loadGame('tok');
+    await dismissMissionBriefing('mission001');
+    const { result } = await loadGame();
     expect(result.mission_briefings_seen).toEqual({ mission001: true });
   });
 
@@ -1364,7 +1364,7 @@ describe('dismissMissionBriefing — reload guard (issue #83)', () => {
     };
     const replayed = applyDelta(freshState(addr), dismissDelta);
     setState(replayed);
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(result.mission_briefings_seen).toEqual({ mission001: true });
   });
 
@@ -1372,7 +1372,7 @@ describe('dismissMissionBriefing — reload guard (issue #83)', () => {
   // must NOT have the flag so the briefing correctly reopens.
   it('no dismiss delta → loadGame response has no seen flag for the gestalt', async () => {
     setState(mkState());
-    const { result } = await loadGame('tok');
+    const { result } = await loadGame();
     expect(result.mission_briefings_seen).toEqual({});
   });
 });
@@ -1383,25 +1383,25 @@ describe('markTokenSeen — happy path', () => {
   beforeEach(() => setState(mkState()));
 
   it('resolves to {result: {ok: true}}', async () => {
-    const data = await markTokenSeen('tok', 'token008');
+    const data = await markTokenSeen('token008');
     expect(data).toEqual({ result: { ok: true } });
   });
 
   it('records the gestalt under state.tokens_seen', async () => {
-    await markTokenSeen('tok', 'token008');
+    await markTokenSeen('token008');
     expect(getState().tokens_seen).toEqual({ token008: true });
   });
 
   it('is idempotent', async () => {
-    await markTokenSeen('tok', 'token008');
-    const data = await markTokenSeen('tok', 'token008');
+    await markTokenSeen('token008');
+    const data = await markTokenSeen('token008');
     expect(data).toEqual({ result: { ok: true } });
     expect(getState().tokens_seen).toEqual({ token008: true });
   });
 
   it('accumulates multiple gestalts', async () => {
-    await markTokenSeen('tok', 'token001');
-    await markTokenSeen('tok', 'token008');
+    await markTokenSeen('token001');
+    await markTokenSeen('token008');
     expect(getState().tokens_seen).toEqual({ token001: true, token008: true });
   });
 });
@@ -1410,18 +1410,18 @@ describe('markTokenSeen — failure modes', () => {
   beforeEach(() => setState(mkState()));
 
   it('returns error 0 for empty string gestalt', async () => {
-    const data = await markTokenSeen('tok', '');
+    const data = await markTokenSeen('');
     expect(data).toEqual({ result: { error: 0 } });
     expect(getState().tokens_seen).toEqual({});
   });
 
   it('returns error 0 for non-string gestalt', async () => {
-    const data = await markTokenSeen('tok', 42);
+    const data = await markTokenSeen(42);
     expect(data).toEqual({ result: { error: 0 } });
   });
 
   it('returns error 0 for undefined gestalt', async () => {
-    const data = await markTokenSeen('tok');
+    const data = await markTokenSeen();
     expect(data).toEqual({ result: { error: 0 } });
   });
 });

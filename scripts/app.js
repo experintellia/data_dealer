@@ -8,8 +8,7 @@ define(function(require) {
     var $ = require('jquery');
 
     var setup = require('setup');
-    var Remote = require('Remote');
-    var Socket = require('Socket');
+    var LocalEngine = require('LocalEngine');
     var i18n = require('i18n');
 
     // Here we store the stuff we might need throughout the whole application.
@@ -27,7 +26,6 @@ define(function(require) {
         'tpl!../views/noitems.html',
         'tpl!../views/popup.html',
         'tpl!../views/levelup.html',
-        'tpl!../views/lost_socket.html',
         'tpl!../views/popup_mission.html',
         'tpl!../views/popup_mission_complete.html',
         'tpl!../views/mission.html',
@@ -103,110 +101,75 @@ define(function(require) {
       }
     };
 
+    // Build app.remote: a thin facade that delegates each call to LocalEngine
+    // and wraps the returned native Promise in a jQuery Deferred so existing
+    // .done()/.fail() chains in Game.js keep working.
+    function _wrapHandler(name) {
+      return function() {
+        var fn = LocalEngine[name];
+        var d = $.Deferred();
+        if (typeof fn !== 'function') {
+          return d.reject('NotImplemented: ' + name).promise();
+        }
+        var result = fn.apply(LocalEngine, arguments);
+        if (result && typeof result.then === 'function') {
+          result.then(function(v) { d.resolve(v); }, function(e) { d.reject(e); });
+        } else {
+          d.resolve(result);
+        }
+        return d.promise();
+      };
+    }
+
+    var REMOTE_METHODS = [
+      'buyPowerup', 'chargePerp', 'collectPerp', 'integrateCollected',
+      'getPowerups', 'getProvidedPerps', 'getSessionLocale', 'setLocale',
+      'buyKarma', 'buyPerp', 'buySlots', 'getToken', 'loadGame',
+      'setDisplayName', 'getRanking', 'ping', 'sellPowerup',
+      'setPerpCoordinates', 'dismissMissionBriefing', 'markTokenSeen'
+    ];
+
+    app.remote = {};
+    for (var i = 0; i < REMOTE_METHODS.length; i++) {
+      app.remote[REMOTE_METHODS[i]] = _wrapHandler(REMOTE_METHODS[i]);
+    }
+
     // This method initializes the application.
     app.start = function() {
-      if (app.token) {
-        console.error("ERROR, we already have a token");
-        console.error('DEATH and MAYHEM!'); 
-        if (app.game) { app.game.kill(); }
-        return { fail: function(cb){ if (cb) { cb();} } }
-      }
-      app.remote = new Remote({
-        endPoint: setup.jsonRpcUrl,
-        queue: {
-          // The queue should be started automatically.
-          paused: false,
-          // A delay of -1 means we step through the queue by using the `queue.next()` method.
-          delay: -1,
-          // The callback for processing a queued event.
-          callback: function(event) {
-            //console.log(event);
-            var queue = this;
-            // Call the event handler with the stored context and arguments.
-            event.handler.apply(event.context, event['arguments']).then(function() {
-              // Now process the next queued event.
-              queue.next();
-            }).fail(function() {
-              console.log('Remote queue error:', arguments);
-            });
-          }
-        }
-      });
-
-      // Define our JSON-RPC methods by wrapping them with Remote prototype.
-      // (Please also refer to the Python docs about JSON-RPC methods.)
-      app.remote.addMethod('buyPowerup');
-      app.remote.addMethod('chargePerp');
-      app.remote.addMethod('collectPerp', Remote.NEEDS_QUEUE); // Calls of this method are going to be queued.
-      app.remote.addMethod('integrateCollected', Remote.NEEDS_QUEUE); // Calls of this method are going to be queued.
-      app.remote.addMethod('getPowerups');
-      app.remote.addMethod('getProvidedPerps');
-      app.remote.addMethod('getSessionLocale');
-      app.remote.addMethod('setLocale');
-      app.remote.addMethod('buyKarma');
-      app.remote.addMethod('buyPerp');
-      app.remote.addMethod('buySlots');
-      app.remote.addMethod('getToken');
-      app.remote.addMethod('loadGame');
-      app.remote.addMethod('setDisplayName');
-      app.remote.addMethod('getRanking');
-      app.remote.addMethod('ping');
-      app.remote.addMethod('sellPowerup');
-      app.remote.addMethod('setPerpCoordinates');
-      app.remote.addMethod('dismissMissionBriefing');
-      app.remote.addMethod('markTokenSeen');
-
-      // Wire LocalEngine's event emitter to the in-process Socket bus so that
-      // node_ready / new_items events from loadGame materialisation reach the
-      // queued socket handlers registered in app.initSocket (lines 259–267).
-      var LocalEngine = require('LocalEngine');
+      // Wire LocalEngine's event emitter onto $(document) so node_ready /
+      // new_items events from materialisation reach the handlers registered
+      // by GameRoot.
       if (typeof LocalEngine.setEmitter === 'function') {
         LocalEngine.setEmitter(function(ev, pl) {
           $(document).trigger(ev, [pl]);
         });
       }
 
-      // Get a token from the back-end and return the deferred remote call.
-      $('#loadertext').text('Fetching token');
-      return app.remote.getToken().then(function(data) {
-        var token = data.result;
-        if (token) {
-          // Store the token in our app container, for good.
-          app.token = token;
-          // Set the locale.
-          $('#loadertext').text('Setting language');
-          return app.remote.getSessionLocale().then(function(data) {
-            var locale = data.result === 'de' ? 'de_AT' : 'en_US';
-            i18n.setLocale(locale);
-            // type_settings runs gettext at module load — must wait for
-            // the locale JSON before requiring Game.
-            $('#loadertext').text('Loading translations');
-            return i18n.ready().then(function() {
-            $('#loadertext').text('Initializing socket');
-            return app.initSocket(token).then(function() {
-              // When handshake is complete, load game data and initialize the game engine.
-              $('#loadertext').text('Loading saved game');
-              // Carefullly approaching async hell with deferred superpowers!
-              return app.remote.loadGame(app.token).then(function(data) {
-                var html = app.renderView('game.html');
-                $('#dd-control').html(html);
-                var Game = require('Game').getGame();
-                var gameData = data.result;
-                app.version = gameData.version;
-                Game.init(gameData);
-                if (setup.debug) {
-                  window.app = app;
-                  window.setup = setup;
-                  window.Game = Game;
-                  window.Render = require('Render').getRender();
-                }
-              });
-            });
-            });
+      // All handlers resolve synchronously now (no network), but we keep the
+      // jQuery Deferred chain so bootstrap.js's .fail() handler still works.
+      $('#loadertext').text('Loading saved game');
+      return app.remote.getSessionLocale().then(function(data) {
+        var locale = data.result === 'de' ? 'de_AT' : 'en_US';
+        i18n.setLocale(locale);
+        // type_settings runs gettext at module load — must wait for the
+        // locale JSON before requiring Game.
+        $('#loadertext').text('Loading translations');
+        return i18n.ready().then(function() {
+          return app.remote.loadGame().then(function(data) {
+            var html = app.renderView('game.html');
+            $('#dd-control').html(html);
+            var Game = require('Game').getGame();
+            var gameData = data.result;
+            app.version = gameData.version;
+            Game.init(gameData);
+            if (setup.debug) {
+              window.app = app;
+              window.setup = setup;
+              window.Game = Game;
+              window.Render = require('Render').getRender();
+            }
           });
-        } else {
-          return { fail: function(cb){ console.error('Y U no Token?'); if (cb) { cb();} } }
-        } 
+        });
       });
     };
 
@@ -214,74 +177,6 @@ define(function(require) {
     app.reset = function() {
       // FIXME: Currently three-o
       //$('body').html(app.renderView('main'));
-    };
-
-    // The initialisation method for the websocket connection.
-    app.initSocket = function(token) {
-
-      // We need to defer initialisation until the socket connection is fully established.
-      var handshake = new $.Deferred();
-
-      var socket = app.socket = new Socket({
-        // We want to be able to queue some socket events.
-        queue: {
-          // The queue should not be started automatically.
-          paused: true,
-          // A delay of -1 means we step through the queue by using the `queue.next()` method.
-          delay: -1,
-          // The callback for processing a queued event.
-          callback: function(event) {
-            // Call the event handler with the stored context and arguments.
-            event.handler.apply(event.context, event['arguments']);
-            // Now process the next queued event.
-            this.next();
-          }
-        }
-      });
-
-      // Defining the connect handler.
-      socket.on("connect", function() {
-        // Tell the back-end that we are listening and send the token.
-        $('#loadertext').text('Socket connected');
-        this.emit("client_connected", {token: token});
-      });
-
-      // If the connection is fully established the server sends the corresponding message.
-      socket.on('established', function() {
-        // And finally, as the handshake is complete, the deferred can be resolved.
-        $('#loadertext').text('Socket established');
-        handshake.resolve();
-      });
-
-      // Defining the disconnect handler.
-      socket.on("disconnect", function() {
-        // FIXME: Determine what should be done when socket is disconnected.
-        console.warn('Socket was disconnected');
-        $('#loadertext').text('Oops, sorry! Socket to server is disconnected. Please try to reload.');
-        if (app.game) {
-          console.error('Game socket lost');
-          app.game.lostSocket();
-        }
-      });
-
-      // Our debug event handler.
-      socket.on("debug", function(data) {
-        if (setup.debug) {
-          console.info("SOCKET DEBUG", data.message);
-        }
-      });
-
-      // Delegate the node_ready event to the game engine.
-      socket.on("node_ready", function(data) {
-        app.game.getById(data.id).trigger('node_ready', [data.result]);
-      }, Socket.NEEDS_QUEUE); // This event handler is queued!
-
-      // Delegate the node_items event to the game engine.
-      socket.on("new_items", function(data) {
-        app.game.trigger('new_items', [data]);
-      }, Socket.NEEDS_QUEUE); // This event handler is queued!
-
-      return handshake.promise();
     };
 
     // Extending Underscore with some helpers for easier templating.

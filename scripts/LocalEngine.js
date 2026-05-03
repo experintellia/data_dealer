@@ -1,5 +1,5 @@
-// Local replacement for the back-end JSON-RPC service.
-// ESM exports — consumed by Remote.js via the AMD bridge in esm-bundle.js.
+// In-process gameplay handlers (formerly the JSON-RPC service).
+// ESM exports — consumed by app.js via the AMD bridge in esm-bundle.js.
 // No DOM globals in handler bodies; safe to import from Node for tests.
 //
 // Handlers implemented here: getToken, ping, getSessionLocale, loadGame (#12),
@@ -140,8 +140,8 @@ function _getVariatedAmount(baseAmount, ts, path) {
 
 /**
  * getToken() → Promise<{result: string}>
- * Returns webxdc.selfAddr as the session token.  Game.js threads this value
- * through subsequent handler calls but never inspects it.
+ * Returns webxdc.selfAddr as the local session identifier.  Retained for
+ * compatibility with code paths that still want a stable string id.
  */
 export function getToken() {
   // eslint-disable-next-line no-undef
@@ -151,7 +151,7 @@ export function getToken() {
 
 /**
  * ping() → Promise<{result: "pong"}>
- * RpcQueue keepalive; not auth-gated.
+ * Health check; resolves synchronously.
  */
 export function ping() {
   return Promise.resolve({ result: 'pong' });
@@ -194,14 +194,14 @@ export function setLocale(localeCode) {
 }
 
 /**
- * loadGame(token) → Promise<{result: GameData}>
+ * loadGame() → Promise<{result: GameData}>
  *
  * Runs the materializer once against current state, persists the result,
  * builds the response shape expected by GameRoot.prototype.loadGame
- * (Game.js:1876), and schedules socket event emission for any charges that
+ * (Game.js:1876), and schedules event emission for any charges that
  * completed during the away window.
  */
-export function loadGame(/* token */) {
+export function loadGame() {
   var state = getState();
   var now = clockNow();
 
@@ -231,12 +231,8 @@ export function loadGame(/* token */) {
 
   var gameData = _buildLoadGameResponse(seededState, now, isNewGame);
 
-  // Schedule socket event emission via queueMicrotask so it runs after the
-  // microtask that resolves the Deferred in Remote.js (result.then → d.resolve
-  // → .done() → app.socket.queue.start()).  In practice M1 (this microtask)
-  // fires BEFORE M2 (d.resolve), but that is safe: Socket.NEEDS_QUEUE handlers
-  // call jqmq.add() on the paused queue — items are buffered, not dropped —
-  // and are processed only after queue.start() (Game.js:2072).
+  // Schedule event emission via queueMicrotask so it runs after the caller's
+  // .then() resolves and Game.js has wired up its event handlers.
   var events = mat.events;
   queueMicrotask(function () {
     for (var i = 0; i < events.length; i++) {
@@ -313,7 +309,7 @@ function _buildLoadGameResponse(state, now, isNewGame) {
   };
 }
 
-export function getProvidedPerps(_token, gnodePath) {
+export function getProvidedPerps(gnodePath) {
   var state = getState();
   var nodes = (state && state.nodes) || [];
   var maps = _getNodeMaps(nodes);
@@ -338,7 +334,7 @@ export function getProvidedPerps(_token, gnodePath) {
   return Promise.resolve({ result: { buyable: buyable } });
 }
 
-export function getPowerups(_token, projectGestalt /*, version */) {
+export function getPowerups(projectGestalt /*, version */) {
   var ruleset = _getRuleset();
   var def = ruleset.perps[projectGestalt];
   if (!def) return Promise.resolve({ result: [] });
@@ -376,7 +372,7 @@ export function getPowerups(_token, projectGestalt /*, version */) {
 // forward-facing field. Unknown types fall back to 'xp' with a console.warn.
 var _RANKING_FIELDS = { cash: 1, profiles: 1, xp: 1, level: 1, spent: 1 };
 
-export function getRanking(_token, type) {
+export function getRanking(type) {
   var state = getState();
   var selfAddr = (state && state.addr) || '';
   var peers = (state && state.peers) || {};
@@ -447,13 +443,13 @@ function validateDisplayName(name) {
 // ---------------------------------------------------------------------------
 
 /**
- * setDisplayName(token, dname) → Promise<{result: {}|{error:0|1}}>
+ * setDisplayName(dname) → Promise<{result: {}|{error:0|1}}>
  *
  * Validates dname (length cap, charset), writes state.user.display_name, and
  * emits a delta so the change survives a reload.
  * Returns {} on success or {error: 0} on bad input / {error: 1} on internal fault.
  */
-export function setDisplayName(/* token, */ _, dname) {
+export function setDisplayName(dname) {
   if (!validateDisplayName(dname)) {
     return Promise.resolve({ result: { error: 0 } });
   }
@@ -469,14 +465,14 @@ export function setDisplayName(/* token, */ _, dname) {
 }
 
 /**
- * setPerpCoordinates(token, updates) → Promise<{result: 1}>
+ * setPerpCoordinates(updates) → Promise<{result: 1}>
  *
  * updates = [[full_path, {x, y}], ...]
  * Matches nodes by full_path and $sets instance_data.x / instance_data.y.
  * Emits one delta covering all entries.  Always returns {result: 1} even when
  * some paths are not found (matches original server behaviour: Game.js:981).
  */
-export function setPerpCoordinates(/* token, */ _, updates) {
+export function setPerpCoordinates(updates) {
   if (!Array.isArray(updates) || updates.length === 0) {
     return Promise.resolve({ result: 1 });
   }
@@ -517,12 +513,12 @@ function _findLevelByXP(levels, xp) {
 }
 
 /**
- * buyKarma(token, karmalauterGestalt) → Promise<{result}>
+ * buyKarma(karmalauterGestalt) → Promise<{result}>
  *
  * Looks up the karmalauter in the ruleset, validates cash, applies increments,
  * and returns {game_values, [levelup]}.  No missions payload (handler-map.md).
  */
-export function buyKarma(_token, karmalauterGestalt) {
+export function buyKarma(karmalauterGestalt) {
   var state = getState();
   var ruleset = _getRuleset();
 
@@ -653,7 +649,7 @@ function _checkLevelup(currentLevel, newXp) {
 // applyDelta in the listener (production) or in _persistDelta's fallback.
 
 // ---------------------------------------------------------------------------
-// buyPowerup(token, perpPath, slot, gestalt)
+// buyPowerup(perpPath, slot, gestalt)
 // ---------------------------------------------------------------------------
 
 /**
@@ -663,7 +659,7 @@ function _checkLevelup(currentLevel, newXp) {
  * Errors: 0 = node/type not found, 1 = slot occupied, 3 = insufficient cash.
  * Returns: { node, game_values, levelup }
  */
-export function buyPowerup(token, perpPath, slot, gestalt) {
+export function buyPowerup(perpPath, slot, gestalt) {
   var r = _resolveNode(perpPath);
   if (!r) return Promise.resolve({ result: { error: 0 } });
   var state = r.state, nodeIdx = r.nodeIdx, node = r.node, perpTypeData = r.perpTypeData;
@@ -719,13 +715,13 @@ export function buyPowerup(token, perpPath, slot, gestalt) {
                  missions: puMissionResult.missions || null };
 
   _persistDelta(_mkDelta(state.addr, 'buyPowerup',
-    [token, perpPath, slot, gestalt], result));
+    [perpPath, slot, gestalt], result));
 
   return Promise.resolve({ result: result });
 }
 
 // ---------------------------------------------------------------------------
-// sellPowerup(token, perpPath, slot, gestalt)
+// sellPowerup(perpPath, slot, gestalt)
 // ---------------------------------------------------------------------------
 
 /**
@@ -735,7 +731,7 @@ export function buyPowerup(token, perpPath, slot, gestalt) {
  * Errors: 0 = node/type not found, 1 = slot not occupied.
  * Returns: { node, game_values, levelup }
  */
-export function sellPowerup(token, perpPath, slot, gestalt) {
+export function sellPowerup(perpPath, slot, gestalt) {
   var r = _resolveNode(perpPath);
   if (!r) return Promise.resolve({ result: { error: 0 } });
   var state = r.state, nodeIdx = r.nodeIdx, node = r.node, perpTypeData = r.perpTypeData;
@@ -781,13 +777,13 @@ export function sellPowerup(token, perpPath, slot, gestalt) {
   var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
 
   _persistDelta(_mkDelta(state.addr, 'sellPowerup',
-    [token, perpPath, slot, gestalt], result));
+    [perpPath, slot, gestalt], result));
 
   return Promise.resolve({ result: result });
 }
 
 // ---------------------------------------------------------------------------
-// buySlots(token, perpPath, slot_type, num)
+// buySlots(perpPath, slot_type, num)
 // ---------------------------------------------------------------------------
 
 /**
@@ -798,7 +794,7 @@ export function sellPowerup(token, perpPath, slot, gestalt) {
  * Errors: 0 = node/type not found, 2 = would exceed max slots, 3 = no cash.
  * Returns: { node, game_values, levelup }
  */
-export function buySlots(token, perpPath, slotType, num) {
+export function buySlots(perpPath, slotType, num) {
   num = parseInt(num, 10) || 1;
   var r = _resolveNode(perpPath);
   if (!r) return Promise.resolve({ result: { error: 0 } });
@@ -845,7 +841,7 @@ export function buySlots(token, perpPath, slotType, num) {
   var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
 
   _persistDelta(_mkDelta(state.addr, 'buySlots',
-    [token, perpPath, slotType, num], result));
+    [perpPath, slotType, num], result));
 
   return Promise.resolve({ result: result });
 }
@@ -855,7 +851,7 @@ export function buySlots(token, perpPath, slotType, num) {
 // ---------------------------------------------------------------------------
 
 /**
- * buyPerp(token, parentPath, gestalt) → Promise<{result: BuyPerpResult}>
+ * buyPerp(parentPath, gestalt) → Promise<{result: BuyPerpResult}>
  *
  * Port of dd_app views.py:1001.  Single-tenant — no concurrent-writer guards.
  *
@@ -865,7 +861,7 @@ export function buySlots(token, perpPath, slotType, num) {
  *   3 — ProxyPerp slot limit reached
  *   4 — already purchased under this parent
  */
-export function buyPerp(_token, parentPath, gestalt) {
+export function buyPerp(parentPath, gestalt) {
   var state = getState();
   var ruleset = _getRuleset();
   var allTypes = Object.assign({}, ruleset.perps, ruleset.tokens);
@@ -1358,7 +1354,7 @@ function _advanceCollectCashMissions(state, gestalt, cashGain) {
 // chargePerp — Phase 3 (#16)
 // ---------------------------------------------------------------------------
 
-export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
+export function chargePerp(path) {
   var rawState = getState();
   var now      = clockNow();
   var ruleset  = _getRuleset();
@@ -1586,7 +1582,7 @@ function _handleKarmaIncident(gv, ruleset) {
 // ---------------------------------------------------------------------------
 
 /**
- * collectPerp(token, gperpPath) → Promise<{result}>
+ * collectPerp(gperpPath) → Promise<{result}>
  *
  * Materialize first (moves ready charges → nodes_collect).  Branch on perp
  * game_type to build the typed result payload.  $pull from nodes_collect,
@@ -1602,7 +1598,7 @@ function _handleKarmaIncident(gv, ruleset) {
  *   2 — node not found in state.nodes
  *   3 — unknown game_type
  */
-export function collectPerp(_token, gperpPath) {
+export function collectPerp(gperpPath) {
   var state = getState();
   var now = clockNow();
   var ruleset = _getRuleset();
@@ -1777,7 +1773,7 @@ export function collectPerp(_token, gperpPath) {
 // ---------------------------------------------------------------------------
 
 /**
- * integrateCollected(token, collectId) → Promise<{result}>
+ * integrateCollected(collectId) → Promise<{result}>
  *
  * $pull the db_queue entry by collect_id.  Apply integration rewards:
  * $inc profiles_value (dup-safe), xp_value, karma_value.  Update token
@@ -1789,7 +1785,7 @@ export function collectPerp(_token, gperpPath) {
  *   0 — collect_id not in db_queue (already integrated or never collected)
  *   1 — insufficient AP (parity with chargePerp)
  */
-export function integrateCollected(_token, collectId) {
+export function integrateCollected(collectId) {
   var rawState = getState();
   var now = clockNow();
   // Materialize so the AP regen ticks accumulated since the last call are
@@ -1960,11 +1956,11 @@ export function integrateCollected(_token, collectId) {
 }
 
 // ---------------------------------------------------------------------------
-// dismissMissionBriefing(token, gestalt) — record that the player has closed
+// dismissMissionBriefing(gestalt) — record that the player has closed
 // the briefing popup for a given mission so we don't re-open it on reload.
 // ---------------------------------------------------------------------------
 
-export function markTokenSeen(_token, gestalt) {
+export function markTokenSeen(gestalt) {
   if (typeof gestalt !== 'string' || !gestalt) {
     return Promise.resolve({ result: { error: 0 } });
   }
@@ -1977,7 +1973,7 @@ export function markTokenSeen(_token, gestalt) {
   return Promise.resolve({ result: { ok: true } });
 }
 
-export function dismissMissionBriefing(_token, gestalt) {
+export function dismissMissionBriefing(gestalt) {
   if (typeof gestalt !== 'string' || !gestalt) {
     return Promise.resolve({ result: { error: 0 } });
   }
@@ -2006,7 +2002,7 @@ _STUBS.forEach(function (name) {
 });
 
 // ---------------------------------------------------------------------------
-// Default export — object consumed by Remote.js via require('LocalEngine').
+// Default export — object consumed by app.js via require('LocalEngine').
 // Includes setEmitter so app.js can wire the DOM event bus after jQuery loads.
 // ---------------------------------------------------------------------------
 var LocalEngine = Object.assign({
