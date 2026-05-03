@@ -125,6 +125,56 @@ describe('applyDelta — schema-version mismatch (acceptance criterion B)', () =
 
 });
 
+describe('applyDelta — chargePerp keys nodes by path (#131)', () => {
+  // The handler emits a positional nodeIdx, but cold-start replay (with
+  // intervening buyPerp/sellPerp/migration deltas) can reorder state.nodes.
+  // The reducer must locate the target by path so the right perp is charged.
+  const addr = 'alice@example.com';
+
+  function chargeDelta(path, nodeIdx, ts) {
+    return {
+      kind: 'delta', addr, op: 'chargePerp', args: [path], ts: ts || 1000,
+      result: {
+        chargeEntry: { path, charge_start: 1000, charge_end: 31000, result: { amount: 100 } },
+        nodeIdx, // legacy positional hint — must NOT be trusted
+        cashDelta: 60, xpInc: 1,
+      },
+    };
+  }
+
+  it('charges the node matching chargeEntry.path even when nodes are reordered', () => {
+    const base = freshState(addr);
+    // Simulate the post-replay layout: A and B exist, but in a different
+    // order than when the chargePerp handler ran. chargeEntry targets B.
+    const nodeA = { game_id: 'a', game_type: 'ContactPerp', full_path: 'Imperium.A', gestalt: 'a', instance_data: {} };
+    const nodeB = { game_id: 'b', game_type: 'ContactPerp', full_path: 'Imperium.B', gestalt: 'b', instance_data: {} };
+    const state = Object.assign({}, base, { nodes: [nodeA, nodeB] });
+
+    // Handler-time index for B was 0 (because A didn't exist yet); now B is at 1.
+    const delta = chargeDelta('Imperium.B', 0);
+    const out = applyDelta(state, delta);
+
+    const a = out.nodes.find((n) => n.full_path === 'Imperium.A');
+    const b = out.nodes.find((n) => n.full_path === 'Imperium.B');
+    expect(b.instance_data.charge_start).toBe(1000);
+    expect(a.instance_data.charge_start).toBeUndefined();
+    expect(out.nodes_charging).toHaveLength(1);
+    expect(out.nodes_charging[0].path).toBe('Imperium.B');
+  });
+
+  it('still applies when nodeIdx is absent (path is the source of truth)', () => {
+    const base = freshState(addr);
+    const nodeB = { game_id: 'b', game_type: 'ContactPerp', full_path: 'Imperium.B', gestalt: 'b', instance_data: {} };
+    const state = Object.assign({}, base, { nodes: [nodeB] });
+
+    const delta = chargeDelta('Imperium.B', undefined);
+    const out = applyDelta(state, delta);
+
+    expect(out.nodes[0].instance_data.charge_start).toBe(1000);
+    expect(out.nodes_charging).toHaveLength(1);
+  });
+});
+
 describe('applyDelta — other-peer filter', () => {
   // Phase 6: foreign deltas now update state.peers[foreignAddr] (peer
   // aggregator runs for all deltas) while still blocking per-self mutations.

@@ -317,12 +317,17 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
 reducers.chargePerp = function chargePerpReducer(state, delta) {
   var r           = delta.result || {};
   var chargeEntry = r.chargeEntry;
-  if (!chargeEntry || typeof r.nodeIdx !== 'number') return state;
+  if (!chargeEntry || !chargeEntry.path) return state;
 
-  var nodeIdx = r.nodeIdx;
+  // Closes #131: locate the target node by path, not by positional index.
+  // The handler emits a positional nodeIdx, but on cold-start replay the
+  // intervening deltas (buyPerp/sellPerp/schema migration) can reorder
+  // state.nodes, so a stale nodeIdx points at the wrong perp. Path-keyed
+  // lookup matches the convention already used for nodes_charging below.
+  var path     = chargeEntry.path;
   var nodes    = state.nodes || [];
-  var newNodes = nodes.map(function(n, i) {
-    if (i !== nodeIdx) return n;
+  var newNodes = nodes.map(function(n) {
+    if (n.full_path !== path) return n;
     return Object.assign({}, n, {
       instance_data: Object.assign({}, n.instance_data, {
         charge_start: chargeEntry.charge_start
