@@ -1,16 +1,24 @@
-define(function(require) {
+// Render.js — ESM (issue #58).  Wrapper-only port: the AMD `define()`
+// shell + dep block are converted to imports + globalThis lookups; all
+// ~5180 lines of render-tree, draghandler, ticker shim and node classes
+// are byte-identical to master.  Vendor libs (zynga-*, createjs-*)
+// remain AMD-loaded — bootstrap.js preloads them so synchronous
+// globalThis.require resolves at first getRender() call.
+import appModule from './app.js';
+import setup from './setup.js';
+import utilDefault from './util.js';
 
-  var Render = function() {
+var Render = function() {
 
-    var _ = require('underscore');
-    var $ = require('jquery');
+    var _ = globalThis._;
+    var $ = globalThis.jQuery || globalThis.$;
 
-    var Scroller = require('zynga-scroller');
-    var core = require('zynga-animate');
+    var Scroller = globalThis.require('zynga-scroller');
+    var core = globalThis.require('zynga-animate');
 
-    var Easel = require('createjs-easel');
-    var Tween = require('createjs-tween');
-    var Sound = require('createjs-sound');
+    var Easel = globalThis.require('createjs-easel');
+    var Tween = globalThis.require('createjs-tween');
+    var Sound = globalThis.require('createjs-sound');
     var Ticker = Easel.Ticker;
     var Ease = Easel.Ease;
 
@@ -37,9 +45,8 @@ define(function(require) {
     // on every call in current TweenJS builds).
     Ticker.setFPS = function(fps) { Ticker.framerate = fps; };
 
-    var app = require('app').getApplication();
-    var setup = require('setup');
-    var extend = require('util').extend;
+    var app = appModule.getApplication();
+    var extend = utilDefault.extend;
 
     var renderConf = {
       cableResolution : 2,
@@ -5291,15 +5298,13 @@ define(function(require) {
       Statusbar: Statusbar,
       DBQueue: DBQueue
     };
-  }
+};
 
-  var render; // We store our singleton instance here.
+var render; // We store our singleton instance here.
 
-  return {
-    getRender: function() {
-      render = render || Render();
-      return render;
-    }
-  };
+export function getRender() {
+  render = render || Render();
+  return render;
+}
 
-});
+export default { getRender };

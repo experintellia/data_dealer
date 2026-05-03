@@ -30,6 +30,7 @@ export { default as i18n } from './i18n.js';
 export { default as type_settings } from './type_settings.js';
 export { default as app } from './app.js';
 export { default as Game } from './Game.js';
+export { default as Render } from './Render.js';
 
 // Bring the engine online before any AMD module can call into it.
 // boot() returns a Promise that resolves once setUpdateListener has

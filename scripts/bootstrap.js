@@ -33,11 +33,21 @@ require([
   // start path finds it in cache.  Note: the inner Game()-factory
   // body still does NOT run until getGame() is actually invoked.
   'Game',
-  // Render is still an AMD `define()` module; its factory body string-
-  // scans for zynga-scroller, zynga-animate, createjs-easel/tween/sound
-  // so preloading 'Render' transitively preloads them.  Once Render is
-  // ported (commit 4) those names will be added explicitly here.
+  // Render is now ESM-bundled; like Game it must be listed here so the
+  // AMD bridge factory is invoked and cached before app.start does a
+  // synchronous globalThis.require('Render').  Render's own factory
+  // body (Ticker setup, render-tree classes) still runs lazily on the
+  // first getRender() call — which only happens once Game's body
+  // calls it.
   'Render',
+  // Vendor libs Render.js's factory body reaches via synchronous
+  // globalThis.require — formerly auto-discovered through Render's
+  // own AMD `define()` factory string-scan, now explicit:
+  'zynga-scroller',
+  'zynga-animate',
+  'createjs-easel',
+  'createjs-tween',
+  'createjs-sound',
   'tpl!../views/loader.html'
 ], function(require) {
 

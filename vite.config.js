@@ -154,7 +154,7 @@ function bundleEsmDev() {
 }
 
 const amdScripts = [
-  'Render.js', 'bootstrap.js',
+  'bootstrap.js',
   'require.config.js',
   // The following are ESM as of issue #58 and reach AMD callers through the
   // bridge footer in esm-bundle.js; do NOT copy the raw files:
