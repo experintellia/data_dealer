@@ -43,7 +43,14 @@ export function clearOverride() {
  *
  * Equivalent to setOverride(now() + deltaMs).  If no override is currently
  * active, the base is the real Date.now() at the moment advance() is called.
+ *
+ * The contract is forward-only: deltaMs must be >= 0.  Passing a negative
+ * value throws RangeError so test bugs surface immediately rather than
+ * silently producing impossible clock states.  (state.js separately guards
+ * stored progress against backwards skew via Math.max(clockNow(),
+ * last_seen_ts), but that does not justify rewinding the clock here.)
  */
 export function advance(deltaMs) {
+  if (deltaMs < 0) throw new RangeError('clock.advance: deltaMs must be >= 0');
   _override = now() + deltaMs;
 }
