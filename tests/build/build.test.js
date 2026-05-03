@@ -28,9 +28,9 @@ describe('dist/ structure', () => {
     'index.html',
     'scripts/require.config.js',
     'scripts/bootstrap.js',
-    'scripts/app.js',
-    // LocalEngine.js is now ESM — bundled into esm-bundle.js via the AMD
-    // bridge; it is NOT copied as a standalone AMD file any more.
+    // LocalEngine.js, app.js, util.js, setup.js, i18n.js, type_settings.js
+    // are now ESM — bundled into esm-bundle.js via the AMD bridge; they
+    // are NOT copied as standalone AMD files.
     'scripts/esm-bundle.js',
     'vendor/requirejs.js',
     'vendor/jquery.js',

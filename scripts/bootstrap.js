@@ -4,14 +4,31 @@
 // remote.getToken() up front to detect a downed backend; in the webxdc
 // port the local engine is always available, so we go straight to
 // app.start() once boot()'s setUpdateListener promise resolves.
+// Preload list: every vendor lib that ESM modules read off the browser
+// global (window.jQuery, window._, window.numeral, …) MUST appear here so
+// RequireJS has fetched and run its AMD-define side effect before
+// app.getApplication() touches it.  In the AMD original, factory-body
+// `require('name')` strings were auto-discovered and added to the dep
+// list; ESM modules have no such magic so the list is now explicit.
 require([
   'require',
   'jquery',
+  'underscore',
+  'numeral',
   'i18n',
   'setup',
   'app',
   'boot',
   'native-console',
+  // Game and Render are preloaded so app.start can reach them via the
+  // synchronous globalThis.require('Game') / require('Render') form.
+  // Their factory bodies do NOT run at preload — only at first
+  // getGame()/getRender() call inside app.start, after the locale has
+  // been set.  Pulling them in here also pre-walks their `define()`
+  // dep lists (zynga-scroller, createjs-easel/tween/sound, sprintf,
+  // type_settings, util, …) so every nested sync require resolves.
+  'Game',
+  'Render',
   'tpl!../views/loader.html'
 ], function(require) {
 
