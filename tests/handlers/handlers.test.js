@@ -1484,7 +1484,7 @@ describe('buySlots — error: exactly one coin short of slot cost', () => {
   });
 });
 
-describe('buyPerp — error: parent path not in state.nodes (non-root, non-existing)', () => {
+describe('buyPerp — current behaviour (regression-only, not endorsement): ProxyPerp slot check skipped when parent absent', () => {
   // TODO: The bypass of the ProxyPerp slot check when parentNode is absent
   // is a known bug.  The desired behaviour is an explicit error code (e.g.
   // error:5 "parent not found") instead of a silent success.  These tests

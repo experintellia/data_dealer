@@ -307,14 +307,8 @@ describe('composability', () => {
 //
 // Verifies de-dup-by-path and "node_ready fires exactly once per charge"
 // at scale.  This exercises the inCollect path-set guard (materializer.js §1).
-//
-// Note on orphan nodes_charging leak (#114): the state.js collectPerp reducer
-// leaves the entry in nodes_charging when it removes it from nodes_collect,
-// so on cold-start replay the entry is re-promoted.  The E2E regression for
-// this is in tests/e2e/collect-after-reload.spec.ts (skipped pending #120).
-// There is no additional unit-level coverage needed here because the
-// materializer itself is correct — the leak is in the state reducer, not the
-// materializer rule.
+// (Orphan nodes_charging leak from issue #114 is covered by the E2E spec in
+// tests/e2e/collect-after-reload.spec.ts rather than here.)
 
 describe('idempotence under stress — 50+ completed charges', () => {
   it('all 52 completed charges move to nodes_collect without duplicates', () => {

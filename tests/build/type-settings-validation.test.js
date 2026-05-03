@@ -21,13 +21,15 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 // ── load fixtures ─────────────────────────────────────────────────────────────
 
-let rulesetDe, rulesetEn, typeSettingsSrc, localEngineSrc;
+let rulesetDe, rulesetEn, typeSettingsSrc, localEngineSrc, localeDe, localeEn;
 
 beforeAll(() => {
   rulesetDe      = JSON.parse(readFileSync(join(root, 'data', 'ruleset_3.de.json'), 'utf8'));
   rulesetEn      = JSON.parse(readFileSync(join(root, 'data', 'ruleset_3.en.json'), 'utf8'));
   typeSettingsSrc = readFileSync(join(root, 'scripts', 'type_settings.js'), 'utf8');
   localEngineSrc  = readFileSync(join(root, 'scripts', 'LocalEngine.js'), 'utf8');
+  localeDe        = JSON.parse(readFileSync(join(root, 'i18n', 'de_AT.json'), 'utf8'));
+  localeEn        = JSON.parse(readFileSync(join(root, 'i18n', 'en_US.json'), 'utf8'));
 });
 
 // ── helper: extract goals_texts workflow keys from type_settings.js source ───
@@ -45,6 +47,33 @@ function extractGoalsTextWorkflows(src) {
     keys.push(m[1]);
   }
   return keys;
+}
+
+// ── helper: extract display string msgids from goals_texts ────────────────────
+//
+// Each goals_texts entry maps a workflow key to _._("msgid").  This extracts
+// the msgid strings so we can verify they exist in the locale files.
+
+function extractGoalsTextMsgids(src) {
+  var match = src.match(/["']goals_texts["']\s*:\s*\{([^}]+)\}/);
+  if (!match) return [];
+  var block = match[1];
+  var msgids = [];
+  // Matches: _._("goal Charge Perp %s") or _._(  'goal Buy Perp %s'  )
+  // Note: _._( = identifier _ + dot + method _ + open-paren (one dot, not two).
+  var re = /_\._\(\s*["']([^"']+)["']\s*\)/g;
+  var m;
+  while ((m = re.exec(block)) !== null) {
+    msgids.push(m[1]);
+  }
+  return msgids;
+}
+
+// ── helper: check msgstr in locale JSON ──────────────────────────────────────
+
+function hasMsgstr(localeData, msgid) {
+  var entry = localeData[msgid];
+  return Array.isArray(entry) && entry.length > 1 && entry[1] != null;
 }
 
 // ── helpers: derive handler workflows from LocalEngine.js source ──────────────
@@ -210,5 +239,26 @@ describe('ruleset — mission reward targets', () => {
       });
     });
     expect(invalid).toEqual([]);
+  });
+});
+
+describe('goals_texts display strings — locale file coverage', () => {
+  // Closes the loop between type_settings.js and the translation files:
+  // every msgid used in goals_texts must have a non-null msgstr in both
+  // de_AT.json and en_US.json.  This would have caught the missing
+  // "goal Charge Perp %s" entry that was the root bug in issue #136.
+
+  it('every goals_texts display string has a German translation in de_AT.json', () => {
+    var msgids = extractGoalsTextMsgids(typeSettingsSrc);
+    expect(msgids.length).toBeGreaterThan(0);
+    var missing = msgids.filter(function (id) { return !hasMsgstr(localeDe, id); });
+    expect(missing).toEqual([]);
+  });
+
+  it('every goals_texts display string has an English translation in en_US.json', () => {
+    var msgids = extractGoalsTextMsgids(typeSettingsSrc);
+    expect(msgids.length).toBeGreaterThan(0);
+    var missing = msgids.filter(function (id) { return !hasMsgstr(localeEn, id); });
+    expect(missing).toEqual([]);
   });
 });
