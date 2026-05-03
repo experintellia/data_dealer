@@ -389,6 +389,7 @@ export function getRanking(_token, type) {
   var rows = Object.keys(peers).map(function (addr) {
     var p = peers[addr];
     return {
+      addr: addr,
       display_name: p.display_name || addr,
       value: typeof p[field] === 'number' ? p[field] : 0,
       self: addr === selfAddr,

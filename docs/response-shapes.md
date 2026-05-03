@@ -400,7 +400,8 @@ Expected response shape (merged into `gnode.data` via `mergeData`):
     top: Array<{
       self?: boolean,             // marks current user
       display_name: string,
-      value: number
+      value: number,
+      addr: string,               // peer addr — used as data-testid suffix
     }>,
     user_rank: number             // 0..1, multiplied by 100 for "%"
     // type_texts, type_texts_notinranking, type_titles are NOT server-provided.
