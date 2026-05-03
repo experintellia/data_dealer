@@ -2024,7 +2024,7 @@ define(function(require) {
       // so the name survives reloads without prompting the user again. The helper
       // is non-mutating — we route the new name through setDisplayName so the
       // reducer produces a fresh state instead of corrupting the live reference.
-      var newSelfName = webxdcIdentity.applyWebxdcIdentity(this.data.user);
+      var newSelfName = webxdcIdentity.getMessengerDisplayNameChange(this.data.user);
       if (newSelfName) {
         app.remote.setDisplayName(app.token, newSelfName);
       }
