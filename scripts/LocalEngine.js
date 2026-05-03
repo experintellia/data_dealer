@@ -1470,7 +1470,6 @@ export function chargePerp(token, path) { // eslint-disable-line no-unused-vars
   // correctly on cold start.
   _persistDelta(_mkDelta(state.addr, 'chargePerp', [path], {
     chargeEntry:  chargeEntry,
-    nodeIdx:      nodeIdx,
     cashDelta:    chargeCost,
     xpInc:        xpInc,
     game_values:  newGv,
