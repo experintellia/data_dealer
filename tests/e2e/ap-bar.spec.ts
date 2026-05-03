@@ -56,8 +56,8 @@ test('energy bar: charge action decrements visual AP value and bar width', async
     const eng = await new Promise<any>((res, rej) =>
       (window as any).require(['LocalEngine'], res, rej),
     );
-    await eng.buyPerp('tok', 'Imperium', args.gestalt);
-    return eng.chargePerp('tok', args.path);
+    await eng.buyPerp('Imperium', args.gestalt);
+    return eng.chargePerp(args.path);
   }, { gestalt: GESTALT, path: PATH });
 
   expect(chargeResult.result).not.toHaveProperty('error');

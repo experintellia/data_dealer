@@ -38,12 +38,12 @@ test('persistence: state is restored after page reload', async ({ page }) => {
   // ── Buy then charge the perp ──────────────────────────────────────────────
   await page.evaluate(async (gestalt) => {
     const eng = await new Promise<any>((res, rej) => (window as any).require(['LocalEngine'], res, rej));
-    await eng.buyPerp('tok', 'Imperium', gestalt);
+    await eng.buyPerp('Imperium', gestalt);
   }, GESTALT);
 
   const { cashAfterCharge } = await page.evaluate(async (path) => {
     const eng = await new Promise<any>((res, rej) => (window as any).require(['LocalEngine'], res, rej));
-    const result = await eng.chargePerp('tok', path);
+    const result = await eng.chargePerp(path);
     return { cashAfterCharge: result.result.game_values.cash_value };
   }, PATH);
 

@@ -63,7 +63,7 @@ test('gameplay: buy→charge→skip→collect→integrate decreases cash and inc
   // ── 2. Buy contact035 (price=0, no cash change) ───────────────────────────
   const buyResult = await page.evaluate(async (gestalt) => {
     const eng = await new Promise<any>((res, rej) => (window as any).require(['LocalEngine'], res, rej));
-    const res = await eng.buyPerp('tok', 'Imperium', gestalt);
+    const res = await eng.buyPerp('Imperium', gestalt);
     return res;
   }, GESTALT);
   expect(buyResult.result).not.toHaveProperty('error');
@@ -73,7 +73,7 @@ test('gameplay: buy→charge→skip→collect→integrate decreases cash and inc
   // ── 3. Charge the perp (charge_cost=60 → cash decreases) ─────────────────
   const chargeResult = await page.evaluate(async (path) => {
     const eng = await new Promise<any>((res, rej) => (window as any).require(['LocalEngine'], res, rej));
-    const res = await eng.chargePerp('tok', path);
+    const res = await eng.chargePerp(path);
     return res;
   }, PATH);
   expect(chargeResult.result).not.toHaveProperty('error');
@@ -90,7 +90,7 @@ test('gameplay: buy→charge→skip→collect→integrate decreases cash and inc
   // ── 5. Collect (ContactPerp path: creates a db_queue entry) ──────────────
   const collectResult = await page.evaluate(async (path) => {
     const eng = await new Promise<any>((res, rej) => (window as any).require(['LocalEngine'], res, rej));
-    const res = await eng.collectPerp('tok', path);
+    const res = await eng.collectPerp(path);
     return res;
   }, PATH);
   expect(collectResult.result.result).not.toHaveProperty('error');
@@ -100,7 +100,7 @@ test('gameplay: buy→charge→skip→collect→integrate decreases cash and inc
   // ── 6. Integrate (increases profiles_value in state) ─────────────────────
   const intResult = await page.evaluate(async (id) => {
     const eng = await new Promise<any>((res, rej) => (window as any).require(['LocalEngine'], res, rej));
-    const res = await eng.integrateCollected('tok', id);
+    const res = await eng.integrateCollected(id);
     return res;
   }, collectId);
   expect(intResult.result.result.increment).toBeGreaterThan(0);
