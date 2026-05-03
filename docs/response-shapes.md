@@ -401,12 +401,7 @@ Expected response shape (merged into `gnode.data` via `mergeData`):
       self?: boolean,             // marks current user
       display_name: string,
       value: number,
-      // Webxdc-port additions (#30): the LocalEngine peer aggregator
-      // populates these so the row template can address peers by addr,
-      // and dim rows whose last delta is older than the stale threshold.
       addr?: string,              // peer addr — used as data-testid suffix
-      last_seen_ts?: number,
-      stale?: boolean             // true ⇔ now - last_seen_ts > 7 days
     }>,
     user_rank: number             // 0..1, multiplied by 100 for "%"
     // type_texts, type_texts_notinranking, type_titles are NOT server-provided.

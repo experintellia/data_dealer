@@ -1534,10 +1534,6 @@
   height: 32px;
 }
 
-.TopscoreRow.dd-leaderboard-row--stale {
-  opacity: 0.5;
-}
-
 .TopscoreDisplayname {
   color:#009fd9;
 }

@@ -3350,18 +3350,13 @@ define(function(require) {
         score.fetchScore();
       });
 
-      // Live leaderboard refresh: subscribe to state.peers identity changes.
-      // Fires on remote peer deltas applied through the listener AND on own
-      // deltas via setState (boot.js). Refresh strategy refreshFromPeers
-      // bypasses the per-Topscore 30s fetch cache.
+      // Live leaderboard refresh: refreshFromPeers fires on every remote or
+      // own peer-field change.  Topscores lives for the page lifetime, so the
+      // returned unsubscribe is intentionally dropped.
       if (bootMod && typeof bootMod.subscribePeersChanged === 'function') {
-        var unsub = bootMod.subscribePeersChanged(function () {
+        bootMod.subscribePeersChanged(function () {
           gnode.refreshFromPeers();
         });
-        // Hold onto the unsubscribe so a future GameNode.remove can call it.
-        // (Topscores currently lives for the page lifetime, so this is
-        // belt-and-braces — no leak in practice.)
-        gnode._unsubscribePeers = unsub;
       }
     };
 
