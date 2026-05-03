@@ -2009,30 +2009,39 @@
 }
 
 .PopupBody.About .PopupHeader {
-  height: 90px;
+  height: 76px;
+  border-bottom: none;
+  border-radius: 12px 12px 0 0;
+  box-shadow: none;
 }
 .PopupBody.About .PopupHeader .MainMenuLogo {
   position: relative;
   top: auto;
   left: auto;
-  margin: 16px 0 6px 12px;
+  margin: 14px 0 0 12px;
+  width: 266px;
+  height: 48px;
+  background-size: 1152px 1229px;
+  background-position: -1px -983px;
 }
-.PopupBody.About .PopupHeader .PopupText {
-  margin-left: 12px;
+.PopupBody.About .PopupHeader .MainMenuLogo.de_AT {
+  background-position: -270px -983px;
 }
-
 .PopupBody.About .PopupMenu {
   position: absolute;
-  top: 88px;
+  top: 78px;
   left: 12px;
   width: 564px;
   text-align: left;
 }
 
-/* About dialog: long text body would otherwise scroll under the absolute
-   PopupButtons strip at bottom:-10px. Make the tab content scroll inside
-   .PopupContent and reserve room for the buttons. */
+/* About dialog: merge header and content into one visual box, and let
+   long text scroll inside .PopupContent rather than overflow. */
 .PopupBody.About .PopupContent {
+  margin-top: 0;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  box-shadow: none;
   overflow-y: auto;
   overflow-x: hidden;
 }
