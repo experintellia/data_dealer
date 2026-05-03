@@ -999,6 +999,21 @@ function _seedGoalRow(missionGestalt, g) {
   };
 }
 
+// Marks buy_perp goals complete when the player already owns the target node.
+// Returns the same array reference when nothing changed so callers can use
+// reference equality to detect whether any repairs were made.
+function _autoCompleteBuyPerpGoals(goals, nodes) {
+  var owned = {};
+  (nodes || []).forEach(function (n) { if (n.gestalt) owned[n.gestalt] = true; });
+  var changed = false;
+  var result = goals.map(function (g) {
+    if (g.workflow !== 'buy_perp' || g.complete || !owned[g.target]) return g;
+    changed = true;
+    return Object.assign({}, g, { complete: true, current_amount: g.amount || 1 });
+  });
+  return changed ? result : goals;
+}
+
 // Without this, fresh games (or saves activated by legacy code) have empty
 // mission_goals and progression handlers find nothing to advance.
 function _seedMissionGoals(state) {
@@ -1025,8 +1040,11 @@ function _seedMissionGoals(state) {
     });
   });
 
-  if (!added) return state;
-  return Object.assign({}, state, { mission_goals: newGoals });
+  // Repair stuck buy_perp goals for items the player already owns — covers
+  // both newly seeded goals and goals seeded before a prior session ended.
+  var repairedGoals = _autoCompleteBuyPerpGoals(newGoals, state.nodes);
+  if (!added && repairedGoals === newGoals) return state;
+  return Object.assign({}, state, { mission_goals: repairedGoals });
 }
 
 // current_amount math mirrors TokenPerp.setAmount → DBTokensAbsolute
@@ -1123,6 +1141,9 @@ function _completeMissionsIfReady(updatedGoals, activeMissions) {
         updatedGoals = updatedGoals.concat([_seedGoalRow(gestalt, g)]);
       });
     });
+    // Auto-complete buy_perp goals for items the player already owns so a
+    // mission that unlocks after the item was bought doesn't get stuck.
+    updatedGoals = _autoCompleteBuyPerpGoals(updatedGoals, getState().nodes);
   }
 
   var updatedMissions = activeMissions.filter(function (m) {
