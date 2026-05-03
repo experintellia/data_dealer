@@ -30,14 +30,10 @@ import { freshState, applyDelta } from './state.js';
 var _currentState = null;
 var _bootPromise  = null;
 
-// Subscribers to user-visible peer changes (display_name, cash, profiles,
-// xp, level, spent).  Used by the Topscores view to refresh without polling.
-// Per-delta book-keeping fields like last_seen_ts are deliberately excluded
-// so handlers that touch only the timestamp (setLocale, markTokenSeen, etc.)
-// don't trigger a leaderboard re-fetch.
+// Subscribers notified whenever applyDelta produces a new state.peers
+// reference.  Used by the Topscores view to refresh the leaderboard
+// without polling.  ESM-pure (no jQuery/event-bus dependency).
 var _peersChangedSubs = [];
-
-var _LEADERBOARD_FIELDS = ['display_name', 'cash', 'profiles', 'xp', 'level', 'spent'];
 
 // Replay progress is updated on every listener callback during initial replay.
 // Polled by bootstrap.js to drive the <progress id="loader"> element. The
@@ -81,7 +77,9 @@ export function boot(options) {
     listenerPromise = webxdc.setUpdateListener(function (update) {
       var prevPeers = _currentState && _currentState.peers;
       _currentState = applyDelta(_currentState, update.payload);
-      _maybeNotifyPeersChanged(prevPeers, _currentState && _currentState.peers);
+      if (_currentState && _currentState.peers !== prevPeers) {
+        _notifyPeersChanged();
+      }
       var s = (typeof update.serial     === 'number') ? update.serial     : 0;
       var m = (typeof update.max_serial === 'number') ? update.max_serial : s;
       if (s > _replayProgress.serial)     _replayProgress.serial     = s;
@@ -141,25 +139,26 @@ export function getState() {
  * Called by LocalEngine after materializer runs to persist the advanced state.
  * Also useful in tests to seed state before exercising handlers.
  *
- * Fires peers-changed subscribers when a user-visible peer field changed,
- * so handler-driven echoes (chargePerp, buyKarma, etc.) propagate to the
- * Topscores view via the same channel as remote peer deltas applied through
- * the listener.
+ * Fires peers-changed subscribers when newState.peers differs by reference
+ * from the previous state, so handler-driven echoes (chargePerp, buyKarma,
+ * etc.) propagate to the Topscores view via the same channel as remote
+ * peer deltas applied through the listener.
  */
 export function setState(newState) {
   var prevPeers = _currentState && _currentState.peers;
   _currentState = newState;
-  _maybeNotifyPeersChanged(prevPeers, newState && newState.peers);
+  if (newState && newState.peers !== prevPeers) {
+    _notifyPeersChanged();
+  }
 }
 
 /**
  * subscribePeersChanged(fn) → unsubscribe()
  *
- * Registers fn(state) to be invoked when a user-visible peer field changes
- * (display_name / cash / profiles / xp / level / spent).  Returns an
- * unsubscribe function.  Used by the legacy Topscores view (scripts/Game.js)
- * to refresh the leaderboard when remote peer deltas land or own deltas
- * mutate the self peer entry.
+ * Registers fn(state) to be invoked when state.peers reference changes.
+ * Returns an unsubscribe function.  The legacy Topscores view
+ * (scripts/Game.js) calls this to refresh the leaderboard when remote
+ * peer deltas land or own deltas mutate the self peer entry.
  */
 export function subscribePeersChanged(fn) {
   if (typeof fn !== 'function') return function noop() {};
@@ -170,34 +169,9 @@ export function subscribePeersChanged(fn) {
   };
 }
 
-// Fires _peersChangedSubs only when at least one peer's leaderboard fields
-// differ between prev and next.  Cheap object-identity short-circuits handle
-// the common no-op case (same .peers reference); the field walk runs only
-// when applyDelta produced a fresh peers object.
-function _maybeNotifyPeersChanged(prevPeers, nextPeers) {
-  if (prevPeers === nextPeers) return;
-  if (!_peersValueChanged(prevPeers, nextPeers)) return;
+function _notifyPeersChanged() {
   for (var i = 0; i < _peersChangedSubs.length; i++) {
     try { _peersChangedSubs[i](_currentState); }
     catch (_) { /* never let one subscriber break the listener */ }
   }
-}
-
-function _peersValueChanged(prev, next) {
-  var prevPeers = prev || {};
-  var nextPeers = next || {};
-  var nextKeys = Object.keys(nextPeers);
-  if (nextKeys.length !== Object.keys(prevPeers).length) return true;
-  for (var i = 0; i < nextKeys.length; i++) {
-    var k = nextKeys[i];
-    var p = prevPeers[k];
-    var n = nextPeers[k];
-    if (!p || !n) return true;
-    if (p === n) continue;
-    for (var f = 0; f < _LEADERBOARD_FIELDS.length; f++) {
-      var key = _LEADERBOARD_FIELDS[f];
-      if (p[key] !== n[key]) return true;
-    }
-  }
-  return false;
 }
