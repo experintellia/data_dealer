@@ -1307,6 +1307,8 @@ function _advanceBuyPerpMissions(state, gestalt) {
   var changed = false;
   var updatedGoals = missionGoals.map(function (goal) {
     if (goal.workflow === 'buy_perp' && goal.target === gestalt && !goal.complete) {
+      // !goal.complete is not sufficient: completing a goal for a mission already
+      // removed from activeMissions leaves mission_goals in an inconsistent state.
       if (activeMissions.indexOf(goal.mission) === -1) return goal;
       changed = true;
       return _completeGoal(goal);
