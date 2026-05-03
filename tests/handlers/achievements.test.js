@@ -245,45 +245,6 @@ describe('achievement — Tier 2: level-up via buyKarma', () => {
   });
 });
 
-// ── Tier 3: first perp (joined) ───────────────────────────────────────────────
-
-describe('achievement — Tier 3: first perp purchased (joined)', () => {
-  beforeEach(() => {
-    setOverride(FIXED_NOW);
-    setState(mkState({
-      display_name: 'Eve',
-      locale: 'en',
-      game_values: mkGv({ cash_value: 5000, xp_level: 1 })
-      // node_counter defaults to 0 in freshState
-    }));
-  });
-
-  afterEach(() => {
-    clearOverride();
-    setSendAchievement(null);
-    setSendDelta(null);
-  });
-
-  it('fires joined achievement on first ever buyPerp', async () => {
-    const spy = mkAchievementSpy();
-    await buyPerp('Imperium', 'client007');
-    expect(callsOfKind(spy, 'joined')).toHaveLength(1);
-  });
-
-  it('joined info contains display name', async () => {
-    const spy = mkAchievementSpy();
-    await buyPerp('Imperium', 'client007');
-    const call = callsOfKind(spy, 'joined')[0];
-    expect(call[0].info).toContain('Eve');
-  });
-
-  it('does NOT fire joined on second buyPerp', async () => {
-    await buyPerp('Imperium', 'client007');   // first buy — joined fires
-    const spy = mkAchievementSpy();           // fresh spy
-    await buyPerp('Imperium', 'client002');   // second buy
-    expect(callsOfKind(spy, 'joined')).toHaveLength(0);
-  });
-});
 
 // ── Tier 3: profile milestone ─────────────────────────────────────────────────
 

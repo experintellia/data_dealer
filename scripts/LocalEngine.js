@@ -1084,9 +1084,6 @@ export function buyPerp(parentPath, gestalt) {
 
   // Achievements
   var _bpDisplayName = state.display_name || state.addr;
-  if (nodeCounter === 1) {
-    triggerAchievement('joined', _t('achievement_joined', _bpDisplayName));
-  }
   if (levelup) {
     triggerAchievement('levelup',
       _t('achievement_levelup', _bpDisplayName, String(newGv.xp_level)));

@@ -941,11 +941,7 @@
     null,
     "%s reached level %s"
   ],
-  "achievement_joined": [
-    null,
-    "%s joined the data dealer game"
-  ],
-  "achievement_profiles_milestone": [
+"achievement_profiles_milestone": [
     null,
     "%s has %s profiles in their database"
   ],
