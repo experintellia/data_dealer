@@ -1,7 +1,7 @@
 // @ts-check
-// In-process gameplay handlers (formerly the JSON-RPC service).
-// ESM exports — consumed by app.js via the AMD bridge in esm-bundle.js.
-// No DOM globals in handler bodies; safe to import from Node for tests.
+// In-process gameplay handlers, consumed by app.js as a default-namespace
+// import.  No DOM globals in handler bodies; safe to import from Node
+// for tests.
 //
 // Handlers implemented here: getToken, ping, getSessionLocale, loadGame (#12),
 // getRanking, setDisplayName, setPerpCoordinates (#13),

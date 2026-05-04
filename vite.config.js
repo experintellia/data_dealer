@@ -115,7 +115,10 @@ function bundleEsmDev() {
     name: 'esm-bundle-dev',
     apply: 'serve',
     async configureServer(server) {
-      await rebuild().catch((err) => {
+      // Kick off the initial build but don't block listen() on it —
+      // the middleware below returns 503 until bundleSrc is set, and
+      // the browser will pick up the bundle on its next request.
+      rebuild().catch((err) => {
         server.config.logger.error('[esm-bundle-dev] initial build failed: ' + err.message);
       });
       server.watcher.on('change', (file) => {
@@ -182,12 +185,8 @@ export default defineConfig({
         { src: 'LICENSE-CODE.txt', dest: '' },
         { src: 'LICENSE-ASSETS.txt', dest: '' },
         // Vendor libs are loaded as plain `<script>` tags from index.html
-        // and exposed as browser globals (window.jQuery, window._, …) the
-        // ESM bundle reads from globalThis.  After issue #58 closed,
-        // vendor/requirejs.js, vendor/text.js, vendor/tpl.js and
-        // vendor/jquery-mobile.js (a stub) are no longer used and not
-        // shipped — the directory ships only the libs index.html actually
-        // references.
+        // and exposed as browser globals (window.jQuery, window._, …)
+        // the ESM bundle reads from globalThis.
         { src: 'vendor', dest: '' },
         { src: 'css', dest: '' },
         { src: 'img', dest: '' },

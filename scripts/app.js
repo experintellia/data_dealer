@@ -1,10 +1,8 @@
-// Application root.  Owns the wiring between the LocalEngine handlers,
-// the i18n layer, and the Game/Render singletons.  Pure ESM (issue #58).
-//
-// Vendor libs ($, _, numeral, sprintf, createjs, etc.) are still global —
-// they are loaded as plain `<script>` tags in index.html before this
-// bundle runs and exposed via window — so we read them off globalThis at
-// factory-body time.  No more RequireJS, no more AMD bridge.
+// Application root.  Wires LocalEngine handlers, the i18n layer, and
+// the Game/Render singletons.  Vendor libs ($, _, numeral, sprintf,
+// createjs) are read off globalThis at factory-body time — they are
+// loaded as plain `<script>` tags in index.html before this bundle
+// runs.
 
 import setup from './setup.js';
 import i18n from './i18n.js';
@@ -12,32 +10,26 @@ import LocalEngine from './LocalEngine.js';
 import { getGame } from './Game.js';
 import { getRender } from './Render.js';
 
-// Pre-compile every <view>.html template at bundle time.  Each entry is
-// a function `(data) => html` that runs through underscore's template
-// engine with the legacy `D` variable name (a holdover from the AMD-era
-// `tpl` plug-in's variable-naming setting).
+// All view sources are inlined at bundle time; templates are compiled
+// the first (and only) time the Application factory runs, when
+// vendor underscore is guaranteed to have set window._.  Doing it at
+// module-eval time would crash because `_` is not yet on globalThis.
 const viewSources = import.meta.glob('../views/*.html', {
   query: '?raw',
   import: 'default',
   eager: true,
 });
 
-// Map basename ('foo.html') → compiled template fn.  Compilation happens
-// the first time the Application factory runs (after vendor underscore
-// has set window._); doing it here would crash because `_` is not yet
-// defined at module-evaluation time.
-let _templates = null;
 function compileTemplates() {
-  if (_templates) return _templates;
   const _ = globalThis._;
-  _templates = {};
+  const out = {};
   for (const path in viewSources) {
     const name = path.split('/').pop();
-    // underscore 1.5.1: `_.template(text, data, settings)`; pass null
-    // for data so we get a compiled function rather than eager output.
-    _templates[name] = _.template(viewSources[path], null, { variable: 'D' });
+    // underscore 1.5.1's signature is `_.template(text, data, settings)`;
+    // pass null for data so we get back a precompiled function.
+    out[name] = _.template(viewSources[path], null, { variable: 'D' });
   }
-  return _templates;
+  return out;
 }
 
 const Application = function() {
@@ -74,9 +66,9 @@ const Application = function() {
     }
   };
 
-  // Wrap each LocalEngine handler so callers get a jQuery Deferred —
-  // Game.js still uses .done()/.fail() chains.  $.when adopts the native
-  // Promise returned by the handler.
+  // Game.js still uses jQuery `.done()/.fail()` chains; wrap each
+  // LocalEngine handler so callers get a Deferred instead of a native
+  // Promise.
   const INTERNAL_API = { setEmitter: 1, setSendDelta: 1, setPrngSeed: 1 };
   app.remote = {};
   Object.keys(LocalEngine).forEach(function(name) {
@@ -128,9 +120,6 @@ const Application = function() {
       else { return {}; }
     },
     numeral: numeral,
-    // vendor/sprintf.js sets window.sprintf when loaded as a plain
-    // <script> tag — its anonymous AMD define is now a no-op since
-    // there is no AMD loader to register with.
     sprintf: window.sprintf,
     renderView: app.renderView,
     pad0: function(number, length) {

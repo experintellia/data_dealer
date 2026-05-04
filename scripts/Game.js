@@ -1,10 +1,6 @@
-// Game.js — ESM (issue #58).  Internal classes / prototype chain are
-// untouched; only the legacy AMD wrapper, the dep block, and the
-// module-tail singleton glue have been ported.  Vendor libs ($, _,
-// sprintf) are still global — loaded via plain `<script>` tags in
-// index.html before the bundle IIFE runs — so we read them off
-// globalThis at factory-body time, which is later than module-
-// evaluation time and well after the vendor scripts have executed.
+// Vendor libs ($, _, sprintf) are read off globalThis at factory-body
+// time, not at module-evaluation time, so this module can be bundled
+// alongside scripts that run before vendor `<script>` tags execute.
 import appModule from './app.js';
 import setup from './setup.js';
 import utilDefault from './util.js';

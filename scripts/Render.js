@@ -1,10 +1,7 @@
-// Render.js — ESM (issue #58).  The legacy AMD wrapper has been
-// replaced with module-top imports + globalThis lookups; all ~5180
-// lines of render-tree, draghandler, ticker shim and node classes are
-// byte-identical to master.  Vendor libs (zynga-*, createjs-*) are
-// loaded as plain `<script>` tags in index.html and expose globals
-// (window.Scroller, window.core, window.createjs) which we read at
-// factory-body time on the first getRender() call.
+// Vendor libs (window.Scroller, window.core, window.createjs) are read
+// off globalThis at factory-body time on the first getRender() call,
+// so this module is safe to bundle alongside code that runs before
+// the vendor `<script>` tags execute.
 import appModule from './app.js';
 import setup from './setup.js';
 import utilDefault from './util.js';
@@ -17,9 +14,7 @@ var Render = function() {
     var Scroller = globalThis.Scroller;
     var core = globalThis.core;
 
-    // The legacy AMD shims returned createjs vs createjs.Tween depending
-    // on the module id; preserve the same handles here.  Easel and Sound
-    // alias the whole namespace; Tween is its sub-class.
+    // Tween is the sub-class; Easel and Sound just alias the namespace.
     var Easel = globalThis.createjs;
     var Tween = globalThis.createjs.Tween;
     var Sound = globalThis.createjs;

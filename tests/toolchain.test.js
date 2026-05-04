@@ -8,10 +8,7 @@ import { fileURLToPath } from 'url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('vendor files', () => {
-  // After issue #58 closed, requirejs.js, almond.js, text.js, tpl.js,
-  // native-console.js and jquery-mobile.js are no longer shipped — the
-  // remaining vendor libs are loaded as plain `<script>` tags from
-  // index.html and exposed via browser globals.
+  // The libs index.html `<script>`-loads, in dependency order.
   const required = [
     'jquery.js', 'jquery-migrate.js', 'underscore.js', 'numeral.js', 'numeral-de.js',
     'easeljs.js', 'tweenjs.js', 'soundjs.js',
@@ -23,7 +20,7 @@ describe('vendor files', () => {
     });
   }
 
-  // Negative assertions: confirm the AMD-era plumbing is really gone.
+  // The legacy AMD plumbing must not regress back into vendor/.
   const removed = ['requirejs.js', 'almond.js', 'text.js', 'tpl.js', 'jquery-mobile.js', 'native-console.js'];
   for (const f of removed) {
     it(`vendor/${f} no longer exists`, () => {

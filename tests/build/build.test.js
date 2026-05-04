@@ -24,10 +24,9 @@ beforeAll(() => {
 }, 180_000);
 
 describe('dist/ structure', () => {
-  // After issue #58 closed, RequireJS is gone.  scripts/require.config.js
-  // and scripts/bootstrap.js + every other AMD module have been folded
-  // into the ESM bundle (dist/scripts/esm-bundle.js); vendor/requirejs.js
-  // is no longer shipped; views/*.html are inlined as `?raw` imports.
+  // RequireJS is gone.  scripts/require.config.js and scripts/bootstrap.js
+  // + every other AMD module are folded into dist/scripts/esm-bundle.js;
+  // views/*.html are inlined as `?raw` imports.
   const required = [
     'index.html',
     'scripts/esm-bundle.js',
@@ -44,7 +43,8 @@ describe('dist/ structure', () => {
     });
   }
 
-  // Negative assertions: confirm the AMD-era plumbing really is gone.
+  // Negative assertions: the legacy AMD plumbing must not regress back
+  // into the build output.
   const removed = [
     'scripts/require.config.js',
     'scripts/bootstrap.js',
@@ -89,13 +89,9 @@ describe('dist/scripts/esm-bundle.js', () => {
     expect(bundle).toContain('integrateCollected');
   });
 
-  it('does NOT contain the legacy AMD bridge footer', async () => {
+  it('does NOT contain a `define.amd` AMD-bridge footer', async () => {
     const { readFileSync } = await import('fs');
     const bundle = readFileSync(join(root, 'dist', 'scripts', 'esm-bundle.js'), 'utf8');
-    // The #31 shim looked like `if (typeof define === 'function' && define.amd)
-    // { Object.keys(__DD).forEach(...) }`.  The bundler may keep the
-    // identifier `__DD` (it's still the IIFE result name), but no
-    // `define.amd` check should remain.
     expect(bundle).not.toContain('define.amd');
   });
 });

@@ -14,11 +14,11 @@
 //   zynga-animate — no npm pkg; vendored verbatim
 //   zynga-scroller — no npm pkg; vendored from upstream + AMD wrapper
 //
-// Issue #58 retired the AMD-era plumbing: the legacy module loader,
-// its text / tpl plug-ins, almond, the no-op console polyfill, and
-// the jquery-mobile stub are no longer installed.  All scripts/ modules
-// are pure ESM, bundled via Vite into scripts/esm-bundle.js; the
-// remaining vendor libs ship as plain `<script>` tags in index.html.
+// scripts/ modules are pure ESM, bundled via Vite into
+// scripts/esm-bundle.js; vendor libs ship as plain `<script>` tags
+// in index.html.  The legacy module loader, its text / tpl plug-ins,
+// almond, the no-op console polyfill, and the jquery-mobile stub are
+// no longer installed.
 //
 // If internet access is available, replace the stubs with their real versions:
 //   zynga-animate: https://raw.githubusercontent.com/zynga/scroller/7d460ea/src/Animate.js
