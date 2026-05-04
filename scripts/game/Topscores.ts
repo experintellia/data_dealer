@@ -40,6 +40,7 @@ interface GameRootWithMenu {
 }
 
 export class Topscores extends GameNode {
+  override renderType = 'ViewTab';
   // Narrow the inherited `children: OrderedSet<GameNode>` to the actual
   // shape Topscores produces — every child added via initTopscore() is a
   // Topscore instance.  Type-only override (`declare`); no runtime change.
@@ -141,5 +142,3 @@ export class Topscores extends GameNode {
     }
   }
 }
-
-Topscores.prototype.renderType = 'ViewTab';

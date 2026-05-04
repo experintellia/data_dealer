@@ -53,6 +53,7 @@ interface TopscoreRenderNode {
 const FETCH_CACHE_MS = 30_000;
 
 export class Topscore extends GameNode {
+  override renderType = 'TopscorePerp';
   scoretype?: string;
   lastFetch?: Date | null;
 
@@ -109,9 +110,3 @@ export class Topscore extends GameNode {
     });
   }
 }
-
-// Static prototype property — set imperatively so Game.js's existing
-// `Render[node.renderType]` lookup continues to find 'TopscorePerp'.
-// (Class-body field initializers would attach the property to instances,
-// not the prototype, breaking the legacy lookup.)
-Topscore.prototype.renderType = 'TopscorePerp';

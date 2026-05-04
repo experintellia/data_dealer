@@ -26,6 +26,7 @@ import {
   getParentId,
   remove,
 } from './game/GameNode.js';
+import { Imperium } from './game/Imperium.js';
 import { Mission } from './game/Mission.js';
 import { Missions } from './game/Missions.js';
 import { OrderedSet } from './game/OrderedSet.js';
@@ -1975,31 +1976,11 @@ var Game = function () {
   ///////////////////////////////////
   // The Imperium
   ///////////////////////////////////
-
-  var Imperium = function (config) {
-    this.init(config);
-    this.ViewMap = this;
-    return this;
-  };
-
-  extend(Imperium, GameNode);
-
-  Imperium.prototype.renderType = 'ViewMap';
-
-  Imperium.prototype.extendRender = function () {
-    this.setState('active', true);
-    // FIXME: name should be in data
-    //this.GameRoot.renderMenu.addButton(this.renderData.config.name, this.id, this.states);
-    this.GameRoot.renderMenu.addButton(_._('My Empire'), this.id, this.states);
-  };
-
-  Imperium.prototype.lock = function () {
-    this.renderNode.lock();
-  };
-
-  Imperium.prototype.unlock = function () {
-    this.renderNode.unlock();
-  };
+  //
+  // Extracted to scripts/game/Imperium.ts in PR 8 of issue #147.  The
+  // class is imported above; the API publisher at the bottom of this
+  // IIFE re-exposes it as Game.Imperium so call sites (GameRoot.loadGame
+  // etc.) keep working unchanged.
 
   ///////////////////////////////////
   // The Database

@@ -50,6 +50,7 @@ interface MissionsParent extends GameNode {
 }
 
 export class Mission extends GameNode {
+  override renderType = 'MissionPerp';
   declare data: MissionDataShape;
   popupTemplate = 'popup_mission.html';
 
@@ -215,7 +216,5 @@ export class Mission extends GameNode {
     }
   }
 }
-
-Mission.prototype.renderType = 'MissionPerp';
 
 void appModule;
