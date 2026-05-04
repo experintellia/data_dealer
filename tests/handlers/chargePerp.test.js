@@ -410,6 +410,18 @@ describe('chargePerp — level-up refills AP and advances xp_level', () => {
     const { result } = await chargePerp(NODE_PATH);
     expect(result.game_values.ap_snapshot).toBe(8);
   });
+
+  // Regression: without raising ap_max in game_values too, the next
+  // materialize() pass clamps ap_snapshot back down to the previous
+  // level's ceiling — so the player visibly loses the energy they were
+  // just awarded for levelling up.
+  it("raises ap_max to the new level's ceiling so the refill survives materialize", async () => {
+    const { result } = await chargePerp(NODE_PATH);
+    expect(result.game_values.ap_max).toBe(8);
+
+    var mat = materialize(getState(), FIXED_NOW + 1);
+    expect(mat.state.game_values.ap_snapshot).toBe(8);
+  });
 });
 
 describe('chargePerp — no level-up keeps xp_level and decrements ap_snapshot', () => {
