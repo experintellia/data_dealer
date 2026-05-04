@@ -164,7 +164,7 @@ interface GameNodeDef {
   children?: GameNodeDef[];
 }
 
-interface GameSeed {
+export interface GameSeed {
   game_values?: Partial<GameValues>;
   active_missions?: string[];
   Imperium?: { children?: GameNodeDef[] };

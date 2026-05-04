@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 // Pull in the official webxdc global types (window.webxdc: Webxdc<…>).
 import type { Webxdc } from '@webxdc/types';
 import '@webxdc/types/global';
