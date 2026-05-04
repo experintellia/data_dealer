@@ -13,8 +13,12 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-  buyPerp, integrateCollected, buyKarma,
-  setSendAchievement, setSendDelta, setEmitter
+  buyPerp,
+  integrateCollected,
+  buyKarma,
+  setSendAchievement,
+  setSendDelta,
+  setEmitter,
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { applyDelta, freshState } from '../../scripts/state.js';
@@ -30,7 +34,7 @@ function mkAchievementSpy() {
 }
 
 function callsOfKind(spy, achievementKind) {
-  return spy.mock.calls.filter(c => c[0].payload.achievement_kind === achievementKind);
+  return spy.mock.calls.filter((c) => c[0].payload.achievement_kind === achievementKind);
 }
 
 // ── Tier 1: mission completion via buyPerp ────────────────────────────────────
@@ -39,26 +43,30 @@ describe('achievement — Tier 1: mission completion via buyPerp', () => {
   // mission008 / Sick World — single seeded goal: buy_perp target client002.
   // Using locale 'en' so mission titles match the en ruleset.
   const MISSION_GESTALT = 'mission008';
-  const MISSION_TITLE   = 'Sick World'; // type_data.title in ruleset_3.en.json
+  const MISSION_TITLE = 'Sick World'; // type_data.title in ruleset_3.en.json
 
   beforeEach(() => {
     setOverride(FIXED_NOW);
-    setState(mkState({
-      display_name: 'Alice',
-      locale: 'en',
-      game_values: mkGv({ cash_value: 5000, xp_level: 1, xp_value: 5 }),
-      active_missions: [MISSION_GESTALT],
-      // Seed only this one goal so the mission completes immediately.
-      mission_goals: [{
-        mission:        MISSION_GESTALT,
-        workflow:       'buy_perp',
-        target:         'client002',
-        amount:         null,
-        position:       1,
-        current_amount: 0,
-        complete:       false
-      }]
-    }));
+    setState(
+      mkState({
+        display_name: 'Alice',
+        locale: 'en',
+        game_values: mkGv({ cash_value: 5000, xp_level: 1, xp_value: 5 }),
+        active_missions: [MISSION_GESTALT],
+        // Seed only this one goal so the mission completes immediately.
+        mission_goals: [
+          {
+            mission: MISSION_GESTALT,
+            workflow: 'buy_perp',
+            target: 'client002',
+            amount: null,
+            position: 1,
+            current_amount: 0,
+            complete: false,
+          },
+        ],
+      })
+    );
   });
 
   afterEach(() => {
@@ -114,33 +122,39 @@ describe('achievement — Tier 1: mission completion via buyPerp', () => {
 // ── Tier 1: mission completion via integrateCollected ─────────────────────────
 
 describe('achievement — Tier 1: mission completion via integrateCollected', () => {
-  const COLLECT_ID    = 'ach-test-cid-001';
-  const MISSION_GEST  = 'mission002';
+  const COLLECT_ID = 'ach-test-cid-001';
+  const MISSION_GEST = 'mission002';
   const MISSION_TITLE = 'Enter the Vault!'; // en ruleset title
 
   beforeEach(() => {
     setOverride(FIXED_NOW);
-    setState(mkState({
-      display_name: 'Bob',
-      locale: 'en',
-      game_values: mkGv({ profiles_value: 0, ap_snapshot: 6 }),
-      active_missions: [MISSION_GEST],
-      mission_goals: [{
-        mission:        MISSION_GEST,
-        workflow:       'integrate_profiles',
-        target:         'token008',
-        amount:         900,
-        position:       1,
-        current_amount: 0,
-        complete:       false
-      }],
-      db_queue: [{
-        origin:      'Imperium.City.Agent0.contact035',
-        collect_id:  COLLECT_ID,
-        profile_set: { profiles_value: 1100, tokens_map: { token008: { amount: 100 } } },
-        collect_dt:  FIXED_NOW
-      }]
-    }));
+    setState(
+      mkState({
+        display_name: 'Bob',
+        locale: 'en',
+        game_values: mkGv({ profiles_value: 0, ap_snapshot: 6 }),
+        active_missions: [MISSION_GEST],
+        mission_goals: [
+          {
+            mission: MISSION_GEST,
+            workflow: 'integrate_profiles',
+            target: 'token008',
+            amount: 900,
+            position: 1,
+            current_amount: 0,
+            complete: false,
+          },
+        ],
+        db_queue: [
+          {
+            origin: 'Imperium.City.Agent0.contact035',
+            collect_id: COLLECT_ID,
+            profile_set: { profiles_value: 1100, tokens_map: { token008: { amount: 100 } } },
+            collect_dt: FIXED_NOW,
+          },
+        ],
+      })
+    );
   });
 
   afterEach(() => {
@@ -180,11 +194,13 @@ describe('achievement — Tier 2: level-up via buyPerp', () => {
 
   beforeEach(() => {
     setOverride(FIXED_NOW);
-    setState(mkState({
-      display_name: 'Charlie',
-      locale: 'en',
-      game_values: mkGv({ xp_value: 10, xp_level: 1, cash_value: 5000 })
-    }));
+    setState(
+      mkState({
+        display_name: 'Charlie',
+        locale: 'en',
+        game_values: mkGv({ xp_value: 10, xp_level: 1, cash_value: 5000 }),
+      })
+    );
   });
 
   afterEach(() => {
@@ -214,11 +230,13 @@ describe('achievement — Tier 2: level-up via buyPerp', () => {
   });
 
   it('does not fire levelup when XP stays within the same level', async () => {
-    setState(mkState({
-      display_name: 'Charlie',
-      locale: 'en',
-      game_values: mkGv({ xp_value: 5, xp_level: 1, cash_value: 5000 })
-    }));
+    setState(
+      mkState({
+        display_name: 'Charlie',
+        locale: 'en',
+        game_values: mkGv({ xp_value: 5, xp_level: 1, cash_value: 5000 }),
+      })
+    );
     const spy = mkAchievementSpy();
     await buyPerp('Imperium', 'client007');
     expect(callsOfKind(spy, 'levelup')).toHaveLength(0);
@@ -227,14 +245,20 @@ describe('achievement — Tier 2: level-up via buyPerp', () => {
 
 describe('achievement — Tier 2: level-up via buyKarma', () => {
   beforeEach(() => setOverride(FIXED_NOW));
-  afterEach(() => { clearOverride(); setSendAchievement(null); setSendDelta(null); });
+  afterEach(() => {
+    clearOverride();
+    setSendAchievement(null);
+    setSendDelta(null);
+  });
 
   it('fires levelup when buyKarma crosses the level boundary', async () => {
-    setState(mkState({
-      display_name: 'Dana',
-      locale: 'en',
-      game_values: mkGv({ xp_value: 10, xp_level: 1, cash_value: 9999, karma_value: 50 })
-    }));
+    setState(
+      mkState({
+        display_name: 'Dana',
+        locale: 'en',
+        game_values: mkGv({ xp_value: 10, xp_level: 1, cash_value: 9999, karma_value: 50 }),
+      })
+    );
     const spy = mkAchievementSpy();
     const { result } = await buyKarma('karmalauter001');
     if (result.levelup) {
@@ -246,27 +270,34 @@ describe('achievement — Tier 2: level-up via buyKarma', () => {
   });
 });
 
-
 // ── Tier 3: profile milestone ─────────────────────────────────────────────────
 
 describe('achievement — Tier 3: profile milestone via integrateCollected', () => {
   const COLLECT_ID = 'ach-milestone-001';
 
   beforeEach(() => setOverride(FIXED_NOW));
-  afterEach(() => { clearOverride(); setSendAchievement(null); setSendDelta(null); });
+  afterEach(() => {
+    clearOverride();
+    setSendAchievement(null);
+    setSendDelta(null);
+  });
 
   it('fires profiles_milestone when crossing the 1k threshold', async () => {
-    setState(mkState({
-      display_name: 'Frank',
-      locale: 'en',
-      game_values: mkGv({ profiles_value: 900, ap_snapshot: 6 }),
-      db_queue: [{
-        origin:      'Imperium.City.contact035',
-        collect_id:  COLLECT_ID,
-        profile_set: { profiles_value: 200, tokens_map: {} },
-        collect_dt:  FIXED_NOW
-      }]
-    }));
+    setState(
+      mkState({
+        display_name: 'Frank',
+        locale: 'en',
+        game_values: mkGv({ profiles_value: 900, ap_snapshot: 6 }),
+        db_queue: [
+          {
+            origin: 'Imperium.City.contact035',
+            collect_id: COLLECT_ID,
+            profile_set: { profiles_value: 200, tokens_map: {} },
+            collect_dt: FIXED_NOW,
+          },
+        ],
+      })
+    );
     const spy = mkAchievementSpy();
     await integrateCollected(COLLECT_ID);
     const calls = callsOfKind(spy, 'profiles_milestone');
@@ -277,17 +308,21 @@ describe('achievement — Tier 3: profile milestone via integrateCollected', () 
   });
 
   it('does not fire milestone when threshold not reached', async () => {
-    setState(mkState({
-      display_name: 'Frank',
-      locale: 'en',
-      game_values: mkGv({ profiles_value: 700, ap_snapshot: 6 }),
-      db_queue: [{
-        origin:      'Imperium.City.contact035',
-        collect_id:  COLLECT_ID,
-        profile_set: { profiles_value: 200, tokens_map: {} },
-        collect_dt:  FIXED_NOW
-      }]
-    }));
+    setState(
+      mkState({
+        display_name: 'Frank',
+        locale: 'en',
+        game_values: mkGv({ profiles_value: 700, ap_snapshot: 6 }),
+        db_queue: [
+          {
+            origin: 'Imperium.City.contact035',
+            collect_id: COLLECT_ID,
+            profile_set: { profiles_value: 200, tokens_map: {} },
+            collect_dt: FIXED_NOW,
+          },
+        ],
+      })
+    );
     const spy = mkAchievementSpy();
     await integrateCollected(COLLECT_ID);
     expect(callsOfKind(spy, 'profiles_milestone')).toHaveLength(0);
@@ -305,19 +340,30 @@ describe('replay invariant — applyDelta never fires achievements', () => {
 
   it('applyDelta with a buyPerp delta does not invoke sendAchievement', async () => {
     setOverride(FIXED_NOW);
-    setState(mkState({
-      display_name: 'Ivan',
-      locale: 'en',
-      game_values: mkGv({ cash_value: 5000, xp_level: 1 }),
-      active_missions: ['mission008'],
-      mission_goals: [{
-        mission: 'mission008', workflow: 'buy_perp', target: 'client002',
-        amount: null, position: 1, current_amount: 0, complete: false
-      }]
-    }));
+    setState(
+      mkState({
+        display_name: 'Ivan',
+        locale: 'en',
+        game_values: mkGv({ cash_value: 5000, xp_level: 1 }),
+        active_missions: ['mission008'],
+        mission_goals: [
+          {
+            mission: 'mission008',
+            workflow: 'buy_perp',
+            target: 'client002',
+            amount: null,
+            position: 1,
+            current_amount: 0,
+            complete: false,
+          },
+        ],
+      })
+    );
 
     let capturedDelta = null;
-    setSendDelta(d => { capturedDelta = d; });
+    setSendDelta((d) => {
+      capturedDelta = d;
+    });
 
     // Run the handler — achievements fire at the action site (expected)
     await buyPerp('Imperium', 'client002');
@@ -333,24 +379,38 @@ describe('replay invariant — applyDelta never fires achievements', () => {
   it('applyDelta with an integrateCollected delta does not invoke sendAchievement', async () => {
     setOverride(FIXED_NOW);
     const COLLECT_ID = 'replay-test-cid';
-    setState(mkState({
-      display_name: 'Jules',
-      locale: 'en',
-      game_values: mkGv({ profiles_value: 0, ap_snapshot: 6 }),
-      active_missions: ['mission002'],
-      mission_goals: [{
-        mission: 'mission002', workflow: 'integrate_profiles', target: 'token008',
-        amount: 900, position: 1, current_amount: 0, complete: false
-      }],
-      db_queue: [{
-        origin: 'Imperium.City.Agent0.contact035', collect_id: COLLECT_ID,
-        profile_set: { profiles_value: 1100, tokens_map: { token008: { amount: 100 } } },
-        collect_dt: FIXED_NOW
-      }]
-    }));
+    setState(
+      mkState({
+        display_name: 'Jules',
+        locale: 'en',
+        game_values: mkGv({ profiles_value: 0, ap_snapshot: 6 }),
+        active_missions: ['mission002'],
+        mission_goals: [
+          {
+            mission: 'mission002',
+            workflow: 'integrate_profiles',
+            target: 'token008',
+            amount: 900,
+            position: 1,
+            current_amount: 0,
+            complete: false,
+          },
+        ],
+        db_queue: [
+          {
+            origin: 'Imperium.City.Agent0.contact035',
+            collect_id: COLLECT_ID,
+            profile_set: { profiles_value: 1100, tokens_map: { token008: { amount: 100 } } },
+            collect_dt: FIXED_NOW,
+          },
+        ],
+      })
+    );
 
     let capturedDelta = null;
-    setSendDelta(d => { capturedDelta = d; });
+    setSendDelta((d) => {
+      capturedDelta = d;
+    });
 
     await integrateCollected(COLLECT_ID);
     expect(capturedDelta).not.toBeNull();
@@ -363,14 +423,16 @@ describe('replay invariant — applyDelta never fires achievements', () => {
 
   it('replaying a sequence of deltas never fires sendAchievement', async () => {
     setOverride(FIXED_NOW);
-    setState(mkState({
-      display_name: 'Kim',
-      locale: 'en',
-      game_values: mkGv({ cash_value: 9999, xp_level: 1, xp_value: 10 })
-    }));
+    setState(
+      mkState({
+        display_name: 'Kim',
+        locale: 'en',
+        game_values: mkGv({ cash_value: 9999, xp_level: 1, xp_value: 10 }),
+      })
+    );
 
     const deltas = [];
-    setSendDelta(d => deltas.push(d));
+    setSendDelta((d) => deltas.push(d));
 
     await buyPerp('Imperium', 'client007');
     await buyPerp('Imperium', 'client002');
@@ -397,11 +459,13 @@ describe('achievement — i18n locale selection', () => {
 
   it('uses German strings when state.locale is "de" (default)', async () => {
     setOverride(FIXED_NOW);
-    setState(mkState({
-      display_name: 'Lena',
-      // locale omitted → defaults to 'de'
-      game_values: mkGv({ xp_value: 10, xp_level: 1, cash_value: 5000 })
-    }));
+    setState(
+      mkState({
+        display_name: 'Lena',
+        // locale omitted → defaults to 'de'
+        game_values: mkGv({ xp_value: 10, xp_level: 1, cash_value: 5000 }),
+      })
+    );
     const spy = mkAchievementSpy();
     await buyPerp('Imperium', 'client007');
     const levelupCall = callsOfKind(spy, 'levelup')[0];
@@ -412,11 +476,13 @@ describe('achievement — i18n locale selection', () => {
 
   it('uses English strings when state.locale is "en"', async () => {
     setOverride(FIXED_NOW);
-    setState(mkState({
-      display_name: 'Mike',
-      locale: 'en',
-      game_values: mkGv({ xp_value: 10, xp_level: 1, cash_value: 5000 })
-    }));
+    setState(
+      mkState({
+        display_name: 'Mike',
+        locale: 'en',
+        game_values: mkGv({ xp_value: 10, xp_level: 1, cash_value: 5000 }),
+      })
+    );
     const spy = mkAchievementSpy();
     await buyPerp('Imperium', 'client007');
     const levelupCall = callsOfKind(spy, 'levelup')[0];

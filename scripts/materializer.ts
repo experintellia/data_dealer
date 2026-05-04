@@ -109,7 +109,9 @@ export function materialize(state: LocalState, now: number): MaterializeResult {
 
   // Emit events in temporal order (earliest charge_end first) so Game.js
   // handlers light up the UI as if the player had been watching live.
-  newlyReady.sort(function(a, b) { return a.charge_end - b.charge_end; });
+  newlyReady.sort(function (a, b) {
+    return a.charge_end - b.charge_end;
+  });
 
   for (var k = 0; k < newlyReady.length; k++) {
     var entry = newlyReady[k];
@@ -122,11 +124,11 @@ export function materialize(state: LocalState, now: number): MaterializeResult {
     events.push({
       ev: 'node_ready',
       pl: {
-        id:     entry.game_id,
-        type:   entry.game_type,
-        path:   entry.path,
-        result: entry.result
-      }
+        id: entry.game_id,
+        type: entry.game_type,
+        path: entry.path,
+        result: entry.result,
+      },
     });
   }
 
@@ -137,20 +139,20 @@ export function materialize(state: LocalState, now: number): MaterializeResult {
   var gv: GameValues = state.game_values || {};
   var newGv: GameValues = Object.assign({}, gv);
   if (
-    typeof gv.ap_snapshot     === 'number' &&
-    typeof gv.ap_inc_value    === 'number' &&
+    typeof gv.ap_snapshot === 'number' &&
+    typeof gv.ap_inc_value === 'number' &&
     typeof gv.ap_inc_interval === 'number' &&
-    gv.ap_inc_interval > 0                 &&
-    typeof gv.ap_max          === 'number'
+    gv.ap_inc_interval > 0 &&
+    typeof gv.ap_max === 'number'
   ) {
     // Lazy-init: when ap_update is null/undefined (e.g. fresh game), start
     // the regen clock at `now` so the next materialize-after-elapsed-time
     // can tick. Without this, ap_update stays null forever and regen never
     // runs, so APs added in-memory by Game.js APTicker reset to ap_snapshot
     // on every reload.
-    var apUpdate = (typeof gv.ap_update === 'number') ? gv.ap_update : now;
-    var elapsed  = Math.max(0, now - apUpdate);
-    var ticks    = Math.floor(elapsed / gv.ap_inc_interval);
+    var apUpdate = typeof gv.ap_update === 'number' ? gv.ap_update : now;
+    var elapsed = Math.max(0, now - apUpdate);
+    var ticks = Math.floor(elapsed / gv.ap_inc_interval);
     newGv = Object.assign({}, gv, {
       ap_snapshot: Math.min(gv.ap_max, gv.ap_snapshot + ticks * gv.ap_inc_value),
       // Advance ap_update only to the last full-tick boundary so the
@@ -171,9 +173,9 @@ export function materialize(state: LocalState, now: number): MaterializeResult {
   return {
     state: Object.assign({}, state, {
       nodes_charging: stillCharging,
-      nodes_collect:  collect,
-      game_values:    newGv
+      nodes_collect: collect,
+      game_values: newGv,
     }),
-    events: events
+    events: events,
   };
 }

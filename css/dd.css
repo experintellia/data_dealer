@@ -1,6 +1,9 @@
-.Stage *, .MainMenu *, .button, button {
-   user-select: none;
-  -o-user-select:none;
+.Stage *,
+.MainMenu *,
+.button,
+button {
+  user-select: none;
+  -o-user-select: none;
   -moz-user-select: none;
   -khtml-user-select: none;
   -webkit-user-select: none;
@@ -8,54 +11,55 @@
 #debug *,
 input,
 .allowselect {
-   user-select: auto;
+  user-select: auto;
   -o-user-select: auto;
   -moz-user-select: auto;
   -khtml-user-select: auto;
   -webkit-user-select: auto;
 }
 @font-face {
-      font-family: Bowlby;
-      font-style: normal;
-      font-weight: normal;
-      src: local('Bowlby One SC Regular'), local('BowlbyOneSC-Regular'), url('../font/BowlbyOneSC.woff') format('woff');
+  font-family: Bowlby;
+  font-style: normal;
+  font-weight: normal;
+  src: local("Bowlby One SC Regular"), local("BowlbyOneSC-Regular"), url("../font/BowlbyOneSC.woff")
+    format("woff");
 }
 @font-face {
-      font-family: Voltaire;
-      src: url('../font/Voltaire-Regular.ttf');
+  font-family: Voltaire;
+  src: url("../font/Voltaire-Regular.ttf");
 }
 @font-face {
-      font-family: Numbers;
-      src: url('../font/Skranji-Regular.ttf');
+  font-family: Numbers;
+  src: url("../font/Skranji-Regular.ttf");
 }
 @font-face {
-      font-family: SourceSansBlack;
-      font-style: normal;
-      font-weight: normal;
-      src: local('Source Sans Pro Black'), local('SourceSansPro-Black'), url('../font/SourceSansPro-Black.woff') format('woff');
+  font-family: SourceSansBlack;
+  font-style: normal;
+  font-weight: normal;
+  src: local("Source Sans Pro Black"), local("SourceSansPro-Black"),
+    url("../font/SourceSansPro-Black.woff") format("woff");
 }
-
 
 body {
-  margin:0;
-  padding:0;
-  width:100%;
-  height:100%;
-  overflow:hidden;
-  background:#011;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #011;
   background: url(../img/dd_auth_header.jpg) no-repeat #011;
-  background-size:100%;
+  background-size: 100%;
 }
 
 #debug {
-  margin:0 auto;
-  width:960px;
-  background:#000;
-  color:#0F0;
+  margin: 0 auto;
+  width: 960px;
+  background: #000;
+  color: #0f0;
 }
 
 .hidden {
-  display:none;
+  display: none;
 }
 
 html {
@@ -95,12 +99,20 @@ html {
 }
 
 @-webkit-keyframes DDSpinnerRotate {
-  from { -webkit-transform: rotate(0deg); }
-  to   { -webkit-transform: rotate(360deg); }
+  from {
+    -webkit-transform: rotate(0deg);
+  }
+  to {
+    -webkit-transform: rotate(360deg);
+  }
 }
 @keyframes DDSpinnerRotate {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 #loader {
@@ -142,5 +154,3 @@ html {
   min-height: 18px;
   text-transform: uppercase;
 }
-
-

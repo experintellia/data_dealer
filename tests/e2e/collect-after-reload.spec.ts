@@ -49,14 +49,16 @@ async function waitForGameReady(page: import('@playwright/test').Page) {
   });
 }
 
-test.skip('collect-after-reload: collected perp does not reappear as collectable after reload (#114)', async ({ page }) => {
+test.skip('collect-after-reload: collected perp does not reappear as collectable after reload (#114)', async ({
+  page,
+}) => {
   await page.goto('/?devtools=1');
   await waitForGameReady(page);
 
   // ── 1. Buy contact035 (price=0) ──────────────────────────────────────────
   await page.evaluate(async (gestalt) => {
     const eng = await new Promise<any>((res, rej) =>
-      (window as any).require(['LocalEngine'], res, rej),
+      (window as any).require(['LocalEngine'], res, rej)
     );
     await eng.buyPerp('Imperium', gestalt);
   }, GESTALT);
@@ -64,7 +66,7 @@ test.skip('collect-after-reload: collected perp does not reappear as collectable
   // ── 2. Charge it ─────────────────────────────────────────────────────────
   await page.evaluate(async (path) => {
     const eng = await new Promise<any>((res, rej) =>
-      (window as any).require(['LocalEngine'], res, rej),
+      (window as any).require(['LocalEngine'], res, rej)
     );
     await eng.chargePerp(path);
   }, PATH);
@@ -77,7 +79,7 @@ test.skip('collect-after-reload: collected perp does not reappear as collectable
   // ── 4. Collect ───────────────────────────────────────────────────────────
   await page.evaluate(async (path) => {
     const eng = await new Promise<any>((res, rej) =>
-      (window as any).require(['LocalEngine'], res, rej),
+      (window as any).require(['LocalEngine'], res, rej)
     );
     await eng.collectPerp(path);
   }, PATH);
@@ -93,11 +95,9 @@ test.skip('collect-after-reload: collected perp does not reappear as collectable
   // back to inspecting engine state directly — both forms encode the same
   // contract from #114.
   const orphan = await page.evaluate(async (path) => {
-    const boot = await new Promise<any>((res, rej) =>
-      (window as any).require(['boot'], res, rej),
-    );
+    const boot = await new Promise<any>((res, rej) => (window as any).require(['boot'], res, rej));
     const s = boot.getState();
-    const inCollect  = (s.nodes_collect  || []).some((c: any) => c.path === path);
+    const inCollect = (s.nodes_collect || []).some((c: any) => c.path === path);
     const inCharging = (s.nodes_charging || []).some((c: any) => c.path === path);
     return { inCollect, inCharging };
   }, PATH);

@@ -29,7 +29,7 @@ describe('now() — override lifecycle', () => {
     clearOverride();
     const before = Date.now();
     const result = now();
-    const after  = Date.now();
+    const after = Date.now();
     expect(result).toBeGreaterThanOrEqual(before);
     expect(result).toBeLessThanOrEqual(after);
   });
@@ -121,17 +121,20 @@ describe('clock-skew guard survives a backwards override', () => {
 
 describe('materializer integration with clock', () => {
   function baseState(overrides) {
-    return Object.assign({
-      nodes_charging: [],
-      nodes_collect:  [],
-      game_values: {
-        ap_snapshot:      0,
-        ap_update:        0,
-        ap_inc_value:     1,
-        ap_inc_interval:  1_000,
-        ap_max:           50,
-      }
-    }, overrides);
+    return Object.assign(
+      {
+        nodes_charging: [],
+        nodes_collect: [],
+        game_values: {
+          ap_snapshot: 0,
+          ap_update: 0,
+          ap_inc_value: 1,
+          ap_inc_interval: 1_000,
+          ap_max: 50,
+        },
+      },
+      overrides
+    );
   }
 
   function makeCharge(path, charge_end) {

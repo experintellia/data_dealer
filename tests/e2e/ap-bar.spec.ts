@@ -18,7 +18,7 @@
 import { test, expect } from '@playwright/test';
 
 const GESTALT = 'contact035';
-const PATH    = `Imperium.${GESTALT}`;
+const PATH = `Imperium.${GESTALT}`;
 
 test('energy bar: charge action decrements visual AP value and bar width', async ({ page }) => {
   await page.goto('/?devtools=1');
@@ -29,9 +29,7 @@ test('energy bar: charge action decrements visual AP value and bar width', async
 
   // ── 1. Read initial AP from the engine (authoritative) ───────────────────
   const initial = await page.evaluate(async () => {
-    const boot = await new Promise<any>((res, rej) =>
-      (window as any).require(['boot'], res, rej),
-    );
+    const boot = await new Promise<any>((res, rej) => (window as any).require(['boot'], res, rej));
     const gv = boot.getState().game_values;
     return { ap: gv.ap_snapshot as number, ap_max: gv.ap_max as number };
   });
@@ -45,20 +43,23 @@ test('energy bar: charge action decrements visual AP value and bar width', async
   // the value driven by D.AP_barsize and animated by FXSimpleCue. Reading
   // it as a string avoids races with the animation's interpolated frames.
   const readBarWidth = async () =>
-    page.locator('[data-testid="dd-ap-bar"]').evaluate((el) =>
-      parseFloat((el as HTMLElement).style.width || '0'),
-    );
+    page
+      .locator('[data-testid="dd-ap-bar"]')
+      .evaluate((el) => parseFloat((el as HTMLElement).style.width || '0'));
   const initialBarWidth = await readBarWidth();
   expect(initialBarWidth).toBeGreaterThan(0);
 
   // ── 3. Buy + charge contact035 — chargePerp consumes exactly 1 AP ────────
-  const chargeResult = await page.evaluate(async (args) => {
-    const eng = await new Promise<any>((res, rej) =>
-      (window as any).require(['LocalEngine'], res, rej),
-    );
-    await eng.buyPerp('Imperium', args.gestalt);
-    return eng.chargePerp(args.path);
-  }, { gestalt: GESTALT, path: PATH });
+  const chargeResult = await page.evaluate(
+    async (args) => {
+      const eng = await new Promise<any>((res, rej) =>
+        (window as any).require(['LocalEngine'], res, rej)
+      );
+      await eng.buyPerp('Imperium', args.gestalt);
+      return eng.chargePerp(args.path);
+    },
+    { gestalt: GESTALT, path: PATH }
+  );
 
   expect(chargeResult.result).not.toHaveProperty('error');
   const apAfter = chargeResult.result.game_values.ap_snapshot as number;
@@ -70,8 +71,7 @@ test('energy bar: charge action decrements visual AP value and bar width', async
   // ── 4. Sync the in-page Game layer so the statusbar template re-renders ──
   await page.evaluate((gv) => {
     const appModule: any = (window as any).require('app');
-    const game: any =
-      appModule && appModule.getApplication && appModule.getApplication().game;
+    const game: any = appModule && appModule.getApplication && appModule.getApplication().game;
     if (game) game.updateGameValues(gv);
   }, chargeResult.result.game_values);
 
@@ -88,7 +88,5 @@ test('energy bar: charge action decrements visual AP value and bar width', async
   // proportionally on every setAP — at ap_max-1 / ap_max the bar should be
   // strictly narrower than at full AP. Use expect.poll so the FXSimpleCue
   // animation (~250ms) is allowed to settle before the assertion.
-  await expect
-    .poll(readBarWidth, { timeout: 2_000 })
-    .toBeLessThan(initialBarWidth);
+  await expect.poll(readBarWidth, { timeout: 2_000 }).toBeLessThan(initialBarWidth);
 });

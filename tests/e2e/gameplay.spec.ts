@@ -41,7 +41,9 @@ function amdGet(modId: string): Promise<unknown> {
   });
 }
 
-test('gameplay: buy→charge→skip→collect→integrate decreases cash and increases profileCount', async ({ page }) => {
+test('gameplay: buy→charge→skip→collect→integrate decreases cash and increases profileCount', async ({
+  page,
+}) => {
   await page.goto('/?devtools=1');
   await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
     timeout: 50_000,
@@ -49,9 +51,9 @@ test('gameplay: buy→charge→skip→collect→integrate decreases cash and inc
 
   // ── 1. Read initial values from the engine (authoritative state) ──────────
   const initial = await page.evaluate(async () => {
-    const boot = await new Promise<{ getState(): { game_values: { cash_value: number; profiles_value: number } } }>(
-      (res, rej) => (window as any).require(['boot'], res, rej),
-    );
+    const boot = await new Promise<{
+      getState(): { game_values: { cash_value: number; profiles_value: number } };
+    }>((res, rej) => (window as any).require(['boot'], res, rej));
     const gv = boot.getState().game_values;
     return { cash: gv.cash_value, profiles: gv.profiles_value };
   });
@@ -62,7 +64,9 @@ test('gameplay: buy→charge→skip→collect→integrate decreases cash and inc
 
   // ── 2. Buy contact035 (price=0, no cash change) ───────────────────────────
   const buyResult = await page.evaluate(async (gestalt) => {
-    const eng = await new Promise<any>((res, rej) => (window as any).require(['LocalEngine'], res, rej));
+    const eng = await new Promise<any>((res, rej) =>
+      (window as any).require(['LocalEngine'], res, rej)
+    );
     const res = await eng.buyPerp('Imperium', gestalt);
     return res;
   }, GESTALT);
@@ -72,7 +76,9 @@ test('gameplay: buy→charge→skip→collect→integrate decreases cash and inc
 
   // ── 3. Charge the perp (charge_cost=60 → cash decreases) ─────────────────
   const chargeResult = await page.evaluate(async (path) => {
-    const eng = await new Promise<any>((res, rej) => (window as any).require(['LocalEngine'], res, rej));
+    const eng = await new Promise<any>((res, rej) =>
+      (window as any).require(['LocalEngine'], res, rej)
+    );
     const res = await eng.chargePerp(path);
     return res;
   }, PATH);
@@ -89,7 +95,9 @@ test('gameplay: buy→charge→skip→collect→integrate decreases cash and inc
 
   // ── 5. Collect (ContactPerp path: creates a db_queue entry) ──────────────
   const collectResult = await page.evaluate(async (path) => {
-    const eng = await new Promise<any>((res, rej) => (window as any).require(['LocalEngine'], res, rej));
+    const eng = await new Promise<any>((res, rej) =>
+      (window as any).require(['LocalEngine'], res, rej)
+    );
     const res = await eng.collectPerp(path);
     return res;
   }, PATH);
@@ -99,7 +107,9 @@ test('gameplay: buy→charge→skip→collect→integrate decreases cash and inc
 
   // ── 6. Integrate (increases profiles_value in state) ─────────────────────
   const intResult = await page.evaluate(async (id) => {
-    const eng = await new Promise<any>((res, rej) => (window as any).require(['LocalEngine'], res, rej));
+    const eng = await new Promise<any>((res, rej) =>
+      (window as any).require(['LocalEngine'], res, rej)
+    );
     const res = await eng.integrateCollected(id);
     return res;
   }, collectId);
@@ -123,5 +133,7 @@ test('gameplay: buy→charge→skip→collect→integrate decreases cash and inc
   // re-renders the template.  Use not.toHaveText with a short timeout so
   // Playwright waits for the animation rather than asserting immediately.
   await expect(page.locator('[data-testid="cash-value"]')).not.toHaveText('270', { timeout: 2000 });
-  await expect(page.locator('[data-testid="profiles-value"]')).not.toHaveText('0', { timeout: 2000 });
+  await expect(page.locator('[data-testid="profiles-value"]')).not.toHaveText('0', {
+    timeout: 2000,
+  });
 });

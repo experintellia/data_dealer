@@ -257,7 +257,7 @@ function _readNumber(rec: object | undefined, key: string): number | undefined {
 
 function _getRuleset(): Ruleset {
   var state = getState();
-  var locale: Locale = (state && state.locale === 'en') ? 'en' : 'de';
+  var locale: Locale = state && state.locale === 'en' ? 'en' : 'de';
   return (locale === 'en' ? rulesetEn : rulesetDe) as unknown as Ruleset;
 }
 
@@ -337,10 +337,10 @@ export function setSendAchievement(fn: AchievementSender): void {
 // Locale-aware format-string lookup.  Replaces %s tokens left-to-right.
 function _t(msgid: string, ...subs: unknown[]): string {
   var state = getState();
-  var locale: Locale = (state && state.locale === 'en') ? 'en' : 'de';
+  var locale: Locale = state && state.locale === 'en' ? 'en' : 'de';
   var table = (locale === 'en' ? i18nEn : i18nDe) as unknown as I18nTable;
   var entry = table[msgid];
-  var tmpl: string = (entry && entry[1]) ? entry[1] : msgid;
+  var tmpl: string = entry && entry[1] ? entry[1] : msgid;
   for (var i = 0; i < subs.length; i++) {
     tmpl = tmpl.replace('%s', String(subs[i]));
   }
@@ -356,7 +356,7 @@ function triggerAchievement(
 ): void {
   var state = getState();
   var addr = state ? state.addr : '';
-  var name = state ? (state.display_name || addr) : addr;
+  var name = state ? state.display_name || addr : addr;
   // kind: 'achievement' is the top-level discriminator for webxdc consumers.
   // achievement_kind carries the subtype (mission_done, levelup, joined, …).
   var payload: AchievementPayload = {
@@ -367,7 +367,9 @@ function triggerAchievement(
     ts: clockNow(),
   };
   if (extraPayload) Object.assign(payload, extraPayload);
-  if (_sendAchievementFn) { _sendAchievementFn({ info: info, payload: payload }); }
+  if (_sendAchievementFn) {
+    _sendAchievementFn({ info: info, payload: payload });
+  }
   if (typeof webxdc !== 'undefined' && webxdc) {
     webxdc.sendUpdate({ info: info, payload: payload }, '');
   }
@@ -401,15 +403,15 @@ function _djb2(str: string): number {
 }
 
 function _seededRand(seed: number): number {
-  var s = (seed >>> 0);
+  var s = seed >>> 0;
   s = (Math.imul(1664525, s) + 1013904223) >>> 0;
-  return s / 0xFFFFFFFF;
+  return s / 0xffffffff;
 }
 
 function _getVariatedAmount(baseAmount: number, ts: number, path: string): number {
-  var seed = ((ts & 0xFFFFFFFF) ^ _djb2(path)) >>> 0;
-  var rand = _seededRand(seed);        // uniform 0..1
-  var variation = rand * 0.1 - 0.05;  // map to −0.05…+0.05 (±5%)
+  var seed = ((ts & 0xffffffff) ^ _djb2(path)) >>> 0;
+  var rand = _seededRand(seed); // uniform 0..1
+  var variation = rand * 0.1 - 0.05; // map to −0.05…+0.05 (±5%)
   return Math.round(baseAmount * (1 + variation));
 }
 
@@ -422,7 +424,7 @@ function _getVariatedAmount(baseAmount: number, ts: number, path: string): numbe
  * Returns webxdc.selfAddr (or 'local' in non-webxdc environments).
  */
 export function getToken(): Promise<{ result: string }> {
-  var addr = (typeof webxdc !== 'undefined' && webxdc) ? webxdc.selfAddr : '';
+  var addr = typeof webxdc !== 'undefined' && webxdc ? webxdc.selfAddr : '';
   return Promise.resolve({ result: addr || 'local' });
 }
 
@@ -441,7 +443,7 @@ export function ping(): Promise<{ result: 'pong' }> {
  */
 export function getSessionLocale(): Promise<{ result: Locale }> {
   var state = getState();
-  var locale: Locale = (state && state.locale === 'en') ? 'en' : 'de';
+  var locale: Locale = state && state.locale === 'en' ? 'en' : 'de';
   return Promise.resolve({ result: locale });
 }
 
@@ -500,10 +502,12 @@ export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameRe
   var startupRepair = _repairStuckMissionGoals(seededState);
   if (startupRepair && startupRepair.missions) {
     var startupGv = _applyRewardsToGv(seededState.game_values || {}, startupRepair.rewards);
-    _persistDelta(_mkDelta(seededState.addr, 'recheckMissions', [], {
-      game_values: startupGv,
-      missions: startupRepair.missions,
-    }));
+    _persistDelta(
+      _mkDelta(seededState.addr, 'recheckMissions', [], {
+        game_values: startupGv,
+        missions: startupRepair.missions,
+      })
+    );
     seededState = getState();
   }
 
@@ -550,7 +554,7 @@ function _buildLoadGameResponse(state: LocalState, now: number, isNewGame: boole
   var gv = state.game_values || {};
   var gameValues = Object.assign({}, gv, {
     ap_initial: typeof gv.ap_snapshot === 'number' ? gv.ap_snapshot : 0,
-    ap_offset: 0
+    ap_offset: 0,
   });
 
   return {
@@ -561,23 +565,23 @@ function _buildLoadGameResponse(state: LocalState, now: number, isNewGame: boole
     // GameRoot.getLevelByXP (Game.js:1704).
     type_data: {
       levels: ruleset.levels,
-      game_values: gameValues
+      game_values: gameValues,
     },
     user: {
       auth_username: state.addr,
-      display_name: state.display_name || ''
+      display_name: state.display_name || '',
     },
     Imperium: {
       game_id: 'Imperium',
       full_path: 'Imperium',
       instance_data: {},
-      type_data: {}
+      type_data: {},
     },
     Database: {
       game_id: 'Database',
       full_path: 'Database',
       instance_data: {},
-      type_data: {}
+      type_data: {},
     },
     nodes: state.nodes || [],
     nodes_charging: state.nodes_charging || [],
@@ -596,7 +600,7 @@ function _buildLoadGameResponse(state: LocalState, now: number, isNewGame: boole
     // dismissMissionBriefing / markTokenSeen think the gestalt is already
     // seen and skip the delta commit, so the dismissal never persists).
     mission_briefings_seen: Object.assign({}, state.mission_briefings_seen || {}),
-    tokens_seen: Object.assign({}, state.tokens_seen || {})
+    tokens_seen: Object.assign({}, state.tokens_seen || {}),
   };
 }
 
@@ -673,7 +677,11 @@ export function getPowerups(
 // forward-facing field. Unknown types fall back to 'xp' with a console.warn.
 type RankingField = 'cash' | 'profiles' | 'xp' | 'level' | 'spent';
 const _RANKING_FIELDS: Record<RankingField, true> = {
-  cash: true, profiles: true, xp: true, level: true, spent: true,
+  cash: true,
+  profiles: true,
+  xp: true,
+  level: true,
+  spent: true,
 };
 
 function _isRankingField(s: string): s is RankingField {
@@ -710,19 +718,21 @@ export function getRanking(
     };
   });
 
-  rows.sort(function (a, b) { return b.value - a.value; });
+  rows.sort(function (a, b) {
+    return b.value - a.value;
+  });
 
   var selfIdx = -1;
   for (var i = 0; i < rows.length; i++) {
     var row = rows[i];
-    if (row && row.self) { selfIdx = i; break; }
+    if (row && row.self) {
+      selfIdx = i;
+      break;
+    }
   }
 
   var n = rows.length;
-  var userRank = n === 0 ? 0
-    : selfIdx < 0 ? 0
-    : n === 1 ? 1
-    : 1 - selfIdx / (n - 1);
+  var userRank = n === 0 ? 0 : selfIdx < 0 ? 0 : n === 1 ? 1 : 1 - selfIdx / (n - 1);
 
   return Promise.resolve({ result: { top: rows, user_rank: userRank } });
 }
@@ -746,12 +756,12 @@ export function getRanking(
  */
 function _mkDelta(addr: string, op: string, args: unknown[], result: unknown): Delta {
   return {
-    kind:   'delta',
-    addr:   addr,
-    op:     op,
-    args:   args as unknown[] as never[],
+    kind: 'delta',
+    addr: addr,
+    op: op,
+    args: args as unknown[] as never[],
     result: result as unknown,
-    ts:     clockNow(),
+    ts: clockNow(),
   } as Delta;
 }
 
@@ -821,7 +831,7 @@ export function setPerpCoordinates(updates: unknown): Promise<{ result: 1 }> {
     var entry = updates[i];
     if (!Array.isArray(entry) || entry.length < 2) continue;
     var path = entry[0];
-    var pos  = entry[1];
+    var pos = entry[1];
     if (typeof path !== 'string' || !pos || typeof pos !== 'object') continue;
     coordMap[path] = pos;
   }
@@ -897,14 +907,15 @@ export function buyKarma(
 
   if (levelup) newGv.ap_snapshot = newLevel.ap_max;
 
-  _persistDelta(_mkDelta(state.addr, 'buyKarma', [karmalauterGestalt],
-    { game_values: newGv }));
+  _persistDelta(_mkDelta(state.addr, 'buyKarma', [karmalauterGestalt], { game_values: newGv }));
 
   // Achievements
   var _bkDisplayName = state.display_name || state.addr;
   if (levelup) {
-    triggerAchievement('levelup',
-      _t('achievement_levelup', _bkDisplayName, String(newLevel.number)));
+    triggerAchievement(
+      'levelup',
+      _t('achievement_levelup', _bkDisplayName, String(newLevel.number))
+    );
   }
   var _bkOldKarma = gv.karma_value || 0;
   if (_bkOldKarma !== 100 && newKarma === 100) {
@@ -937,14 +948,17 @@ function _resolveNode(perpPath: string): ResolvedNode | null {
   var nodeIdx = -1;
   for (var i = 0; i < state.nodes.length; i++) {
     var n0 = state.nodes[i];
-    if (n0 && n0.full_path === perpPath) { nodeIdx = i; break; }
+    if (n0 && n0.full_path === perpPath) {
+      nodeIdx = i;
+      break;
+    }
   }
   if (nodeIdx === -1) return null;
   var node = state.nodes[nodeIdx];
   if (!node) return null;
   var ft = node.full_type || '';
   var colon = ft.indexOf(':');
-  var perpGestalt = colon >= 0 ? ft.slice(colon + 1) : (node.gestalt || '');
+  var perpGestalt = colon >= 0 ? ft.slice(colon + 1) : node.gestalt || '';
   var perpTypeDef = _getRuleset().perps[perpGestalt];
   if (!perpTypeDef || !perpTypeDef.type_data) return null;
   return { state: state, nodeIdx: nodeIdx, node: node, perpTypeData: perpTypeDef.type_data };
@@ -999,9 +1013,9 @@ function _computeModifiers(perpTypeData: PerpTypeData, powerups: PowerupDef[]): 
     if (!pu || !pu.gestalt) continue;
     var puDef = defByGestalt[pu.gestalt];
     if (puDef) {
-      chargeCost    += puDef.charge_cost_modifier    || 0;
+      chargeCost += puDef.charge_cost_modifier || 0;
       collectAmount += puDef.collect_amount_modifier || 0;
-      collectRisk   += puDef.collect_risk_modifier   || 0;
+      collectRisk += puDef.collect_risk_modifier || 0;
     }
   }
   return { charge_cost: chargeCost, collect_amount: collectAmount, collect_risk: collectRisk };
@@ -1045,7 +1059,10 @@ export function buyPowerup(
 ): Promise<{ result: { error: number } | Record<string, unknown> }> {
   var r = _resolveNode(perpPath);
   if (!r) return Promise.resolve({ result: { error: 0 } });
-  var state = r.state, nodeIdx = r.nodeIdx, node = r.node, perpTypeData = r.perpTypeData;
+  var state = r.state,
+    nodeIdx = r.nodeIdx,
+    node = r.node,
+    perpTypeData = r.perpTypeData;
 
   var puDef = _findPowerupDef(perpTypeData, gestalt);
   if (!puDef) return Promise.resolve({ result: { error: 0 } });
@@ -1070,20 +1087,20 @@ export function buyPowerup(
   var mods = _computeModifiers(perpTypeData, newPowerups);
 
   var newInstanceData = Object.assign({}, node.instance_data, {
-    powerups:       newPowerups,
-    charge_cost:    mods.charge_cost,
+    powerups: newPowerups,
+    charge_cost: mods.charge_cost,
     collect_amount: mods.collect_amount,
-    collect_risk:   mods.collect_risk,
-    tokens:         perpTypeData.tokens || [],
+    collect_risk: mods.collect_risk,
+    tokens: perpTypeData.tokens || [],
   });
 
   var newXp = (state.game_values.xp_value || 0) + (perpTypeData.xp_inc || 1);
   var levelup = _checkLevelup(state.game_values.xp_level || 1, newXp);
 
   var newGameValues: GameValues = Object.assign({}, state.game_values, {
-    cash_value:  cashValue - price,
-    cash_spent:  (state.game_values.cash_spent  || 0) + price,
-    xp_value:    newXp,
+    cash_value: cashValue - price,
+    cash_spent: (state.game_values.cash_spent || 0) + price,
+    xp_value: newXp,
     karma_value: (state.game_values.karma_value || 0) + 1,
   });
   if (levelup) newGameValues.xp_level = _getLevelByXP(newXp);
@@ -1096,32 +1113,40 @@ export function buyPowerup(
   newGameValues = _applyRewardsToGv(newGameValues, puMissionResult.rewards);
 
   var responseNode = {
-    game_id: node.game_id, game_type: node.game_type,
-    full_path: node.full_path, instance_data: newInstanceData,
+    game_id: node.game_id,
+    game_type: node.game_type,
+    full_path: node.full_path,
+    instance_data: newInstanceData,
   };
   var result = {
-    node: responseNode, game_values: newGameValues, levelup: levelup,
+    node: responseNode,
+    game_values: newGameValues,
+    levelup: levelup,
     missions: puMissionResult.missions || null,
   };
 
-  _persistDelta(_mkDelta(state.addr, 'buyPowerup',
-    [perpPath, slot, gestalt], result));
+  _persistDelta(_mkDelta(state.addr, 'buyPowerup', [perpPath, slot, gestalt], result));
 
   // Achievements
   var _bpuDisplayName = state.display_name || state.addr;
   if (levelup) {
-    triggerAchievement('levelup',
-      _t('achievement_levelup', _bpuDisplayName, String(newGameValues.xp_level)));
+    triggerAchievement(
+      'levelup',
+      _t('achievement_levelup', _bpuDisplayName, String(newGameValues.xp_level))
+    );
   }
-  var _bpuCompletedMissions = (puMissionResult.missions && puMissionResult.missions.complete_missions) || [];
+  var _bpuCompletedMissions =
+    (puMissionResult.missions && puMissionResult.missions.complete_missions) || [];
   for (var _bpuMi = 0; _bpuMi < _bpuCompletedMissions.length; _bpuMi++) {
     var mGestalt = _bpuCompletedMissions[_bpuMi];
     if (typeof mGestalt !== 'string') continue;
     var _bpuMDef = _findMissionDef(_getRuleset(), mGestalt);
     var _bpuMTitle = (_bpuMDef && _bpuMDef.type_data && _bpuMDef.type_data.title) || mGestalt;
-    triggerAchievement('mission_done',
+    triggerAchievement(
+      'mission_done',
       _t('achievement_mission_done', _bpuDisplayName, _bpuMTitle),
-      { mission: mGestalt });
+      { mission: mGestalt }
+    );
   }
   var _bpuOldKarma = state.game_values.karma_value || 0;
   var _bpuNewKarma = newGameValues.karma_value || 0;
@@ -1150,30 +1175,38 @@ export function sellPowerup(
 ): Promise<{ result: { error: number } | Record<string, unknown> }> {
   var r = _resolveNode(perpPath);
   if (!r) return Promise.resolve({ result: { error: 0 } });
-  var state = r.state, nodeIdx = r.nodeIdx, node = r.node, perpTypeData = r.perpTypeData;
+  var state = r.state,
+    nodeIdx = r.nodeIdx,
+    node = r.node,
+    perpTypeData = r.perpTypeData;
 
   var idata: NodeInstanceData = node.instance_data || {};
   var powerups: PowerupDef[] = idata.powerups || [];
   var puEntry: PowerupDef | null = null;
   for (var i = 0; i < powerups.length; i++) {
     var p0 = powerups[i];
-    if (p0 && p0.slot === slot) { puEntry = p0; break; }
+    if (p0 && p0.slot === slot) {
+      puEntry = p0;
+      break;
+    }
   }
   if (!puEntry) return Promise.resolve({ result: { error: 1 } });
 
   var puDef = puEntry.gestalt ? _findPowerupDef(perpTypeData, puEntry.gestalt) : null;
-  var price = puDef ? (puDef.price || 0) : 0;
+  var price = puDef ? puDef.price || 0 : 0;
   var refund = Math.floor(price * 0.75);
 
-  var newPowerups: PowerupDef[] = powerups.filter(function (p) { return p && p.slot !== slot; });
+  var newPowerups: PowerupDef[] = powerups.filter(function (p) {
+    return p && p.slot !== slot;
+  });
   var mods = _computeModifiers(perpTypeData, newPowerups);
 
   var newInstanceData = Object.assign({}, node.instance_data, {
-    powerups:       newPowerups,
-    charge_cost:    mods.charge_cost,
+    powerups: newPowerups,
+    charge_cost: mods.charge_cost,
     collect_amount: mods.collect_amount,
-    collect_risk:   mods.collect_risk,
-    tokens:         perpTypeData.tokens || [],
+    collect_risk: mods.collect_risk,
+    tokens: perpTypeData.tokens || [],
   });
 
   var newXp = (state.game_values.xp_value || 0) + 1;
@@ -1181,7 +1214,7 @@ export function sellPowerup(
 
   var newGameValues: GameValues = Object.assign({}, state.game_values, {
     cash_value: (state.game_values.cash_value || 0) + refund,
-    xp_value:   newXp,
+    xp_value: newXp,
   });
   if (levelup) newGameValues.xp_level = _getLevelByXP(newXp);
 
@@ -1189,18 +1222,21 @@ export function sellPowerup(
   newNodes[nodeIdx] = Object.assign({}, node, { instance_data: newInstanceData });
 
   var responseNode = {
-    game_id: node.game_id, game_type: node.game_type,
-    full_path: node.full_path, instance_data: newInstanceData,
+    game_id: node.game_id,
+    game_type: node.game_type,
+    full_path: node.full_path,
+    instance_data: newInstanceData,
   };
   var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
 
-  _persistDelta(_mkDelta(state.addr, 'sellPowerup',
-    [perpPath, slot, gestalt], result));
+  _persistDelta(_mkDelta(state.addr, 'sellPowerup', [perpPath, slot, gestalt], result));
 
   if (levelup) {
     var _spDisplayName = state.display_name || state.addr;
-    triggerAchievement('levelup',
-      _t('achievement_levelup', _spDisplayName, String(newGameValues.xp_level)));
+    triggerAchievement(
+      'levelup',
+      _t('achievement_levelup', _spDisplayName, String(newGameValues.xp_level))
+    );
   }
 
   return Promise.resolve({ result: result });
@@ -1226,9 +1262,12 @@ export function buySlots(
   var nNum = parseInt(String(num), 10) || 1;
   var r = _resolveNode(perpPath);
   if (!r) return Promise.resolve({ result: { error: 0 } });
-  var state = r.state, nodeIdx = r.nodeIdx, node = r.node, perpTypeData = r.perpTypeData;
+  var state = r.state,
+    nodeIdx = r.nodeIdx,
+    node = r.node,
+    perpTypeData = r.perpTypeData;
   var slotKey = slotType + '_slots';
-  var maxKey  = 'max_' + slotType + '_slots';
+  var maxKey = 'max_' + slotType + '_slots';
 
   // PerpTypeData / NodeInstanceData both whitelist their typed fields and
   // fall through to `[key: string]: unknown` for the long tail. The slot
@@ -1236,9 +1275,7 @@ export function buySlots(
   // open-ended portion — read once via _readNumber and the rest of the
   // function works on plain `number` values.
   var currentSlots: number =
-    _readNumber(node.instance_data, slotKey) ??
-    _readNumber(perpTypeData, slotKey) ??
-    0;
+    _readNumber(node.instance_data, slotKey) ?? _readNumber(perpTypeData, slotKey) ?? 0;
   var maxSlots: number = _readNumber(perpTypeData, maxKey) ?? Infinity;
 
   if (currentSlots + nNum > maxSlots) return Promise.resolve({ result: { error: 2 } });
@@ -1262,7 +1299,7 @@ export function buySlots(
   var newGameValues: GameValues = Object.assign({}, state.game_values, {
     cash_value: cashValue - totalCost,
     cash_spent: (state.game_values.cash_spent || 0) + totalCost,
-    xp_value:   newXp,
+    xp_value: newXp,
   });
   if (levelup) newGameValues.xp_level = _getLevelByXP(newXp);
 
@@ -1270,18 +1307,21 @@ export function buySlots(
   newNodes[nodeIdx] = Object.assign({}, node, { instance_data: newInstanceData });
 
   var responseNode = {
-    game_id: node.game_id, game_type: node.game_type,
-    full_path: node.full_path, instance_data: newInstanceData,
+    game_id: node.game_id,
+    game_type: node.game_type,
+    full_path: node.full_path,
+    instance_data: newInstanceData,
   };
   var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
 
-  _persistDelta(_mkDelta(state.addr, 'buySlots',
-    [perpPath, slotType, nNum], result));
+  _persistDelta(_mkDelta(state.addr, 'buySlots', [perpPath, slotType, nNum], result));
 
   if (levelup) {
     var _bsDisplayName = state.display_name || state.addr;
-    triggerAchievement('levelup',
-      _t('achievement_levelup', _bsDisplayName, String(newGameValues.xp_level)));
+    triggerAchievement(
+      'levelup',
+      _t('achievement_levelup', _bsDisplayName, String(newGameValues.xp_level))
+    );
   }
 
   return Promise.resolve({ result: result });
@@ -1323,19 +1363,21 @@ export function buyPerp(
 ): Promise<{ result: { error: number } | BuyPerpPayload }> {
   var state = getState();
   var ruleset = _getRuleset();
-  var allTypes: Record<string, PerpDef> = Object.assign(
-    {}, ruleset.perps, ruleset.tokens
-  );
+  var allTypes: Record<string, PerpDef> = Object.assign({}, ruleset.perps, ruleset.tokens);
 
   var perpDef = allTypes[gestalt];
-  if (!perpDef) { return Promise.resolve({ result: { error: 1 } }); }
+  if (!perpDef) {
+    return Promise.resolve({ result: { error: 1 } });
+  }
   var typeData: PerpTypeData = perpDef.type_data || {};
   var gameType = perpDef.game_type || '';
 
   var gv = state.game_values || {};
   var currentLevel = gv.xp_level || 1;
   var requiredLevel = typeData.required_level != null ? typeData.required_level : 1;
-  if (currentLevel < requiredLevel) { return Promise.resolve({ result: { error: 1 } }); }
+  if (currentLevel < requiredLevel) {
+    return Promise.resolve({ result: { error: 1 } });
+  }
 
   // Roots ("Imperium", "Database") are always valid.  Other paths are checked
   // against state.nodes; if not found we still allow the call (single-tenant,
@@ -1345,14 +1387,17 @@ export function buyPerp(
     var nodes = state.nodes || [];
     for (var ni = 0; ni < nodes.length; ni++) {
       var pn = nodes[ni];
-      if (pn && pn.full_path === parentPath) { parentNode = pn; break; }
+      if (pn && pn.full_path === parentPath) {
+        parentNode = pn;
+        break;
+      }
     }
   }
 
   // Only validate provided_perps when we can resolve the parent's type definition.
-  var parentGestalt = parentNode ? (parentNode.gestalt || '') : '';
+  var parentGestalt = parentNode ? parentNode.gestalt || '' : '';
   var parentTypeDef = parentGestalt ? allTypes[parentGestalt] : null;
-  var parentTypeData: PerpTypeData | null = parentTypeDef ? (parentTypeDef.type_data || {}) : null;
+  var parentTypeData: PerpTypeData | null = parentTypeDef ? parentTypeDef.type_data || {} : null;
 
   if (parentTypeData && Array.isArray(parentTypeData.provided_perps)) {
     if (parentTypeData.provided_perps.indexOf(gestalt) === -1) {
@@ -1367,14 +1412,20 @@ export function buyPerp(
     var allNodes = state.nodes || [];
     for (var ci = 0; ci < allNodes.length; ci++) {
       var an = allNodes[ci];
-      if (an && an.full_path.indexOf(childPrefix) === 0) { childCount++; }
+      if (an && an.full_path.indexOf(childPrefix) === 0) {
+        childCount++;
+      }
     }
-    if (childCount >= maxSlots) { return Promise.resolve({ result: { error: 3 } }); }
+    if (childCount >= maxSlots) {
+      return Promise.resolve({ result: { error: 3 } });
+    }
   }
 
   var price = typeof typeData.price === 'number' ? typeData.price : 0;
   var cashValue = gv.cash_value || 0;
-  if (cashValue < price) { return Promise.resolve({ result: { error: 2 } }); }
+  if (cashValue < price) {
+    return Promise.resolve({ result: { error: 2 } });
+  }
 
   var newFullPath = parentPath + '.' + gestalt;
   var stateNodes = state.nodes || [];
@@ -1411,7 +1462,8 @@ export function buyPerp(
   if (levelup) {
     newGv = Object.assign({}, newGv, { xp_level: newLevel });
     var levelInfo = ruleset.levels[newLevel - 1] as
-      (LevelEntry & { ap_inc_value?: number; ap_inc_interval?: number }) | undefined;
+      | (LevelEntry & { ap_inc_value?: number; ap_inc_interval?: number })
+      | undefined;
     if (levelInfo) {
       newGv = Object.assign({}, newGv, {
         ap_inc_value: levelInfo.ap_inc_value,
@@ -1432,11 +1484,10 @@ export function buyPerp(
   // profile_set for project*/contact*/city* gestalts:
   // initial data batch pushed to db_queue; city-buy path also read by Game.js:3816.
   var profileSetPayload: BuyPerpProfileSetPayload | null = null;
-  var isProfileGestalt = (
+  var isProfileGestalt =
     gestalt.indexOf('project') === 0 ||
     gestalt.indexOf('contact') === 0 ||
-    gestalt.indexOf('city') === 0
-  );
+    gestalt.indexOf('city') === 0;
   if (isProfileGestalt) {
     var collectId = 'cq_' + nodeCounter;
     var tokensMap: Record<string, { amount: number }> = {};
@@ -1447,11 +1498,18 @@ export function buyPerp(
         tokensMap[tk.gestalt] = { amount: tk.amount || 0 };
       }
     }
-    var profilesValue: number = typeof typeData.profileset_size === 'number'
-      ? typeData.profileset_size
-      : (typeof typeData.collect_amount === 'number' ? typeData.collect_amount : 0);
+    var profilesValue: number =
+      typeof typeData.profileset_size === 'number'
+        ? typeData.profileset_size
+        : typeof typeData.collect_amount === 'number'
+          ? typeData.collect_amount
+          : 0;
     var generatedProfileSet = { profiles_value: profilesValue, tokens_map: tokensMap };
-    profileSetPayload = { profile_set: generatedProfileSet, origin: newFullPath, collect_id: collectId };
+    profileSetPayload = {
+      profile_set: generatedProfileSet,
+      origin: newFullPath,
+      collect_id: collectId,
+    };
   }
 
   var payload: BuyPerpPayload = {
@@ -1461,25 +1519,30 @@ export function buyPerp(
     node_counter: nodeCounter,
     missions: missionResult.missions || null,
   };
-  if (profileSetPayload) { payload.profile_set = profileSetPayload; }
+  if (profileSetPayload) {
+    payload.profile_set = profileSetPayload;
+  }
 
   _persistDelta(_mkDelta(state.addr, 'buyPerp', [parentPath, gestalt], payload));
 
   // Achievements
   var _bpDisplayName = state.display_name || state.addr;
   if (levelup) {
-    triggerAchievement('levelup',
-      _t('achievement_levelup', _bpDisplayName, String(newGv.xp_level)));
+    triggerAchievement(
+      'levelup',
+      _t('achievement_levelup', _bpDisplayName, String(newGv.xp_level))
+    );
   }
-  var _bpCompletedMissions = (missionResult.missions && missionResult.missions.complete_missions) || [];
+  var _bpCompletedMissions =
+    (missionResult.missions && missionResult.missions.complete_missions) || [];
   for (var _bpMi = 0; _bpMi < _bpCompletedMissions.length; _bpMi++) {
     var mGestalt = _bpCompletedMissions[_bpMi];
     if (typeof mGestalt !== 'string') continue;
     var _bpMDef = _findMissionDef(_getRuleset(), mGestalt);
     var _bpMTitle = (_bpMDef && _bpMDef.type_data && _bpMDef.type_data.title) || mGestalt;
-    triggerAchievement('mission_done',
-      _t('achievement_mission_done', _bpDisplayName, _bpMTitle),
-      { mission: mGestalt });
+    triggerAchievement('mission_done', _t('achievement_mission_done', _bpDisplayName, _bpMTitle), {
+      mission: mGestalt,
+    });
   }
 
   return Promise.resolve({ result: payload });
@@ -1514,9 +1577,14 @@ function _completeGoal(goal: MissionGoal): MissionGoal {
 
 // Returns the same array reference when nothing changed so callers can use
 // reference equality to detect whether any repairs were made.
-function _autoCompleteBuyPerpGoals(goals: MissionGoal[], nodes: GameNode[] | undefined): MissionGoal[] {
+function _autoCompleteBuyPerpGoals(
+  goals: MissionGoal[],
+  nodes: GameNode[] | undefined
+): MissionGoal[] {
   var owned: Record<string, true> = {};
-  (nodes || []).forEach(function (n) { if (n.gestalt) owned[n.gestalt] = true; });
+  (nodes || []).forEach(function (n) {
+    if (n.gestalt) owned[n.gestalt] = true;
+  });
   var changed = false;
   var result = goals.map(function (g) {
     if (g.workflow !== 'buy_perp' || g.complete || !owned[g.target]) return g;
@@ -1652,9 +1720,15 @@ function _completeMissionsIfReady(
   var ruleset = _getRuleset();
   var completed: string[] = [];
   var stillActive = activeMissions.filter(function (mGestalt) {
-    var goals = updatedGoals.filter(function (g) { return g.mission === mGestalt; });
+    var goals = updatedGoals.filter(function (g) {
+      return g.mission === mGestalt;
+    });
     if (!goals.length) return true;
-    if (goals.every(function (g) { return g.complete; })) {
+    if (
+      goals.every(function (g) {
+        return g.complete;
+      })
+    ) {
       completed.push(mGestalt);
       return false;
     }
@@ -1682,8 +1756,12 @@ function _completeMissionsIfReady(
   }
 
   var updatedMissions = activeMissions.filter(function (m) {
-    var goals = updatedGoals.filter(function (g) { return g.mission === m; });
-    return goals.some(function (g) { return g.current_amount > 0 || g.complete; });
+    var goals = updatedGoals.filter(function (g) {
+      return g.mission === m;
+    });
+    return goals.some(function (g) {
+      return g.current_amount > 0 || g.complete;
+    });
   });
 
   return {
@@ -1710,7 +1788,9 @@ function _repairStuckMissionGoals(state: LocalState): MissionAdvanceResult | nul
   if (!goals.length || !activeMissions.length) return null;
 
   var activeSet: Record<string, true> = {};
-  activeMissions.forEach(function (m) { activeSet[m] = true; });
+  activeMissions.forEach(function (m) {
+    activeSet[m] = true;
+  });
 
   var changed = false;
   var updatedGoals = goals.map(function (goal) {
@@ -1759,11 +1839,10 @@ function _collectMissionRewards(ruleset: Ruleset, completedGestalts: string[]): 
 function _applyRewardsToGv(gv: GameValues, rewards: RewardSet | undefined): GameValues {
   if (!rewards) return gv;
   return Object.assign({}, gv, {
-    cash_value:   (gv.cash_value   || 0) + (rewards.cash_value   || 0),
-    xp_value:     (gv.xp_value     || 0) + (rewards.xp_value     || 0),
-    karma_value:  Math.max(-100, Math.min(100,
-                  (gv.karma_value  || 0) + (rewards.karma_value || 0))),
-    profiles_max: (gv.profiles_max || 0) + (rewards.profiles_max || 0)
+    cash_value: (gv.cash_value || 0) + (rewards.cash_value || 0),
+    xp_value: (gv.xp_value || 0) + (rewards.xp_value || 0),
+    karma_value: Math.max(-100, Math.min(100, (gv.karma_value || 0) + (rewards.karma_value || 0))),
+    profiles_max: (gv.profiles_max || 0) + (rewards.profiles_max || 0),
   });
 }
 
@@ -1791,7 +1870,10 @@ function _advanceChargePerpMissions(state: LocalState, gestalt: string): Mission
   return _completeMissionsIfReady(updatedGoals, activeMissions);
 }
 
-function _advanceBuyPowerupMissions(state: LocalState, powerupGestalt: string): MissionAdvanceResult {
+function _advanceBuyPowerupMissions(
+  state: LocalState,
+  powerupGestalt: string
+): MissionAdvanceResult {
   var activeMissions = state.active_missions || [];
   var missionGoals = state.mission_goals || [];
 
@@ -1815,7 +1897,10 @@ function _advanceBuyPowerupMissions(state: LocalState, powerupGestalt: string): 
   return _completeMissionsIfReady(updatedGoals, activeMissions);
 }
 
-function _advanceUpgradeTokenMissions(state: LocalState, tokenGestalt: string): MissionAdvanceResult {
+function _advanceUpgradeTokenMissions(
+  state: LocalState,
+  tokenGestalt: string
+): MissionAdvanceResult {
   var activeMissions = state.active_missions || [];
   var missionGoals = state.mission_goals || [];
 
@@ -1911,21 +1996,24 @@ export function chargePerp(
   path: string
 ): Promise<{ result: { error: number } | Record<string, unknown> }> {
   var rawState = getState();
-  var now      = clockNow();
-  var ruleset  = _getRuleset();
+  var now = clockNow();
+  var ruleset = _getRuleset();
 
   // Materialize before reading game_values so AP regen ticks accumulated
   // since the last handler call are visible. Without this, the UI's
   // APTicker can show 1 AP while state.ap_snapshot still says 0, and
   // chargePerp would refuse the action despite the visible bar.
-  var mat   = materialize(rawState, now);
+  var mat = materialize(rawState, now);
   var state = mat.state;
 
-  var nodes   = state.nodes || [];
+  var nodes = state.nodes || [];
   var nodeIdx = -1;
   for (var i = 0; i < nodes.length; i++) {
     var n0 = nodes[i];
-    if (n0 && n0.full_path === path) { nodeIdx = i; break; }
+    if (n0 && n0.full_path === path) {
+      nodeIdx = i;
+      break;
+    }
   }
   if (nodeIdx < 0) return Promise.resolve({ result: { error: 1 } });
 
@@ -1933,7 +2021,7 @@ export function chargePerp(
   if (!node) return Promise.resolve({ result: { error: 1 } });
   var gestalt = node.gestalt || _gestaltFrom(node.full_type) || '';
   var perpDef: PerpDef | undefined = gestalt
-    ? (ruleset.perps[gestalt] || ruleset.tokens[gestalt])
+    ? ruleset.perps[gestalt] || ruleset.tokens[gestalt]
     : undefined;
   var typeData: PerpTypeData | undefined = perpDef ? perpDef.type_data : undefined;
   if (!typeData || typeof typeData.charge_time !== 'number') {
@@ -1946,34 +2034,41 @@ export function chargePerp(
     if (ce && ce.path === path) return Promise.resolve({ result: { error: 2 } });
   }
 
-  var gv           = state.game_values || {};
+  var gv = state.game_values || {};
   var instanceData: NodeInstanceData = node.instance_data || {};
   // charge_cost: instance_data wins (powerup-modified), then type_data, then 0.
-  var chargeCost = typeof instanceData.charge_cost === 'number'
-    ? instanceData.charge_cost
-    : (typeof typeData.charge_cost === 'number' ? typeData.charge_cost : 0);
+  var chargeCost =
+    typeof instanceData.charge_cost === 'number'
+      ? instanceData.charge_cost
+      : typeof typeData.charge_cost === 'number'
+        ? typeData.charge_cost
+        : 0;
 
   // Distinct codes (1=AP, 3=cash) let Game.js show the correct feedback animation.
-  if ((gv.ap_snapshot || 0) < 1)           return Promise.resolve({ result: { error: 1 } });
-  if ((gv.cash_value  || 0) < chargeCost)  return Promise.resolve({ result: { error: 3 } });
+  if ((gv.ap_snapshot || 0) < 1) return Promise.resolve({ result: { error: 1 } });
+  if ((gv.cash_value || 0) < chargeCost) return Promise.resolve({ result: { error: 3 } });
 
   // ClientPerps don't carry collect_amount in the ruleset — they ship
   // income_base / income_factor instead. Fall back so charging the car
   // company actually pays out when collected.
-  var baseAmount = typeof instanceData.collect_amount === 'number'
-    ? instanceData.collect_amount
-    : (typeof typeData.collect_amount === 'number' ? typeData.collect_amount
-      : (typeof typeData.income_base === 'number' ? typeData.income_base : 0));
+  var baseAmount =
+    typeof instanceData.collect_amount === 'number'
+      ? instanceData.collect_amount
+      : typeof typeData.collect_amount === 'number'
+        ? typeData.collect_amount
+        : typeof typeData.income_base === 'number'
+          ? typeData.income_base
+          : 0;
   var chargeResult = { amount: _getVariatedAmount(baseAmount, now, path) };
 
-  var durationMs  = typeData.charge_time;
+  var durationMs = typeData.charge_time;
   var chargeEntry = {
-    path:         path,
-    result:       chargeResult,
+    path: path,
+    result: chargeResult,
     charge_start: now,
-    charge_end:   now + durationMs,
-    game_id:      node.game_id   || path,
-    game_type:    node.game_type || '',
+    charge_end: now + durationMs,
+    game_id: node.game_id || path,
+    game_type: node.game_type || '',
   };
 
   var xpInc = typeof typeData.xp_inc === 'number' ? typeData.xp_inc : 0;
@@ -1988,9 +2083,9 @@ export function chargePerp(
   });
 
   var newGv: GameValues = Object.assign({}, gv, {
-    cash_value:  (gv.cash_value  || 0) - chargeCost,
-    cash_spent:  (gv.cash_spent  || 0) + chargeCost,
-    xp_value:    (gv.xp_value   || 0) + xpInc,
+    cash_value: (gv.cash_value || 0) - chargeCost,
+    cash_spent: (gv.cash_spent || 0) + chargeCost,
+    xp_value: (gv.xp_value || 0) + xpInc,
     ap_snapshot: Math.max(0, (gv.ap_snapshot || 0) - 1),
   });
 
@@ -2009,21 +2104,23 @@ export function chargePerp(
   }
 
   var preMissionStateCharge = Object.assign({}, state, {
-    nodes:          newNodes,
+    nodes: newNodes,
     nodes_charging: charging.concat([chargeEntry]),
-    game_values:    newGv,
+    game_values: newGv,
   });
 
   var chargeMissionResult = _advanceChargePerpMissions(preMissionStateCharge, gestalt);
   newGv = _applyRewardsToGv(newGv, chargeMissionResult.rewards);
 
-  _persistDelta(_mkDelta(state.addr, 'chargePerp', [path], {
-    chargeEntry:  chargeEntry,
-    cashDelta:    chargeCost,
-    xpInc:        xpInc,
-    game_values:  newGv,
-    missions:     chargeMissionResult.missions || null,
-  }));
+  _persistDelta(
+    _mkDelta(state.addr, 'chargePerp', [path], {
+      chargeEntry: chargeEntry,
+      cashDelta: chargeCost,
+      xpInc: xpInc,
+      game_values: newGv,
+      missions: chargeMissionResult.missions || null,
+    })
+  );
 
   // Live-tick: schedule one-shot materialize at exactly charge_end so the
   // node_ready event fires without depending on the player reloading.
@@ -2032,23 +2129,27 @@ export function chargePerp(
   // Achievements
   var _cpDisplayName = state.display_name || state.addr;
   if (levelup) {
-    triggerAchievement('levelup',
-      _t('achievement_levelup', _cpDisplayName, String(newLevelNum)));
+    triggerAchievement('levelup', _t('achievement_levelup', _cpDisplayName, String(newLevelNum)));
   }
-  var _cpCompletedMissions = (chargeMissionResult.missions && chargeMissionResult.missions.complete_missions) || [];
+  var _cpCompletedMissions =
+    (chargeMissionResult.missions && chargeMissionResult.missions.complete_missions) || [];
   for (var _cpMi = 0; _cpMi < _cpCompletedMissions.length; _cpMi++) {
     var mGestalt = _cpCompletedMissions[_cpMi];
     if (typeof mGestalt !== 'string') continue;
     var _cpMDef = _findMissionDef(_getRuleset(), mGestalt);
     var _cpMTitle = (_cpMDef && _cpMDef.type_data && _cpMDef.type_data.title) || mGestalt;
-    triggerAchievement('mission_done',
-      _t('achievement_mission_done', _cpDisplayName, _cpMTitle),
-      { mission: mGestalt });
+    triggerAchievement('mission_done', _t('achievement_mission_done', _cpDisplayName, _cpMTitle), {
+      mission: mGestalt,
+    });
   }
 
   return Promise.resolve({
-    result: { game_values: newGv, duration: durationMs, levelup: levelup,
-              missions: chargeMissionResult.missions || {} },
+    result: {
+      game_values: newGv,
+      duration: durationMs,
+      levelup: levelup,
+      missions: chargeMissionResult.missions || {},
+    },
   });
 }
 
@@ -2086,7 +2187,9 @@ function _scheduleChargeReady(chargeEnd: number, path: string): void {
     var s = getState();
     if (!s) return;
     if (path) {
-      var stillCharging = (s.nodes_charging || []).some(function (c: { path: string }) { return c.path === path; });
+      var stillCharging = (s.nodes_charging || []).some(function (c: { path: string }) {
+        return c.path === path;
+      });
       if (!stillCharging) return;
     }
     var mat = materialize(s, clockNow());
@@ -2104,7 +2207,7 @@ function _scheduleChargeReady(chargeEnd: number, path: string): void {
 // PRNG — Mulberry32, seeded for deterministic tests.
 // Call setPrngSeed(n) before any handler invocation that uses RNG.
 // ---------------------------------------------------------------------------
-var _prngSeed = 0xDEADBEEF;
+var _prngSeed = 0xdeadbeef;
 
 /**
  * Seed the deterministic PRNG used for charge-amount jitter.
@@ -2115,7 +2218,7 @@ export function setPrngSeed(seed: number): void {
 }
 
 function _rng(): number {
-  _prngSeed = (_prngSeed + 0x6D2B79F5) | 0;
+  _prngSeed = (_prngSeed + 0x6d2b79f5) | 0;
   var t = Math.imul(_prngSeed ^ (_prngSeed >>> 15), 1 | _prngSeed);
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
@@ -2123,12 +2226,17 @@ function _rng(): number {
 
 function _generateId(): string {
   // Timestamp base + two RNG words → collision-resistant string without deps.
-  return Date.now().toString(36) +
-    Math.floor(_rng() * 0xFFFFFF).toString(36) +
-    Math.floor(_rng() * 0xFFFFFF).toString(36);
+  return (
+    Date.now().toString(36) +
+    Math.floor(_rng() * 0xffffff).toString(36) +
+    Math.floor(_rng() * 0xffffff).toString(36)
+  );
 }
 
-interface KarmaIncident { gestalt: string; karma_delta: number }
+interface KarmaIncident {
+  gestalt: string;
+  karma_delta: number;
+}
 
 // Returns { gestalt, karma_delta } if a karma incident fires, else null.
 // factor = sqrt((-karma)/100) + 0.05  (dd_app views.py:483 WeightedRandomizer)
@@ -2136,7 +2244,7 @@ function _handleKarmaIncident(gv: GameValues, ruleset: Ruleset): KarmaIncident |
   var karma = (gv && gv.karma_value) || 0;
   if (karma >= 0) return null;
 
-  var factor = Math.pow((-karma) / 100, 0.5) + 0.05;
+  var factor = Math.pow(-karma / 100, 0.5) + 0.05;
   if (_rng() >= factor) return null;
 
   var level = (gv && gv.xp_level) || 1;
@@ -2148,7 +2256,7 @@ function _handleKarmaIncident(gv: GameValues, ruleset: Ruleset): KarmaIncident |
   var k = eligible[Math.floor(_rng() * eligible.length)];
   if (!k) return null;
   return {
-    gestalt:     (k.type_data && k.type_data.gestalt) || '',
+    gestalt: (k.type_data && k.type_data.gestalt) || '',
     karma_delta: (k.type_data && k.type_data.karma_points) || -1,
   };
 }
@@ -2180,7 +2288,10 @@ interface DbEntry {
   profile_set: { profiles_value: number; tokens_map: Record<string, { amount: number }> };
   collect_dt?: number;
 }
-interface TokenUpdate { path: string; amount: number }
+interface TokenUpdate {
+  path: string;
+  amount: number;
+}
 
 export function collectPerp(
   gperpPath: string
@@ -2196,7 +2307,10 @@ export function collectPerp(
   var collectEntry: { path: string; result?: { amount?: number } } | null = null;
   for (var i = 0; i < ms.nodes_collect.length; i++) {
     var ne = ms.nodes_collect[i];
-    if (ne && ne.path === gperpPath) { collectEntry = ne; break; }
+    if (ne && ne.path === gperpPath) {
+      collectEntry = ne;
+      break;
+    }
   }
   if (!collectEntry) {
     return Promise.resolve({ result: { error: 1 } });
@@ -2205,7 +2319,10 @@ export function collectPerp(
   var node: GameNode | null = null;
   for (var j = 0; j < ms.nodes.length; j++) {
     var nn = ms.nodes[j];
-    if (nn && nn.full_path === gperpPath) { node = nn; break; }
+    if (nn && nn.full_path === gperpPath) {
+      node = nn;
+      break;
+    }
   }
   if (!node) {
     return Promise.resolve({ result: { error: 2 } });
@@ -2213,15 +2330,17 @@ export function collectPerp(
 
   var gestalt = node.gestalt || _gestaltFrom(node.full_type) || '';
   var perpDef: PerpDef | undefined = gestalt
-    ? (ruleset.perps[gestalt] || ruleset.tokens[gestalt])
+    ? ruleset.perps[gestalt] || ruleset.tokens[gestalt]
     : undefined;
   var typeData: PerpTypeData | undefined = perpDef ? perpDef.type_data : undefined;
 
   var cr = collectEntry.result || {};
-  var xpGain = (typeData && typeof typeData.xp_inc === 'number') ? typeData.xp_inc : 1;
+  var xpGain = typeData && typeof typeData.xp_inc === 'number' ? typeData.xp_inc : 1;
   var gameType = node.game_type;
 
-  var newCollect = ms.nodes_collect.filter(function (e) { return e.path !== gperpPath; });
+  var newCollect = ms.nodes_collect.filter(function (e) {
+    return e.path !== gperpPath;
+  });
   var newGv: GameValues = Object.assign({}, ms.game_values, {
     xp_value: (ms.game_values.xp_value || 0) + xpGain,
   });
@@ -2237,9 +2356,7 @@ export function collectPerp(
     // ContactPerps store yielded token-types under `tokens`; TokenPerps
     // (super-token decomposition) under `contained_tokens` — accept either.
     var tokensMap: Record<string, { amount: number }> = {};
-    var contained: TokenSpec[] = (typeData && (
-      typeData.tokens || typeData.contained_tokens
-    )) || [];
+    var contained: TokenSpec[] = (typeData && (typeData.tokens || typeData.contained_tokens)) || [];
     for (var ct = 0; ct < contained.length; ct++) {
       var ctEntry = contained[ct];
       if (ctEntry && ctEntry.gestalt) {
@@ -2248,21 +2365,19 @@ export function collectPerp(
     }
     var profileSet = { profiles_value: cr.amount || 0, tokens_map: tokensMap };
     dbEntry = {
-      origin:      gperpPath,
-      collect_id:  collectId,
+      origin: gperpPath,
+      collect_id: collectId,
       profile_set: profileSet,
-      collect_dt:  now,
+      collect_dt: now,
     };
     newQueue = newQueue.concat([dbEntry]);
     innerResult = { profile_set: profileSet, origin: gperpPath, collect_id: collectId };
-
   } else if (gameType === 'ClientPerp') {
     var cashGain = cr.amount || 0;
     newGv = Object.assign({}, newGv, {
       cash_value: (ms.game_values.cash_value || 0) + cashGain,
     });
     innerResult = { cash: newGv.cash_value };
-
   } else if (gameType === 'TokenPerp') {
     var tpIdata: NodeInstanceData = node.instance_data || {};
     var prevAmount = typeof tpIdata.amount === 'number' ? tpIdata.amount : 0;
@@ -2275,7 +2390,6 @@ export function collectPerp(
       });
     });
     innerResult = { token_upgraded_amount: newAmount };
-
   } else {
     return Promise.resolve({ result: { error: 3 } });
   }
@@ -2283,14 +2397,13 @@ export function collectPerp(
   var incident = _handleKarmaIncident(newGv, ruleset);
   if (incident) {
     newGv = Object.assign({}, newGv, {
-      karma_value: Math.max(-100, Math.min(100,
-        (newGv.karma_value || 0) + incident.karma_delta))
+      karma_value: Math.max(-100, Math.min(100, (newGv.karma_value || 0) + incident.karma_delta)),
     });
   }
 
   var oldLevel = (ms.game_values && ms.game_values.xp_level) || 1;
   var newLevel = _getLevelByXP(newGv.xp_value || 0);
-  var levelup  = newLevel > oldLevel;
+  var levelup = newLevel > oldLevel;
   if (levelup) {
     var collectLevels = _getRuleset().levels;
     var collectLevelInfo = collectLevels[newLevel - 1] || collectLevels[collectLevels.length - 1];
@@ -2303,29 +2416,36 @@ export function collectPerp(
   }
 
   var preMissionState = Object.assign({}, ms, {
-    nodes:         newNodes,
+    nodes: newNodes,
     nodes_collect: newCollect,
-    db_queue:      newQueue,
-    game_values:   newGv,
-    last_seen_ts:  Math.max(now, ms.last_seen_ts || 0)
+    db_queue: newQueue,
+    game_values: newGv,
+    last_seen_ts: Math.max(now, ms.last_seen_ts || 0),
   });
 
   var collectMissionResult;
   if (gameType === 'ContactPerp') {
-    collectMissionResult = _advanceCollectProfilesMissions(preMissionState, gestalt, cr.amount || 0);
+    collectMissionResult = _advanceCollectProfilesMissions(
+      preMissionState,
+      gestalt,
+      cr.amount || 0
+    );
   } else if (gameType === 'ClientPerp') {
     collectMissionResult = _advanceCollectCashMissions(preMissionState, gestalt, cr.amount || 0);
   } else if (gameType === 'TokenPerp') {
     collectMissionResult = _advanceUpgradeTokenMissions(preMissionState, gestalt);
   } else {
-    collectMissionResult = { missions: null, mission_goals: preMissionState.mission_goals,
-      active_missions: preMissionState.active_missions };
+    collectMissionResult = {
+      missions: null,
+      mission_goals: preMissionState.mission_goals,
+      active_missions: preMissionState.active_missions,
+    };
   }
   newGv = _applyRewardsToGv(newGv, collectMissionResult.rewards);
   var newState = Object.assign({}, preMissionState, {
     game_values: newGv,
     mission_goals: collectMissionResult.mission_goals,
-    active_missions: collectMissionResult.active_missions
+    active_missions: collectMissionResult.active_missions,
   });
 
   var deltaResult: {
@@ -2335,31 +2455,37 @@ export function collectPerp(
     db_entry?: DbEntry;
     token_update?: TokenUpdate;
   } = { game_values: newGv, path: gperpPath, missions: collectMissionResult.missions };
-  if (dbEntry)     deltaResult.db_entry     = dbEntry;
+  if (dbEntry) deltaResult.db_entry = dbEntry;
   if (tokenUpdate) deltaResult.token_update = tokenUpdate;
   _persistDelta(_mkDelta(state.addr, 'collectPerp', [gperpPath], deltaResult));
 
   var response = Object.assign(
-    { result: innerResult, game_values: newGv, levelup: levelup,
-      missions: collectMissionResult.missions || { complete_missions: [], updated_missions: [] } },
+    {
+      result: innerResult,
+      game_values: newGv,
+      levelup: levelup,
+      missions: collectMissionResult.missions || { complete_missions: [], updated_missions: [] },
+    },
     incident ? { karma_incident: incident.gestalt } : {}
   );
 
   // Achievements
   var _clpDisplayName = state.display_name || state.addr;
   if (levelup) {
-    triggerAchievement('levelup',
-      _t('achievement_levelup', _clpDisplayName, String(newLevel)));
+    triggerAchievement('levelup', _t('achievement_levelup', _clpDisplayName, String(newLevel)));
   }
-  var _clpCompletedMissions = (collectMissionResult.missions && collectMissionResult.missions.complete_missions) || [];
+  var _clpCompletedMissions =
+    (collectMissionResult.missions && collectMissionResult.missions.complete_missions) || [];
   for (var _clpMi = 0; _clpMi < _clpCompletedMissions.length; _clpMi++) {
     var clpG = _clpCompletedMissions[_clpMi];
     if (typeof clpG !== 'string') continue;
     var _clpMDef = _findMissionDef(_getRuleset(), clpG);
     var _clpMTitle = (_clpMDef && _clpMDef.type_data && _clpMDef.type_data.title) || clpG;
-    triggerAchievement('mission_done',
+    triggerAchievement(
+      'mission_done',
       _t('achievement_mission_done', _clpDisplayName, _clpMTitle),
-      { mission: clpG });
+      { mission: clpG }
+    );
   }
   var _clpOldKarma = (ms.game_values && ms.game_values.karma_value) || 0;
   var _clpNewKarma = newGv.karma_value || 0;
@@ -2428,28 +2554,31 @@ export function integrateCollected(
   }
 
   var queue = state.db_queue || [];
-  var entry = queue.find(function (q) { return q.collect_id === collectId; });
+  var entry = queue.find(function (q) {
+    return q.collect_id === collectId;
+  });
   if (!entry) {
     return Promise.resolve({ result: { error: 0 } });
   }
-  var newQueue = queue.filter(function (q) { return q.collect_id !== collectId; });
+  var newQueue = queue.filter(function (q) {
+    return q.collect_id !== collectId;
+  });
 
   var ps: ProfileSetView = (entry.profile_set as ProfileSetView) || {};
   var profilesIncrement = ps.profiles_value || 0;
 
   var integratedIds = state.integrated_ids || {};
-  var dup       = integratedIds[collectId] ? profilesIncrement : 0;
+  var dup = integratedIds[collectId] ? profilesIncrement : 0;
   var increment = integratedIds[collectId] ? 0 : profilesIncrement;
   var newIntegratedIds = Object.assign({}, integratedIds, { [collectId]: true });
 
-  var xpGain    = ps.xp_gain    || 0;
+  var xpGain = ps.xp_gain || 0;
   var karmaGain = ps.karma_gain || 0;
   var newGv: GameValues = Object.assign({}, state.game_values, {
-    xp_value:       (state.game_values.xp_value    || 0) + xpGain,
-    karma_value: Math.max(-100, Math.min(100,
-      (state.game_values.karma_value || 0) + karmaGain)),
+    xp_value: (state.game_values.xp_value || 0) + xpGain,
+    karma_value: Math.max(-100, Math.min(100, (state.game_values.karma_value || 0) + karmaGain)),
     profiles_value: (state.game_values.profiles_value || 0) + increment,
-    ap_snapshot:    Math.max(0, (state.game_values.ap_snapshot || 0) - 1),
+    ap_snapshot: Math.max(0, (state.game_values.ap_snapshot || 0) - 1),
   });
 
   var ruleset = _getRuleset();
@@ -2501,30 +2630,32 @@ export function integrateCollected(
   // saveCoordsQueue persists the resolved position. Pre-seeding x/y
   // bypassed that and made every new token stack at a single hashed point.
   // Initial share = ps_share * N / (M + N) (= ps_share when M = 0).
-  if (!skipMerge) Object.keys(tokensMap).forEach(function (gestalt) {
-    if (seenGestalts[gestalt]) return;
-    if (!ruleset.tokens || !ruleset.tokens[gestalt]) return;
-    var tok = tokensMap[gestalt];
-    if (!tok) return;
-    var seedShare = Math.min(100, ((tok.amount || 0) * N) / denom);
-    var newNode: GameNode = {
-      game_id:    gestalt,
-      gestalt:    gestalt,
-      game_type:  'TokenPerp',
-      full_type:  'TokenPerp:' + gestalt,
-      full_path:  'Database.' + gestalt,
-      instance_data: { amount: seedShare },
-    };
-    newNodes.push(newNode);
-    updatedNodes.push(newNode);
-  });
+  if (!skipMerge)
+    Object.keys(tokensMap).forEach(function (gestalt) {
+      if (seenGestalts[gestalt]) return;
+      if (!ruleset.tokens || !ruleset.tokens[gestalt]) return;
+      var tok = tokensMap[gestalt];
+      if (!tok) return;
+      var seedShare = Math.min(100, ((tok.amount || 0) * N) / denom);
+      var newNode: GameNode = {
+        game_id: gestalt,
+        gestalt: gestalt,
+        game_type: 'TokenPerp',
+        full_type: 'TokenPerp:' + gestalt,
+        full_path: 'Database.' + gestalt,
+        instance_data: { amount: seedShare },
+      };
+      newNodes.push(newNode);
+      updatedNodes.push(newNode);
+    });
 
   var oldLevel = (state.game_values && state.game_values.xp_level) || 1;
   var newLevel = _getLevelByXP(newGv.xp_value || 0);
-  var levelup  = newLevel > oldLevel;
+  var levelup = newLevel > oldLevel;
   if (levelup) {
     var integrateLevels = _getRuleset().levels;
-    var integrateLevelInfo = integrateLevels[newLevel - 1] || integrateLevels[integrateLevels.length - 1];
+    var integrateLevelInfo =
+      integrateLevels[newLevel - 1] || integrateLevels[integrateLevels.length - 1];
     if (integrateLevelInfo) {
       newGv = Object.assign({}, newGv, {
         xp_level: newLevel,
@@ -2534,34 +2665,42 @@ export function integrateCollected(
   }
 
   var preMissionState = Object.assign({}, state, {
-    db_queue:       newQueue,
-    nodes:          newNodes,
-    game_values:    newGv,
+    db_queue: newQueue,
+    nodes: newNodes,
+    game_values: newGv,
     integrated_ids: newIntegratedIds,
-    last_seen_ts:   Math.max(now, state.last_seen_ts || 0)
+    last_seen_ts: Math.max(now, state.last_seen_ts || 0),
   });
 
   // Advance integrate_profiles goals against the new TokenPerp amounts.
   var missionResult = _advanceIntegrateProfilesMissions(
-    preMissionState, newGv.profiles_value || 0, newNodes
+    preMissionState,
+    newGv.profiles_value || 0,
+    newNodes
   );
   newGv = _applyRewardsToGv(newGv, missionResult.rewards);
   var newState = Object.assign({}, preMissionState, {
     game_values: newGv,
     mission_goals: missionResult.mission_goals,
-    active_missions: missionResult.active_missions
+    active_missions: missionResult.active_missions,
   });
 
   // Persist delta for webxdc replay; result carries full state for the reducer.
-  _persistDelta(_mkDelta(state.addr, 'integrateCollected', [collectId],
-    { increment: increment, dup: dup, game_values: newGv, nodes: updatedNodes,
-      missions: missionResult.missions }));
+  _persistDelta(
+    _mkDelta(state.addr, 'integrateCollected', [collectId], {
+      increment: increment,
+      dup: dup,
+      game_values: newGv,
+      nodes: updatedNodes,
+      missions: missionResult.missions,
+    })
+  );
 
   var response = {
     result: { nodes: updatedNodes, increment: increment, dup: dup },
     game_values: newGv,
     levelup: levelup,
-    missions: missionResult.missions || { complete_missions: [], updated_missions: [] }
+    missions: missionResult.missions || { complete_missions: [], updated_missions: [] },
   };
 
   if (levelup) {
@@ -2573,18 +2712,18 @@ export function integrateCollected(
   // Achievements
   var _icDisplayName = state.display_name || state.addr;
   if (levelup) {
-    triggerAchievement('levelup',
-      _t('achievement_levelup', _icDisplayName, String(newLevel)));
+    triggerAchievement('levelup', _t('achievement_levelup', _icDisplayName, String(newLevel)));
   }
-  var _icCompletedMissions = (missionResult.missions && missionResult.missions.complete_missions) || [];
+  var _icCompletedMissions =
+    (missionResult.missions && missionResult.missions.complete_missions) || [];
   for (var _icMi = 0; _icMi < _icCompletedMissions.length; _icMi++) {
     var icG = _icCompletedMissions[_icMi];
     if (typeof icG !== 'string') continue;
     var _icMDef = _findMissionDef(_getRuleset(), icG);
     var _icMTitle = (_icMDef && _icMDef.type_data && _icMDef.type_data.title) || icG;
-    triggerAchievement('mission_done',
-      _t('achievement_mission_done', _icDisplayName, _icMTitle),
-      { mission: icG });
+    triggerAchievement('mission_done', _t('achievement_mission_done', _icDisplayName, _icMTitle), {
+      mission: icG,
+    });
   }
   var _icOldProfiles = (state.game_values && state.game_values.profiles_value) || 0;
   var _icNewProfiles = newGv.profiles_value || 0;
@@ -2593,9 +2732,11 @@ export function integrateCollected(
     var ms2 = _icMilestones[_icPi];
     if (ms2 === undefined) continue;
     if (_icOldProfiles < ms2 && _icNewProfiles >= ms2) {
-      triggerAchievement('profiles_milestone',
+      triggerAchievement(
+        'profiles_milestone',
         _t('achievement_profiles_milestone', _icDisplayName, String(ms2)),
-        { threshold: ms2 });
+        { threshold: ms2 }
+      );
     }
   }
   var _icOldKarma = (state.game_values && state.game_values.karma_value) || 0;
@@ -2615,9 +2756,7 @@ export function integrateCollected(
 // the briefing popup for a given mission so we don't re-open it on reload.
 // ---------------------------------------------------------------------------
 
-export function markTokenSeen(
-  gestalt: unknown
-): Promise<{ result: { error: 0 } | { ok: true } }> {
+export function markTokenSeen(gestalt: unknown): Promise<{ result: { error: 0 } | { ok: true } }> {
   if (typeof gestalt !== 'string' || !gestalt) {
     return Promise.resolve({ result: { error: 0 } });
   }
@@ -2630,7 +2769,9 @@ export function markTokenSeen(
   return Promise.resolve({ result: { ok: true } });
 }
 
-export function dismissMissionBriefing(gestalt: unknown): Promise<{ result: { error: 0 } | { ok: true } }> {
+export function dismissMissionBriefing(
+  gestalt: unknown
+): Promise<{ result: { error: 0 } | { ok: true } }> {
   if (typeof gestalt !== 'string' || !gestalt) {
     return Promise.resolve({ result: { error: 0 } });
   }
@@ -2639,8 +2780,7 @@ export function dismissMissionBriefing(gestalt: unknown): Promise<{ result: { er
   if (seen[gestalt]) {
     return Promise.resolve({ result: { ok: true } });
   }
-  _persistDelta(_mkDelta(state.addr, 'dismissMissionBriefing',
-    [gestalt], { gestalt: gestalt }));
+  _persistDelta(_mkDelta(state.addr, 'dismissMissionBriefing', [gestalt], { gestalt: gestalt }));
   return Promise.resolve({ result: { ok: true } });
 }
 
@@ -2658,10 +2798,12 @@ export function recheckMissions(): Promise<{
     return Promise.resolve({ result: { repaired: false } });
   }
   var newGv = _applyRewardsToGv(state.game_values || {}, repair.rewards);
-  _persistDelta(_mkDelta(state.addr, 'recheckMissions', [], {
-    game_values: newGv,
-    missions: repair.missions,
-  }));
+  _persistDelta(
+    _mkDelta(state.addr, 'recheckMissions', [], {
+      game_values: newGv,
+      missions: repair.missions,
+    })
+  );
   return Promise.resolve({
     result: { repaired: true, missions: repair.missions, game_values: newGv, levelup: false },
   });
@@ -2670,9 +2812,7 @@ export function recheckMissions(): Promise<{
 // ---------------------------------------------------------------------------
 // Stub handlers — Wave 4+ issues fill these in.
 // ---------------------------------------------------------------------------
-var _STUBS = [
-  'checkUsername',
-] as const;
+var _STUBS = ['checkUsername'] as const;
 
 type StubName = (typeof _STUBS)[number];
 var _stubHandlers: Record<string, () => Promise<never>> = {};
@@ -2691,32 +2831,35 @@ _STUBS.forEach(function (name: StubName) {
 //
 // HandlerResult shapes are documented in docs/response-shapes.md.
 // ---------------------------------------------------------------------------
-var LocalEngine = Object.assign({
-  getToken:           getToken,
-  ping:               ping,
-  getSessionLocale:   getSessionLocale,
-  setLocale:          setLocale,
-  loadGame:           loadGame,
-  getRanking:         getRanking,
-  setDisplayName:     setDisplayName,
-  setPerpCoordinates: setPerpCoordinates,
-  getProvidedPerps:   getProvidedPerps,
-  getPowerups:        getPowerups,
-  buyKarma:           buyKarma,
-  buyPowerup:         buyPowerup,
-  sellPowerup:        sellPowerup,
-  buySlots:           buySlots,
-  buyPerp:            buyPerp,
-  chargePerp:         chargePerp,
-  collectPerp:        collectPerp,
-  integrateCollected: integrateCollected,
-  dismissMissionBriefing: dismissMissionBriefing,
-  markTokenSeen:      markTokenSeen,
-  recheckMissions:    recheckMissions,
-  setEmitter:           setEmitter,
-  setSendDelta:         setSendDelta,
-  setSendAchievement:   setSendAchievement,
-  setPrngSeed:          setPrngSeed,
-}, _stubHandlers);
+var LocalEngine = Object.assign(
+  {
+    getToken: getToken,
+    ping: ping,
+    getSessionLocale: getSessionLocale,
+    setLocale: setLocale,
+    loadGame: loadGame,
+    getRanking: getRanking,
+    setDisplayName: setDisplayName,
+    setPerpCoordinates: setPerpCoordinates,
+    getProvidedPerps: getProvidedPerps,
+    getPowerups: getPowerups,
+    buyKarma: buyKarma,
+    buyPowerup: buyPowerup,
+    sellPowerup: sellPowerup,
+    buySlots: buySlots,
+    buyPerp: buyPerp,
+    chargePerp: chargePerp,
+    collectPerp: collectPerp,
+    integrateCollected: integrateCollected,
+    dismissMissionBriefing: dismissMissionBriefing,
+    markTokenSeen: markTokenSeen,
+    recheckMissions: recheckMissions,
+    setEmitter: setEmitter,
+    setSendDelta: setSendDelta,
+    setSendAchievement: setSendAchievement,
+    setPrngSeed: setPrngSeed,
+  },
+  _stubHandlers
+);
 
 export default LocalEngine;

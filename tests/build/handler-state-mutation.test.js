@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = dirname(__filename);
+const __dirname = dirname(__filename);
 const enginePath = resolve(__dirname, '../../scripts/LocalEngine.ts');
 
 // Lines that may legitimately call setState. Each entry is a substring
@@ -64,13 +64,16 @@ describe('LocalEngine handlers do not call setState directly (closes #120)', () 
     });
 
     if (offenders.length) {
-      const msg = offenders.map(function (o) {
-        return '  scripts/LocalEngine.ts:' + o.line + '  ' + o.text;
-      }).join('\n');
+      const msg = offenders
+        .map(function (o) {
+          return '  scripts/LocalEngine.ts:' + o.line + '  ' + o.text;
+        })
+        .join('\n');
       throw new Error(
         'Found setState call(s) in scripts/LocalEngine.ts outside the\n' +
-        'allowlist. Handlers must compute deltas and call _persistDelta —\n' +
-        'they must NOT call setState directly. Offenders:\n' + msg
+          'allowlist. Handlers must compute deltas and call _persistDelta —\n' +
+          'they must NOT call setState directly. Offenders:\n' +
+          msg
       );
     }
     expect(offenders).toEqual([]);

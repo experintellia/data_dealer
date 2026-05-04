@@ -5,7 +5,7 @@
 // module's top-level evaluation does not depend on $ existing yet.
 
 export function extend(C, P) {
-  var F = function() {};
+  var F = function () {};
   F.prototype = P.prototype;
   C.prototype = new F();
   C.prototype.constructor = C;
@@ -16,7 +16,7 @@ export function wait(delay) {
   console.warn('Asynchronously waiting for %s milliseconds.', delay);
   var $ = globalThis.jQuery || globalThis.$;
   var deferred = new $.Deferred();
-  setTimeout(function() {
+  setTimeout(function () {
     deferred.resolve();
   }, delay);
   return deferred.promise();

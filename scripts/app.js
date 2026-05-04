@@ -33,8 +33,7 @@ function compileTemplates() {
   return out;
 }
 
-const Application = function() {
-
+const Application = function () {
   const _ = globalThis._;
   const $ = globalThis.jQuery || globalThis.$;
   const numeral = globalThis.numeral;
@@ -48,12 +47,12 @@ const Application = function() {
   // Templates are pre-compiled at bundle time; loadViews is retained as
   // an immediately-resolved Deferred so callers (bootstrap.continueStart,
   // any Game-internal reset path) keep their `.then(...)` chains.
-  app.loadViews = function() {
+  app.loadViews = function () {
     return $.when();
   };
 
   // A nice wrapper for rendering underscore templates.
-  app.renderView = function(viewName, data) {
+  app.renderView = function (viewName, data) {
     const view = templates[viewName];
     if (!view) {
       console.warn('Could not render view “%s”: not bundled', viewName);
@@ -72,17 +71,17 @@ const Application = function() {
   // Promise.
   const INTERNAL_API = { setEmitter: 1, setSendDelta: 1, setPrngSeed: 1 };
   app.remote = {};
-  Object.keys(LocalEngine).forEach(function(name) {
+  Object.keys(LocalEngine).forEach(function (name) {
     if (INTERNAL_API[name]) return;
     const fn = LocalEngine[name];
     if (typeof fn !== 'function') return;
-    app.remote[name] = function() {
+    app.remote[name] = function () {
       return $.when(fn.apply(LocalEngine, arguments));
     };
   });
 
-  app.start = function() {
-    LocalEngine.setEmitter(function(ev, pl) {
+  app.start = function () {
+    LocalEngine.setEmitter(function (ev, pl) {
       $(document).trigger(ev, [pl]);
     });
 
@@ -93,25 +92,25 @@ const Application = function() {
     // but no per-perp gnode listener (which lives on gnode.jq = $(this),
     // not on document) ever fires — the timer decorator stays put and
     // the collect icon never appears.
-    $(document).on('node_ready', function(e, pl) {
+    $(document).on('node_ready', function (e, pl) {
       if (!app.game || !pl || !pl.id) return;
       const gnode = app.game.getById(pl.id);
       if (gnode) gnode.trigger('node_ready', [pl.result]);
     });
-    $(document).on('new_items', function(e, pl) {
+    $(document).on('new_items', function (e, pl) {
       if (!app.game) return;
       app.game.trigger('new_items', [pl]);
     });
 
     $('#loadertext').text('Loading saved game');
-    return app.remote.getSessionLocale().then(function(data) {
+    return app.remote.getSessionLocale().then(function (data) {
       const locale = data.result === 'de' ? 'de_AT' : 'en_US';
       i18n.setLocale(locale);
       // type_settings runs gettext at module load — must wait for the
       // locale JSON before requiring Game.
       $('#loadertext').text('Loading translations');
-      return i18n.ready().then(function() {
-        return app.remote.loadGame().then(function(data) {
+      return i18n.ready().then(function () {
+        return app.remote.loadGame().then(function (data) {
           const html = app.renderView('game.html');
           $('#dd-control').html(html);
           const Game = getGame();
@@ -137,40 +136,48 @@ const Application = function() {
 
   // Extending Underscore with some helpers for easier templating.
   _.mixin({
-    mixindone: function() { return true; },
-    game: function() {
+    mixindone: function () {
+      return true;
+    },
+    game: function () {
       // FIXME: only expose certain functions to _
-      if (app.game) { return app.game; }
-      else { return {}; }
+      if (app.game) {
+        return app.game;
+      } else {
+        return {};
+      }
     },
     numeral: numeral,
     sprintf: window.sprintf,
     renderView: app.renderView,
-    pad0: function(number, length) {
+    pad0: function (number, length) {
       // Fastest implementation according to http://jsperf.com/ways-to-0-pad-a-number
       const N = Math.pow(10, length);
       return number < N ? ('' + (N + number)).slice(1) : '' + number;
     },
-    crlf2html: function(str) {
+    crlf2html: function (str) {
       return String(str || '').replace(new RegExp('\r?\n|\r', 'g'), '<br>');
     },
-    toKSNum: function(number) {
+    toKSNum: function (number) {
       // To activate german language set:
       //_.numeral.language('de-de');  // load vendor/numeral-de.js first
       return _.numeral(number).format('0,0');
     },
-    toTime: function(ms) {
+    toTime: function (ms) {
       const date = new Date(ms || 0);
       if (ms >= 3600000) {
-        return _.pad0(date.getUTCHours(), 2) + ':' +
-               _.pad0(date.getUTCMinutes(), 2) + ':' +
-               _.pad0(date.getUTCSeconds(), 2);
+        return (
+          _.pad0(date.getUTCHours(), 2) +
+          ':' +
+          _.pad0(date.getUTCMinutes(), 2) +
+          ':' +
+          _.pad0(date.getUTCSeconds(), 2)
+        );
       } else {
-        return _.pad0(date.getUTCMinutes(), 2) + ':' +
-               _.pad0(date.getUTCSeconds(), 2);
+        return _.pad0(date.getUTCMinutes(), 2) + ':' + _.pad0(date.getUTCSeconds(), 2);
       }
     },
-    span: function(text, CSSClass) {
+    span: function (text, CSSClass) {
       CSSClass = CSSClass || 'highlight';
       return '<span class="' + CSSClass + '">' + text + '</span>';
     },
@@ -178,12 +185,14 @@ const Application = function() {
     __: i18n.ngettext,
   });
 
-
-  $(function() {
+  $(function () {
     // Inject a new style element to define our main sprite image.
     // FIXME: This needs to be modified for retrieving the image path from the back-end.
-    $('head').append($('<style type="text/css">')
-        .html('.RenderSprite {background-image: url(img/MainSprites.png);}'));
+    $('head').append(
+      $('<style type="text/css">').html(
+        '.RenderSprite {background-image: url(img/MainSprites.png);}'
+      )
+    );
   });
 
   return app;

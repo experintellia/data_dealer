@@ -5,27 +5,30 @@ import { materialize } from '../../scripts/materializer.js';
 // ── test fixtures ────────────────────────────────────────────────────────────
 
 function baseState(overrides) {
-  return Object.assign({
-    nodes_charging: [],
-    nodes_collect:  [],
-    game_values: {
-      ap_snapshot:     10,
-      ap_update:        0,
-      ap_inc_value:     1,
-      ap_inc_interval:  60000,  // 1 AP per minute
-      ap_max:          20,
-    }
-  }, overrides);
+  return Object.assign(
+    {
+      nodes_charging: [],
+      nodes_collect: [],
+      game_values: {
+        ap_snapshot: 10,
+        ap_update: 0,
+        ap_inc_value: 1,
+        ap_inc_interval: 60000, // 1 AP per minute
+        ap_max: 20,
+      },
+    },
+    overrides
+  );
 }
 
 function charge(path, charge_end, game_id, game_type) {
   return {
-    path:         path      || 'Imperium.City.Agent0',
-    result:       { value: 10 },
+    path: path || 'Imperium.City.Agent0',
+    result: { value: 10 },
     charge_start: 0,
-    charge_end:   charge_end != null ? charge_end : 5000,
-    game_id:      game_id   || 'abc123',
-    game_type:    game_type || 'ContactPerp',
+    charge_end: charge_end != null ? charge_end : 5000,
+    game_id: game_id || 'abc123',
+    game_type: game_type || 'ContactPerp',
   };
 }
 
@@ -62,7 +65,7 @@ describe('chargePerpReady rule', () => {
     expect(r.events).toHaveLength(1);
     expect(r.events[0]).toEqual({
       ev: 'node_ready',
-      pl: { id: 'id1', type: 'ContactPerp', path: 'p.a', result: c.result }
+      pl: { id: 'id1', type: 'ContactPerp', path: 'p.a', result: c.result },
     });
   });
 
@@ -72,17 +75,17 @@ describe('chargePerpReady rule', () => {
         charge('p.b', 8000, 'id2', 'T'),
         charge('p.a', 5000, 'id1', 'T'),
         charge('p.c', 3000, 'id3', 'T'),
-      ]
+      ],
     });
     const r = materialize(s, 10000);
-    expect(r.events.map(e => e.pl.path)).toEqual(['p.c', 'p.a', 'p.b']);
+    expect(r.events.map((e) => e.pl.path)).toEqual(['p.c', 'p.a', 'p.b']);
   });
 
   it('preserves pre-existing nodes_collect entries', () => {
     const existing = { path: 'p.x', result: { value: 5 } };
     const s = baseState({
       nodes_charging: [charge('p.a', 5000)],
-      nodes_collect:  [existing],
+      nodes_collect: [existing],
     });
     const r = materialize(s, 5000);
     expect(r.state.nodes_collect).toHaveLength(2);
@@ -93,7 +96,7 @@ describe('chargePerpReady rule', () => {
     // Guard: if somehow both arrays contain the same path, don't double-add.
     const s = baseState({
       nodes_charging: [charge('p.a', 5000)],
-      nodes_collect:  [{ path: 'p.a', result: { value: 10 } }],
+      nodes_collect: [{ path: 'p.a', result: { value: 10 } }],
     });
     const r = materialize(s, 5000);
     expect(r.state.nodes_collect).toHaveLength(1);
@@ -103,10 +106,7 @@ describe('chargePerpReady rule', () => {
 
   it('keeps still-charging entries in nodes_charging', () => {
     const s = baseState({
-      nodes_charging: [
-        charge('p.done',  1000),
-        charge('p.later', 9000),
-      ]
+      nodes_charging: [charge('p.done', 1000), charge('p.later', 9000)],
     });
     const r = materialize(s, 5000);
     expect(r.state.nodes_charging).toHaveLength(1);
@@ -121,26 +121,41 @@ describe('chargePerpReady rule', () => {
 describe('AP regen rule', () => {
   it('advances AP by the correct number of ticks', () => {
     const s = baseState({
-      game_values: { ap_snapshot: 5, ap_update: 0,
-                     ap_inc_value: 2, ap_inc_interval: 1000, ap_max: 100 }
+      game_values: {
+        ap_snapshot: 5,
+        ap_update: 0,
+        ap_inc_value: 2,
+        ap_inc_interval: 1000,
+        ap_max: 100,
+      },
     });
-    const r = materialize(s, 3000);  // 3 ticks × 2 = 6
+    const r = materialize(s, 3000); // 3 ticks × 2 = 6
     expect(r.state.game_values.ap_snapshot).toBe(11);
     expect(r.state.game_values.ap_update).toBe(3000);
   });
 
   it('caps AP at ap_max', () => {
     const s = baseState({
-      game_values: { ap_snapshot: 18, ap_update: 0,
-                     ap_inc_value: 5, ap_inc_interval: 1000, ap_max: 20 }
+      game_values: {
+        ap_snapshot: 18,
+        ap_update: 0,
+        ap_inc_value: 5,
+        ap_inc_interval: 1000,
+        ap_max: 20,
+      },
     });
     expect(materialize(s, 5000).state.game_values.ap_snapshot).toBe(20);
   });
 
   it('does not advance AP before a full interval elapses', () => {
     const s = baseState({
-      game_values: { ap_snapshot: 5, ap_update: 0,
-                     ap_inc_value: 1, ap_inc_interval: 1000, ap_max: 20 }
+      game_values: {
+        ap_snapshot: 5,
+        ap_update: 0,
+        ap_inc_value: 1,
+        ap_inc_interval: 1000,
+        ap_max: 20,
+      },
     });
     expect(materialize(s, 999).state.game_values.ap_snapshot).toBe(5);
   });
@@ -153,16 +168,26 @@ describe('AP regen rule', () => {
 
   it('does not regress AP when now < ap_update', () => {
     const s = baseState({
-      game_values: { ap_snapshot: 10, ap_update: 5000,
-                     ap_inc_value: 1, ap_inc_interval: 1000, ap_max: 20 }
+      game_values: {
+        ap_snapshot: 10,
+        ap_update: 5000,
+        ap_inc_value: 1,
+        ap_inc_interval: 1000,
+        ap_max: 20,
+      },
     });
     expect(materialize(s, 3000).state.game_values.ap_snapshot).toBe(10);
   });
 
   it('null ap_update seeds the regen clock from now (no immediate ticks)', () => {
     const s = baseState({
-      game_values: { ap_snapshot: 5, ap_update: null,
-                     ap_inc_value: 1, ap_inc_interval: 1000, ap_max: 20 }
+      game_values: {
+        ap_snapshot: 5,
+        ap_update: null,
+        ap_inc_value: 1,
+        ap_inc_interval: 1000,
+        ap_max: 20,
+      },
     });
     const r = materialize(s, 7000);
     expect(r.state.game_values.ap_snapshot).toBe(5); // no time has passed since seed
@@ -171,14 +196,19 @@ describe('AP regen rule', () => {
 
   it('seeded clock ticks correctly on subsequent materialize', () => {
     const seed = baseState({
-      game_values: { ap_snapshot: 0, ap_update: null,
-                     ap_inc_value: 1, ap_inc_interval: 1000, ap_max: 20 }
+      game_values: {
+        ap_snapshot: 0,
+        ap_update: null,
+        ap_inc_value: 1,
+        ap_inc_interval: 1000,
+        ap_max: 20,
+      },
     });
     const s1 = materialize(seed, 1000).state;
     expect(s1.game_values.ap_update).toBe(1000);
     const s2 = materialize(s1, 4500).state;
-    expect(s2.game_values.ap_snapshot).toBe(3);    // 3 full ticks
-    expect(s2.game_values.ap_update).toBe(4000);   // last full-tick boundary
+    expect(s2.game_values.ap_snapshot).toBe(3); // 3 full ticks
+    expect(s2.game_values.ap_update).toBe(4000); // last full-tick boundary
   });
 });
 
@@ -207,14 +237,18 @@ describe('idempotence', () => {
 
   it('AP snapshot does not drift on repeated same-t calls', () => {
     const s = baseState({
-      game_values: { ap_snapshot: 0, ap_update: 0,
-                     ap_inc_value: 1, ap_inc_interval: 1000, ap_max: 50 }
+      game_values: {
+        ap_snapshot: 0,
+        ap_update: 0,
+        ap_inc_value: 1,
+        ap_inc_interval: 1000,
+        ap_max: 50,
+      },
     });
     const t = 5000;
     const r1 = materialize(s, t);
     const r2 = materialize(r1.state, t);
-    expect(r2.state.game_values.ap_snapshot)
-      .toBe(r1.state.game_values.ap_snapshot);
+    expect(r2.state.game_values.ap_snapshot).toBe(r1.state.game_values.ap_snapshot);
   });
 });
 
@@ -226,11 +260,7 @@ describe('idempotence', () => {
 describe('monotonicity', () => {
   it('nodes_collect count is non-decreasing as t increases', () => {
     const s = baseState({
-      nodes_charging: [
-        charge('p.a', 1000),
-        charge('p.b', 3000),
-        charge('p.c', 5000),
-      ]
+      nodes_charging: [charge('p.a', 1000), charge('p.b', 3000), charge('p.c', 5000)],
     });
     const times = [0, 500, 1000, 2000, 3000, 4000, 5000, 10000];
     let prev = 0;
@@ -243,8 +273,13 @@ describe('monotonicity', () => {
 
   it('AP is non-decreasing as t increases', () => {
     const s = baseState({
-      game_values: { ap_snapshot: 0, ap_update: 0,
-                     ap_inc_value: 1, ap_inc_interval: 1000, ap_max: 10 }
+      game_values: {
+        ap_snapshot: 0,
+        ap_update: 0,
+        ap_inc_value: 1,
+        ap_inc_interval: 1000,
+        ap_max: 10,
+      },
     });
     const times = [0, 1000, 2000, 5000, 9000, 10000, 20000];
     let prev = 0;
@@ -266,8 +301,13 @@ describe('composability', () => {
   it('two-step state equals big-step state', () => {
     const s = baseState({
       nodes_charging: [charge('p.a', 2000), charge('p.b', 7000)],
-      game_values: { ap_snapshot: 0, ap_update: 0,
-                     ap_inc_value: 1, ap_inc_interval: 1000, ap_max: 50 }
+      game_values: {
+        ap_snapshot: 0,
+        ap_update: 0,
+        ap_inc_value: 1,
+        ap_inc_interval: 1000,
+        ap_max: 50,
+      },
     });
     const r1 = materialize(s, 3000);
     const r2 = materialize(r1.state, 9000);
@@ -276,10 +316,7 @@ describe('composability', () => {
 
   it('accumulated two-step events equal big-step events', () => {
     const s = baseState({
-      nodes_charging: [
-        charge('p.a', 2000, 'id1', 'T'),
-        charge('p.b', 7000, 'id2', 'T'),
-      ]
+      nodes_charging: [charge('p.a', 2000, 'id1', 'T'), charge('p.b', 7000, 'id2', 'T')],
     });
     const r1 = materialize(s, 3000);
     const r2 = materialize(r1.state, 9000);
@@ -288,13 +325,14 @@ describe('composability', () => {
 
   it('five-step state equals big-step state', () => {
     const s = baseState({
-      nodes_charging: [
-        charge('p.a', 1500),
-        charge('p.b', 3500),
-        charge('p.c', 7000),
-      ],
-      game_values: { ap_snapshot: 3, ap_update: 0,
-                     ap_inc_value: 2, ap_inc_interval: 1000, ap_max: 100 }
+      nodes_charging: [charge('p.a', 1500), charge('p.b', 3500), charge('p.c', 7000)],
+      game_values: {
+        ap_snapshot: 3,
+        ap_update: 0,
+        ap_inc_value: 2,
+        ap_inc_interval: 1000,
+        ap_max: 100,
+      },
     });
     let cur = s;
     for (const t of [1000, 2000, 4000, 6000, 8000]) {
@@ -316,13 +354,21 @@ describe('idempotence under stress — 50+ completed charges', () => {
     var NUM = 52;
     var charges = [];
     for (var i = 0; i < NUM; i++) {
-      charges.push({ path: 'p.' + i, result: { value: i }, charge_start: 0, charge_end: 1000,
-                     game_id: 'id' + i, game_type: 'ContactPerp' });
+      charges.push({
+        path: 'p.' + i,
+        result: { value: i },
+        charge_start: 0,
+        charge_end: 1000,
+        game_id: 'id' + i,
+        game_type: 'ContactPerp',
+      });
     }
     const r = materialize(baseState({ nodes_charging: charges }), 2000);
     expect(r.state.nodes_charging).toHaveLength(0);
     expect(r.state.nodes_collect).toHaveLength(NUM);
-    var paths = r.state.nodes_collect.map(function (e) { return e.path; });
+    var paths = r.state.nodes_collect.map(function (e) {
+      return e.path;
+    });
     expect(new Set(paths).size).toBe(NUM);
   });
 
@@ -330,8 +376,14 @@ describe('idempotence under stress — 50+ completed charges', () => {
     var NUM = 52;
     var charges = [];
     for (var i = 0; i < NUM; i++) {
-      charges.push({ path: 'p.' + i, result: { value: i }, charge_start: 0, charge_end: 1000,
-                     game_id: 'id' + i, game_type: 'ContactPerp' });
+      charges.push({
+        path: 'p.' + i,
+        result: { value: i },
+        charge_start: 0,
+        charge_end: 1000,
+        game_id: 'id' + i,
+        game_type: 'ContactPerp',
+      });
     }
     const t = 2000;
     const r1 = materialize(baseState({ nodes_charging: charges }), t);
@@ -346,15 +398,23 @@ describe('idempotence under stress — 50+ completed charges', () => {
     var NUM = 55;
     var charges = [];
     for (var i = 0; i < NUM; i++) {
-      charges.push({ path: 'p.' + i, result: { value: i }, charge_start: 0, charge_end: 1000,
-                     game_id: 'id' + i, game_type: 'ContactPerp' });
+      charges.push({
+        path: 'p.' + i,
+        result: { value: i },
+        charge_start: 0,
+        charge_end: 1000,
+        game_id: 'id' + i,
+        game_type: 'ContactPerp',
+      });
     }
     const r1 = materialize(baseState({ nodes_charging: charges }), 2000);
     const r2 = materialize(r1.state, 2000);
 
     const allEvents = r1.events.concat(r2.events);
-    expect(allEvents).toHaveLength(NUM);  // exactly once per charge, none on second call
-    var eventPaths = allEvents.map(function (e) { return e.pl.path; });
+    expect(allEvents).toHaveLength(NUM); // exactly once per charge, none on second call
+    var eventPaths = allEvents.map(function (e) {
+      return e.pl.path;
+    });
     expect(new Set(eventPaths).size).toBe(NUM);
   });
 
@@ -365,17 +425,31 @@ describe('idempotence under stress — 50+ completed charges', () => {
       { path: 'p.1', result: { value: 1 } },
     ];
     var charges = existing.map(function (e, idx) {
-      return { path: e.path, result: e.result, charge_start: 0, charge_end: 1000,
-               game_id: 'id' + idx, game_type: 'ContactPerp' };
+      return {
+        path: e.path,
+        result: e.result,
+        charge_start: 0,
+        charge_end: 1000,
+        game_id: 'id' + idx,
+        game_type: 'ContactPerp',
+      };
     });
     for (var i = 2; i < 52; i++) {
-      charges.push({ path: 'p.' + i, result: { value: i }, charge_start: 0, charge_end: 1000,
-                     game_id: 'id' + i, game_type: 'ContactPerp' });
+      charges.push({
+        path: 'p.' + i,
+        result: { value: i },
+        charge_start: 0,
+        charge_end: 1000,
+        game_id: 'id' + i,
+        game_type: 'ContactPerp',
+      });
     }
 
     const r = materialize(baseState({ nodes_charging: charges, nodes_collect: existing }), 2000);
-    expect(r.state.nodes_collect).toHaveLength(52);  // 50 new + 2 pre-existing, no double-adds
-    var paths = r.state.nodes_collect.map(function (e) { return e.path; });
+    expect(r.state.nodes_collect).toHaveLength(52); // 50 new + 2 pre-existing, no double-adds
+    var paths = r.state.nodes_collect.map(function (e) {
+      return e.path;
+    });
     expect(new Set(paths).size).toBe(52);
   });
 });
@@ -389,8 +463,13 @@ describe('idempotence under stress — 50+ completed charges', () => {
 describe('AP regen — ap_snapshot > ap_max invariant', () => {
   it('clamps ap_snapshot to ap_max when snapshot starts above cap (no elapsed time)', () => {
     const s = baseState({
-      game_values: { ap_snapshot: 10, ap_update: 0,
-                     ap_inc_value: 1, ap_inc_interval: 1000, ap_max: 6 }
+      game_values: {
+        ap_snapshot: 10,
+        ap_update: 0,
+        ap_inc_value: 1,
+        ap_inc_interval: 1000,
+        ap_max: 6,
+      },
     });
     // now == ap_update → 0 ticks; Math.min(6, 10 + 0) = 6
     expect(materialize(s, 0).state.game_values.ap_snapshot).toBe(6);
@@ -398,8 +477,13 @@ describe('AP regen — ap_snapshot > ap_max invariant', () => {
 
   it('clamps even when additional regen ticks would push it further over cap', () => {
     const s = baseState({
-      game_values: { ap_snapshot: 10, ap_update: 0,
-                     ap_inc_value: 2, ap_inc_interval: 1000, ap_max: 6 }
+      game_values: {
+        ap_snapshot: 10,
+        ap_update: 0,
+        ap_inc_value: 2,
+        ap_inc_interval: 1000,
+        ap_max: 6,
+      },
     });
     // 5 ticks × 2 = 10 added to already-excessive 10 → still capped at 6
     expect(materialize(s, 5000).state.game_values.ap_snapshot).toBe(6);
@@ -419,12 +503,12 @@ describe('property — random delta sequences', () => {
     let s = seed >>> 0;
     return function rand() {
       s = (Math.imul(1664525, s) + 1013904223) >>> 0;
-      return s / 0xFFFFFFFF;
+      return s / 0xffffffff;
     };
   }
 
   it('N random stepwise advances produce the same final state as one big jump', () => {
-    const rand = prng(0xDEADBEEF);
+    const rand = prng(0xdeadbeef);
 
     for (let trial = 0; trial < 50; trial++) {
       // Random charge entries (1–5) with charge_ends in 0–100 s
@@ -437,12 +521,12 @@ describe('property — random delta sequences', () => {
       const s = baseState({
         nodes_charging: charges,
         game_values: {
-          ap_snapshot:     0,
-          ap_update:       0,
-          ap_inc_value:    Math.floor(rand() * 3) + 1,
+          ap_snapshot: 0,
+          ap_update: 0,
+          ap_inc_value: Math.floor(rand() * 3) + 1,
           ap_inc_interval: Math.floor(rand() * 5000) + 1000,
-          ap_max:          Math.floor(rand() * 50) + 10,
-        }
+          ap_max: Math.floor(rand() * 50) + 10,
+        },
       });
 
       const tFinal = Math.floor(rand() * 150000);
@@ -454,7 +538,7 @@ describe('property — random delta sequences', () => {
         steps.push(Math.floor(rand() * tFinal));
       }
       steps.sort((a, b) => a - b);
-      steps.push(tFinal);   // always end exactly at tFinal
+      steps.push(tFinal); // always end exactly at tFinal
 
       // Stepwise path
       let cur = s;

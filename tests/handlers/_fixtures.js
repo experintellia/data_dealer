@@ -15,13 +15,23 @@ export const FIXED_NOW = 1_700_000_000_000;
  * @param {object} [overrides]
  */
 export function mkGv(overrides) {
-  return Object.assign({
-    xp_value: 5, xp_level: 1,
-    karma_value: 50, cash_value: 300, cash_spent: 0,
-    profiles_value: 0, profiles_max: 1,
-    ap_snapshot: 6, ap_update: FIXED_NOW,
-    ap_inc_value: 1, ap_inc_interval: 120000, ap_max: 6,
-  }, overrides || {});
+  return Object.assign(
+    {
+      xp_value: 5,
+      xp_level: 1,
+      karma_value: 50,
+      cash_value: 300,
+      cash_spent: 0,
+      profiles_value: 0,
+      profiles_max: 1,
+      ap_snapshot: 6,
+      ap_update: FIXED_NOW,
+      ap_inc_value: 1,
+      ap_inc_interval: 120000,
+      ap_max: 6,
+    },
+    overrides || {}
+  );
 }
 
 /**
@@ -47,11 +57,11 @@ export function mkNode(gameType, path, instData) {
   var parts = path.split('.');
   var gestalt = parts[parts.length - 1];
   return {
-    game_id:       'node_' + gestalt,
-    game_type:     gameType,
-    full_type:     gameType + ':' + gestalt,
-    gestalt:       gestalt,
-    full_path:     path,
+    game_id: 'node_' + gestalt,
+    game_type: gameType,
+    full_type: gameType + ':' + gestalt,
+    gestalt: gestalt,
+    full_path: path,
     instance_data: instData || {},
   };
 }
@@ -65,16 +75,16 @@ export function mkNode(gameType, path, instData) {
  * @param {number} [now]
  */
 export function mkChargingEntry(path, result, gameType, now) {
-  var t   = now !== undefined ? now : FIXED_NOW;
+  var t = now !== undefined ? now : FIXED_NOW;
   var dur = 120_000;
-  var parts   = path.split('.');
+  var parts = path.split('.');
   var gestalt = parts[parts.length - 1];
   return {
-    path:         path,
-    result:       result,
+    path: path,
+    result: result,
     charge_start: t - dur,
-    charge_end:   t + dur,
-    game_id:      'node_' + gestalt,
-    game_type:    gameType,
+    charge_end: t + dur,
+    game_id: 'node_' + gestalt,
+    game_type: gameType,
   };
 }

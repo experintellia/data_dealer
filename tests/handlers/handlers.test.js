@@ -1,10 +1,23 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  getToken, ping, getSessionLocale, setLocale, loadGame, getRanking, setEmitter,
-  setDisplayName, setPerpCoordinates, buyKarma,
-  buyPowerup, sellPowerup, buySlots, buyPerp,
-  dismissMissionBriefing, markTokenSeen, recheckMissions
+  getToken,
+  ping,
+  getSessionLocale,
+  setLocale,
+  loadGame,
+  getRanking,
+  setEmitter,
+  setDisplayName,
+  setPerpCoordinates,
+  buyKarma,
+  buyPowerup,
+  sellPowerup,
+  buySlots,
+  buyPerp,
+  dismissMissionBriefing,
+  markTokenSeen,
+  recheckMissions,
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
@@ -19,7 +32,7 @@ import { FIXED_NOW, mkState } from './_fixtures.js';
 // set below so the two sources stay consistent.  Includes `spent` (cash_spent)
 // to cover the Investor tab registered in type_settings.js.
 function mkRankingState() {
-  var base = mkState();  // freshState('test@local')
+  var base = mkState(); // freshState('test@local')
   var selfAddr = 'test@local';
   return Object.assign({}, base, {
     display_name: 'TestUser',
@@ -177,7 +190,7 @@ describe('loadGame — fresh state', () => {
       game_id: 'Imperium',
       full_path: 'Imperium',
       instance_data: expect.any(Object),
-      type_data: expect.any(Object)
+      type_data: expect.any(Object),
     });
   });
 
@@ -187,7 +200,7 @@ describe('loadGame — fresh state', () => {
       game_id: 'Database',
       full_path: 'Database',
       instance_data: expect.any(Object),
-      type_data: expect.any(Object)
+      type_data: expect.any(Object),
     });
   });
 
@@ -251,8 +264,12 @@ describe('loadGame — replayed state', () => {
     var s = freshState('player@example');
     // Simulate a prior loadGame having bumped cash_value via a delta.
     var delta = {
-      kind: 'delta', addr: 'player@example',
-      op: 'loadGame', args: [], result: {}, ts: Date.now()
+      kind: 'delta',
+      addr: 'player@example',
+      op: 'loadGame',
+      args: [],
+      result: {},
+      ts: Date.now(),
     };
     var evolved = applyDelta(s, delta);
     // The stub reducer returns state unchanged — but addr and schema_version persist.
@@ -279,18 +296,26 @@ describe('loadGame — replayed state', () => {
 
 // karma001: price=250, karma_points=5, required_level=5
 const KARMA_GESTALT = 'karma001';
-const KARMA_PRICE   = 250;
-const KARMA_POINTS  = 5;
+const KARMA_PRICE = 250;
+const KARMA_POINTS = 5;
 
 describe('buyKarma — happy path', () => {
   beforeEach(() => {
-    setState(mkState({
-      game_values: {
-        xp_value: 1, xp_level: 1, cash_value: 1000, cash_spent: 0,
-        karma_value: 50, profiles_value: 0, profiles_max: 1,
-        ap_snapshot: 6, ap_update: null
-      }
-    }));
+    setState(
+      mkState({
+        game_values: {
+          xp_value: 1,
+          xp_level: 1,
+          cash_value: 1000,
+          cash_spent: 0,
+          karma_value: 50,
+          profiles_value: 0,
+          profiles_max: 1,
+          ap_snapshot: 6,
+          ap_update: null,
+        },
+      })
+    );
   });
 
   it('resolves to an object with a result property', async () => {
@@ -336,26 +361,42 @@ describe('buyKarma — happy path', () => {
   });
 
   it('clamps karma_value at 100 when already near the cap', async () => {
-    setState(mkState({
-      game_values: {
-        xp_value: 1, xp_level: 1, cash_value: 9999, cash_spent: 0,
-        karma_value: 98, profiles_value: 0, profiles_max: 1,
-        ap_snapshot: 6, ap_update: null
-      }
-    }));
+    setState(
+      mkState({
+        game_values: {
+          xp_value: 1,
+          xp_level: 1,
+          cash_value: 9999,
+          cash_spent: 0,
+          karma_value: 98,
+          profiles_value: 0,
+          profiles_max: 1,
+          ap_snapshot: 6,
+          ap_update: null,
+        },
+      })
+    );
     // karma001 karma_points=5; 98+5=103 → clamped to 100
     const { result } = await buyKarma(KARMA_GESTALT);
     expect(result.game_values.karma_value).toBe(100);
   });
 
   it('clamps karma_value at -100 when already below the floor', async () => {
-    setState(mkState({
-      game_values: {
-        xp_value: 1, xp_level: 1, cash_value: 9999, cash_spent: 0,
-        karma_value: -106, profiles_value: 0, profiles_max: 1,
-        ap_snapshot: 6, ap_update: null
-      }
-    }));
+    setState(
+      mkState({
+        game_values: {
+          xp_value: 1,
+          xp_level: 1,
+          cash_value: 9999,
+          cash_spent: 0,
+          karma_value: -106,
+          profiles_value: 0,
+          profiles_max: 1,
+          ap_snapshot: 6,
+          ap_update: null,
+        },
+      })
+    );
     // karma001 karma_points=5; -106+5=-101 → clamped to -100
     const { result } = await buyKarma(KARMA_GESTALT);
     expect(result.game_values.karma_value).toBe(-100);
@@ -364,13 +405,21 @@ describe('buyKarma — happy path', () => {
 
 describe('buyKarma — failure: insufficient cash', () => {
   beforeEach(() => {
-    setState(mkState({
-      game_values: {
-        xp_value: 1, xp_level: 1, cash_value: 10, cash_spent: 0,
-        karma_value: 0, profiles_value: 0, profiles_max: 1,
-        ap_snapshot: 6, ap_update: null
-      }
-    }));
+    setState(
+      mkState({
+        game_values: {
+          xp_value: 1,
+          xp_level: 1,
+          cash_value: 10,
+          cash_spent: 0,
+          karma_value: 0,
+          profiles_value: 0,
+          profiles_max: 1,
+          ap_snapshot: 6,
+          ap_update: null,
+        },
+      })
+    );
   });
 
   it('resolves with error when cash is below price', async () => {
@@ -387,13 +436,21 @@ describe('buyKarma — failure: insufficient cash', () => {
 
 describe('buyKarma — failure: unknown karmalauter', () => {
   beforeEach(() => {
-    setState(mkState({
-      game_values: {
-        xp_value: 1, xp_level: 1, cash_value: 9999, cash_spent: 0,
-        karma_value: 0, profiles_value: 0, profiles_max: 1,
-        ap_snapshot: 6, ap_update: null
-      }
-    }));
+    setState(
+      mkState({
+        game_values: {
+          xp_value: 1,
+          xp_level: 1,
+          cash_value: 9999,
+          cash_spent: 0,
+          karma_value: 0,
+          profiles_value: 0,
+          profiles_max: 1,
+          ap_snapshot: 6,
+          ap_update: null,
+        },
+      })
+    );
   });
 
   it('resolves with error for an unknown gestalt', async () => {
@@ -413,18 +470,22 @@ describe('materialization on boot', () => {
 
   it('emits a node_ready event for a charge that completed during the away window', async () => {
     const emitted = [];
-    setEmitter(function(ev, pl) { emitted.push({ ev, pl }); });
+    setEmitter(function (ev, pl) {
+      emitted.push({ ev, pl });
+    });
 
     const chargeEnd = FIXED_NOW - 10000; // completed 10 s before frozen "now"
     const s = mkState({
-      nodes_charging: [{
-        path: 'Imperium.City.contact001',
-        result: { value: 42 },
-        charge_start: chargeEnd - 120000,
-        charge_end: chargeEnd,
-        game_id: 'abc123',
-        game_type: 'ContactPerp'
-      }]
+      nodes_charging: [
+        {
+          path: 'Imperium.City.contact001',
+          result: { value: 42 },
+          charge_start: chargeEnd - 120000,
+          charge_end: chargeEnd,
+          game_id: 'abc123',
+          game_type: 'ContactPerp',
+        },
+      ],
     });
     setState(s);
 
@@ -436,25 +497,27 @@ describe('materialization on boot', () => {
     expect(emitted).toHaveLength(1);
     expect(emitted[0].ev).toBe('node_ready');
     expect(emitted[0].pl).toMatchObject({
-      id:   'abc123',
+      id: 'abc123',
       type: 'ContactPerp',
-      path: 'Imperium.City.contact001'
+      path: 'Imperium.City.contact001',
     });
   });
 
   it('moves the completed charge to nodes_collect in the persisted state', async () => {
-    setEmitter(function() {});
+    setEmitter(function () {});
 
     const chargeEnd = FIXED_NOW - 5000;
     const s = mkState({
-      nodes_charging: [{
-        path: 'Imperium.City.contact002',
-        result: { value: 10 },
-        charge_start: chargeEnd - 60000,
-        charge_end: chargeEnd,
-        game_id: 'def456',
-        game_type: 'ContactPerp'
-      }]
+      nodes_charging: [
+        {
+          path: 'Imperium.City.contact002',
+          result: { value: 10 },
+          charge_start: chargeEnd - 60000,
+          charge_end: chargeEnd,
+          game_id: 'def456',
+          game_type: 'ContactPerp',
+        },
+      ],
     });
     setState(s);
 
@@ -470,7 +533,9 @@ describe('materialization on boot', () => {
 
   it('emits no events when there are no completed charges', async () => {
     const emitted = [];
-    setEmitter(function(ev, pl) { emitted.push({ ev, pl }); });
+    setEmitter(function (ev, pl) {
+      emitted.push({ ev, pl });
+    });
 
     setState(mkState());
     await loadGame();
@@ -481,11 +546,14 @@ describe('materialization on boot', () => {
 
   it('AP regen survives reload — first loadGame seeds the clock, second ticks', async () => {
     setOverride(FIXED_NOW);
-    setState(mkState({
-      game_values: Object.assign({}, freshState('test@local').game_values, {
-        ap_snapshot: 0, ap_update: null
+    setState(
+      mkState({
+        game_values: Object.assign({}, freshState('test@local').game_values, {
+          ap_snapshot: 0,
+          ap_update: null,
+        }),
       })
-    }));
+    );
 
     // First load seeds ap_update without granting any ticks.
     await loadGame();
@@ -555,18 +623,20 @@ function mkStateWithNodes() {
   return mkState({
     nodes: [
       {
-        game_id: 'n1', game_type: 'ContactPerp',
+        game_id: 'n1',
+        game_type: 'ContactPerp',
         full_path: 'Imperium.City.Agent0',
         full_type: 'ContactPerp:Agent0',
-        instance_data: { x: 0, y: 0 }
+        instance_data: { x: 0, y: 0 },
       },
       {
-        game_id: 'n2', game_type: 'ProjectPerp',
+        game_id: 'n2',
+        game_type: 'ProjectPerp',
         full_path: 'Imperium.City.Project1',
         full_type: 'ProjectPerp:Project1',
-        instance_data: { x: 10, y: 20 }
-      }
-    ]
+        instance_data: { x: 10, y: 20 },
+      },
+    ],
   });
 }
 
@@ -574,29 +644,25 @@ describe('setPerpCoordinates — happy path', () => {
   beforeEach(() => setState(mkStateWithNodes()));
 
   it('returns {result: 1}', async () => {
-    const data = await setPerpCoordinates([
-      ['Imperium.City.Agent0', { x: 5, y: 7 }]
-    ]);
+    const data = await setPerpCoordinates([['Imperium.City.Agent0', { x: 5, y: 7 }]]);
     expect(data).toEqual({ result: 1 });
   });
 
   it('updates x/y on matched node', async () => {
-    await setPerpCoordinates([
-      ['Imperium.City.Agent0', { x: 42, y: 99 }]
-    ]);
-    const node = getState().nodes.find(n => n.full_path === 'Imperium.City.Agent0');
+    await setPerpCoordinates([['Imperium.City.Agent0', { x: 42, y: 99 }]]);
+    const node = getState().nodes.find((n) => n.full_path === 'Imperium.City.Agent0');
     expect(node.instance_data.x).toBe(42);
     expect(node.instance_data.y).toBe(99);
   });
 
   it('updates multiple nodes in a single call', async () => {
     await setPerpCoordinates([
-      ['Imperium.City.Agent0',   { x: 1, y: 2 }],
-      ['Imperium.City.Project1', { x: 3, y: 4 }]
+      ['Imperium.City.Agent0', { x: 1, y: 2 }],
+      ['Imperium.City.Project1', { x: 3, y: 4 }],
     ]);
     const nodes = getState().nodes;
-    const a = nodes.find(n => n.full_path === 'Imperium.City.Agent0');
-    const p = nodes.find(n => n.full_path === 'Imperium.City.Project1');
+    const a = nodes.find((n) => n.full_path === 'Imperium.City.Agent0');
+    const p = nodes.find((n) => n.full_path === 'Imperium.City.Project1');
     expect(a.instance_data).toMatchObject({ x: 1, y: 2 });
     expect(p.instance_data).toMatchObject({ x: 3, y: 4 });
   });
@@ -613,18 +679,16 @@ describe('setPerpCoordinates — failure modes', () => {
   it('silently skips a malformed entry (non-array element)', async () => {
     const data = await setPerpCoordinates([
       'not-an-array',
-      ['Imperium.City.Agent0', { x: 7, y: 8 }]
+      ['Imperium.City.Agent0', { x: 7, y: 8 }],
     ]);
     expect(data).toEqual({ result: 1 });
-    const node = getState().nodes.find(n => n.full_path === 'Imperium.City.Agent0');
+    const node = getState().nodes.find((n) => n.full_path === 'Imperium.City.Agent0');
     expect(node.instance_data.x).toBe(7);
   });
 
   it('leaves unmatched nodes unchanged', async () => {
-    await setPerpCoordinates([
-      ['Imperium.City.NoSuchNode', { x: 99, y: 99 }]
-    ]);
-    const node = getState().nodes.find(n => n.full_path === 'Imperium.City.Agent0');
+    await setPerpCoordinates([['Imperium.City.NoSuchNode', { x: 99, y: 99 }]]);
+    const node = getState().nodes.find((n) => n.full_path === 'Imperium.City.Agent0');
     expect(node.instance_data.x).toBe(0);
     expect(node.instance_data.y).toBe(0);
   });
@@ -635,15 +699,16 @@ describe('setPerpCoordinates — failure modes', () => {
 // A minimal ProjectPerp node using the real project001 ruleset entry.
 // Starts with empty powerups and default ad_slots from type_data (3).
 var PROJECT_NODE = {
-  game_id:       'proj001',
-  game_type:     'ProjectPerp',
-  full_path:     'Imperium.CityVienna.proj001',
-  full_type:     'ProjectPerp:project001',
-  gestalt:       'project001',
+  game_id: 'proj001',
+  game_type: 'ProjectPerp',
+  full_path: 'Imperium.CityVienna.proj001',
+  full_type: 'ProjectPerp:project001',
+  gestalt: 'project001',
   instance_data: {
-    x: 100, y: 100,
-    powerups: []
-  }
+    x: 100,
+    y: 100,
+    powerups: [],
+  },
 };
 
 // State with enough cash for any normal purchase (default seed: 270).
@@ -720,7 +785,7 @@ describe('buyPowerup — happy path', () => {
 describe('buyPowerup — failure: slot occupied', () => {
   it('returns error:1 when the requested slot already holds a powerup of the same type', async () => {
     const occupiedNode = Object.assign({}, PROJECT_NODE, {
-      instance_data: { powerups: [{ slot: 0, gestalt: 'ad002', full_type: 'AdPowerup:ad002' }] }
+      instance_data: { powerups: [{ slot: 0, gestalt: 'ad002', full_type: 'AdPowerup:ad002' }] },
     });
     setState(Object.assign({}, freshState('test@local'), { nodes: [occupiedNode] }));
     const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad003');
@@ -730,7 +795,7 @@ describe('buyPowerup — failure: slot occupied', () => {
   it('does NOT block slot 0 for a different powerup type even if same slot index is taken', async () => {
     // Ad slot 0 is occupied; upgrade slot 0 is independent and must remain free.
     const occupiedNode = Object.assign({}, PROJECT_NODE, {
-      instance_data: { powerups: [{ slot: 0, gestalt: 'ad002', full_type: 'AdPowerup:ad002' }] }
+      instance_data: { powerups: [{ slot: 0, gestalt: 'ad002', full_type: 'AdPowerup:ad002' }] },
     });
     setState(Object.assign({}, freshState('test@local'), { nodes: [occupiedNode] }));
     const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'upgrade001');
@@ -741,7 +806,7 @@ describe('buyPowerup — failure: slot occupied', () => {
 describe('buyPowerup — failure: insufficient cash', () => {
   it('returns error:3 when cash_value < powerup price', async () => {
     const broke = mkProjectState({
-      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 5 })
+      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 5 }),
     });
     setState(broke);
     const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
@@ -755,12 +820,13 @@ describe('buyPowerup — failure: insufficient cash', () => {
 function mkStateWithPowerup() {
   var nodeWithPu = Object.assign({}, PROJECT_NODE, {
     instance_data: {
-      x: 100, y: 100,
+      x: 100,
+      y: 100,
       powerups: [{ slot: 0, gestalt: 'ad002', full_type: 'AdPowerup:ad002' }],
-      charge_cost:    225,  // after ad002 modifiers
+      charge_cost: 225, // after ad002 modifiers
       collect_amount: 3760,
-      collect_risk:   2
-    }
+      collect_risk: 2,
+    },
   });
   return Object.assign({}, freshState('test@local'), { nodes: [nodeWithPu] });
 }
@@ -835,14 +901,23 @@ describe('sellPowerup — failure: slot empty', () => {
 
 function mkBuyPerpState(overrides) {
   // Level-3 player with ample cash; no nodes yet.
-  return Object.assign(freshState('buyer@local'), {
-    game_values: {
-      xp_value: 15, xp_level: 3,
-      cash_value: 10000, cash_spent: 0,
-      karma_value: 0, profiles_value: 0, profiles_max: 1,
-      ap_snapshot: 6, ap_update: null
-    }
-  }, overrides || {});
+  return Object.assign(
+    freshState('buyer@local'),
+    {
+      game_values: {
+        xp_value: 15,
+        xp_level: 3,
+        cash_value: 10000,
+        cash_spent: 0,
+        karma_value: 0,
+        profiles_value: 0,
+        profiles_max: 1,
+        ap_snapshot: 6,
+        ap_update: null,
+      },
+    },
+    overrides || {}
+  );
 }
 
 describe('buyPerp — happy path (contact gestalt)', () => {
@@ -868,7 +943,7 @@ describe('buyPerp — happy path (contact gestalt)', () => {
       full_type: 'ContactPerp:contact001',
       gestalt: 'contact001',
       full_path: 'Imperium.contact001',
-      instance_data: expect.any(Object)
+      instance_data: expect.any(Object),
     });
   });
 
@@ -912,8 +987,10 @@ describe('buyPerp — happy path (contact gestalt)', () => {
     // city002: required_level 1, price 0 — always accessible
     await buyPerp('Imperium', 'city002');
     const s = getState();
-    const ids = s.nodes.map(function(n) { return n.game_id; });
-    expect(new Set(ids).size).toBe(ids.length);  // all unique (seed + 2 buys)
+    const ids = s.nodes.map(function (n) {
+      return n.game_id;
+    });
+    expect(new Set(ids).size).toBe(ids.length); // all unique (seed + 2 buys)
     expect(r1.result.node.game_id).toBe('contact001');
   });
 });
@@ -946,7 +1023,7 @@ describe('buyPerp — happy path delta replay (applyDelta roundtrip)', () => {
     const replayBase = freshState('buyer@local');
     // We seed game_values so cash floor is satisfied in the reducer.
     const seedState = Object.assign({}, replayBase, {
-      game_values: initialState.game_values
+      game_values: initialState.game_values,
     });
 
     const delta = {
@@ -955,7 +1032,7 @@ describe('buyPerp — happy path delta replay (applyDelta roundtrip)', () => {
       op: 'buyPerp',
       args: ['Imperium', 'contact001'],
       result: result,
-      ts: Date.now()
+      ts: Date.now(),
     };
 
     const replayed = applyDelta(seedState, delta);
@@ -968,23 +1045,41 @@ describe('buyPerp — happy path delta replay (applyDelta roundtrip)', () => {
 
 describe('buyPerp — failure: insufficient cash', () => {
   it('returns error 2 when cash_value < price', async () => {
-    setState(mkBuyPerpState({ game_values: {
-      xp_value: 15, xp_level: 3,
-      cash_value: 100, cash_spent: 0,  // contact001 costs 400
-      karma_value: 0, profiles_value: 0, profiles_max: 1,
-      ap_snapshot: 6, ap_update: null
-    }}));
+    setState(
+      mkBuyPerpState({
+        game_values: {
+          xp_value: 15,
+          xp_level: 3,
+          cash_value: 100,
+          cash_spent: 0, // contact001 costs 400
+          karma_value: 0,
+          profiles_value: 0,
+          profiles_max: 1,
+          ap_snapshot: 6,
+          ap_update: null,
+        },
+      })
+    );
     const { result } = await buyPerp('Imperium', 'contact001');
     expect(result.error).toBe(2);
   });
 
   it('does not add a node on cash failure', async () => {
-    setState(mkBuyPerpState({ game_values: {
-      xp_value: 15, xp_level: 3,
-      cash_value: 50, cash_spent: 0,
-      karma_value: 0, profiles_value: 0, profiles_max: 1,
-      ap_snapshot: 6, ap_update: null
-    }}));
+    setState(
+      mkBuyPerpState({
+        game_values: {
+          xp_value: 15,
+          xp_level: 3,
+          cash_value: 50,
+          cash_spent: 0,
+          karma_value: 0,
+          profiles_value: 0,
+          profiles_max: 1,
+          ap_snapshot: 6,
+          ap_update: null,
+        },
+      })
+    );
     await buyPerp('Imperium', 'contact001');
     expect(getState().nodes.find((n) => n.gestalt === 'contact001')).toBeUndefined();
   });
@@ -993,12 +1088,21 @@ describe('buyPerp — failure: insufficient cash', () => {
 describe('buyPerp — failure: level too low', () => {
   it('returns error 1 when xp_level < required_level', async () => {
     // contact001 requires level 3; state is level 1
-    setState(mkBuyPerpState({ game_values: {
-      xp_value: 0, xp_level: 1,
-      cash_value: 10000, cash_spent: 0,
-      karma_value: 0, profiles_value: 0, profiles_max: 1,
-      ap_snapshot: 6, ap_update: null
-    }}));
+    setState(
+      mkBuyPerpState({
+        game_values: {
+          xp_value: 0,
+          xp_level: 1,
+          cash_value: 10000,
+          cash_spent: 0,
+          karma_value: 0,
+          profiles_value: 0,
+          profiles_max: 1,
+          ap_snapshot: 6,
+          ap_update: null,
+        },
+      })
+    );
     const { result } = await buyPerp('Imperium', 'contact001');
     expect(result.error).toBe(1);
   });
@@ -1052,7 +1156,7 @@ describe('buySlots — happy path', () => {
 describe('buySlots — failure: insufficient cash', () => {
   it('returns error:3 when cash_value < slot cost', async () => {
     const broke = mkProjectState({
-      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 0 })
+      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 0 }),
     });
     setState(broke);
     const { result } = await buySlots(PROJECT_NODE.full_path, 'ad', 1);
@@ -1064,21 +1168,33 @@ describe('buyPerp — failure: ProxyPerp slot full', () => {
   it('returns error 3 when proxy max_slots is reached', async () => {
     // proxy001 has max_slots=3.  Pre-fill 3 project children.
     const proxyNode = {
-      game_id: 'node_0', game_type: 'ProxyPerp',
-      full_type: 'ProxyPerp:proxy001', gestalt: 'proxy001',
-      full_path: 'Imperium.proxy001', instance_data: {}
+      game_id: 'node_0',
+      game_type: 'ProxyPerp',
+      full_type: 'ProxyPerp:proxy001',
+      gestalt: 'proxy001',
+      full_path: 'Imperium.proxy001',
+      instance_data: {},
     };
-    const childNodes = ['project001','project002','project003'].map(function(g, i) {
+    const childNodes = ['project001', 'project002', 'project003'].map(function (g, i) {
       return {
-        game_id: 'node_c' + i, game_type: 'ProjectPerp',
-        full_type: 'ProjectPerp:' + g, gestalt: g,
-        full_path: 'Imperium.proxy001.' + g, instance_data: {}
+        game_id: 'node_c' + i,
+        game_type: 'ProjectPerp',
+        full_type: 'ProjectPerp:' + g,
+        gestalt: g,
+        full_path: 'Imperium.proxy001.' + g,
+        instance_data: {},
       };
     });
     // project005 requires level 7 — boost xp_level so level check passes
     // and only the slot check (error 3) triggers.
-    const highLevelValues = Object.assign({}, mkBuyPerpState().game_values, { xp_level: 7, xp_value: 200, cash_value: 10000 });
-    setState(mkBuyPerpState({ nodes: [proxyNode].concat(childNodes), game_values: highLevelValues }));
+    const highLevelValues = Object.assign({}, mkBuyPerpState().game_values, {
+      xp_level: 7,
+      xp_value: 200,
+      cash_value: 10000,
+    });
+    setState(
+      mkBuyPerpState({ nodes: [proxyNode].concat(childNodes), game_values: highLevelValues })
+    );
 
     // Try to buy a 4th project (project005 is also in proxy001 provided_perps)
     const { result } = await buyPerp('Imperium.proxy001', 'project005');
@@ -1089,9 +1205,12 @@ describe('buyPerp — failure: ProxyPerp slot full', () => {
 describe('buyPerp — failure: duplicate gestalt', () => {
   it('returns error 4 when gestalt already exists under parent', async () => {
     const existing = {
-      game_id: 'node_1', game_type: 'ContactPerp',
-      full_type: 'ContactPerp:contact001', gestalt: 'contact001',
-      full_path: 'Imperium.contact001', instance_data: {}
+      game_id: 'node_1',
+      game_type: 'ContactPerp',
+      full_type: 'ContactPerp:contact001',
+      gestalt: 'contact001',
+      full_path: 'Imperium.contact001',
+      instance_data: {},
     };
     setState(mkBuyPerpState({ nodes: [existing] }));
     const { result } = await buyPerp('Imperium', 'contact001');
@@ -1115,14 +1234,21 @@ describe('buyPerp — failure: unknown gestalt', () => {
 
 describe('buyPerp — level-up refills ap_snapshot', () => {
   beforeEach(() => {
-    setState(Object.assign(mkBuyPerpState(), {
-      game_values: {
-        xp_value: 54, xp_level: 3,
-        cash_value: 10000, cash_spent: 0,
-        karma_value: 0, profiles_value: 0, profiles_max: 1,
-        ap_snapshot: 1, ap_update: null
-      }
-    }));
+    setState(
+      Object.assign(mkBuyPerpState(), {
+        game_values: {
+          xp_value: 54,
+          xp_level: 3,
+          cash_value: 10000,
+          cash_spent: 0,
+          karma_value: 0,
+          profiles_value: 0,
+          profiles_max: 1,
+          ap_snapshot: 1,
+          ap_update: null,
+        },
+      })
+    );
   });
 
   it('returns levelup=true', async () => {
@@ -1131,7 +1257,7 @@ describe('buyPerp — level-up refills ap_snapshot', () => {
     expect(result.levelup).toBe(true);
   });
 
-  it('advances xp_level and refills AP to the new level\'s ap_max', async () => {
+  it("advances xp_level and refills AP to the new level's ap_max", async () => {
     const { result } = await buyPerp('Imperium', 'contact001');
     expect(result.game_values.xp_level).toBe(4);
     expect(result.game_values.ap_snapshot).toBe(14);
@@ -1142,29 +1268,33 @@ describe('buyPerp — level-up refills ap_snapshot', () => {
 // ── buyPerp — stuck mission repair ───────────────────────────────────────────
 
 const NURSE_NODE = {
-  game_id:       'contact001',
-  game_type:     'ContactPerp',
-  full_type:     'ContactPerp:contact001',
-  gestalt:       'contact001',
-  full_path:     'Imperium.contact001',
-  instance_data: {}
+  game_id: 'contact001',
+  game_type: 'ContactPerp',
+  full_type: 'ContactPerp:contact001',
+  gestalt: 'contact001',
+  full_path: 'Imperium.contact001',
+  instance_data: {},
 };
 
 describe('buyPerp — loadGame repairs stuck buy_perp goal', () => {
   it('marks buy_perp goal complete when target node is already owned at load time', async () => {
-    setState(Object.assign(mkBuyPerpState(), {
-      active_missions: ['mission007'],
-      mission_goals: [{
-        mission:        'mission007',
-        workflow:       'buy_perp',
-        target:         'contact001',
-        amount:         null,
-        position:       1,
-        current_amount: 0,
-        complete:       false
-      }],
-      nodes: mkBuyPerpState().nodes.concat([NURSE_NODE])
-    }));
+    setState(
+      Object.assign(mkBuyPerpState(), {
+        active_missions: ['mission007'],
+        mission_goals: [
+          {
+            mission: 'mission007',
+            workflow: 'buy_perp',
+            target: 'contact001',
+            amount: null,
+            position: 1,
+            current_amount: 0,
+            complete: false,
+          },
+        ],
+        nodes: mkBuyPerpState().nodes.concat([NURSE_NODE]),
+      })
+    );
 
     await loadGame();
 
@@ -1176,18 +1306,22 @@ describe('buyPerp — loadGame repairs stuck buy_perp goal', () => {
   });
 
   it('does not alter buy_perp goals when the target is not yet owned', async () => {
-    setState(Object.assign(mkBuyPerpState(), {
-      active_missions: ['mission007'],
-      mission_goals: [{
-        mission:        'mission007',
-        workflow:       'buy_perp',
-        target:         'contact001',
-        amount:         null,
-        position:       1,
-        current_amount: 0,
-        complete:       false
-      }]
-    }));
+    setState(
+      Object.assign(mkBuyPerpState(), {
+        active_missions: ['mission007'],
+        mission_goals: [
+          {
+            mission: 'mission007',
+            workflow: 'buy_perp',
+            target: 'contact001',
+            amount: null,
+            position: 1,
+            current_amount: 0,
+            complete: false,
+          },
+        ],
+      })
+    );
 
     await loadGame();
 
@@ -1201,14 +1335,40 @@ describe('buyPerp — loadGame repairs stuck buy_perp goal', () => {
 
 describe('recheckMissions — recovers stuck goals (current_amount >= amount)', () => {
   it('flips a stuck integrate_profiles goal to complete and finishes the mission', async () => {
-    setState(Object.assign(mkBuyPerpState(), {
-      active_missions: ['mission007'],
-      mission_goals: [
-        { mission: 'mission007', workflow: 'buy_perp',           target: 'contact001', amount: null, position: 1, current_amount: 1,    complete: true  },
-        { mission: 'mission007', workflow: 'collect_profiles',   target: 'contact001', amount: 3000, position: 2, current_amount: 3000, complete: true  },
-        { mission: 'mission007', workflow: 'integrate_profiles', target: 'token017',   amount: 3000, position: 3, current_amount: 3000, complete: false },
-      ],
-    }));
+    setState(
+      Object.assign(mkBuyPerpState(), {
+        active_missions: ['mission007'],
+        mission_goals: [
+          {
+            mission: 'mission007',
+            workflow: 'buy_perp',
+            target: 'contact001',
+            amount: null,
+            position: 1,
+            current_amount: 1,
+            complete: true,
+          },
+          {
+            mission: 'mission007',
+            workflow: 'collect_profiles',
+            target: 'contact001',
+            amount: 3000,
+            position: 2,
+            current_amount: 3000,
+            complete: true,
+          },
+          {
+            mission: 'mission007',
+            workflow: 'integrate_profiles',
+            target: 'token017',
+            amount: 3000,
+            position: 3,
+            current_amount: 3000,
+            complete: false,
+          },
+        ],
+      })
+    );
 
     const { result } = await recheckMissions();
 
@@ -1222,12 +1382,22 @@ describe('recheckMissions — recovers stuck goals (current_amount >= amount)', 
   });
 
   it('is a no-op when no goal is stuck', async () => {
-    setState(Object.assign(mkBuyPerpState(), {
-      active_missions: ['mission007'],
-      mission_goals: [
-        { mission: 'mission007', workflow: 'collect_profiles',   target: 'contact001', amount: 3000, position: 2, current_amount: 1500, complete: false },
-      ],
-    }));
+    setState(
+      Object.assign(mkBuyPerpState(), {
+        active_missions: ['mission007'],
+        mission_goals: [
+          {
+            mission: 'mission007',
+            workflow: 'collect_profiles',
+            target: 'contact001',
+            amount: 3000,
+            position: 2,
+            current_amount: 1500,
+            complete: false,
+          },
+        ],
+      })
+    );
 
     const { result } = await recheckMissions();
     expect(result.repaired).toBe(false);
@@ -1235,14 +1405,40 @@ describe('recheckMissions — recovers stuck goals (current_amount >= amount)', 
   });
 
   it('replaying the recheckMissions delta does not double-apply rewards', async () => {
-    setState(Object.assign(mkBuyPerpState(), {
-      active_missions: ['mission007'],
-      mission_goals: [
-        { mission: 'mission007', workflow: 'buy_perp',           target: 'contact001', amount: null, position: 1, current_amount: 1,    complete: true  },
-        { mission: 'mission007', workflow: 'collect_profiles',   target: 'contact001', amount: 3000, position: 2, current_amount: 3000, complete: true  },
-        { mission: 'mission007', workflow: 'integrate_profiles', target: 'token017',   amount: 3000, position: 3, current_amount: 3000, complete: false },
-      ],
-    }));
+    setState(
+      Object.assign(mkBuyPerpState(), {
+        active_missions: ['mission007'],
+        mission_goals: [
+          {
+            mission: 'mission007',
+            workflow: 'buy_perp',
+            target: 'contact001',
+            amount: null,
+            position: 1,
+            current_amount: 1,
+            complete: true,
+          },
+          {
+            mission: 'mission007',
+            workflow: 'collect_profiles',
+            target: 'contact001',
+            amount: 3000,
+            position: 2,
+            current_amount: 3000,
+            complete: true,
+          },
+          {
+            mission: 'mission007',
+            workflow: 'integrate_profiles',
+            target: 'token017',
+            amount: 3000,
+            position: 3,
+            current_amount: 3000,
+            complete: false,
+          },
+        ],
+      })
+    );
 
     await recheckMissions();
     const xpAfterFirst = getState().game_values.xp_value;
@@ -1254,14 +1450,40 @@ describe('recheckMissions — recovers stuck goals (current_amount >= amount)', 
 
 describe('loadGame — repairs stuck integrate_profiles goal at startup', () => {
   it('marks goal complete and removes mission from active_missions on load', async () => {
-    setState(Object.assign(mkBuyPerpState(), {
-      active_missions: ['mission007'],
-      mission_goals: [
-        { mission: 'mission007', workflow: 'buy_perp',           target: 'contact001', amount: null, position: 1, current_amount: 1,    complete: true  },
-        { mission: 'mission007', workflow: 'collect_profiles',   target: 'contact001', amount: 3000, position: 2, current_amount: 3000, complete: true  },
-        { mission: 'mission007', workflow: 'integrate_profiles', target: 'token017',   amount: 3000, position: 3, current_amount: 3000, complete: false },
-      ],
-    }));
+    setState(
+      Object.assign(mkBuyPerpState(), {
+        active_missions: ['mission007'],
+        mission_goals: [
+          {
+            mission: 'mission007',
+            workflow: 'buy_perp',
+            target: 'contact001',
+            amount: null,
+            position: 1,
+            current_amount: 1,
+            complete: true,
+          },
+          {
+            mission: 'mission007',
+            workflow: 'collect_profiles',
+            target: 'contact001',
+            amount: 3000,
+            position: 2,
+            current_amount: 3000,
+            complete: true,
+          },
+          {
+            mission: 'mission007',
+            workflow: 'integrate_profiles',
+            target: 'token017',
+            amount: 3000,
+            position: 3,
+            current_amount: 3000,
+            complete: false,
+          },
+        ],
+      })
+    );
 
     await loadGame();
 
@@ -1275,15 +1497,41 @@ describe('loadGame — repairs stuck integrate_profiles goal at startup', () => 
 
 describe('buyPerp — mission activating after nurse already owned seeds goal as complete', () => {
   beforeEach(() => {
-    setState(Object.assign(mkBuyPerpState(), {
-      active_missions: ['mission006'],
-      mission_goals: [
-        { mission: 'mission006', workflow: 'buy_powerup', target: 'upgrade001',    amount: null, position: 1, current_amount: 1, complete: true  },
-        { mission: 'mission006', workflow: 'buy_powerup', target: 'ad002',         amount: null, position: 2, current_amount: 1, complete: true  },
-        { mission: 'mission006', workflow: 'buy_powerup', target: 'teammember020', amount: null, position: 3, current_amount: 0, complete: false }
-      ],
-      nodes: mkBuyPerpState().nodes.concat([PROJECT_NODE, NURSE_NODE])
-    }));
+    setState(
+      Object.assign(mkBuyPerpState(), {
+        active_missions: ['mission006'],
+        mission_goals: [
+          {
+            mission: 'mission006',
+            workflow: 'buy_powerup',
+            target: 'upgrade001',
+            amount: null,
+            position: 1,
+            current_amount: 1,
+            complete: true,
+          },
+          {
+            mission: 'mission006',
+            workflow: 'buy_powerup',
+            target: 'ad002',
+            amount: null,
+            position: 2,
+            current_amount: 1,
+            complete: true,
+          },
+          {
+            mission: 'mission006',
+            workflow: 'buy_powerup',
+            target: 'teammember020',
+            amount: null,
+            position: 3,
+            current_amount: 0,
+            complete: false,
+          },
+        ],
+        nodes: mkBuyPerpState().nodes.concat([PROJECT_NODE, NURSE_NODE]),
+      })
+    );
   });
 
   it('mission007 is added to active_missions after buying the final mission006 powerup', async () => {
@@ -1393,7 +1641,7 @@ describe('dismissMissionBriefing — happy path', () => {
     await dismissMissionBriefing('mission003');
     expect(getState().mission_briefings_seen).toEqual({
       mission002: true,
-      mission003: true
+      mission003: true,
     });
   });
 });
@@ -1441,7 +1689,7 @@ describe('dismissMissionBriefing — reload guard (issue #83)', () => {
       op: 'dismissMissionBriefing',
       args: ['mission001'],
       result: {},
-      ts: Date.now()
+      ts: Date.now(),
     };
     const replayed = applyDelta(freshState(addr), dismissDelta);
     setState(replayed);
@@ -1517,7 +1765,7 @@ describe('buyPowerup — error: exactly one coin short of powerup price', () => 
   it('returns error:3 when cash_value is price − 1 (ad002 price=90, cash=89)', async () => {
     // ad002 price = 90; state has 89 — one coin short.
     const oneCoinShort = mkProjectState({
-      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 89 })
+      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 89 }),
     });
     setState(oneCoinShort);
     const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
@@ -1526,7 +1774,7 @@ describe('buyPowerup — error: exactly one coin short of powerup price', () => 
 
   it('does not mutate state on partial-funds failure', async () => {
     const oneCoinShort = mkProjectState({
-      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 89 })
+      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 89 }),
     });
     setState(oneCoinShort);
     const before = getState().game_values.cash_value;
@@ -1541,7 +1789,7 @@ describe('buySlots — error: exactly one coin short of slot cost', () => {
   // cash=12 is one coin short.
   it('returns error:3 when cash_value is slot cost − 1', async () => {
     const oneCoinShort = mkProjectState({
-      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 12 })
+      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 12 }),
     });
     setState(oneCoinShort);
     const { result } = await buySlots(PROJECT_NODE.full_path, 'ad', 1);
@@ -1550,7 +1798,7 @@ describe('buySlots — error: exactly one coin short of slot cost', () => {
 
   it('does not mutate state on partial-funds failure', async () => {
     const oneCoinShort = mkProjectState({
-      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 12 })
+      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 12 }),
     });
     setState(oneCoinShort);
     const before = getState().game_values.cash_value;

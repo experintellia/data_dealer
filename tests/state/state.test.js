@@ -123,7 +123,6 @@ describe('applyDelta — schema-version mismatch (acceptance criterion B)', () =
     const result = applyDelta(oldState, makeDelta(addr, 'buyPerp', 1000));
     expect(result.schema_version).toBe(SCHEMA_VERSION);
   });
-
 });
 
 describe('applyDelta — chargePerp keys nodes by path', () => {
@@ -131,15 +130,37 @@ describe('applyDelta — chargePerp keys nodes by path', () => {
 
   it('charges the node matching chargeEntry.path even when nodes are reordered', () => {
     const base = freshState(addr);
-    const nodeA = { game_id: 'a', game_type: 'ContactPerp', full_path: 'Imperium.A', gestalt: 'a', instance_data: {} };
-    const nodeB = { game_id: 'b', game_type: 'ContactPerp', full_path: 'Imperium.B', gestalt: 'b', instance_data: {} };
+    const nodeA = {
+      game_id: 'a',
+      game_type: 'ContactPerp',
+      full_path: 'Imperium.A',
+      gestalt: 'a',
+      instance_data: {},
+    };
+    const nodeB = {
+      game_id: 'b',
+      game_type: 'ContactPerp',
+      full_path: 'Imperium.B',
+      gestalt: 'b',
+      instance_data: {},
+    };
     const state = Object.assign({}, base, { nodes: [nodeA, nodeB] });
 
     const delta = {
-      kind: 'delta', addr, op: 'chargePerp', args: ['Imperium.B'], ts: 1000,
+      kind: 'delta',
+      addr,
+      op: 'chargePerp',
+      args: ['Imperium.B'],
+      ts: 1000,
       result: {
-        chargeEntry: { path: 'Imperium.B', charge_start: 1000, charge_end: 31000, result: { amount: 100 } },
-        cashDelta: 60, xpInc: 1,
+        chargeEntry: {
+          path: 'Imperium.B',
+          charge_start: 1000,
+          charge_end: 31000,
+          result: { amount: 100 },
+        },
+        cashDelta: 60,
+        xpInc: 1,
       },
     };
     const out = applyDelta(state, delta);
@@ -264,7 +285,6 @@ describe('applyDelta — setLocale reducer', () => {
     const result = applyDelta(s, makeLocaleDelta(addr, 'en', 2000));
     expect(result.locale).toBe('en');
   });
-
 });
 
 // ---------------------------------------------------------------------------
@@ -275,7 +295,13 @@ describe('applyDelta — dismissMissionBriefing reducer', () => {
   const addr = 'alice@example.com';
 
   function makeDismissDelta(addr, gestalt, ts) {
-    return { kind: 'delta', addr, op: 'dismissMissionBriefing', args: [gestalt], ts: ts || Date.now() };
+    return {
+      kind: 'delta',
+      addr,
+      op: 'dismissMissionBriefing',
+      args: [gestalt],
+      ts: ts || Date.now(),
+    };
   }
 
   it('freshState seeds mission_briefings_seen as an empty object', () => {
@@ -320,7 +346,6 @@ describe('applyDelta — dismissMissionBriefing reducer', () => {
     expect(applyDelta(s, makeDismissDelta(addr, 42)).mission_briefings_seen).toEqual({});
     expect(applyDelta(s, makeDismissDelta(addr, null)).mission_briefings_seen).toEqual({});
   });
-
 });
 
 // ---------------------------------------------------------------------------
@@ -369,7 +394,6 @@ describe('applyDelta — markTokenSeen reducer', () => {
     expect(applyDelta(s, makeSeenDelta(addr, '')).tokens_seen).toEqual({});
     expect(applyDelta(s, makeSeenDelta(addr, 42)).tokens_seen).toEqual({});
   });
-
 });
 
 // ---------------------------------------------------------------------------
@@ -397,7 +421,13 @@ describe('applyDelta — addr guard and pre-boot replay (#117 / #130)', () => {
     // because state.addr is unknown.  This reinforces that boot.js MUST seed
     // selfAddr before replay (closes #130: foreign deltas must not do it).
     var s = freshState('');
-    var delta = { kind: 'delta', addr: 'alice@local', op: 'markTokenSeen', args: ['token008'], ts: 1 };
+    var delta = {
+      kind: 'delta',
+      addr: 'alice@local',
+      op: 'markTokenSeen',
+      args: ['token008'],
+      ts: 1,
+    };
     var result = applyDelta(s, delta);
     expect(result.addr).toBe('');
     expect(result.tokens_seen).toEqual({});

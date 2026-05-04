@@ -45,9 +45,16 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  chargePerp, buyKarma, buyPerp, collectPerp, integrateCollected,
-  buyPowerup, sellPowerup, buySlots,
-  setSendDelta, setEmitter
+  chargePerp,
+  buyKarma,
+  buyPerp,
+  collectPerp,
+  integrateCollected,
+  buyPowerup,
+  sellPowerup,
+  buySlots,
+  setSendDelta,
+  setEmitter,
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
@@ -58,8 +65,12 @@ import { FIXED_NOW, mkGv, mkState, mkNode, mkChargingEntry } from './_fixtures.j
 // ── shared fixtures ─────────────────────────────────────────────────────────
 
 const ECONOMY_FIELDS = [
-  'cash_value', 'cash_spent', 'xp_value',
-  'karma_value', 'profiles_value', 'ap_snapshot'
+  'cash_value',
+  'cash_spent',
+  'xp_value',
+  'karma_value',
+  'profiles_value',
+  'ap_snapshot',
 ];
 
 function expectEconomyUnchanged(echoed, handlerState) {
@@ -83,31 +94,31 @@ afterEach(() => {
 // When the listener echoes the own delta back, this re-applies on top of the
 // already-deducted state — KNOWN bug from PR #119.
 
-const CHARGE_GESTALT  = 'contact035';
-const CHARGE_TIME     = 30_000;
-const CHARGE_COST     = 60;
-const CHARGE_PATH     = 'Imperium.CityVienna.Agent0.contact035';
+const CHARGE_GESTALT = 'contact035';
+const CHARGE_TIME = 30_000;
+const CHARGE_COST = 60;
+const CHARGE_PATH = 'Imperium.CityVienna.Agent0.contact035';
 
 function mkChargeNode() {
   return {
-    game_id:       'node-abc123',
-    game_type:     'ContactPerp',
-    full_path:     CHARGE_PATH,
-    full_type:     'ContactPerp:' + CHARGE_GESTALT,
-    gestalt:       CHARGE_GESTALT,
+    game_id: 'node-abc123',
+    game_type: 'ContactPerp',
+    full_path: CHARGE_PATH,
+    full_type: 'ContactPerp:' + CHARGE_GESTALT,
+    gestalt: CHARGE_GESTALT,
     instance_data: {},
   };
 }
 
 const CHARGE_BASE_GV = {
-  cash_value:      500,
-  cash_spent:      0,
-  xp_value:        0,
-  ap_snapshot:     3,
-  ap_update:       FIXED_NOW,
-  ap_inc_value:    1,
+  cash_value: 500,
+  cash_spent: 0,
+  xp_value: 0,
+  ap_snapshot: 3,
+  ap_update: FIXED_NOW,
+  ap_inc_value: 1,
   ap_inc_interval: 120_000,
-  ap_max:          6,
+  ap_max: 6,
 };
 
 function mkChargeState(overrides) {
@@ -121,7 +132,7 @@ describe('chargePerp — listener echo idempotence', () => {
 
   it('listener echo does not double-deduct cash_value', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkChargeState());
 
     await chargePerp(CHARGE_PATH);
@@ -133,7 +144,7 @@ describe('chargePerp — listener echo idempotence', () => {
 
   it('listener echo does not double-add cash_spent', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkChargeState());
 
     await chargePerp(CHARGE_PATH);
@@ -145,7 +156,7 @@ describe('chargePerp — listener echo idempotence', () => {
 
   it('listener echo does not double-decrement ap_snapshot', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkChargeState());
 
     await chargePerp(CHARGE_PATH);
@@ -157,7 +168,7 @@ describe('chargePerp — listener echo idempotence', () => {
 
   it('listener echo does not double-add xp_value', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkChargeState());
 
     await chargePerp(CHARGE_PATH);
@@ -169,7 +180,7 @@ describe('chargePerp — listener echo idempotence', () => {
 
   it('all economy fields stable across echo', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkChargeState());
 
     await chargePerp(CHARGE_PATH);
@@ -190,17 +201,23 @@ function mkKarmaState() {
   var base = freshState('test@local');
   return Object.assign({}, base, {
     game_values: Object.assign({}, base.game_values, {
-      xp_value: 1, xp_level: 1, cash_value: 1000, cash_spent: 0,
-      karma_value: 50, profiles_value: 0, profiles_max: 1,
-      ap_snapshot: 6, ap_update: null
-    })
+      xp_value: 1,
+      xp_level: 1,
+      cash_value: 1000,
+      cash_spent: 0,
+      karma_value: 50,
+      profiles_value: 0,
+      profiles_max: 1,
+      ap_snapshot: 6,
+      ap_update: null,
+    }),
   });
 }
 
 describe('buyKarma — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-deduct cash_value', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkKarmaState());
 
     await buyKarma(KARMA_GESTALT);
@@ -213,7 +230,7 @@ describe('buyKarma — listener echo idempotence (regression guard)', () => {
 
   it('listener echo does not double-add karma_value', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkKarmaState());
 
     await buyKarma(KARMA_GESTALT);
@@ -225,7 +242,7 @@ describe('buyKarma — listener echo idempotence (regression guard)', () => {
 
   it('all economy fields stable across echo', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkKarmaState());
 
     await buyKarma(KARMA_GESTALT);
@@ -244,20 +261,29 @@ describe('buyKarma — listener echo idempotence (regression guard)', () => {
 // length. node_counter behavior is intentionally NOT asserted here.
 
 function mkBuyPerpState(overrides) {
-  return Object.assign(freshState('buyer@local'), {
-    game_values: {
-      xp_value: 15, xp_level: 3,
-      cash_value: 10000, cash_spent: 0,
-      karma_value: 0, profiles_value: 0, profiles_max: 1,
-      ap_snapshot: 6, ap_update: null
-    }
-  }, overrides || {});
+  return Object.assign(
+    freshState('buyer@local'),
+    {
+      game_values: {
+        xp_value: 15,
+        xp_level: 3,
+        cash_value: 10000,
+        cash_spent: 0,
+        karma_value: 0,
+        profiles_value: 0,
+        profiles_max: 1,
+        ap_snapshot: 6,
+        ap_update: null,
+      },
+    },
+    overrides || {}
+  );
 }
 
 describe('buyPerp — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-deduct cash on a successful buy', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkBuyPerpState());
 
     await buyPerp('Imperium', 'contact001');
@@ -271,7 +297,7 @@ describe('buyPerp — listener echo idempotence (regression guard)', () => {
 
   it('listener echo does not double-grow nodes array (de-dup by full_path)', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkBuyPerpState());
 
     await buyPerp('Imperium', 'contact001');
@@ -283,7 +309,7 @@ describe('buyPerp — listener echo idempotence (regression guard)', () => {
 
   it('listener echo does not double-grow db_queue for contact gestalt', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkBuyPerpState());
 
     await buyPerp('Imperium', 'contact001');
@@ -295,7 +321,7 @@ describe('buyPerp — listener echo idempotence (regression guard)', () => {
 
   it('all economy fields stable across echo', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkBuyPerpState());
 
     await buyPerp('Imperium', 'contact001');
@@ -310,17 +336,17 @@ describe('buyPerp — listener echo idempotence (regression guard)', () => {
 // Reducer applies snapshot-style game_values merge. db_queue and
 // nodes_collect have explicit de-dup. Regression guard.
 
-const COLLECT_PATH    = 'Imperium.City.Agent0.contact001';
-const COLLECT_DUR     = 120_000;
-const COLLECT_END     = FIXED_NOW + COLLECT_DUR;
+const COLLECT_PATH = 'Imperium.City.Agent0.contact001';
+const COLLECT_DUR = 120_000;
+const COLLECT_END = FIXED_NOW + COLLECT_DUR;
 
 describe('collectPerp — listener echo idempotence (regression guard)', () => {
   beforeEach(() => setOverride(FIXED_NOW));
 
   function setupCharged() {
     var s = mkState({
-      nodes:          [mkNode('ContactPerp', COLLECT_PATH)],
-      nodes_charging: [mkChargingEntry(COLLECT_PATH, { amount: 5 }, 'ContactPerp')]
+      nodes: [mkNode('ContactPerp', COLLECT_PATH)],
+      nodes_charging: [mkChargingEntry(COLLECT_PATH, { amount: 5 }, 'ContactPerp')],
     });
     setState(s);
     // Materialize so nodes_collect has the entry collectPerp expects.
@@ -332,7 +358,7 @@ describe('collectPerp — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-add xp_value or profiles_value', async () => {
     setupCharged();
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await collectPerp(COLLECT_PATH);
     const handlerState = getState();
@@ -345,7 +371,7 @@ describe('collectPerp — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-grow db_queue', async () => {
     setupCharged();
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await collectPerp(COLLECT_PATH);
     const handlerState = getState();
@@ -357,7 +383,7 @@ describe('collectPerp — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-shrink nodes_collect', async () => {
     setupCharged();
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await collectPerp(COLLECT_PATH);
     const handlerState = getState();
@@ -369,7 +395,7 @@ describe('collectPerp — listener echo idempotence (regression guard)', () => {
   it('all economy fields stable across echo', async () => {
     setupCharged();
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await collectPerp(COLLECT_PATH);
     const handlerState = getState();
@@ -388,8 +414,8 @@ describe('integrateCollected — listener echo idempotence (regression guard)', 
 
   async function chargeCollectAndCapture() {
     var s = mkState({
-      nodes:          [mkNode('ContactPerp', COLLECT_PATH)],
-      nodes_charging: [mkChargingEntry(COLLECT_PATH, { amount: 5 }, 'ContactPerp')]
+      nodes: [mkNode('ContactPerp', COLLECT_PATH)],
+      nodes_charging: [mkChargingEntry(COLLECT_PATH, { amount: 5 }, 'ContactPerp')],
     });
     setState(s);
     setOverride(COLLECT_END + 1000);
@@ -403,7 +429,7 @@ describe('integrateCollected — listener echo idempotence (regression guard)', 
   it('listener echo does not double-add profiles_value or xp_value', async () => {
     const collectId = await chargeCollectAndCapture();
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await integrateCollected(collectId);
     const handlerState = getState();
@@ -416,7 +442,7 @@ describe('integrateCollected — listener echo idempotence (regression guard)', 
   it('listener echo does not re-add the entry to db_queue', async () => {
     const collectId = await chargeCollectAndCapture();
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await integrateCollected(collectId);
     const handlerState = getState();
@@ -428,7 +454,7 @@ describe('integrateCollected — listener echo idempotence (regression guard)', 
   it('listener echo does not double-grow nodes (TokenPerp first integration)', async () => {
     const collectId = await chargeCollectAndCapture();
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await integrateCollected(collectId);
     const handlerState = getState();
@@ -440,7 +466,7 @@ describe('integrateCollected — listener echo idempotence (regression guard)', 
   it('all economy fields stable across echo', async () => {
     const collectId = await chargeCollectAndCapture();
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await integrateCollected(collectId);
     const handlerState = getState();
@@ -456,12 +482,12 @@ describe('integrateCollected — listener echo idempotence (regression guard)', 
 // IFF the delta carries a full snapshot. Regression guards.
 
 var PROJECT_NODE = {
-  game_id:       'proj001',
-  game_type:     'ProjectPerp',
-  full_path:     'Imperium.CityVienna.proj001',
-  full_type:     'ProjectPerp:project001',
-  gestalt:       'project001',
-  instance_data: { x: 100, y: 100, powerups: [] }
+  game_id: 'proj001',
+  game_type: 'ProjectPerp',
+  full_path: 'Imperium.CityVienna.proj001',
+  full_type: 'ProjectPerp:project001',
+  gestalt: 'project001',
+  instance_data: { x: 100, y: 100, powerups: [] },
 };
 
 function mkProjectState(overrides) {
@@ -472,12 +498,13 @@ function mkProjectState(overrides) {
 function mkStateWithPowerup() {
   var nodeWithPu = Object.assign({}, PROJECT_NODE, {
     instance_data: {
-      x: 100, y: 100,
+      x: 100,
+      y: 100,
       powerups: [{ slot: 0, gestalt: 'ad002', full_type: 'AdPowerup:ad002' }],
-      charge_cost:    225,
+      charge_cost: 225,
       collect_amount: 3760,
-      collect_risk:   2
-    }
+      collect_risk: 2,
+    },
   });
   return Object.assign({}, freshState('test@local'), { nodes: [nodeWithPu] });
 }
@@ -488,7 +515,7 @@ describe('buyPowerup — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-deduct cash on powerup buy', async () => {
     setState(mkProjectState());
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     const handlerState = getState();
@@ -501,7 +528,7 @@ describe('buyPowerup — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-add xp_value or karma_value', async () => {
     setState(mkProjectState());
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     const handlerState = getState();
@@ -514,7 +541,7 @@ describe('buyPowerup — listener echo idempotence (regression guard)', () => {
   it('all economy fields stable across echo', async () => {
     setState(mkProjectState());
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     const handlerState = getState();
@@ -530,7 +557,7 @@ describe('sellPowerup — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-refund cash on powerup sell', async () => {
     setState(mkStateWithPowerup());
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     const handlerState = getState();
@@ -542,7 +569,7 @@ describe('sellPowerup — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-add xp_value', async () => {
     setState(mkStateWithPowerup());
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     const handlerState = getState();
@@ -554,7 +581,7 @@ describe('sellPowerup — listener echo idempotence (regression guard)', () => {
   it('all economy fields stable across echo', async () => {
     setState(mkStateWithPowerup());
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
     const handlerState = getState();
@@ -570,7 +597,7 @@ describe('buySlots — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-deduct cash on slot purchase', async () => {
     setState(mkProjectState());
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await buySlots(PROJECT_NODE.full_path, 'ad', 1);
     const handlerState = getState();
@@ -583,7 +610,7 @@ describe('buySlots — listener echo idempotence (regression guard)', () => {
   it('listener echo does not double-add xp_value', async () => {
     setState(mkProjectState());
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await buySlots(PROJECT_NODE.full_path, 'ad', 1);
     const handlerState = getState();
@@ -595,7 +622,7 @@ describe('buySlots — listener echo idempotence (regression guard)', () => {
   it('all economy fields stable across echo', async () => {
     setState(mkProjectState());
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     await buySlots(PROJECT_NODE.full_path, 'ad', 1);
     const handlerState = getState();

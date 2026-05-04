@@ -11,9 +11,17 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 describe('vendor files', () => {
   // The libs index.html `<script>`-loads, in dependency order.
   const required = [
-    'jquery.js', 'jquery-migrate.js', 'underscore.js', 'numeral.js', 'numeral-de.js',
-    'easeljs.js', 'tweenjs.js', 'soundjs.js',
-    'sprintf.js', 'zynga-animate.js', 'zynga-scroller.js',
+    'jquery.js',
+    'jquery-migrate.js',
+    'underscore.js',
+    'numeral.js',
+    'numeral-de.js',
+    'easeljs.js',
+    'tweenjs.js',
+    'soundjs.js',
+    'sprintf.js',
+    'zynga-animate.js',
+    'zynga-scroller.js',
   ];
   for (const f of required) {
     it(`vendor/${f} exists`, () => {
@@ -22,7 +30,14 @@ describe('vendor files', () => {
   }
 
   // The legacy AMD plumbing must not regress back into vendor/.
-  const removed = ['requirejs.js', 'almond.js', 'text.js', 'tpl.js', 'jquery-mobile.js', 'native-console.js'];
+  const removed = [
+    'requirejs.js',
+    'almond.js',
+    'text.js',
+    'tpl.js',
+    'jquery-mobile.js',
+    'native-console.js',
+  ];
   for (const f of removed) {
     it(`vendor/${f} no longer exists`, () => {
       expect(existsSync(join(root, 'vendor', f))).toBe(false);

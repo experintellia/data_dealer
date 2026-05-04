@@ -35,7 +35,7 @@ const shippedSrc = [
   readFile(join(root, 'manifest.toml')),
 ].join('\n');
 
-const images = readdirSync(join(root, 'img')).filter(f => /\.(png|jpg|gif|svg|webp)$/i.test(f));
+const images = readdirSync(join(root, 'img')).filter((f) => /\.(png|jpg|gif|svg|webp)$/i.test(f));
 
 describe('img/ asset references', () => {
   for (const img of images) {

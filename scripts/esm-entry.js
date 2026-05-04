@@ -25,7 +25,8 @@ if (typeof window !== 'undefined') {
       const resolved = deps.map(lookup);
       if (cb) cb(...resolved);
     } catch (e) {
-      if (errCb) errCb(e); else throw e;
+      if (errCb) errCb(e);
+      else throw e;
     }
   };
 }

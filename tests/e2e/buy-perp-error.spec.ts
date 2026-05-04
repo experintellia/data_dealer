@@ -23,7 +23,7 @@ test('buy-perp: insufficient cash returns error code 2', async ({ page }) => {
 
   const result = await page.evaluate(async () => {
     const eng = await new Promise<any>((res, rej) =>
-      (window as any).require(['LocalEngine'], res, rej),
+      (window as any).require(['LocalEngine'], res, rej)
     );
     // client006 costs 400 cash; starting cash is 270 → should fail.
     return eng.buyPerp('Imperium', 'client006');

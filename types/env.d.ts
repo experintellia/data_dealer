@@ -1,6 +1,6 @@
 // Pull in the official webxdc global types (window.webxdc: Webxdc<…>).
-import type { Webxdc } from "@webxdc/types";
-import "@webxdc/types/global";
+import type { Webxdc } from '@webxdc/types';
+import '@webxdc/types/global';
 
 declare global {
   // Declare webxdc as a bare global in addition to window.webxdc.  Scripts in

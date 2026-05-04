@@ -28,8 +28,8 @@ if (
     return (view && view.renderNode) || null;
   };
   window.__dd = {
-    setNow:          setOverride,
-    advanceNow:      advance,
+    setNow: setOverride,
+    advanceNow: advance,
     clearNowOverride: clearOverride,
     // Test hooks for the zoom-controls e2e spec — read from / write to the
     // active ViewMap's scroller without exposing the whole app surface.
