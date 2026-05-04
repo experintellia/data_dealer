@@ -994,15 +994,13 @@ var Game = function () {
       });
       gnode.activeView = getById(view_id);
       gnode.activeView.setState('active', true);
-      // Refresh the new view's scroller dimensions against the current
-      // stage (it may have been resized while a different tab was active),
-      // then recentre on its content. Without this, switching to Database
-      // leaves the camera wherever the previous view was scrolled.
+      // Refresh scroller dimensions in case the stage was resized while
+      // this tab was inactive. Tab switches preserve scroll position;
+      // the reset-zoom button is the explicit way to recentre.
       var vm = gnode.activeView && gnode.activeView.renderNode;
       if (vm && typeof vm.updateScroller === 'function') {
         vm.updateScroller();
       }
-      gnode._centerActiveView(true);
     });
 
     gnode.on('toggle_locale', function (e) {
@@ -1664,43 +1662,40 @@ var Game = function () {
     return popup;
   };
 
-  // The fullscreen button now resets zoom AND re-centers on the ViewMap's
+  // Cancel any debounced _centerActiveView so an explicit camera move
+  // (reset-zoom, tutorial scrollTo) isn't clobbered ~50ms later.
+  GameRoot.prototype._cancelPendingCenter = function () {
+    clearTimeout(this._centerActiveViewTimer);
+    this._centerActiveViewTimer = null;
+  };
+
+  // The fullscreen button resets zoom AND re-centers on the ViewMap's
   // design home point — for Imperium that's where the seed places the
-  // Database (≈1024,800).  Falls back to a no-op if no ViewMap is active.
+  // Database (≈1024,800). No-op if no ViewMap is active.
   GameRoot.prototype.resetZoom = function () {
-    // activeView is only set after the first switch_view; on initial
-    // boot we need the same Imperium fallback as _centerActiveView.
     var view = this.activeView || (this.getImperium && this.getImperium());
     var vm = view && view.renderNode;
     if (!vm || !vm.scroller || typeof vm.scroller.scrollTo !== 'function') return;
     if (typeof vm.updateScroller === 'function') vm.updateScroller();
     var vp = vm.parentNode;
     if (!vp) return;
-    // Cancel any debounced re-center so it can't interrupt this animation
-    // 50ms in, which used to freeze zoom mid-tween (zoomTo+scrollTo issue
-    // a single __publish each, and the second one cancels the first).
-    clearTimeout(this._centerActiveViewTimer);
-    // scrollTo with an explicit zoom multiplies left/top by zoom internally
-    // and combines both into one __publish, so we get a single tween from
-    // (current zoom, current scroll) to (1.0, centered) instead of two
-    // animations fighting each other.
+    this._cancelPendingCenter();
+    // Combined zoom+scroll in one __publish so the tween goes
+    // (current zoom, current scroll) → (1.0, centered) instead of
+    // two animations fighting each other.
     var sx = Math.max(0, vm.width / 2 - vp.width / 2);
     var sy = Math.max(0, vm.height / 2 - vp.height / 2);
     vm.scroller.scrollTo(sx, sy, true, 1);
   };
 
-  // Re-centers the active ViewMap so the design home point sits in the
-  // middle of the visible viewport — used both at startup and from the
-  // reset-zoom button so the player isn't staring at empty space when
-  // the window is wider than the legacy 960×600 frame.
-  // Debounced: rapid callers during initial mount (fitToWindow → render
-  // after_render → tutorial switch_view) collapse into one scroll.
+  // Re-centers the active ViewMap on its design home point. Debounced
+  // so rapid callers during initial mount (fitToWindow → after_render
+  // → tutorial switch_view) collapse into one scroll.
   GameRoot.prototype._centerActiveView = function (animate) {
     var self = this;
-    clearTimeout(self._centerActiveViewTimer);
+    self._cancelPendingCenter();
     self._centerActiveViewTimer = setTimeout(function () {
       self._centerActiveViewTimer = null;
-      // activeView is set only after a switch_view; fall back to Imperium.
       var view = self.activeView || (self.getImperium && self.getImperium());
       var vm = view && view.renderNode;
       if (!vm || !vm.scroller || !vm.parentNode) return;

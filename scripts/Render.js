@@ -4181,6 +4181,9 @@ var Render = function () {
   ViewMap.prototype.scrollTo = function (pos, dur) {
     var vpCenter = this.parentNode.getCenterPosition();
     dur = dur !== undefined ? dur : 300;
+    // Explicit scrollTo beats any debounced generic recenter still pending.
+    var groot = this.gameNode && this.gameNode.GameRoot;
+    if (groot) groot._cancelPendingCenter();
     this.scroller.options.animating = dur > 0;
     this.scroller.options.animationDuration = dur;
     this.scroller.scrollTo(pos.x - vpCenter.x, pos.y - vpCenter.y, true);
