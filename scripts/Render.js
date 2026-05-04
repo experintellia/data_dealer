@@ -4004,10 +4004,13 @@ var Render = function() {
         e.preventDefault();
         var offset = node.jdomelem.offset();
         // Normalize across deltaMode (pixel/line/page) and clamp so a
-        // single trackpad swipe never multiplies zoom by more than ~2x.
+        // single trackpad fling never multiplies zoom by more than ~1.5x.
+        // Per-pixel base is intentionally tiny — a typical wheel notch
+        // (~100px) ends up around ~10% zoom, so the change feels
+        // continuous rather than stepped like the +/- buttons.
         var unit = (e.deltaMode === 1) ? 16 : (e.deltaMode === 2) ? 400 : 1;
-        var delta = Math.max(-100, Math.min(100, e.deltaY * unit));
-        var factor = Math.pow(0.995, delta);
+        var delta = Math.max(-400, Math.min(400, e.deltaY * unit));
+        var factor = Math.pow(0.999, delta);
         var opts = node.scroller.options;
         var base = (node._wheelZoomTarget != null)
           ? node._wheelZoomTarget
