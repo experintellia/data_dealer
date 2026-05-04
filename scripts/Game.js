@@ -1669,7 +1669,13 @@ var Game = function() {
     // load and on window resize so the game fills the available space by
     // default rather than sitting in a 960×600 letterbox.
     GameRoot.prototype.fitToWindow = function() {
-      this.setSize($(window).width(), $(window).height());
+      // The MainMenu is a sibling of the Stage in #GameContainer (not a
+      // child), so its height eats into the available viewport — without
+      // subtracting it the Stage pushes the page past the bottom edge.
+      var menuH = (this.renderMenu && this.renderMenu.jdomelem)
+        ? this.renderMenu.jdomelem.outerHeight()
+        : 0;
+      this.setSize($(window).width(), $(window).height() - menuH);
       // Refresh the scroller's viewport dimensions so the new stage size is
       // reflected in clamping/zoom math. Without this, scrollTo and the
       // +/- zoom buttons clamp against the previous viewport.

@@ -661,6 +661,8 @@
 .MainMenu {
   overflow:hidden;
   margin:0 auto;
+  padding:4px 8px 0 8px;
+  box-sizing:border-box;
   background: #001111;
   background: -moz-linear-gradient(top,  #001111 0%, #06546c 100%);
   background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#001111), color-stop(100%,#06546c));
