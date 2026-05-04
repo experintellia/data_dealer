@@ -5,8 +5,8 @@
 // `length` field, single `each` walker).
 //
 // Extracted from scripts/Game.js's IIFE in the issue #147 / Phase 7
-// migration.  Game.ts re-exports this as `Set` to keep the in-IIFE call
-// sites unchanged while the rest of Game.ts is still under `@ts-nocheck`.
+// migration.  Game.js re-exports this as `Set` to keep the in-IIFE call
+// sites unchanged while the rest of Game.js is still under `@ts-nocheck`.
 //
 // Behaviour preserved from the legacy class:
 //   - `set` and `length` are public.  AniTicker.listeners.set is reassigned
@@ -55,8 +55,7 @@ export class OrderedSet<T> {
 
   each(func: (node: T) => void): void {
     if (!func) return;
-    for (let n = 0; n < this.set.length; n++) {
-      const node = this.set[n] as T;
+    for (const node of this.set) {
       func(node);
     }
     this.length = this.set.length;
