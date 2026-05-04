@@ -40,6 +40,10 @@ interface GameRootWithMenu {
 }
 
 export class Topscores extends GameNode {
+  // Narrow the inherited `children: OrderedSet<GameNode>` to the actual
+  // shape Topscores produces — every child added via initTopscore() is a
+  // Topscore instance.  Type-only override (`declare`); no runtime change.
+  declare children: OrderedSet<Topscore>;
   ViewMap?: Topscores;
   queue?: OrderedSet<unknown>;
 
@@ -77,8 +81,7 @@ export class Topscores extends GameNode {
   }
 
   updateScores(): void {
-    this.children.each((child) => {
-      const score = child as Topscore;
+    this.children.each((score) => {
       score.lastFetch = null;
       score.fetchScore(score.scoretype, true);
     });
@@ -94,15 +97,14 @@ export class Topscores extends GameNode {
 
     gnode.on('viewtab_selected', function () {
       let all_hidden = true;
-      gnode.children.each((child) => {
-        const score = child as Topscore;
+      gnode.children.each((score) => {
         score.fetchScore();
         const rn = score.renderNode as TopscoreRenderNodeMenu | undefined;
         if (rn && !rn.hidden) {
           all_hidden = false;
         }
       });
-      const first = gnode.children.set[0] as Topscore | undefined;
+      const first = gnode.children.set[0];
       if (first && all_hidden && gnode.children.length) {
         const firstRn = first.renderNode as TopscoreRenderNodeMenu | undefined;
         firstRn?.show?.();
@@ -121,8 +123,7 @@ export class Topscores extends GameNode {
       if (!t) return;
       const score = getByGestalt('topscore_' + t) as Topscore | undefined;
       if (!score) return;
-      gnode.children.each((child) => {
-        const ts = child as Topscore;
+      gnode.children.each((ts) => {
         const rn = ts.renderNode as TopscoreRenderNodeMenu | undefined;
         rn?.hide?.();
       });
