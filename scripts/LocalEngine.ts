@@ -1,4 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // In-process gameplay handlers, consumed by app.js as a default-namespace
 // import.  No DOM globals in handler bodies; safe to import from Node
 // for tests.
@@ -10,16 +9,10 @@
 //   chargePerp (#16), collectPerp, integrateCollected (#17).
 // resetGame is intentionally absent — in webxdc, reset = re-share the .xdc.
 // Remaining handlers are stubs that return a rejected Promise.
-//
-// Type references (see types/ and scripts/state.ts for full definitions):
-/** @typedef {import('./state.js').LocalState} LocalState */
-/** @typedef {import('./state.js').Delta} Delta */
-/** @typedef {import('./state.js').GameValues} GameValues */
-/** @typedef {import('./state.js').GameNode} GameNode */
-/** @typedef {import('./materializer.js').MaterializeResult} MaterializeResult */
 
 import { getState, setState } from './boot.js';
 import { applyDelta } from './state.js';
+import type { LocalState, Delta, GameValues, GameNode, MissionGoal } from './state.js';
 import { materialize } from './materializer.js';
 import { now as clockNow } from './clock.js';
 import rulesetDe from '../data/ruleset_3.de.json' with { type: 'json' };
@@ -28,70 +21,291 @@ import i18nDe from '../i18n/de_AT.json' with { type: 'json' };
 import i18nEn from '../i18n/en_US.json' with { type: 'json' };
 
 // ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
+
+/** Locale shorthand persisted in state.locale and selected by handlers. */
+type Locale = 'de' | 'en';
+
+/** Loose ruleset shape — full schema is the JSON, not enforced here. */
+interface PerpDef {
+  game_type?: string;
+  type_data?: PerpTypeData;
+  [key: string]: unknown;
+}
+
+/**
+ * Loose type for per-perp ruleset data.  Real schema lives in
+ * data/ruleset_3.*.json and is not formalized; the fields below are the
+ * ones actually read by the handlers in this module.  `[key: string]:
+ * unknown` covers the long tail (description, illustration, etc.) without
+ * forcing typed reads where the handlers don't care.
+ */
+interface PerpTypeData {
+  required_level?: number;
+  required_providers?: string[];
+  provided_perps?: string[];
+  provided_ads?: PowerupDef[];
+  provided_upgrades?: PowerupDef[];
+  provided_teammembers?: PowerupDef[];
+  powerups?: PowerupDef[];
+  charge_cost?: number;
+  collect_amount?: number;
+  collect_risk?: number;
+  charge_time?: number;
+  collect_time?: number;
+  tokens?: TokenSpec[];
+  contained_tokens?: TokenSpec[];
+  income_base?: number;
+  xp_inc?: number;
+  price?: number;
+  profileset_size?: number;
+  profiles_max?: number;
+  slot_cost?: number;
+  slot_cost_modifier?: number;
+  max_slots?: number;
+  slots?: SlotEntry[];
+  origin_full_type?: string;
+  origin_gestalt?: string;
+  title?: string;
+  [key: string]: unknown;
+}
+
+interface SlotEntry {
+  type: string;
+  count: number;
+  price?: number;
+  [key: string]: unknown;
+}
+
+interface TokenSpec {
+  gestalt?: string;
+  amount?: number;
+  is_required?: boolean;
+  [key: string]: unknown;
+}
+
+interface PowerupDef {
+  gestalt?: string;
+  slot?: number;
+  full_type?: string;
+  price?: number;
+  charge_cost_modifier?: number;
+  collect_amount_modifier?: number;
+  collect_risk_modifier?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Per-node instance_data fields handlers read.  Persisted into state.nodes
+ * via reducers; not all nodes carry every field.  Open-ended so legacy
+ * fields (x, y, charge_start, etc.) pass through without explicit typing.
+ */
+interface NodeInstanceData {
+  amount?: number;
+  charge_cost?: number;
+  collect_amount?: number;
+  collect_risk?: number;
+  powerups?: PowerupDef[];
+  tokens?: TokenSpec[];
+  charge_start?: number;
+  [key: string]: unknown;
+}
+
+interface MissionDef {
+  game_type?: string;
+  type_data?: MissionTypeData;
+  [key: string]: unknown;
+}
+
+interface MissionTypeData {
+  gestalt?: string;
+  title?: string;
+  required_mission?: string;
+  goals?: GoalDef[];
+  rewards?: Array<{ target?: string; amount?: number }>;
+  [key: string]: unknown;
+}
+
+interface GoalDef {
+  goal_id?: string;
+  workflow?: string;
+  target?: string;
+  amount?: number;
+  position?: number;
+  project?: string | null;
+  [key: string]: unknown;
+}
+
+interface RewardSet {
+  cash_value?: number;
+  xp_value?: number;
+  karma_value?: number;
+  profiles_max?: number;
+  profile_sets?: Array<{ profile_set: unknown; origin: string; collect_id: string }>;
+  [key: string]: unknown;
+}
+
+interface LevelEntry {
+  number: number;
+  xp_min: number;
+  xp_max: number;
+  ap_max: number;
+  [key: string]: unknown;
+}
+
+interface Karmalauter {
+  type_data: {
+    gestalt: string;
+    price: number;
+    karma_points: number;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+interface Karmalizer {
+  type_data: {
+    gestalt?: string;
+    karma_points?: number;
+    required_level?: number;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+interface Ruleset {
+  version: string | number;
+  perps: Record<string, PerpDef>;
+  tokens: Record<string, PerpDef | undefined>;
+  powerups: Record<string, { game_type?: string; type_data?: Record<string, unknown> } | undefined>;
+  levels: LevelEntry[];
+  karmalauters: Karmalauter[];
+  karmalizers: Karmalizer[];
+  missions: MissionDef[];
+  [key: string]: unknown;
+}
+
+/** i18n table entry: [msgctxt, msgstr]. */
+type I18nEntry = readonly [string, string];
+type I18nTable = Record<string, I18nEntry | undefined>;
+
+/** Indexes built lazily over state.nodes. */
+interface NodeMaps {
+  paths: Record<string, GameNode>;
+  gestalts: Record<string, true>;
+}
+
+/** Achievement event payload posted via webxdc.sendUpdate at action sites. */
+interface AchievementPayload {
+  kind: 'achievement';
+  achievement_kind: string;
+  addr: string;
+  name: string;
+  ts: number;
+  [key: string]: unknown;
+}
+
+type Emitter = (ev: string, pl: unknown) => void;
+type DeltaSender = (delta: Delta) => void;
+type AchievementSender = (msg: { info: string; payload: AchievementPayload }) => void;
+
+interface MissionUpdate {
+  complete_missions: string[];
+  updated_missions: string[];
+  mission_data: {
+    active_missions: string[];
+    mission_goals: MissionGoal[];
+  };
+}
+
+interface MissionAdvanceResult {
+  missions: MissionUpdate | null;
+  rewards?: RewardSet;
+  mission_goals: MissionGoal[];
+  active_missions: string[];
+}
+
+// ---------------------------------------------------------------------------
 // Event emitter — injected by production boot (app.js); no-op in tests.
 // Call setEmitter(fn) with fn(ev, pl) before any gameplay begins.
 // ---------------------------------------------------------------------------
-var _emitter = null;
+let _emitter: Emitter | null = null;
 
-/**
- * Inject the event emitter.  Call before gameplay begins.
- * @param {(ev: string, pl: unknown) => void} fn
- */
-export function setEmitter(fn) {
+/** Inject the event emitter.  Call before gameplay begins. */
+export function setEmitter(fn: Emitter): void {
   _emitter = fn;
 }
 
-function _emit(ev, pl) {
+function _emit(ev: string, pl: unknown): void {
   if (_emitter) _emitter(ev, pl);
+}
+
+// Typed read for the open-ended `[key: string]: unknown` regions of
+// PerpTypeData / NodeInstanceData / ruleset records.  Returns the number
+// at `key` or undefined if the field is missing or not a number — keeps
+// the cast surface to a single helper instead of scattered `as` reads.
+function _readNumber(rec: object | undefined, key: string): number | undefined {
+  if (!rec) return undefined;
+  var v = (rec as Record<string, unknown>)[key];
+  return typeof v === 'number' ? v : undefined;
 }
 
 // ---------------------------------------------------------------------------
 // Ruleset selection — locale-memoised, node-index helpers
 // ---------------------------------------------------------------------------
 
-function _getRuleset() {
+function _getRuleset(): Ruleset {
   var state = getState();
-  var locale = (state && state.locale) || 'de';
-  return (locale === 'en') ? rulesetEn : rulesetDe;
+  var locale: Locale = (state && state.locale === 'en') ? 'en' : 'de';
+  return (locale === 'en' ? rulesetEn : rulesetDe) as unknown as Ruleset;
 }
 
-var _nodeMapRef = null;
-var _nodeMapCache = null;
+let _nodeMapRef: GameNode[] | null = null;
+let _nodeMapCache: NodeMaps | null = null;
 
-function _getNodeMaps(nodes) {
-  if (nodes === _nodeMapRef) return _nodeMapCache;
+function _getNodeMaps(nodes: GameNode[]): NodeMaps {
+  if (nodes === _nodeMapRef && _nodeMapCache) return _nodeMapCache;
   _nodeMapRef = nodes;
-  var paths = {};
-  var gestalts = {};
+  var paths: Record<string, GameNode> = {};
+  var gestalts: Record<string, true> = {};
   for (var i = 0; i < nodes.length; i++) {
-    paths[nodes[i].full_path] = nodes[i];
-    var g = nodes[i].gestalt || _gestaltFrom(nodes[i].full_type);
+    var n = nodes[i];
+    if (!n) continue;
+    paths[n.full_path] = n;
+    var g = n.gestalt || _gestaltFrom(n.full_type);
     if (g) gestalts[g] = true;
   }
   _nodeMapCache = { paths: paths, gestalts: gestalts };
   return _nodeMapCache;
 }
 
-function _gestaltFrom(fullType) {
+function _gestaltFrom(fullType: string | undefined): string | null {
   if (!fullType) return null;
   var idx = fullType.indexOf(':');
   return idx >= 0 ? fullType.slice(idx + 1) : null;
 }
 
-function _gameTypeFrom(fullType) {
+function _gameTypeFrom(fullType: string | undefined): string {
   if (!fullType) return '';
   var idx = fullType.indexOf(':');
   return idx >= 0 ? fullType.slice(0, idx) : fullType;
 }
 
-function _isProvidable(gestalt, ruleset, playerLevel, ownedGestalts) {
+function _isProvidable(
+  gestalt: string,
+  ruleset: Ruleset,
+  playerLevel: number,
+  ownedGestalts: Record<string, true>
+): boolean {
   var def = ruleset.perps[gestalt];
   if (!def) return false;
   var td = def.type_data || {};
   if ((td.required_level || 0) > playerLevel) return false;
   var reqs = td.required_providers || [];
   for (var i = 0; i < reqs.length; i++) {
-    if (!ownedGestalts[reqs[i]]) return false;
+    var req = reqs[i];
+    if (!req || !ownedGestalts[req]) return false;
   }
   return true;
 }
@@ -100,14 +314,13 @@ function _isProvidable(gestalt, ruleset, playerLevel, ownedGestalts) {
 // Delta persistence — injected by production boot so webxdc.sendUpdate is
 // not imported here.  Tests override with setSendDelta to capture deltas.
 // ---------------------------------------------------------------------------
-var _sendDelta = null;
+let _sendDelta: DeltaSender | null = null;
 
 /**
  * Inject the delta persistence function (tests use this to capture deltas).
  * In production, boot.js wires this to webxdc.sendUpdate via the listener.
- * @param {(delta: Delta) => void} fn
  */
-export function setSendDelta(fn) {
+export function setSendDelta(fn: DeltaSender): void {
   _sendDelta = fn;
 }
 
@@ -115,39 +328,47 @@ export function setSendDelta(fn) {
 // Achievement emit — fires info messages at action sites only.
 // setSendAchievement(fn) injects a spy in tests; production uses webxdc.
 // ---------------------------------------------------------------------------
-var _sendAchievementFn = null;
+let _sendAchievementFn: AchievementSender | null = null;
 
-export function setSendAchievement(fn) {
+export function setSendAchievement(fn: AchievementSender): void {
   _sendAchievementFn = fn;
 }
 
 // Locale-aware format-string lookup.  Replaces %s tokens left-to-right.
-function _t(msgid) {
+function _t(msgid: string, ...subs: unknown[]): string {
   var state = getState();
-  var locale = (state && state.locale) || 'de';
-  var table = (locale === 'en') ? i18nEn : i18nDe;
+  var locale: Locale = (state && state.locale === 'en') ? 'en' : 'de';
+  var table = (locale === 'en' ? i18nEn : i18nDe) as unknown as I18nTable;
   var entry = table[msgid];
-  var tmpl = (entry && entry[1]) ? entry[1] : msgid;
-  for (var i = 1; i < arguments.length; i++) {
-    tmpl = tmpl.replace('%s', String(arguments[i]));
+  var tmpl: string = (entry && entry[1]) ? entry[1] : msgid;
+  for (var i = 0; i < subs.length; i++) {
+    tmpl = tmpl.replace('%s', String(subs[i]));
   }
   return tmpl;
 }
 
 // Fire an achievement info message.  Called only at handler action sites —
 // never from applyDelta or the materializer so replay never re-emits.
-function triggerAchievement(kind, info, extraPayload) {
+function triggerAchievement(
+  kind: string,
+  info: string,
+  extraPayload?: Record<string, unknown>
+): void {
   var state = getState();
   var addr = state ? state.addr : '';
   var name = state ? (state.display_name || addr) : addr;
   // kind: 'achievement' is the top-level discriminator for webxdc consumers.
   // achievement_kind carries the subtype (mission_done, levelup, joined, …).
-  var payload = { kind: 'achievement', achievement_kind: kind, addr: addr, name: name, ts: clockNow() };
+  var payload: AchievementPayload = {
+    kind: 'achievement',
+    achievement_kind: kind,
+    addr: addr,
+    name: name,
+    ts: clockNow(),
+  };
   if (extraPayload) Object.assign(payload, extraPayload);
   if (_sendAchievementFn) { _sendAchievementFn({ info: info, payload: payload }); }
-  // eslint-disable-next-line no-undef
-  if (typeof webxdc !== 'undefined') {
-    // eslint-disable-next-line no-undef
+  if (typeof webxdc !== 'undefined' && webxdc) {
     webxdc.sendUpdate({ info: info, payload: payload }, '');
   }
 }
@@ -157,11 +378,9 @@ function triggerAchievement(kind, info, extraPayload) {
 // Node/no-webxdc environments, emulate the listener echo synchronously.
 // This is the only place outside the listener that calls setState — it IS the
 // listener-equivalent for environments without webxdc.
-function _persistDelta(delta) {
+function _persistDelta(delta: Delta): void {
   if (_sendDelta) _sendDelta(delta);
-  // eslint-disable-next-line no-undef
-  if (typeof webxdc !== 'undefined') {
-    // eslint-disable-next-line no-undef
+  if (typeof webxdc !== 'undefined' && webxdc) {
     webxdc.sendUpdate({ payload: delta }, '');
   } else {
     setState(applyDelta(getState(), delta));
@@ -173,7 +392,7 @@ function _persistDelta(delta) {
 // Seed is derived from (ts, path) so replaying the same delta always produces
 // the same charge_result.
 // ---------------------------------------------------------------------------
-function _djb2(str) {
+function _djb2(str: string): number {
   var h = 5381;
   for (var i = 0; i < str.length; i++) {
     h = (Math.imul(33, h) ^ str.charCodeAt(i)) >>> 0;
@@ -181,13 +400,13 @@ function _djb2(str) {
   return h;
 }
 
-function _seededRand(seed) {
+function _seededRand(seed: number): number {
   var s = (seed >>> 0);
   s = (Math.imul(1664525, s) + 1013904223) >>> 0;
   return s / 0xFFFFFFFF;
 }
 
-function _getVariatedAmount(baseAmount, ts, path) {
+function _getVariatedAmount(baseAmount: number, ts: number, path: string): number {
   var seed = ((ts & 0xFFFFFFFF) ^ _djb2(path)) >>> 0;
   var rand = _seededRand(seed);        // uniform 0..1
   var variation = rand * 0.1 - 0.05;  // map to −0.05…+0.05 (±5%)
@@ -202,9 +421,8 @@ function _getVariatedAmount(baseAmount, ts, path) {
  * getToken() → Promise<{result: string}>
  * Returns webxdc.selfAddr (or 'local' in non-webxdc environments).
  */
-export function getToken() {
-  // eslint-disable-next-line no-undef
-  var addr = (typeof webxdc !== 'undefined') ? webxdc.selfAddr : '';
+export function getToken(): Promise<{ result: string }> {
+  var addr = (typeof webxdc !== 'undefined' && webxdc) ? webxdc.selfAddr : '';
   return Promise.resolve({ result: addr || 'local' });
 }
 
@@ -212,7 +430,7 @@ export function getToken() {
  * ping() → Promise<{result: "pong"}>
  * Health check; resolves synchronously.
  */
-export function ping() {
+export function ping(): Promise<{ result: 'pong' }> {
   return Promise.resolve({ result: 'pong' });
 }
 
@@ -221,9 +439,9 @@ export function ping() {
  * Returns locale string; Game.js checks === "de" for branch selection.
  * Returns state.locale if persisted, otherwise defaults to "de".
  */
-export function getSessionLocale() {
+export function getSessionLocale(): Promise<{ result: Locale }> {
   var state = getState();
-  var locale = (state && state.locale) || 'de';
+  var locale: Locale = (state && state.locale === 'en') ? 'en' : 'de';
   return Promise.resolve({ result: locale });
 }
 
@@ -235,7 +453,7 @@ export function getSessionLocale() {
  * calling location.reload() after this resolves.
  * Invalid locale codes are silently ignored (result still echoes the code).
  */
-export function setLocale(localeCode) {
+export function setLocale(localeCode: string): Promise<{ result: string }> {
   if (localeCode !== 'de' && localeCode !== 'en') {
     return Promise.resolve({ result: localeCode });
   }
@@ -246,7 +464,7 @@ export function setLocale(localeCode) {
     op: 'setLocale',
     addr: state ? state.addr : '',
     locale: localeCode,
-    ts: clockNow()
+    ts: clockNow(),
   });
 
   return Promise.resolve({ result: localeCode });
@@ -260,7 +478,7 @@ export function setLocale(localeCode) {
  * (Game.js:1876), and schedules event emission for any charges that
  * completed during the away window.
  */
-export function loadGame() {
+export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameResponse> }> {
   var state = getState();
   var now = clockNow();
 
@@ -283,8 +501,9 @@ export function loadGame() {
   _clearAllChargeReady();
   var stillCharging = (seededState && seededState.nodes_charging) || [];
   for (var i = 0; i < stillCharging.length; i++) {
-    if (typeof stillCharging[i].charge_end === 'number') {
-      _scheduleChargeReady(stillCharging[i].charge_end, stillCharging[i].path);
+    var c = stillCharging[i];
+    if (c && typeof c.charge_end === 'number') {
+      _scheduleChargeReady(c.charge_end, c.path);
     }
   }
 
@@ -295,7 +514,8 @@ export function loadGame() {
   var events = mat.events;
   queueMicrotask(function () {
     for (var i = 0; i < events.length; i++) {
-      _emit(events[i].ev, events[i].pl);
+      var e = events[i];
+      if (e) _emit(e.ev, e.pl);
     }
   });
 
@@ -306,7 +526,7 @@ export function loadGame() {
 // Response builder
 // ---------------------------------------------------------------------------
 
-function _buildLoadGameResponse(state, now, isNewGame) {
+function _buildLoadGameResponse(state: LocalState, now: number, isNewGame: boolean) {
   var ruleset = _getRuleset();
 
   // type_registry: merged dict of all perp/token/powerup type definitions.
@@ -368,7 +588,9 @@ function _buildLoadGameResponse(state, now, isNewGame) {
   };
 }
 
-export function getProvidedPerps(gnodePath) {
+export function getProvidedPerps(
+  gnodePath: string
+): Promise<{ result: { error: number } | { buyable: string[] } }> {
   var state = getState();
   var nodes = (state && state.nodes) || [];
   var maps = _getNodeMaps(nodes);
@@ -393,27 +615,35 @@ export function getProvidedPerps(gnodePath) {
   return Promise.resolve({ result: { buyable: buyable } });
 }
 
-export function getPowerups(projectGestalt /*, version */) {
+interface PowerupListEntry {
+  game_gestalt: string;
+  game_type: string | undefined;
+  type_data: Record<string, unknown>;
+}
+
+export function getPowerups(
+  projectGestalt: string /*, version */
+): Promise<{ result: PowerupListEntry[] }> {
   var ruleset = _getRuleset();
   var def = ruleset.perps[projectGestalt];
   if (!def) return Promise.resolve({ result: [] });
 
-  var td = def.type_data || {};
-  var entries = [].concat(
-    td.provided_ads || [],
+  var td: PerpTypeData = def.type_data || {};
+  var entries: PowerupDef[] = (td.provided_ads || []).concat(
     td.provided_upgrades || [],
     td.provided_teammembers || []
   );
 
-  var result = [];
+  var result: PowerupListEntry[] = [];
   for (var i = 0; i < entries.length; i++) {
     var entry = entries[i];
+    if (!entry || typeof entry.gestalt !== 'string') continue;
     var puDef = ruleset.powerups[entry.gestalt];
     if (!puDef) continue;
     result.push({
       game_gestalt: entry.gestalt,
       game_type: puDef.game_type,
-      type_data: Object.assign({ gestalt: entry.gestalt }, puDef.type_data, entry)
+      type_data: Object.assign({ gestalt: entry.gestalt }, puDef.type_data || {}, entry),
     });
   }
 
@@ -429,24 +659,41 @@ export function getPowerups(projectGestalt /*, version */) {
 // site at Game.js:3352 (Topscore.fetchScore). Includes `spent` (cash_spent)
 // for the Investor tab registered in type_settings.js, and `level` as a
 // forward-facing field. Unknown types fall back to 'xp' with a console.warn.
-var _RANKING_FIELDS = { cash: 1, profiles: 1, xp: 1, level: 1, spent: 1 };
+type RankingField = 'cash' | 'profiles' | 'xp' | 'level' | 'spent';
+const _RANKING_FIELDS: Record<RankingField, true> = {
+  cash: true, profiles: true, xp: true, level: true, spent: true,
+};
 
-export function getRanking(type) {
+function _isRankingField(s: string): s is RankingField {
+  return Object.prototype.hasOwnProperty.call(_RANKING_FIELDS, s);
+}
+
+interface RankingRow {
+  addr: string;
+  display_name: string;
+  value: number;
+  self: boolean;
+}
+
+export function getRanking(
+  type: string
+): Promise<{ result: { top: RankingRow[]; user_rank: number } }> {
   var state = getState();
   var selfAddr = (state && state.addr) || '';
   var peers = (state && state.peers) || {};
 
-  if (!_RANKING_FIELDS[type]) {
+  if (!_isRankingField(type)) {
     console.warn('[getRanking] unknown type "' + type + '", falling back to xp');
   }
-  var field = _RANKING_FIELDS[type] ? type : 'xp';
+  var field: RankingField = _isRankingField(type) ? type : 'xp';
 
-  var rows = Object.keys(peers).map(function (addr) {
-    var p = peers[addr];
+  var rows: RankingRow[] = Object.keys(peers).map(function (addr) {
+    var p = peers[addr] || {};
+    var v = p[field];
     return {
       addr: addr,
       display_name: p.display_name || addr,
-      value: typeof p[field] === 'number' ? p[field] : 0,
+      value: typeof v === 'number' ? v : 0,
       self: addr === selfAddr,
     };
   });
@@ -455,7 +702,8 @@ export function getRanking(type) {
 
   var selfIdx = -1;
   for (var i = 0; i < rows.length; i++) {
-    if (rows[i].self) { selfIdx = i; break; }
+    var row = rows[i];
+    if (row && row.self) { selfIdx = i; break; }
   }
 
   var n = rows.length;
@@ -476,21 +724,23 @@ export function getRanking(type) {
 // don't repeat the kind/ts boilerplate.
 /**
  * Build a persisted delta object.
- * @param {string} addr
- * @param {string} op
- * @param {any[]} args
- * @param {any} result
- * @returns {Delta}
+ *
+ * TODO #147 follow-up: tighten Delta.args / Delta.result in state.ts so this
+ * function can construct the Delta directly without the type-erasure cast.
+ * The current shape `args?: any[] / result?: any` plus exactOptionalPropertyTypes
+ * means an `unknown[]` argument can't be assigned to `args` without the seam.
+ * Narrowing the Delta envelope is gated on typing the reducer family in
+ * state.ts, which the per-handler PRs (4-N) finish off.
  */
-function _mkDelta(addr, op, args, result) {
+function _mkDelta(addr: string, op: string, args: unknown[], result: unknown): Delta {
   return {
     kind:   'delta',
     addr:   addr,
     op:     op,
-    args:   args,
-    result: result,
-    ts:     clockNow()
-  };
+    args:   args as unknown[] as never[],
+    result: result as unknown,
+    ts:     clockNow(),
+  } as Delta;
 }
 
 // ---------------------------------------------------------------------------
@@ -500,7 +750,7 @@ function _mkDelta(addr, op, args, result) {
 // Printable Unicode, 1–30 chars; no ASCII control chars (< 0x20) or DEL (0x7f).
 var DISPLAY_NAME_RE = /^[^\x00-\x1f\x7f]{1,30}$/;
 
-function validateDisplayName(name) {
+function validateDisplayName(name: unknown): name is string {
   if (typeof name !== 'string') return false;
   return name.trim().length > 0 && DISPLAY_NAME_RE.test(name);
 }
@@ -516,7 +766,9 @@ function validateDisplayName(name) {
  * emits a delta so the change survives a reload.
  * Returns {} on success or {error: 0} on bad input / {error: 1} on internal fault.
  */
-export function setDisplayName(dname) {
+export function setDisplayName(
+  dname: unknown
+): Promise<{ result: Record<string, never> | { error: 0 | 1 } }> {
   if (!validateDisplayName(dname)) {
     return Promise.resolve({ result: { error: 0 } });
   }
@@ -539,7 +791,7 @@ export function setDisplayName(dname) {
  * Emits one delta covering all entries.  Always returns {result: 1} even when
  * some paths are not found (matches original server behaviour: Game.js:981).
  */
-export function setPerpCoordinates(updates) {
+export function setPerpCoordinates(updates: unknown): Promise<{ result: 1 }> {
   if (!Array.isArray(updates) || updates.length === 0) {
     return Promise.resolve({ result: 1 });
   }
@@ -549,8 +801,10 @@ export function setPerpCoordinates(updates) {
     return Promise.resolve({ result: 1 });
   }
 
-  // Build a lookup map: full_path → {x, y}
-  var coordMap = {};
+  // Build a lookup map: full_path → {x, y}.  Result is unused (the reducer
+  // walks `updates` itself) — we just validate each entry's shape here so
+  // malformed inputs are dropped before persistence.
+  var coordMap: Record<string, unknown> = {};
   for (var i = 0; i < updates.length; i++) {
     var entry = updates[i];
     if (!Array.isArray(entry) || entry.length < 2) continue;
@@ -570,13 +824,14 @@ export function setPerpCoordinates(updates) {
 // ---------------------------------------------------------------------------
 
 // Returns the matching level entry (or the last level for XP beyond the cap).
-function _findLevelByXP(levels, xp) {
+function _findLevelByXP(levels: LevelEntry[], xp: number): LevelEntry {
   for (var i = 0; i < levels.length; i++) {
-    if (xp >= levels[i].xp_min && xp <= levels[i].xp_max) {
-      return levels[i];
-    }
+    var lvl = levels[i];
+    if (lvl && xp >= lvl.xp_min && xp <= lvl.xp_max) return lvl;
   }
-  return levels[levels.length - 1];
+  var last = levels[levels.length - 1];
+  if (!last) throw new Error('_findLevelByXP: empty levels');
+  return last;
 }
 
 /**
@@ -585,14 +840,17 @@ function _findLevelByXP(levels, xp) {
  * Looks up the karmalauter in the ruleset, validates cash, applies increments,
  * and returns {game_values, [levelup]}.  No missions payload (handler-map.md).
  */
-export function buyKarma(karmalauterGestalt) {
+export function buyKarma(
+  karmalauterGestalt: string
+): Promise<{ result: { error: number } | { game_values: GameValues; levelup?: boolean } }> {
   var state = getState();
   var ruleset = _getRuleset();
 
-  var karmalauter = null;
+  var karmalauter: Karmalauter | null = null;
   for (var i = 0; i < ruleset.karmalauters.length; i++) {
-    if (ruleset.karmalauters[i].type_data.gestalt === karmalauterGestalt) {
-      karmalauter = ruleset.karmalauters[i];
+    var k = ruleset.karmalauters[i];
+    if (k && k.type_data.gestalt === karmalauterGestalt) {
+      karmalauter = k;
       break;
     }
   }
@@ -602,26 +860,27 @@ export function buyKarma(karmalauterGestalt) {
 
   var td = karmalauter.type_data;
   var gv = state.game_values;
+  var cashValue = gv.cash_value || 0;
 
-  if (gv.cash_value < td.price) {
+  if (cashValue < td.price) {
     return Promise.resolve({ result: { error: 2 } });
   }
 
   var newXp = (gv.xp_value || 0) + td.karma_points;
   var newKarma = Math.min(100, Math.max(-100, (gv.karma_value || 0) + td.karma_points));
-  var newCash = gv.cash_value - td.price;
+  var newCash = cashValue - td.price;
   var newCashSpent = (gv.cash_spent || 0) + td.price;
 
   var oldLevelNum = gv.xp_level || 1;
   var newLevel = _findLevelByXP(ruleset.levels, newXp);
   var levelup = newLevel.number > oldLevelNum;
 
-  var newGv = Object.assign({}, gv, {
+  var newGv: GameValues = Object.assign({}, gv, {
     xp_value: newXp,
     karma_value: newKarma,
     cash_value: newCash,
     cash_spent: newCashSpent,
-    xp_level: newLevel.number
+    xp_level: newLevel.number,
   });
 
   if (levelup) newGv.ap_snapshot = newLevel.ap_max;
@@ -643,7 +902,7 @@ export function buyKarma(karmalauterGestalt) {
     triggerAchievement('karma_devil', _t('achievement_karma_devil', _bkDisplayName));
   }
 
-  var response = { game_values: newGv };
+  var response: { game_values: GameValues; levelup?: boolean } = { game_values: newGv };
   if (levelup) response.levelup = true;
   return Promise.resolve({ result: response });
 }
@@ -654,34 +913,44 @@ export function buyKarma(karmalauterGestalt) {
 
 // Looks up a node by full_path and its ruleset type_data.  Returns
 // { state, nodeIdx, node, perpTypeData } or null when either is missing.
-function _resolveNode(perpPath) {
+interface ResolvedNode {
+  state: LocalState;
+  nodeIdx: number;
+  node: GameNode;
+  perpTypeData: PerpTypeData;
+}
+
+function _resolveNode(perpPath: string): ResolvedNode | null {
   var state = getState();
   var nodeIdx = -1;
   for (var i = 0; i < state.nodes.length; i++) {
-    if (state.nodes[i].full_path === perpPath) { nodeIdx = i; break; }
+    var n0 = state.nodes[i];
+    if (n0 && n0.full_path === perpPath) { nodeIdx = i; break; }
   }
   if (nodeIdx === -1) return null;
   var node = state.nodes[nodeIdx];
+  if (!node) return null;
   var ft = node.full_type || '';
   var colon = ft.indexOf(':');
   var perpGestalt = colon >= 0 ? ft.slice(colon + 1) : (node.gestalt || '');
   var perpTypeDef = _getRuleset().perps[perpGestalt];
-  if (!perpTypeDef) return null;
+  if (!perpTypeDef || !perpTypeDef.type_data) return null;
   return { state: state, nodeIdx: nodeIdx, node: node, perpTypeData: perpTypeDef.type_data };
 }
 
 // Searches provided_ads / provided_upgrades / provided_teammembers for a
 // powerup entry by gestalt.  O(P) where P = total provided entries.
-function _findPowerupDef(perpTypeData, powerupGestalt) {
-  var lists = [
+function _findPowerupDef(perpTypeData: PerpTypeData, powerupGestalt: string): PowerupDef | null {
+  var lists: Array<PowerupDef[] | undefined> = [
     perpTypeData.provided_ads,
     perpTypeData.provided_upgrades,
-    perpTypeData.provided_teammembers
+    perpTypeData.provided_teammembers,
   ];
   for (var i = 0; i < lists.length; i++) {
     var list = lists[i] || [];
     for (var j = 0; j < list.length; j++) {
-      if (list[j].gestalt === powerupGestalt) return list[j];
+      var entry = list[j];
+      if (entry && entry.gestalt === powerupGestalt) return entry;
     }
   }
   return null;
@@ -690,18 +959,33 @@ function _findPowerupDef(perpTypeData, powerupGestalt) {
 // Recomputes charge_cost / collect_amount / collect_risk from the perp's
 // base type_data values plus the cumulative modifiers of all active powerups.
 // Pre-indexes provided_* lists into a map so the powerup loop is O(N) not O(N×P).
-function _computeModifiers(perpTypeData, powerups) {
-  var defByGestalt = {};
-  var provided = [perpTypeData.provided_ads, perpTypeData.provided_upgrades, perpTypeData.provided_teammembers];
+interface ModifierResult {
+  charge_cost: number;
+  collect_amount: number;
+  collect_risk: number;
+}
+
+function _computeModifiers(perpTypeData: PerpTypeData, powerups: PowerupDef[]): ModifierResult {
+  var defByGestalt: Record<string, PowerupDef> = {};
+  var provided: Array<PowerupDef[] | undefined> = [
+    perpTypeData.provided_ads,
+    perpTypeData.provided_upgrades,
+    perpTypeData.provided_teammembers,
+  ];
   for (var k = 0; k < provided.length; k++) {
     var list = provided[k] || [];
-    for (var j = 0; j < list.length; j++) { defByGestalt[list[j].gestalt] = list[j]; }
+    for (var j = 0; j < list.length; j++) {
+      var entry = list[j];
+      if (entry && entry.gestalt) defByGestalt[entry.gestalt] = entry;
+    }
   }
   var chargeCost = perpTypeData.charge_cost || 0;
   var collectAmount = perpTypeData.collect_amount || 0;
   var collectRisk = perpTypeData.collect_risk || 0;
   for (var i = 0; i < powerups.length; i++) {
-    var puDef = defByGestalt[powerups[i].gestalt];
+    var pu = powerups[i];
+    if (!pu || !pu.gestalt) continue;
+    var puDef = defByGestalt[pu.gestalt];
     if (puDef) {
       chargeCost    += puDef.charge_cost_modifier    || 0;
       collectAmount += puDef.collect_amount_modifier || 0;
@@ -711,15 +995,17 @@ function _computeModifiers(perpTypeData, powerups) {
   return { charge_cost: chargeCost, collect_amount: collectAmount, collect_risk: collectRisk };
 }
 
-function _getLevelByXP(xp) {
+function _getLevelByXP(xp: number): number {
   var levels = _getRuleset().levels;
   for (var i = 0; i < levels.length; i++) {
-    if (xp >= levels[i].xp_min && xp <= levels[i].xp_max) return levels[i].number;
+    var lvl = levels[i];
+    if (lvl && xp >= lvl.xp_min && xp <= lvl.xp_max) return lvl.number;
   }
-  return levels[levels.length - 1].number;
+  var last = levels[levels.length - 1];
+  return last ? last.number : 1;
 }
 
-function _checkLevelup(currentLevel, newXp) {
+function _checkLevelup(currentLevel: number, newXp: number): boolean {
   return _getLevelByXP(newXp) > currentLevel;
 }
 
@@ -740,7 +1026,11 @@ function _checkLevelup(currentLevel, newXp) {
  * Errors: 0 = node/type not found, 1 = slot occupied, 3 = insufficient cash.
  * Returns: { node, game_values, levelup }
  */
-export function buyPowerup(perpPath, slot, gestalt) {
+export function buyPowerup(
+  perpPath: string,
+  slot: number,
+  gestalt: string
+): Promise<{ result: { error: number } | Record<string, unknown> }> {
   var r = _resolveNode(perpPath);
   if (!r) return Promise.resolve({ result: { error: 0 } });
   var state = r.state, nodeIdx = r.nodeIdx, node = r.node, perpTypeData = r.perpTypeData;
@@ -748,18 +1038,23 @@ export function buyPowerup(perpPath, slot, gestalt) {
   var puDef = _findPowerupDef(perpTypeData, gestalt);
   if (!puDef) return Promise.resolve({ result: { error: 0 } });
 
-  var powerups = node.instance_data.powerups || [];
+  var idata: NodeInstanceData = node.instance_data || {};
+  var powerups: PowerupDef[] = idata.powerups || [];
   var puGameType = _gameTypeFrom(puDef.full_type);
   for (var i = 0; i < powerups.length; i++) {
-    if (powerups[i].slot === slot && _gameTypeFrom(powerups[i].full_type) === puGameType) {
+    var pi = powerups[i];
+    if (pi && pi.slot === slot && _gameTypeFrom(pi.full_type) === puGameType) {
       return Promise.resolve({ result: { error: 1 } });
     }
   }
 
   var price = puDef.price || 0;
-  if (state.game_values.cash_value < price) return Promise.resolve({ result: { error: 3 } });
+  var cashValue = state.game_values.cash_value || 0;
+  if (cashValue < price) return Promise.resolve({ result: { error: 3 } });
 
-  var newPowerups = powerups.concat([{ slot: slot, gestalt: gestalt, full_type: puDef.full_type }]);
+  var addedPu: PowerupDef = { slot: slot, gestalt: gestalt };
+  if (puDef.full_type !== undefined) addedPu.full_type = puDef.full_type;
+  var newPowerups: PowerupDef[] = powerups.concat([addedPu]);
   var mods = _computeModifiers(perpTypeData, newPowerups);
 
   var newInstanceData = Object.assign({}, node.instance_data, {
@@ -767,17 +1062,17 @@ export function buyPowerup(perpPath, slot, gestalt) {
     charge_cost:    mods.charge_cost,
     collect_amount: mods.collect_amount,
     collect_risk:   mods.collect_risk,
-    tokens:         perpTypeData.tokens || []
+    tokens:         perpTypeData.tokens || [],
   });
 
-  var newXp = state.game_values.xp_value + (perpTypeData.xp_inc || 1);
-  var levelup = _checkLevelup(state.game_values.xp_level, newXp);
+  var newXp = (state.game_values.xp_value || 0) + (perpTypeData.xp_inc || 1);
+  var levelup = _checkLevelup(state.game_values.xp_level || 1, newXp);
 
-  var newGameValues = Object.assign({}, state.game_values, {
-    cash_value:  state.game_values.cash_value - price,
+  var newGameValues: GameValues = Object.assign({}, state.game_values, {
+    cash_value:  cashValue - price,
     cash_spent:  (state.game_values.cash_spent  || 0) + price,
     xp_value:    newXp,
-    karma_value: (state.game_values.karma_value || 0) + 1
+    karma_value: (state.game_values.karma_value || 0) + 1,
   });
   if (levelup) newGameValues.xp_level = _getLevelByXP(newXp);
 
@@ -790,10 +1085,12 @@ export function buyPowerup(perpPath, slot, gestalt) {
 
   var responseNode = {
     game_id: node.game_id, game_type: node.game_type,
-    full_path: node.full_path, instance_data: newInstanceData
+    full_path: node.full_path, instance_data: newInstanceData,
   };
-  var result = { node: responseNode, game_values: newGameValues, levelup: levelup,
-                 missions: puMissionResult.missions || null };
+  var result = {
+    node: responseNode, game_values: newGameValues, levelup: levelup,
+    missions: puMissionResult.missions || null,
+  };
 
   _persistDelta(_mkDelta(state.addr, 'buyPowerup',
     [perpPath, slot, gestalt], result));
@@ -804,13 +1101,15 @@ export function buyPowerup(perpPath, slot, gestalt) {
     triggerAchievement('levelup',
       _t('achievement_levelup', _bpuDisplayName, String(newGameValues.xp_level)));
   }
-  var _bpuCompletedMissions = puMissionResult.missions && puMissionResult.missions.complete_missions || [];
+  var _bpuCompletedMissions = (puMissionResult.missions && puMissionResult.missions.complete_missions) || [];
   for (var _bpuMi = 0; _bpuMi < _bpuCompletedMissions.length; _bpuMi++) {
-    var _bpuMDef = _findMissionDef(_getRuleset(), _bpuCompletedMissions[_bpuMi]);
-    var _bpuMTitle = (_bpuMDef && _bpuMDef.type_data && _bpuMDef.type_data.title) || _bpuCompletedMissions[_bpuMi];
+    var mGestalt = _bpuCompletedMissions[_bpuMi];
+    if (typeof mGestalt !== 'string') continue;
+    var _bpuMDef = _findMissionDef(_getRuleset(), mGestalt);
+    var _bpuMTitle = (_bpuMDef && _bpuMDef.type_data && _bpuMDef.type_data.title) || mGestalt;
     triggerAchievement('mission_done',
       _t('achievement_mission_done', _bpuDisplayName, _bpuMTitle),
-      { mission: _bpuCompletedMissions[_bpuMi] });
+      { mission: mGestalt });
   }
   var _bpuOldKarma = state.game_values.karma_value || 0;
   var _bpuNewKarma = newGameValues.karma_value || 0;
@@ -832,23 +1131,29 @@ export function buyPowerup(perpPath, slot, gestalt) {
  * Errors: 0 = node/type not found, 1 = slot not occupied.
  * Returns: { node, game_values, levelup }
  */
-export function sellPowerup(perpPath, slot, gestalt) {
+export function sellPowerup(
+  perpPath: string,
+  slot: number,
+  gestalt: string
+): Promise<{ result: { error: number } | Record<string, unknown> }> {
   var r = _resolveNode(perpPath);
   if (!r) return Promise.resolve({ result: { error: 0 } });
   var state = r.state, nodeIdx = r.nodeIdx, node = r.node, perpTypeData = r.perpTypeData;
 
-  var powerups = node.instance_data.powerups || [];
-  var puEntry = null;
+  var idata: NodeInstanceData = node.instance_data || {};
+  var powerups: PowerupDef[] = idata.powerups || [];
+  var puEntry: PowerupDef | null = null;
   for (var i = 0; i < powerups.length; i++) {
-    if (powerups[i].slot === slot) { puEntry = powerups[i]; break; }
+    var p0 = powerups[i];
+    if (p0 && p0.slot === slot) { puEntry = p0; break; }
   }
   if (!puEntry) return Promise.resolve({ result: { error: 1 } });
 
-  var puDef = _findPowerupDef(perpTypeData, puEntry.gestalt);
+  var puDef = puEntry.gestalt ? _findPowerupDef(perpTypeData, puEntry.gestalt) : null;
   var price = puDef ? (puDef.price || 0) : 0;
   var refund = Math.floor(price * 0.75);
 
-  var newPowerups = powerups.filter(function (p) { return p.slot !== slot; });
+  var newPowerups: PowerupDef[] = powerups.filter(function (p) { return p && p.slot !== slot; });
   var mods = _computeModifiers(perpTypeData, newPowerups);
 
   var newInstanceData = Object.assign({}, node.instance_data, {
@@ -856,15 +1161,15 @@ export function sellPowerup(perpPath, slot, gestalt) {
     charge_cost:    mods.charge_cost,
     collect_amount: mods.collect_amount,
     collect_risk:   mods.collect_risk,
-    tokens:         perpTypeData.tokens || []
+    tokens:         perpTypeData.tokens || [],
   });
 
-  var newXp = state.game_values.xp_value + 1;
-  var levelup = _checkLevelup(state.game_values.xp_level, newXp);
+  var newXp = (state.game_values.xp_value || 0) + 1;
+  var levelup = _checkLevelup(state.game_values.xp_level || 1, newXp);
 
-  var newGameValues = Object.assign({}, state.game_values, {
-    cash_value: state.game_values.cash_value + refund,
-    xp_value:   newXp
+  var newGameValues: GameValues = Object.assign({}, state.game_values, {
+    cash_value: (state.game_values.cash_value || 0) + refund,
+    xp_value:   newXp,
   });
   if (levelup) newGameValues.xp_level = _getLevelByXP(newXp);
 
@@ -873,7 +1178,7 @@ export function sellPowerup(perpPath, slot, gestalt) {
 
   var responseNode = {
     game_id: node.game_id, game_type: node.game_type,
-    full_path: node.full_path, instance_data: newInstanceData
+    full_path: node.full_path, instance_data: newInstanceData,
   };
   var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
 
@@ -901,40 +1206,51 @@ export function sellPowerup(perpPath, slot, gestalt) {
  * Errors: 0 = node/type not found, 2 = would exceed max slots, 3 = no cash.
  * Returns: { node, game_values, levelup }
  */
-export function buySlots(perpPath, slotType, num) {
-  num = parseInt(num, 10) || 1;
+export function buySlots(
+  perpPath: string,
+  slotType: string,
+  num: number | string
+): Promise<{ result: { error: number } | Record<string, unknown> }> {
+  var nNum = parseInt(String(num), 10) || 1;
   var r = _resolveNode(perpPath);
   if (!r) return Promise.resolve({ result: { error: 0 } });
   var state = r.state, nodeIdx = r.nodeIdx, node = r.node, perpTypeData = r.perpTypeData;
   var slotKey = slotType + '_slots';
   var maxKey  = 'max_' + slotType + '_slots';
 
-  var currentSlots = (node.instance_data[slotKey] !== undefined)
-    ? node.instance_data[slotKey]
-    : (perpTypeData[slotKey] || 0);
-  var maxSlots = perpTypeData[maxKey] != null ? perpTypeData[maxKey] : Infinity;
+  // PerpTypeData / NodeInstanceData both whitelist their typed fields and
+  // fall through to `[key: string]: unknown` for the long tail. The slot
+  // counters are constructed from `slotType` at runtime so they live on the
+  // open-ended portion — read once via _readNumber and the rest of the
+  // function works on plain `number` values.
+  var currentSlots: number =
+    _readNumber(node.instance_data, slotKey) ??
+    _readNumber(perpTypeData, slotKey) ??
+    0;
+  var maxSlots: number = _readNumber(perpTypeData, maxKey) ?? Infinity;
 
-  if (currentSlots + num > maxSlots) return Promise.resolve({ result: { error: 2 } });
+  if (currentSlots + nNum > maxSlots) return Promise.resolve({ result: { error: 2 } });
 
   var slotCost = perpTypeData.slot_cost || 0;
   var slotCostModifier = perpTypeData.slot_cost_modifier || 0;
   var totalCost = 0;
-  for (var i = 0; i < num; i++) {
+  for (var i = 0; i < nNum; i++) {
     totalCost += slotCost + slotCostModifier * (currentSlots + i);
   }
 
-  if (state.game_values.cash_value < totalCost) return Promise.resolve({ result: { error: 3 } });
+  var cashValue = state.game_values.cash_value || 0;
+  if (cashValue < totalCost) return Promise.resolve({ result: { error: 3 } });
 
-  var newInstanceData = Object.assign({}, node.instance_data);
-  newInstanceData[slotKey] = currentSlots + num;
+  var newInstanceData: NodeInstanceData = Object.assign({}, node.instance_data);
+  newInstanceData[slotKey] = currentSlots + nNum;
 
-  var newXp = state.game_values.xp_value + 1;
-  var levelup = _checkLevelup(state.game_values.xp_level, newXp);
+  var newXp = (state.game_values.xp_value || 0) + 1;
+  var levelup = _checkLevelup(state.game_values.xp_level || 1, newXp);
 
-  var newGameValues = Object.assign({}, state.game_values, {
-    cash_value: state.game_values.cash_value - totalCost,
+  var newGameValues: GameValues = Object.assign({}, state.game_values, {
+    cash_value: cashValue - totalCost,
     cash_spent: (state.game_values.cash_spent || 0) + totalCost,
-    xp_value:   newXp
+    xp_value:   newXp,
   });
   if (levelup) newGameValues.xp_level = _getLevelByXP(newXp);
 
@@ -943,12 +1259,12 @@ export function buySlots(perpPath, slotType, num) {
 
   var responseNode = {
     game_id: node.game_id, game_type: node.game_type,
-    full_path: node.full_path, instance_data: newInstanceData
+    full_path: node.full_path, instance_data: newInstanceData,
   };
   var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
 
   _persistDelta(_mkDelta(state.addr, 'buySlots',
-    [perpPath, slotType, num], result));
+    [perpPath, slotType, nNum], result));
 
   if (levelup) {
     var _bsDisplayName = state.display_name || state.addr;
@@ -974,15 +1290,35 @@ export function buySlots(perpPath, slotType, num) {
  *   3 — ProxyPerp slot limit reached
  *   4 — already purchased under this parent
  */
-export function buyPerp(parentPath, gestalt) {
+interface BuyPerpProfileSetPayload {
+  profile_set: { profiles_value: number; tokens_map: Record<string, { amount: number }> };
+  origin: string;
+  collect_id: string;
+}
+
+interface BuyPerpPayload {
+  node: GameNode;
+  game_values: GameValues;
+  levelup: boolean;
+  node_counter: number;
+  missions: MissionUpdate | null;
+  profile_set?: BuyPerpProfileSetPayload;
+}
+
+export function buyPerp(
+  parentPath: string,
+  gestalt: string
+): Promise<{ result: { error: number } | BuyPerpPayload }> {
   var state = getState();
   var ruleset = _getRuleset();
-  var allTypes = Object.assign({}, ruleset.perps, ruleset.tokens);
+  var allTypes: Record<string, PerpDef> = Object.assign(
+    {}, ruleset.perps, ruleset.tokens
+  );
 
   var perpDef = allTypes[gestalt];
   if (!perpDef) { return Promise.resolve({ result: { error: 1 } }); }
-  var typeData = perpDef.type_data || {};
-  var gameType = perpDef.game_type;
+  var typeData: PerpTypeData = perpDef.type_data || {};
+  var gameType = perpDef.game_type || '';
 
   var gv = state.game_values || {};
   var currentLevel = gv.xp_level || 1;
@@ -992,18 +1328,19 @@ export function buyPerp(parentPath, gestalt) {
   // Roots ("Imperium", "Database") are always valid.  Other paths are checked
   // against state.nodes; if not found we still allow the call (single-tenant,
   // client already guards this) so that pre-loaded seed nodes don't block buys.
-  var parentNode = null;
+  var parentNode: GameNode | null = null;
   if (parentPath !== 'Imperium' && parentPath !== 'Database') {
     var nodes = state.nodes || [];
     for (var ni = 0; ni < nodes.length; ni++) {
-      if (nodes[ni].full_path === parentPath) { parentNode = nodes[ni]; break; }
+      var pn = nodes[ni];
+      if (pn && pn.full_path === parentPath) { parentNode = pn; break; }
     }
   }
 
   // Only validate provided_perps when we can resolve the parent's type definition.
   var parentGestalt = parentNode ? (parentNode.gestalt || '') : '';
   var parentTypeDef = parentGestalt ? allTypes[parentGestalt] : null;
-  var parentTypeData = parentTypeDef ? (parentTypeDef.type_data || {}) : null;
+  var parentTypeData: PerpTypeData | null = parentTypeDef ? (parentTypeDef.type_data || {}) : null;
 
   if (parentTypeData && Array.isArray(parentTypeData.provided_perps)) {
     if (parentTypeData.provided_perps.indexOf(gestalt) === -1) {
@@ -1012,53 +1349,57 @@ export function buyPerp(parentPath, gestalt) {
   }
 
   if (parentNode && parentNode.game_type === 'ProxyPerp') {
-    var maxSlots = (parentTypeData && parentTypeData.max_slots) || 0;
+    var maxSlots: number = (parentTypeData && parentTypeData.max_slots) || 0;
     var childPrefix = parentPath + '.';
     var childCount = 0;
     var allNodes = state.nodes || [];
     for (var ci = 0; ci < allNodes.length; ci++) {
-      if (allNodes[ci].full_path.indexOf(childPrefix) === 0) { childCount++; }
+      var an = allNodes[ci];
+      if (an && an.full_path.indexOf(childPrefix) === 0) { childCount++; }
     }
     if (childCount >= maxSlots) { return Promise.resolve({ result: { error: 3 } }); }
   }
 
   var price = typeof typeData.price === 'number' ? typeData.price : 0;
-  if (gv.cash_value < price) { return Promise.resolve({ result: { error: 2 } }); }
+  var cashValue = gv.cash_value || 0;
+  if (cashValue < price) { return Promise.resolve({ result: { error: 2 } }); }
 
   var newFullPath = parentPath + '.' + gestalt;
   var stateNodes = state.nodes || [];
   for (var di = 0; di < stateNodes.length; di++) {
-    if (stateNodes[di].full_path === newFullPath) {
+    var sn = stateNodes[di];
+    if (sn && sn.full_path === newFullPath) {
       return Promise.resolve({ result: { error: 4 } });
     }
   }
 
   var nodeCounter = (state.node_counter || 0) + 1;
-  var newNode = {
+  var newNode: GameNode = {
     // game_id == gestalt (last path segment); see _seedNodesFromTree for invariant.
     game_id: gestalt,
     game_type: gameType,
     full_type: gameType + ':' + gestalt,
     gestalt: gestalt,
     full_path: newFullPath,
-    instance_data: {}
+    instance_data: {},
   };
 
   var xpInc = typeof typeData.xp_inc === 'number' ? typeData.xp_inc : 0;
   var profilesMaxInc = typeof typeData.profiles_max === 'number' ? typeData.profiles_max : 0;
-  var newGv = Object.assign({}, gv, {
-    cash_value: gv.cash_value - price,
+  var newGv: GameValues = Object.assign({}, gv, {
+    cash_value: cashValue - price,
     cash_spent: (gv.cash_spent || 0) + price,
     xp_value: (gv.xp_value || 0) + xpInc,
-    profiles_max: (gv.profiles_max || 0) + profilesMaxInc
+    profiles_max: (gv.profiles_max || 0) + profilesMaxInc,
   });
 
   var oldLevel = gv.xp_level || 1;
-  var newLevel = _getLevelByXP(newGv.xp_value);
+  var newLevel = _getLevelByXP(newGv.xp_value || 0);
   var levelup = newLevel > oldLevel;
   if (levelup) {
     newGv = Object.assign({}, newGv, { xp_level: newLevel });
-    var levelInfo = ruleset.levels[newLevel - 1];
+    var levelInfo = ruleset.levels[newLevel - 1] as
+      (LevelEntry & { ap_inc_value?: number; ap_inc_interval?: number }) | undefined;
     if (levelInfo) {
       newGv = Object.assign({}, newGv, {
         ap_inc_value: levelInfo.ap_inc_value,
@@ -1068,7 +1409,7 @@ export function buyPerp(parentPath, gestalt) {
         // matches buyKarma/chargePerp behaviour. Without this, ap_snapshot
         // stayed at the previous level's value while ap_max grew, so the AP
         // bar visibly under-filled after a buyPerp-triggered level.
-        ap_snapshot: levelInfo.ap_max
+        ap_snapshot: levelInfo.ap_max,
       });
     }
   }
@@ -1078,8 +1419,7 @@ export function buyPerp(parentPath, gestalt) {
 
   // profile_set for project*/contact*/city* gestalts:
   // initial data batch pushed to db_queue; city-buy path also read by Game.js:3816.
-  var profileSetPayload = null;
-  var newDbQueue = (state.db_queue || []).slice();
+  var profileSetPayload: BuyPerpProfileSetPayload | null = null;
   var isProfileGestalt = (
     gestalt.indexOf('project') === 0 ||
     gestalt.indexOf('contact') === 0 ||
@@ -1087,22 +1427,28 @@ export function buyPerp(parentPath, gestalt) {
   );
   if (isProfileGestalt) {
     var collectId = 'cq_' + nodeCounter;
-    var tokensMap = {};
+    var tokensMap: Record<string, { amount: number }> = {};
     var tokList = typeData.tokens || [];
     for (var ti = 0; ti < tokList.length; ti++) {
-      tokensMap[tokList[ti].gestalt] = { amount: tokList[ti].amount };
+      var tk = tokList[ti];
+      if (tk && typeof tk.gestalt === 'string') {
+        tokensMap[tk.gestalt] = { amount: tk.amount || 0 };
+      }
     }
-    var profilesValue = typeof typeData.profileset_size === 'number'
+    var profilesValue: number = typeof typeData.profileset_size === 'number'
       ? typeData.profileset_size
       : (typeof typeData.collect_amount === 'number' ? typeData.collect_amount : 0);
     var generatedProfileSet = { profiles_value: profilesValue, tokens_map: tokensMap };
     profileSetPayload = { profile_set: generatedProfileSet, origin: newFullPath, collect_id: collectId };
-    newDbQueue = newDbQueue.concat([{ origin: newFullPath, collect_id: collectId, profile_set: generatedProfileSet }]);
   }
 
-  var payload = { node: newNode, game_values: newGv, levelup: levelup,
-                  node_counter: nodeCounter,
-                  missions: missionResult.missions || null };
+  var payload: BuyPerpPayload = {
+    node: newNode,
+    game_values: newGv,
+    levelup: levelup,
+    node_counter: nodeCounter,
+    missions: missionResult.missions || null,
+  };
   if (profileSetPayload) { payload.profile_set = profileSetPayload; }
 
   _persistDelta(_mkDelta(state.addr, 'buyPerp', [parentPath, gestalt], payload));
@@ -1113,19 +1459,21 @@ export function buyPerp(parentPath, gestalt) {
     triggerAchievement('levelup',
       _t('achievement_levelup', _bpDisplayName, String(newGv.xp_level)));
   }
-  var _bpCompletedMissions = missionResult.missions && missionResult.missions.complete_missions || [];
+  var _bpCompletedMissions = (missionResult.missions && missionResult.missions.complete_missions) || [];
   for (var _bpMi = 0; _bpMi < _bpCompletedMissions.length; _bpMi++) {
-    var _bpMDef = _findMissionDef(_getRuleset(), _bpCompletedMissions[_bpMi]);
-    var _bpMTitle = (_bpMDef && _bpMDef.type_data && _bpMDef.type_data.title) || _bpCompletedMissions[_bpMi];
+    var mGestalt = _bpCompletedMissions[_bpMi];
+    if (typeof mGestalt !== 'string') continue;
+    var _bpMDef = _findMissionDef(_getRuleset(), mGestalt);
+    var _bpMTitle = (_bpMDef && _bpMDef.type_data && _bpMDef.type_data.title) || mGestalt;
     triggerAchievement('mission_done',
       _t('achievement_mission_done', _bpDisplayName, _bpMTitle),
-      { mission: _bpCompletedMissions[_bpMi] });
+      { mission: mGestalt });
   }
 
   return Promise.resolve({ result: payload });
 }
 
-function _findMissionDef(ruleset, gestalt) {
+function _findMissionDef(ruleset: Ruleset, gestalt: string): MissionDef | null {
   if (!ruleset || !ruleset.missions || !gestalt) return null;
   for (var i = 0; i < ruleset.missions.length; i++) {
     var def = ruleset.missions[i];
@@ -1135,26 +1483,27 @@ function _findMissionDef(ruleset, gestalt) {
 }
 
 // Canonical mission-goal row shape. One source so adding a field touches one place.
-function _seedGoalRow(missionGestalt, g) {
-  return {
+function _seedGoalRow(missionGestalt: string, g: GoalDef): MissionGoal {
+  var row: MissionGoal = {
     mission: missionGestalt,
-    workflow: g.workflow,
-    target: g.target,
-    amount: g.amount,
-    position: g.position,
+    workflow: g.workflow || '',
+    target: g.target || '',
+    amount: g.amount || 0,
     current_amount: 0,
-    complete: false
+    complete: false,
   };
+  if (typeof g.position === 'number') row.position = g.position;
+  return row;
 }
 
-function _completeGoal(goal) {
+function _completeGoal(goal: MissionGoal): MissionGoal {
   return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
 }
 
 // Returns the same array reference when nothing changed so callers can use
 // reference equality to detect whether any repairs were made.
-function _autoCompleteBuyPerpGoals(goals, nodes) {
-  var owned = {};
+function _autoCompleteBuyPerpGoals(goals: MissionGoal[], nodes: GameNode[] | undefined): MissionGoal[] {
+  var owned: Record<string, true> = {};
   (nodes || []).forEach(function (n) { if (n.gestalt) owned[n.gestalt] = true; });
   var changed = false;
   var result = goals.map(function (g) {
@@ -1165,27 +1514,35 @@ function _autoCompleteBuyPerpGoals(goals, nodes) {
   return changed ? result : goals;
 }
 
+function _eachMissionDef(ruleset: Ruleset, fn: (def: MissionDef) => void): void {
+  if (!ruleset.missions) return;
+  for (var i = 0; i < ruleset.missions.length; i++) {
+    var d = ruleset.missions[i];
+    if (d) fn(d);
+  }
+}
+
 // Without this, fresh games (or saves activated by legacy code) have empty
 // mission_goals and progression handlers find nothing to advance.
-function _seedMissionGoals(state) {
+function _seedMissionGoals(state: LocalState): LocalState {
   var activeMissions = state.active_missions || [];
   if (!activeMissions.length) return state;
   var ruleset = _getRuleset();
   if (!ruleset || !ruleset.missions) return state;
 
   var existingGoals = state.mission_goals || [];
-  var existingByMission = {};
+  var existingByMission: Record<string, true> = {};
   existingGoals.forEach(function (g) {
     existingByMission[g.mission] = true;
   });
 
-  var newGoals = existingGoals.slice();
+  var newGoals: MissionGoal[] = existingGoals.slice();
   var added = false;
   activeMissions.forEach(function (mGestalt) {
     if (existingByMission[mGestalt]) return;
     var mDef = _findMissionDef(ruleset, mGestalt);
     if (!mDef || !mDef.type_data || !mDef.type_data.goals) return;
-    mDef.type_data.goals.forEach(function (g) {
+    mDef.type_data.goals.forEach(function (g: GoalDef) {
       newGoals.push(_seedGoalRow(mGestalt, g));
       added = true;
     });
@@ -1200,17 +1557,23 @@ function _seedMissionGoals(state) {
 
 // current_amount math mirrors TokenPerp.setAmount → DBTokensAbsolute
 // (Game.js:5439) so the LocalEngine and UI agree on completion.
-function _advanceIntegrateProfilesMissions(state, profilesValue, nodes) {
+function _advanceIntegrateProfilesMissions(
+  state: LocalState,
+  profilesValue: number,
+  nodes: GameNode[] | undefined
+): MissionAdvanceResult {
   var goals = state.mission_goals || [];
   var activeMissions = state.active_missions || [];
   if (!goals.length || !activeMissions.length) {
     return { missions: null, mission_goals: goals, active_missions: activeMissions };
   }
 
-  var amountByGestalt = {};
+  var amountByGestalt: Record<string, number> = {};
   (nodes || []).forEach(function (n) {
     if (n.game_type === 'TokenPerp' && n.gestalt && n.instance_data) {
-      amountByGestalt[n.gestalt] = n.instance_data.amount || 0;
+      var idata: NodeInstanceData = n.instance_data || {};
+      var amt = idata.amount;
+      amountByGestalt[n.gestalt] = typeof amt === 'number' ? amt : 0;
     }
   });
 
@@ -1227,7 +1590,7 @@ function _advanceIntegrateProfilesMissions(state, profilesValue, nodes) {
     changed = true;
     return Object.assign({}, goal, {
       current_amount: newAmount,
-      complete: newAmount >= goal.amount
+      complete: newAmount >= goal.amount,
     });
   });
 
@@ -1238,7 +1601,11 @@ function _advanceIntegrateProfilesMissions(state, profilesValue, nodes) {
   return _completeMissionsIfReady(updatedGoals, activeMissions);
 }
 
-function _advanceCollectProfilesMissions(state, contactGestalt, profilesCollected) {
+function _advanceCollectProfilesMissions(
+  state: LocalState,
+  contactGestalt: string,
+  profilesCollected: number
+): MissionAdvanceResult {
   var goals = state.mission_goals || [];
   var activeMissions = state.active_missions || [];
   if (!goals.length || !activeMissions.length || !profilesCollected || !contactGestalt) {
@@ -1255,7 +1622,7 @@ function _advanceCollectProfilesMissions(state, contactGestalt, profilesCollecte
     changed = true;
     return Object.assign({}, goal, {
       current_amount: newAmount,
-      complete: newAmount >= goal.amount
+      complete: newAmount >= goal.amount,
     });
   });
 
@@ -1266,9 +1633,12 @@ function _advanceCollectProfilesMissions(state, contactGestalt, profilesCollecte
   return _completeMissionsIfReady(updatedGoals, activeMissions);
 }
 
-function _completeMissionsIfReady(updatedGoals, activeMissions) {
+function _completeMissionsIfReady(
+  updatedGoals: MissionGoal[],
+  activeMissions: string[]
+): MissionAdvanceResult {
   var ruleset = _getRuleset();
-  var completed = [];
+  var completed: string[] = [];
   var stillActive = activeMissions.filter(function (mGestalt) {
     var goals = updatedGoals.filter(function (g) { return g.mission === mGestalt; });
     if (!goals.length) return true;
@@ -1281,15 +1651,17 @@ function _completeMissionsIfReady(updatedGoals, activeMissions) {
 
   var newActive = stillActive.slice();
   if (ruleset && ruleset.missions && completed.length) {
-    ruleset.missions.forEach(function (def) {
-      if (!def || !def.type_data) return;
-      var req = def.type_data.required_mission;
-      var gestalt = def.type_data.gestalt;
+    _eachMissionDef(ruleset, function (def) {
+      var td = def.type_data;
+      if (!td) return;
+      var req = td.required_mission;
+      var gestalt = td.gestalt;
       if (!req || !gestalt || newActive.indexOf(gestalt) !== -1) return;
       if (completed.indexOf(req) === -1) return;
-      newActive.push(gestalt);
-      (def.type_data.goals || []).forEach(function (g) {
-        updatedGoals = updatedGoals.concat([_seedGoalRow(gestalt, g)]);
+      var seededGestalt: string = gestalt;
+      newActive.push(seededGestalt);
+      (td.goals || []).forEach(function (g) {
+        updatedGoals = updatedGoals.concat([_seedGoalRow(seededGestalt, g)]);
       });
     });
     // Auto-complete buy_perp goals for items the player already owns so a
@@ -1308,28 +1680,36 @@ function _completeMissionsIfReady(updatedGoals, activeMissions) {
       updated_missions: updatedMissions,
       mission_data: {
         active_missions: newActive,
-        mission_goals: updatedGoals
-      }
+        mission_goals: updatedGoals,
+      },
     },
     rewards: _collectMissionRewards(ruleset, completed),
     mission_goals: updatedGoals,
-    active_missions: newActive
+    active_missions: newActive,
   };
 }
 
 // Sums up cash / xp / karma rewards across the just-completed missions so
 // the caller can fold them into the new game_values. Without this, mission
 // completion notifications fire but the player never sees the payout.
-function _collectMissionRewards(ruleset, completedGestalts) {
-  var totals = { cash_value: 0, xp_value: 0, karma_value: 0, profiles_max: 0 };
+type RewardKey = 'cash_value' | 'xp_value' | 'karma_value' | 'profiles_max';
+type RewardTotals = Record<RewardKey, number>;
+
+function _isRewardKey(s: string): s is RewardKey {
+  return s === 'cash_value' || s === 'xp_value' || s === 'karma_value' || s === 'profiles_max';
+}
+
+function _collectMissionRewards(ruleset: Ruleset, completedGestalts: string[]): RewardTotals {
+  var totals: RewardTotals = { cash_value: 0, xp_value: 0, karma_value: 0, profiles_max: 0 };
   if (!completedGestalts.length || !ruleset || !ruleset.missions) return totals;
   completedGestalts.forEach(function (mGestalt) {
     var def = _findMissionDef(ruleset, mGestalt);
     var rewards = (def && def.type_data && def.type_data.rewards) || [];
     rewards.forEach(function (r) {
       if (!r || typeof r.amount !== 'number') return;
-      if (Object.prototype.hasOwnProperty.call(totals, r.target)) {
-        totals[r.target] += r.amount;
+      var t = r.target;
+      if (t && _isRewardKey(t)) {
+        totals[t] += r.amount;
       }
     });
   });
@@ -1338,7 +1718,7 @@ function _collectMissionRewards(ruleset, completedGestalts) {
 
 // Folds reward totals into a fresh game_values object, clamping karma to
 // [-100, 100] to match the integrate/karmalizer math.
-function _applyRewardsToGv(gv, rewards) {
+function _applyRewardsToGv(gv: GameValues, rewards: RewardSet | undefined): GameValues {
   if (!rewards) return gv;
   return Object.assign({}, gv, {
     cash_value:   (gv.cash_value   || 0) + (rewards.cash_value   || 0),
@@ -1349,7 +1729,7 @@ function _applyRewardsToGv(gv, rewards) {
   });
 }
 
-function _advanceChargePerpMissions(state, gestalt) {
+function _advanceChargePerpMissions(state: LocalState, gestalt: string): MissionAdvanceResult {
   var activeMissions = state.active_missions || [];
   var missionGoals = state.mission_goals || [];
 
@@ -1373,7 +1753,7 @@ function _advanceChargePerpMissions(state, gestalt) {
   return _completeMissionsIfReady(updatedGoals, activeMissions);
 }
 
-function _advanceBuyPowerupMissions(state, powerupGestalt) {
+function _advanceBuyPowerupMissions(state: LocalState, powerupGestalt: string): MissionAdvanceResult {
   var activeMissions = state.active_missions || [];
   var missionGoals = state.mission_goals || [];
 
@@ -1397,7 +1777,7 @@ function _advanceBuyPowerupMissions(state, powerupGestalt) {
   return _completeMissionsIfReady(updatedGoals, activeMissions);
 }
 
-function _advanceUpgradeTokenMissions(state, tokenGestalt) {
+function _advanceUpgradeTokenMissions(state: LocalState, tokenGestalt: string): MissionAdvanceResult {
   var activeMissions = state.active_missions || [];
   var missionGoals = state.mission_goals || [];
 
@@ -1425,7 +1805,7 @@ function _advanceUpgradeTokenMissions(state, tokenGestalt) {
  * Advance any active mission goals that have workflow==='buy_perp' and
  * target===gestalt.  Pure; does not mutate state.
  */
-function _advanceBuyPerpMissions(state, gestalt) {
+function _advanceBuyPerpMissions(state: LocalState, gestalt: string): MissionAdvanceResult {
   var activeMissions = state.active_missions || [];
   var missionGoals = state.mission_goals || [];
 
@@ -1452,7 +1832,11 @@ function _advanceBuyPerpMissions(state, gestalt) {
   return _completeMissionsIfReady(updatedGoals, activeMissions);
 }
 
-function _advanceCollectCashMissions(state, gestalt, cashGain) {
+function _advanceCollectCashMissions(
+  state: LocalState,
+  gestalt: string,
+  cashGain: number
+): MissionAdvanceResult {
   var activeMissions = state.active_missions || [];
   var missionGoals = state.mission_goals || [];
 
@@ -1470,7 +1854,7 @@ function _advanceCollectCashMissions(state, gestalt, cashGain) {
     changed = true;
     return Object.assign({}, goal, {
       current_amount: newAmount,
-      complete: newAmount >= goal.amount
+      complete: newAmount >= goal.amount,
     });
   });
 
@@ -1485,7 +1869,9 @@ function _advanceCollectCashMissions(state, gestalt, cashGain) {
 // chargePerp — Phase 3 (#16)
 // ---------------------------------------------------------------------------
 
-export function chargePerp(path) {
+export function chargePerp(
+  path: string
+): Promise<{ result: { error: number } | Record<string, unknown> }> {
   var rawState = getState();
   var now      = clockNow();
   var ruleset  = _getRuleset();
@@ -1500,25 +1886,30 @@ export function chargePerp(path) {
   var nodes   = state.nodes || [];
   var nodeIdx = -1;
   for (var i = 0; i < nodes.length; i++) {
-    if (nodes[i].full_path === path) { nodeIdx = i; break; }
+    var n0 = nodes[i];
+    if (n0 && n0.full_path === path) { nodeIdx = i; break; }
   }
   if (nodeIdx < 0) return Promise.resolve({ result: { error: 1 } });
 
-  var node    = nodes[nodeIdx];
-  var gestalt = node.gestalt || _gestaltFrom(node.full_type);
-  var perpDef  = gestalt && (ruleset.perps[gestalt] || ruleset.tokens[gestalt]);
-  var typeData = perpDef && perpDef.type_data;
+  var node = nodes[nodeIdx];
+  if (!node) return Promise.resolve({ result: { error: 1 } });
+  var gestalt = node.gestalt || _gestaltFrom(node.full_type) || '';
+  var perpDef: PerpDef | undefined = gestalt
+    ? (ruleset.perps[gestalt] || ruleset.tokens[gestalt])
+    : undefined;
+  var typeData: PerpTypeData | undefined = perpDef ? perpDef.type_data : undefined;
   if (!typeData || typeof typeData.charge_time !== 'number') {
     return Promise.resolve({ result: { error: 1 } });
   }
 
   var charging = state.nodes_charging || [];
   for (var j = 0; j < charging.length; j++) {
-    if (charging[j].path === path) return Promise.resolve({ result: { error: 2 } });
+    var ce = charging[j];
+    if (ce && ce.path === path) return Promise.resolve({ result: { error: 2 } });
   }
 
   var gv           = state.game_values || {};
-  var instanceData = node.instance_data || {};
+  var instanceData: NodeInstanceData = node.instance_data || {};
   // charge_cost: instance_data wins (powerup-modified), then type_data, then 0.
   var chargeCost = typeof instanceData.charge_cost === 'number'
     ? instanceData.charge_cost
@@ -1530,12 +1921,11 @@ export function chargePerp(path) {
 
   // ClientPerps don't carry collect_amount in the ruleset — they ship
   // income_base / income_factor instead. Fall back so charging the car
-  // company actually pays out when collected. (Income_factor / consumed-
-  // tokens scaling is a separate enhancement; this gives the base payout.)
+  // company actually pays out when collected.
   var baseAmount = typeof instanceData.collect_amount === 'number'
     ? instanceData.collect_amount
     : (typeof typeData.collect_amount === 'number' ? typeData.collect_amount
-      : (typeof typeData.income_base   === 'number' ? typeData.income_base   : 0));
+      : (typeof typeData.income_base === 'number' ? typeData.income_base : 0));
   var chargeResult = { amount: _getVariatedAmount(baseAmount, now, path) };
 
   var durationMs  = typeData.charge_time;
@@ -1552,34 +1942,32 @@ export function chargePerp(path) {
 
   // mirrors dd_app views.py:776: $set charge_start, $addToSet nodes_charging,
   // $inc cash_value/cash_spent/xp_value, $dec ap_snapshot
-  var newNodes = nodes.map(function(n, idx) {
+  var newNodes = nodes.map(function (n, idx) {
     if (idx !== nodeIdx) return n;
     return Object.assign({}, n, {
-      instance_data: Object.assign({}, n.instance_data, { charge_start: now })
+      instance_data: Object.assign({}, n.instance_data, { charge_start: now }),
     });
   });
 
-  var newGv = Object.assign({}, gv, {
+  var newGv: GameValues = Object.assign({}, gv, {
     cash_value:  (gv.cash_value  || 0) - chargeCost,
     cash_spent:  (gv.cash_spent  || 0) + chargeCost,
     xp_value:    (gv.xp_value   || 0) + xpInc,
     ap_snapshot: Math.max(0, (gv.ap_snapshot || 0) - 1),
   });
 
-  // Advance xp_level if the new XP crossed a threshold. The legacy port
-  // omitted this for chargePerp specifically (collectPerp / integrateCollected
-  // / buyKarma all do compute it), so the player's XP could drift past
-  // xp_level.xp_max — visible as a status-bar overflow on screen.
   var oldLevelNum = gv.xp_level || 1;
-  var newLevelNum = _getLevelByXP(newGv.xp_value);
+  var newLevelNum = _getLevelByXP(newGv.xp_value || 0);
   var levelup = newLevelNum > oldLevelNum;
   if (levelup) {
     var levels = _getRuleset().levels;
     var newLevelInfo = levels[newLevelNum - 1] || levels[levels.length - 1];
-    newGv = Object.assign({}, newGv, {
-      xp_level: newLevelNum,
-      ap_snapshot: newLevelInfo.ap_max,
-    });
+    if (newLevelInfo) {
+      newGv = Object.assign({}, newGv, {
+        xp_level: newLevelNum,
+        ap_snapshot: newLevelInfo.ap_max,
+      });
+    }
   }
 
   var preMissionStateCharge = Object.assign({}, state, {
@@ -1591,22 +1979,16 @@ export function chargePerp(path) {
   var chargeMissionResult = _advanceChargePerpMissions(preMissionStateCharge, gestalt);
   newGv = _applyRewardsToGv(newGv, chargeMissionResult.rewards);
 
-  // Carry the post-mutation game_values snapshot in the delta so the reducer
-  // applies via Object.assign — idempotent under self-echo. Legacy fields
-  // (cashDelta, xpInc) stay so already-persisted pre-fix deltas still replay
-  // correctly on cold start.
   _persistDelta(_mkDelta(state.addr, 'chargePerp', [path], {
     chargeEntry:  chargeEntry,
     cashDelta:    chargeCost,
     xpInc:        xpInc,
     game_values:  newGv,
-    missions:     chargeMissionResult.missions || null
+    missions:     chargeMissionResult.missions || null,
   }));
 
-  // Live-tick: nothing in the page periodically calls materialize(), so
-  // without this the charge ripens silently — the perp's UI blinks at zero
-  // but no node_ready fires until the player reloads (which runs materialize
-  // on cold-start). Schedule a one-shot materialize at exactly charge_end.
+  // Live-tick: schedule one-shot materialize at exactly charge_end so the
+  // node_ready event fires without depending on the player reloading.
   _scheduleChargeReady(chargeEntry.charge_end, chargeEntry.path);
 
   // Achievements
@@ -1615,13 +1997,15 @@ export function chargePerp(path) {
     triggerAchievement('levelup',
       _t('achievement_levelup', _cpDisplayName, String(newLevelNum)));
   }
-  var _cpCompletedMissions = chargeMissionResult.missions && chargeMissionResult.missions.complete_missions || [];
+  var _cpCompletedMissions = (chargeMissionResult.missions && chargeMissionResult.missions.complete_missions) || [];
   for (var _cpMi = 0; _cpMi < _cpCompletedMissions.length; _cpMi++) {
-    var _cpMDef = _findMissionDef(_getRuleset(), _cpCompletedMissions[_cpMi]);
-    var _cpMTitle = (_cpMDef && _cpMDef.type_data && _cpMDef.type_data.title) || _cpCompletedMissions[_cpMi];
+    var mGestalt = _cpCompletedMissions[_cpMi];
+    if (typeof mGestalt !== 'string') continue;
+    var _cpMDef = _findMissionDef(_getRuleset(), mGestalt);
+    var _cpMTitle = (_cpMDef && _cpMDef.type_data && _cpMDef.type_data.title) || mGestalt;
     triggerAchievement('mission_done',
       _t('achievement_mission_done', _cpDisplayName, _cpMTitle),
-      { mission: _cpCompletedMissions[_cpMi] });
+      { mission: mGestalt });
   }
 
   return Promise.resolve({
@@ -1634,26 +2018,28 @@ export function chargePerp(path) {
 // handles before re-scheduling — e.g. when loadGame replays history we
 // re-arm every in-flight charge, and without cleanup duplicate timers fire
 // duplicate node_ready events for the same charge.
-var _chargeReadyTimers = {};
+type TimerHandle = ReturnType<typeof setTimeout>;
+var _chargeReadyTimers: Record<string, TimerHandle> = {};
 
-function _clearChargeReady(path) {
-  if (!path || !_chargeReadyTimers[path]) return;
-  clearTimeout(_chargeReadyTimers[path]);
+function _clearChargeReady(path: string): void {
+  if (!path) return;
+  var h = _chargeReadyTimers[path];
+  if (h === undefined) return;
+  clearTimeout(h);
   delete _chargeReadyTimers[path];
 }
 
-function _clearAllChargeReady() {
+function _clearAllChargeReady(): void {
   Object.keys(_chargeReadyTimers).forEach(function (p) {
-    clearTimeout(_chargeReadyTimers[p]);
+    var h = _chargeReadyTimers[p];
+    if (h !== undefined) clearTimeout(h);
   });
   _chargeReadyTimers = {};
 }
 
 // One-shot per charge: at charge_end, run materialize() to transition the
-// charging entry into nodes_collect and emit node_ready. Tests stub
-// setTimeout via the override clock; we use the host setTimeout directly so
-// production play actually fires.
-function _scheduleChargeReady(chargeEnd, path) {
+// charging entry into nodes_collect and emit node_ready.
+function _scheduleChargeReady(chargeEnd: number, path: string): void {
   if (typeof setTimeout !== 'function') return;
   _clearChargeReady(path);
   var msUntil = Math.max(0, chargeEnd - clockNow());
@@ -1661,16 +2047,16 @@ function _scheduleChargeReady(chargeEnd, path) {
     if (path) delete _chargeReadyTimers[path];
     var s = getState();
     if (!s) return;
-    // Skip if the charge no longer exists (cancelled / already collected).
     if (path) {
-      var stillCharging = (s.nodes_charging || []).some(function (c) { return c.path === path; });
+      var stillCharging = (s.nodes_charging || []).some(function (c: { path: string }) { return c.path === path; });
       if (!stillCharging) return;
     }
     var mat = materialize(s, clockNow());
     setState(mat.state);
     var events = mat.events || [];
     for (var i = 0; i < events.length; i++) {
-      _emit(events[i].ev, events[i].pl);
+      var e = events[i];
+      if (e) _emit(e.ev, e.pl);
     }
   }, msUntil);
   if (path) _chargeReadyTimers[path] = handle;
@@ -1685,29 +2071,30 @@ var _prngSeed = 0xDEADBEEF;
 /**
  * Seed the deterministic PRNG used for charge-amount jitter.
  * Call in tests before any chargePerp invocation to get repeatable results.
- * @param {number} seed
  */
-export function setPrngSeed(seed) {
+export function setPrngSeed(seed: number): void {
   _prngSeed = seed >>> 0;
 }
 
-function _rng() {
+function _rng(): number {
   _prngSeed = (_prngSeed + 0x6D2B79F5) | 0;
   var t = Math.imul(_prngSeed ^ (_prngSeed >>> 15), 1 | _prngSeed);
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
-function _generateId() {
+function _generateId(): string {
   // Timestamp base + two RNG words → collision-resistant string without deps.
   return Date.now().toString(36) +
     Math.floor(_rng() * 0xFFFFFF).toString(36) +
     Math.floor(_rng() * 0xFFFFFF).toString(36);
 }
 
+interface KarmaIncident { gestalt: string; karma_delta: number }
+
 // Returns { gestalt, karma_delta } if a karma incident fires, else null.
 // factor = sqrt((-karma)/100) + 0.05  (dd_app views.py:483 WeightedRandomizer)
-function _handleKarmaIncident(gv, ruleset) {
+function _handleKarmaIncident(gv: GameValues, ruleset: Ruleset): KarmaIncident | null {
   var karma = (gv && gv.karma_value) || 0;
   if (karma >= 0) return null;
 
@@ -1721,9 +2108,10 @@ function _handleKarmaIncident(gv, ruleset) {
   if (!eligible.length) return null;
 
   var k = eligible[Math.floor(_rng() * eligible.length)];
+  if (!k) return null;
   return {
     gestalt:     (k.type_data && k.type_data.gestalt) || '',
-    karma_delta: (k.type_data && k.type_data.karma_points) || -1
+    karma_delta: (k.type_data && k.type_data.karma_points) || -1,
   };
 }
 
@@ -1748,7 +2136,17 @@ function _handleKarmaIncident(gv, ruleset) {
  *   2 — node not found in state.nodes
  *   3 — unknown game_type
  */
-export function collectPerp(gperpPath) {
+interface DbEntry {
+  origin: string;
+  collect_id: string;
+  profile_set: { profiles_value: number; tokens_map: Record<string, { amount: number }> };
+  collect_dt?: number;
+}
+interface TokenUpdate { path: string; amount: number }
+
+export function collectPerp(
+  gperpPath: string
+): Promise<{ result: { error: number } | Record<string, unknown> }> {
   var state = getState();
   var now = clockNow();
   var ruleset = _getRuleset();
@@ -1757,55 +2155,53 @@ export function collectPerp(gperpPath) {
   var mat = materialize(state, now);
   var ms = mat.state;
 
-  var collectEntry = null;
+  var collectEntry: { path: string; result?: { amount?: number } } | null = null;
   for (var i = 0; i < ms.nodes_collect.length; i++) {
-    if (ms.nodes_collect[i].path === gperpPath) {
-      collectEntry = ms.nodes_collect[i];
-      break;
-    }
+    var ne = ms.nodes_collect[i];
+    if (ne && ne.path === gperpPath) { collectEntry = ne; break; }
   }
   if (!collectEntry) {
-    // Materialized state is recoverable (materialize is pure), so an early
-    // return doesn't persist it — the next handler call re-materialises.
     return Promise.resolve({ result: { error: 1 } });
   }
 
-  var node = null;
+  var node: GameNode | null = null;
   for (var j = 0; j < ms.nodes.length; j++) {
-    if (ms.nodes[j].full_path === gperpPath) {
-      node = ms.nodes[j];
-      break;
-    }
+    var nn = ms.nodes[j];
+    if (nn && nn.full_path === gperpPath) { node = nn; break; }
   }
   if (!node) {
     return Promise.resolve({ result: { error: 2 } });
   }
 
-  var gestalt = node.gestalt || _gestaltFrom(node.full_type);
-  var perpDef = gestalt && (ruleset.perps[gestalt] || ruleset.tokens[gestalt]);
-  var typeData = perpDef && perpDef.type_data;
+  var gestalt = node.gestalt || _gestaltFrom(node.full_type) || '';
+  var perpDef: PerpDef | undefined = gestalt
+    ? (ruleset.perps[gestalt] || ruleset.tokens[gestalt])
+    : undefined;
+  var typeData: PerpTypeData | undefined = perpDef ? perpDef.type_data : undefined;
 
   var cr = collectEntry.result || {};
   var xpGain = (typeData && typeof typeData.xp_inc === 'number') ? typeData.xp_inc : 1;
   var gameType = node.game_type;
 
   var newCollect = ms.nodes_collect.filter(function (e) { return e.path !== gperpPath; });
-  var newGv = Object.assign({}, ms.game_values, {
-    xp_value: (ms.game_values.xp_value || 0) + xpGain
+  var newGv: GameValues = Object.assign({}, ms.game_values, {
+    xp_value: (ms.game_values.xp_value || 0) + xpGain,
   });
 
-  var innerResult;
-  var newNodes = ms.nodes;
+  var innerResult: Record<string, unknown>;
+  var newNodes: GameNode[] = ms.nodes;
   var newQueue = ms.db_queue || [];
-  var dbEntry = null;
-  var tokenUpdate = null;
+  var dbEntry: DbEntry | null = null;
+  var tokenUpdate: TokenUpdate | null = null;
 
   if (gameType === 'ContactPerp' || gameType === 'ProjectPerp') {
     var collectId = _generateId();
     // ContactPerps store yielded token-types under `tokens`; TokenPerps
     // (super-token decomposition) under `contained_tokens` — accept either.
-    var tokensMap = {};
-    var contained = (typeData && (typeData.tokens || typeData.contained_tokens)) || [];
+    var tokensMap: Record<string, { amount: number }> = {};
+    var contained: TokenSpec[] = (typeData && (
+      typeData.tokens || typeData.contained_tokens
+    )) || [];
     for (var ct = 0; ct < contained.length; ct++) {
       var ctEntry = contained[ct];
       if (ctEntry && ctEntry.gestalt) {
@@ -1817,7 +2213,7 @@ export function collectPerp(gperpPath) {
       origin:      gperpPath,
       collect_id:  collectId,
       profile_set: profileSet,
-      collect_dt:  now
+      collect_dt:  now,
     };
     newQueue = newQueue.concat([dbEntry]);
     innerResult = { profile_set: profileSet, origin: gperpPath, collect_id: collectId };
@@ -1825,18 +2221,19 @@ export function collectPerp(gperpPath) {
   } else if (gameType === 'ClientPerp') {
     var cashGain = cr.amount || 0;
     newGv = Object.assign({}, newGv, {
-      cash_value: (ms.game_values.cash_value || 0) + cashGain
+      cash_value: (ms.game_values.cash_value || 0) + cashGain,
     });
     innerResult = { cash: newGv.cash_value };
 
   } else if (gameType === 'TokenPerp') {
-    var prevAmount = (node.instance_data && node.instance_data.amount) || 0;
+    var tpIdata: NodeInstanceData = node.instance_data || {};
+    var prevAmount = typeof tpIdata.amount === 'number' ? tpIdata.amount : 0;
     var newAmount = prevAmount + (cr.amount || 0);
     tokenUpdate = { path: gperpPath, amount: newAmount };
     newNodes = ms.nodes.map(function (n) {
       if (n.full_path !== gperpPath) return n;
       return Object.assign({}, n, {
-        instance_data: Object.assign({}, n.instance_data, { amount: newAmount })
+        instance_data: Object.assign({}, n.instance_data, { amount: newAmount }),
       });
     });
     innerResult = { token_upgraded_amount: newAmount };
@@ -1854,15 +2251,17 @@ export function collectPerp(gperpPath) {
   }
 
   var oldLevel = (ms.game_values && ms.game_values.xp_level) || 1;
-  var newLevel = _getLevelByXP(newGv.xp_value);
+  var newLevel = _getLevelByXP(newGv.xp_value || 0);
   var levelup  = newLevel > oldLevel;
   if (levelup) {
     var collectLevels = _getRuleset().levels;
     var collectLevelInfo = collectLevels[newLevel - 1] || collectLevels[collectLevels.length - 1];
-    newGv = Object.assign({}, newGv, {
-      xp_level: newLevel,
-      ap_snapshot: collectLevelInfo.ap_max
-    });
+    if (collectLevelInfo) {
+      newGv = Object.assign({}, newGv, {
+        xp_level: newLevel,
+        ap_snapshot: collectLevelInfo.ap_max,
+      });
+    }
   }
 
   var preMissionState = Object.assign({}, ms, {
@@ -1891,7 +2290,13 @@ export function collectPerp(gperpPath) {
     active_missions: collectMissionResult.active_missions
   });
 
-  var deltaResult = { game_values: newGv, path: gperpPath, missions: collectMissionResult.missions };
+  var deltaResult: {
+    game_values: GameValues;
+    path: string;
+    missions: MissionUpdate | null;
+    db_entry?: DbEntry;
+    token_update?: TokenUpdate;
+  } = { game_values: newGv, path: gperpPath, missions: collectMissionResult.missions };
   if (dbEntry)     deltaResult.db_entry     = dbEntry;
   if (tokenUpdate) deltaResult.token_update = tokenUpdate;
   _persistDelta(_mkDelta(state.addr, 'collectPerp', [gperpPath], deltaResult));
@@ -1908,13 +2313,15 @@ export function collectPerp(gperpPath) {
     triggerAchievement('levelup',
       _t('achievement_levelup', _clpDisplayName, String(newLevel)));
   }
-  var _clpCompletedMissions = collectMissionResult.missions && collectMissionResult.missions.complete_missions || [];
+  var _clpCompletedMissions = (collectMissionResult.missions && collectMissionResult.missions.complete_missions) || [];
   for (var _clpMi = 0; _clpMi < _clpCompletedMissions.length; _clpMi++) {
-    var _clpMDef = _findMissionDef(_getRuleset(), _clpCompletedMissions[_clpMi]);
-    var _clpMTitle = (_clpMDef && _clpMDef.type_data && _clpMDef.type_data.title) || _clpCompletedMissions[_clpMi];
+    var clpG = _clpCompletedMissions[_clpMi];
+    if (typeof clpG !== 'string') continue;
+    var _clpMDef = _findMissionDef(_getRuleset(), clpG);
+    var _clpMTitle = (_clpMDef && _clpMDef.type_data && _clpMDef.type_data.title) || clpG;
     triggerAchievement('mission_done',
       _t('achievement_mission_done', _clpDisplayName, _clpMTitle),
-      { mission: _clpCompletedMissions[_clpMi] });
+      { mission: clpG });
   }
   var _clpOldKarma = (ms.game_values && ms.game_values.karma_value) || 0;
   var _clpNewKarma = newGv.karma_value || 0;
@@ -1930,7 +2337,8 @@ export function collectPerp(gperpPath) {
   var emitLevel = levelup ? newLevel : 0;
   queueMicrotask(function () {
     for (var ei = 0; ei < matEvents.length; ei++) {
-      _emit(matEvents[ei].ev, matEvents[ei].pl);
+      var ev = matEvents[ei];
+      if (ev) _emit(ev.ev, ev.pl);
     }
     if (emitLevel) {
       _emit('new_items', { perps: [], powerups: {}, trigger: 'levelup', level: emitLevel });
@@ -1957,29 +2365,38 @@ export function collectPerp(gperpPath) {
  *   0 — collect_id not in db_queue (already integrated or never collected)
  *   1 — insufficient AP (parity with chargePerp)
  */
-export function integrateCollected(collectId) {
+/**
+ * The persisted shape of state.db_queue[i].profile_set as written by
+ * collectPerp / buyPerp.  state.ts:DbQueueEntry types `profile_set: any`
+ * to keep the reducer free of cross-module schema knowledge; this view
+ * narrows it locally for the integrate path.
+ */
+interface ProfileSetView {
+  profiles_value?: number;
+  tokens_map?: Record<string, { amount?: number }>;
+  xp_gain?: number;
+  karma_gain?: number;
+}
+
+export function integrateCollected(
+  collectId: string
+): Promise<{ result: { error: number } | Record<string, unknown> }> {
   var rawState = getState();
   var now = clockNow();
-  // Materialize so the AP regen ticks accumulated since the last call are
-  // visible — same contract as collectPerp / chargePerp.
   var state = materialize(rawState, now).state;
 
-  if ((state.game_values && state.game_values.ap_snapshot || 0) < 1) {
+  if (((state.game_values && state.game_values.ap_snapshot) || 0) < 1) {
     return Promise.resolve({ result: { error: 1 } });
   }
 
-  // $pull db_queue entry.
-  /** @type {import('./state.js').DbQueueEntry | null} */
-  var entry = null;
-  var newQueue = (state.db_queue || []).filter(function (q) {
-    if (q.collect_id === collectId) { entry = q; return false; }
-    return true;
-  });
+  var queue = state.db_queue || [];
+  var entry = queue.find(function (q) { return q.collect_id === collectId; });
   if (!entry) {
     return Promise.resolve({ result: { error: 0 } });
   }
+  var newQueue = queue.filter(function (q) { return q.collect_id !== collectId; });
 
-  var ps = entry.profile_set || {};
+  var ps: ProfileSetView = (entry.profile_set as ProfileSetView) || {};
   var profilesIncrement = ps.profiles_value || 0;
 
   var integratedIds = state.integrated_ids || {};
@@ -1989,18 +2406,18 @@ export function integrateCollected(collectId) {
 
   var xpGain    = ps.xp_gain    || 0;
   var karmaGain = ps.karma_gain || 0;
-  var newGv = Object.assign({}, state.game_values, {
+  var newGv: GameValues = Object.assign({}, state.game_values, {
     xp_value:       (state.game_values.xp_value    || 0) + xpGain,
     karma_value: Math.max(-100, Math.min(100,
       (state.game_values.karma_value || 0) + karmaGain)),
     profiles_value: (state.game_values.profiles_value || 0) + increment,
-    ap_snapshot:    Math.max(0, (state.game_values.ap_snapshot || 0) - 1)
+    ap_snapshot:    Math.max(0, (state.game_values.ap_snapshot || 0) - 1),
   });
 
   var ruleset = _getRuleset();
-  var tokensMap = ps.tokens_map || {};
-  var updatedNodes = [];
-  var seenGestalts = {};
+  var tokensMap: Record<string, { amount?: number }> = ps.tokens_map || {};
+  var updatedNodes: GameNode[] = [];
+  var seenGestalts: Record<string, true> = {};
 
   // Weighted-average share merge — upstream dd_app/dd_calc.py
   // `Database.merge` computes:
@@ -2021,26 +2438,20 @@ export function integrateCollected(collectId) {
   // (seedShare = 0). Bail before the per-node arithmetic.
   var skipMerge = denom === 0;
 
-  var newNodes = (state.nodes || []).map(function (n) {
+  var newNodes: GameNode[] = (state.nodes || []).map(function (n) {
     if (skipMerge) return n;
     if (n.game_type !== 'TokenPerp' || !n.gestalt) return n;
-    var oldShare = (n.instance_data && n.instance_data.amount) || 0;
+    var npIdata: NodeInstanceData = n.instance_data || {};
+    var oldShare = typeof npIdata.amount === 'number' ? npIdata.amount : 0;
     var tok = tokensMap[n.gestalt];
     if (tok) seenGestalts[n.gestalt] = true;
     var psContrib = tok ? (tok.amount || 0) * N : 0;
     var newShare = Math.min(100, (oldShare * M + psContrib) / denom);
     if (Math.abs(newShare - oldShare) < 1e-9) return n;
-    var updated = Object.assign({}, n, {
-      instance_data: Object.assign({}, n.instance_data, { amount: newShare })
+    var updated: GameNode = Object.assign({}, n, {
+      instance_data: Object.assign({}, n.instance_data, { amount: newShare }),
     });
-    updatedNodes.push({
-      game_id:       updated.game_id,
-      gestalt:       updated.gestalt,
-      game_type:     updated.game_type,
-      full_type:     updated.full_type,
-      full_path:     updated.full_path,
-      instance_data: updated.instance_data
-    });
+    updatedNodes.push(updated);
     return updated;
   });
 
@@ -2056,36 +2467,32 @@ export function integrateCollected(collectId) {
     if (seenGestalts[gestalt]) return;
     if (!ruleset.tokens || !ruleset.tokens[gestalt]) return;
     var tok = tokensMap[gestalt];
+    if (!tok) return;
     var seedShare = Math.min(100, ((tok.amount || 0) * N) / denom);
-    var newNode = {
+    var newNode: GameNode = {
       game_id:    gestalt,
       gestalt:    gestalt,
       game_type:  'TokenPerp',
       full_type:  'TokenPerp:' + gestalt,
       full_path:  'Database.' + gestalt,
-      instance_data: { amount: seedShare }
+      instance_data: { amount: seedShare },
     };
     newNodes.push(newNode);
-    updatedNodes.push({
-      game_id:       newNode.game_id,
-      gestalt:       newNode.gestalt,
-      game_type:     newNode.game_type,
-      full_type:     newNode.full_type,
-      full_path:     newNode.full_path,
-      instance_data: newNode.instance_data
-    });
+    updatedNodes.push(newNode);
   });
 
   var oldLevel = (state.game_values && state.game_values.xp_level) || 1;
-  var newLevel = _getLevelByXP(newGv.xp_value);
+  var newLevel = _getLevelByXP(newGv.xp_value || 0);
   var levelup  = newLevel > oldLevel;
   if (levelup) {
     var integrateLevels = _getRuleset().levels;
     var integrateLevelInfo = integrateLevels[newLevel - 1] || integrateLevels[integrateLevels.length - 1];
-    newGv = Object.assign({}, newGv, {
-      xp_level: newLevel,
-      ap_snapshot: integrateLevelInfo.ap_max
-    });
+    if (integrateLevelInfo) {
+      newGv = Object.assign({}, newGv, {
+        xp_level: newLevel,
+        ap_snapshot: integrateLevelInfo.ap_max,
+      });
+    }
   }
 
   var preMissionState = Object.assign({}, state, {
@@ -2131,22 +2538,26 @@ export function integrateCollected(collectId) {
     triggerAchievement('levelup',
       _t('achievement_levelup', _icDisplayName, String(newLevel)));
   }
-  var _icCompletedMissions = missionResult.missions && missionResult.missions.complete_missions || [];
+  var _icCompletedMissions = (missionResult.missions && missionResult.missions.complete_missions) || [];
   for (var _icMi = 0; _icMi < _icCompletedMissions.length; _icMi++) {
-    var _icMDef = _findMissionDef(_getRuleset(), _icCompletedMissions[_icMi]);
-    var _icMTitle = (_icMDef && _icMDef.type_data && _icMDef.type_data.title) || _icCompletedMissions[_icMi];
+    var icG = _icCompletedMissions[_icMi];
+    if (typeof icG !== 'string') continue;
+    var _icMDef = _findMissionDef(_getRuleset(), icG);
+    var _icMTitle = (_icMDef && _icMDef.type_data && _icMDef.type_data.title) || icG;
     triggerAchievement('mission_done',
       _t('achievement_mission_done', _icDisplayName, _icMTitle),
-      { mission: _icCompletedMissions[_icMi] });
+      { mission: icG });
   }
   var _icOldProfiles = (state.game_values && state.game_values.profiles_value) || 0;
   var _icNewProfiles = newGv.profiles_value || 0;
   var _icMilestones = [1000, 10000, 100000, 1000000];
   for (var _icPi = 0; _icPi < _icMilestones.length; _icPi++) {
-    if (_icOldProfiles < _icMilestones[_icPi] && _icNewProfiles >= _icMilestones[_icPi]) {
+    var ms2 = _icMilestones[_icPi];
+    if (ms2 === undefined) continue;
+    if (_icOldProfiles < ms2 && _icNewProfiles >= ms2) {
       triggerAchievement('profiles_milestone',
-        _t('achievement_profiles_milestone', _icDisplayName, String(_icMilestones[_icPi])),
-        { threshold: _icMilestones[_icPi] });
+        _t('achievement_profiles_milestone', _icDisplayName, String(ms2)),
+        { threshold: ms2 });
     }
   }
   var _icOldKarma = (state.game_values && state.game_values.karma_value) || 0;
@@ -2166,7 +2577,9 @@ export function integrateCollected(collectId) {
 // the briefing popup for a given mission so we don't re-open it on reload.
 // ---------------------------------------------------------------------------
 
-export function markTokenSeen(gestalt) {
+export function markTokenSeen(
+  gestalt: unknown
+): Promise<{ result: { error: 0 } | { ok: true } }> {
   if (typeof gestalt !== 'string' || !gestalt) {
     return Promise.resolve({ result: { error: 0 } });
   }
@@ -2179,7 +2592,7 @@ export function markTokenSeen(gestalt) {
   return Promise.resolve({ result: { ok: true } });
 }
 
-export function dismissMissionBriefing(gestalt) {
+export function dismissMissionBriefing(gestalt: unknown): Promise<{ result: { error: 0 } | { ok: true } }> {
   if (typeof gestalt !== 'string' || !gestalt) {
     return Promise.resolve({ result: { error: 0 } });
   }
@@ -2197,11 +2610,12 @@ export function dismissMissionBriefing(gestalt) {
 // Stub handlers — Wave 4+ issues fill these in.
 // ---------------------------------------------------------------------------
 var _STUBS = [
-  'checkUsername'
-];
+  'checkUsername',
+] as const;
 
-var _stubHandlers = {};
-_STUBS.forEach(function (name) {
+type StubName = (typeof _STUBS)[number];
+var _stubHandlers: Record<string, () => Promise<never>> = {};
+_STUBS.forEach(function (name: StubName) {
   _stubHandlers[name] = function () {
     return Promise.reject('NotImplemented: ' + name);
   };

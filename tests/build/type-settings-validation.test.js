@@ -5,7 +5,7 @@
  * Guards against silent gameplay breakage from typos:
  *   1. Every mission-goal `workflow` used in the ruleset has a display string
  *      in type_settings.js `goals_texts` AND a corresponding handler in
- *      LocalEngine.js.
+ *      LocalEngine.ts.
  *   2. Every mission-goal `target` gestalt exists in the ruleset perps/tokens.
  *   3. Every `perp_id` / `token_id` referenced in the ruleset missions exists
  *      in the combined perp+token catalogue.
@@ -32,7 +32,7 @@ beforeAll(() => {
   localeEn       = JSON.parse(readFileSync(join(root, 'i18n', 'en_US.json'), 'utf8'));
 
   var typeSettingsSrc = readFileSync(join(root, 'scripts', 'type_settings.js'), 'utf8');
-  var localEngineSrc  = readFileSync(join(root, 'scripts', 'LocalEngine.js'), 'utf8');
+  var localEngineSrc  = readFileSync(join(root, 'scripts', 'LocalEngine.ts'), 'utf8');
   goalsTextWorkflows     = extractGoalsTextWorkflows(typeSettingsSrc);
   goalsTextMsgids        = extractGoalsTextMsgids(typeSettingsSrc);
   knownHandlerWorkflows  = extractHandlerWorkflows(localEngineSrc);
@@ -82,10 +82,10 @@ function hasMsgstr(localeData, msgid) {
   return Array.isArray(entry) && entry.length > 1 && entry[1] != null;
 }
 
-// ── helpers: derive handler workflows from LocalEngine.js source ──────────────
+// ── helpers: derive handler workflows from LocalEngine.ts source ──────────────
 //
 // Instead of a hand-maintained constant, we extract the workflow string
-// literals that LocalEngine.js actually compares against goal.workflow so
+// literals that LocalEngine.ts actually compares against goal.workflow so
 // that removing a handler branch automatically fails the test.
 
 function extractHandlerWorkflows(src) {
@@ -113,8 +113,8 @@ function allGoals(ruleset) {
 
 // ── tests ─────────────────────────────────────────────────────────────────────
 
-describe('LocalEngine.js — handler workflow extraction', () => {
-  it('extracts at least 7 workflow handlers from LocalEngine.js', () => {
+describe('LocalEngine.ts — handler workflow extraction', () => {
+  it('extracts at least 7 workflow handlers from LocalEngine.ts', () => {
     expect(knownHandlerWorkflows.size).toBeGreaterThanOrEqual(7);
   });
 

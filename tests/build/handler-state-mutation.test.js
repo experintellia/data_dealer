@@ -1,5 +1,5 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
-// Phase 6 regression guard for #120: scripts/LocalEngine.js handlers must
+// Phase 6 regression guard for #120: scripts/LocalEngine.ts handlers must
 // NOT call setState directly. State mutation goes through _persistDelta
 // (which routes via applyDelta in the listener / its no-webxdc twin).
 //
@@ -13,7 +13,7 @@
 //   - _scheduleChargeReady (one-shot setTimeout that materialises at
 //     charge_end; not a handler — internal time-tick helper)
 //
-// Anything else calling setState in LocalEngine.js fails CI.
+// Anything else calling setState in LocalEngine.ts fails CI.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -22,7 +22,7 @@ import { dirname, resolve } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
-const enginePath = resolve(__dirname, '../../scripts/LocalEngine.js');
+const enginePath = resolve(__dirname, '../../scripts/LocalEngine.ts');
 
 // Lines that may legitimately call setState. Each entry is a substring
 // match against a single physical line. Keep this list short — every new
@@ -65,10 +65,10 @@ describe('LocalEngine handlers do not call setState directly (closes #120)', () 
 
     if (offenders.length) {
       const msg = offenders.map(function (o) {
-        return '  scripts/LocalEngine.js:' + o.line + '  ' + o.text;
+        return '  scripts/LocalEngine.ts:' + o.line + '  ' + o.text;
       }).join('\n');
       throw new Error(
-        'Found setState call(s) in scripts/LocalEngine.js outside the\n' +
+        'Found setState call(s) in scripts/LocalEngine.ts outside the\n' +
         'allowlist. Handlers must compute deltas and call _persistDelta —\n' +
         'they must NOT call setState directly. Offenders:\n' + msg
       );

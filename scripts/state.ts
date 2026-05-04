@@ -68,16 +68,22 @@ export interface DbQueueEntry {
   collect_dt?: number;
 }
 
-/** A single mission-progress row in state.mission_goals. */
+/**
+ * A single mission-progress row in state.mission_goals.
+ *
+ * goal_id / position / project are optional because handler-seeded rows
+ * (LocalEngine._seedGoalRow) don't carry them — only the fields needed for
+ * progression matching are required.  Game.js consumers tolerate the absence.
+ */
 export interface MissionGoal {
   amount: number;
   current_amount: number;
-  goal_id: string;
   mission: string;
-  position: number;
-  project: string | null;
   target: string;
   workflow: string;
+  goal_id?: string;
+  position?: number;
+  project?: string | null;
   complete?: boolean;
 }
 
