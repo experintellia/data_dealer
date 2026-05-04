@@ -91,13 +91,15 @@ export function materialize(state: LocalState, now: number): MaterializeResult {
   // Build a path-set for O(1) duplicate detection.
   var inCollect: Record<string, boolean> = Object.create(null);
   for (var i = 0; i < collect.length; i++) {
-    inCollect[collect[i].path] = true;
+    var ce = collect[i];
+    if (ce) inCollect[ce.path] = true;
   }
 
   var stillCharging: ChargingEntry[] = [];
   var newlyReady: ChargingEntry[] = [];
   for (var j = 0; j < charging.length; j++) {
     var c = charging[j];
+    if (!c) continue;
     if (now >= c.charge_end) {
       newlyReady.push(c);
     } else {
@@ -111,6 +113,7 @@ export function materialize(state: LocalState, now: number): MaterializeResult {
 
   for (var k = 0; k < newlyReady.length; k++) {
     var entry = newlyReady[k];
+    if (!entry) continue;
     // Guard against a path being present in both arrays simultaneously.
     if (!inCollect[entry.path]) {
       collect.push({ path: entry.path, result: entry.result });
@@ -134,10 +137,11 @@ export function materialize(state: LocalState, now: number): MaterializeResult {
   var gv: GameValues = state.game_values || {};
   var newGv: GameValues = Object.assign({}, gv);
   if (
-    typeof gv.ap_snapshot    === 'number' &&
-    typeof gv.ap_inc_value   === 'number' &&
-    gv.ap_inc_interval > 0                &&
-    typeof gv.ap_max         === 'number'
+    typeof gv.ap_snapshot     === 'number' &&
+    typeof gv.ap_inc_value    === 'number' &&
+    typeof gv.ap_inc_interval === 'number' &&
+    gv.ap_inc_interval > 0                 &&
+    typeof gv.ap_max          === 'number'
   ) {
     // Lazy-init: when ap_update is null/undefined (e.g. fresh game), start
     // the regen clock at `now` so the next materialize-after-elapsed-time
@@ -146,12 +150,12 @@ export function materialize(state: LocalState, now: number): MaterializeResult {
     // on every reload.
     var apUpdate = (typeof gv.ap_update === 'number') ? gv.ap_update : now;
     var elapsed  = Math.max(0, now - apUpdate);
-    var ticks    = Math.floor(elapsed / gv.ap_inc_interval!);
+    var ticks    = Math.floor(elapsed / gv.ap_inc_interval);
     newGv = Object.assign({}, gv, {
       ap_snapshot: Math.min(gv.ap_max, gv.ap_snapshot + ticks * gv.ap_inc_value),
       // Advance ap_update only to the last full-tick boundary so the
       // fractional remainder is preserved across stepwise materializations.
-      ap_update: apUpdate + ticks * gv.ap_inc_interval!,
+      ap_update: apUpdate + ticks * gv.ap_inc_interval,
     });
   }
 

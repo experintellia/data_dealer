@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Boot the browser UI: render the loader, await engine replay, hand off
 // to app.start.  Imported as a side effect by scripts/esm-entry.js, so
 // the body runs once the bundle IIFE evaluates.

@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 /**
  * Tests for the i18n layer (scripts/i18n.js).
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Vendor libs ($, _, sprintf) are read off globalThis at factory-body
 // time, not at module-evaluation time, so this module can be bundled
 // alongside scripts that run before vendor `<script>` tags execute.

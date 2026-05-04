@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Lightweight gettext/ngettext layer.  In the AMD original, locale JSON
 // files were fetched via $.getJSON at module-load time.  In the ESM port
 // they are statically imported so the module body has no async work and

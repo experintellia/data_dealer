@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Vendor libs (window.Scroller, window.core, window.createjs) are read
 // off globalThis at factory-body time on the first getRender() call,
 // so this module is safe to bundle alongside code that runs before

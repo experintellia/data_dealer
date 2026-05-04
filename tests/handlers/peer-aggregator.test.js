@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 /**
  * Tests for Phase 6 peer-score aggregation (issue #29).
  *

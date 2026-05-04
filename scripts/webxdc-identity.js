@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Look at the host messenger's selfName and report whether it differs from the
 // stored display_name. Display name is owned by the messenger — the game has
 // no UI to rename — so this runs once per boot and only fires the dispatch

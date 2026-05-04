@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 import { describe, it, expect } from 'vitest';
 import { freshState, applyDelta, SCHEMA_VERSION } from '../../scripts/state.js';
 

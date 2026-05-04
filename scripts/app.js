@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Application root.  Wires LocalEngine handlers, the i18n layer, and
 // the Game/Render singletons.  Vendor libs ($, _, numeral, sprintf,
 // createjs) are read off globalThis at factory-body time — they are

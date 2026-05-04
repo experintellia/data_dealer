@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Some fixtures that are currently not handled or provided by dd_cms.
 // Underscore is read from globalThis (set by vendor/underscore.js) at
 // call time; getTypeSettings() is invoked after app.start() has run

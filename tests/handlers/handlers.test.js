@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   getToken, ping, getSessionLocale, setLocale, loadGame, getRanking, setEmitter,

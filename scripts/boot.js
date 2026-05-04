@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Boot sequence for the webxdc port of Data Dealer.
 // Implements the four-step engine startup described in issue #10:
 //

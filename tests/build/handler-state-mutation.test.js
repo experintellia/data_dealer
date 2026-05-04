@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Phase 6 regression guard for #120: scripts/LocalEngine.js handlers must
 // NOT call setState directly. State mutation goes through _persistDelta
 // (which routes via applyDelta in the listener / its no-webxdc twin).
