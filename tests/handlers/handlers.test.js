@@ -1,27 +1,27 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  getToken,
-  ping,
-  getSessionLocale,
-  setLocale,
-  loadGame,
-  getRanking,
-  setEmitter,
-  setDisplayName,
-  setPerpCoordinates,
   buyKarma,
-  buyPowerup,
-  sellPowerup,
-  buySlots,
   buyPerp,
+  buyPowerup,
+  buySlots,
   dismissMissionBriefing,
+  getRanking,
+  getSessionLocale,
+  getToken,
+  loadGame,
   markTokenSeen,
+  ping,
   recheckMissions,
+  sellPowerup,
+  setDisplayName,
+  setEmitter,
+  setLocale,
+  setPerpCoordinates,
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
-import { freshState, applyDelta } from '../../scripts/state.js';
-import { setOverride, clearOverride } from '../../scripts/clock.js';
+import { clearOverride, setOverride } from '../../scripts/clock.js';
+import { applyDelta, freshState } from '../../scripts/state.js';
 import { FIXED_NOW, mkState } from './_fixtures.js';
 
 // ── getRanking ───────────────────────────────────────────────────────────────

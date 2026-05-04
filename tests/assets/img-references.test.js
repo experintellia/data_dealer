@@ -1,10 +1,10 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 // Asserts that every file in img/ is referenced from at least one shipped
 // source so that orphaned assets are caught at PR time.
-import { describe, it, expect } from 'vitest';
-import { readdirSync, readFileSync, statSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { describe, expect, it } from 'vitest';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 

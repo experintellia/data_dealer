@@ -1,15 +1,15 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
+import { getRender } from './Render.js';
 // Vendor libs ($, _, sprintf) are read off globalThis at factory-body
 // time, not at module-evaluation time, so this module can be bundled
 // alongside scripts that run before vendor `<script>` tags execute.
 import appModule from './app.js';
-import setup from './setup.js';
-import utilDefault from './util.js';
-import { getTypeSettings } from './type_settings.js';
-import webxdcIdentity from './webxdc-identity.js';
 import * as bootMod from './boot.js';
 import i18n from './i18n.js';
-import { getRender } from './Render.js';
+import setup from './setup.js';
+import { getTypeSettings } from './type_settings.js';
+import utilDefault from './util.js';
+import webxdcIdentity from './webxdc-identity.js';
 
 var Game = function () {
   var _ = globalThis._;
@@ -79,6 +79,7 @@ var Game = function () {
   // The Set
   ////////////////////////////////
 
+  // biome-ignore lint/suspicious/noShadowRestrictedNames: legacy collection class predates ES6 Set
   var Set = function (set) {
     if (!set) {
       set = [];
@@ -413,8 +414,6 @@ var Game = function () {
   };
 
   GameNode.prototype.remove = function () {
-    // Remove GameNode from all references and remove renderNodes
-    var gnode = this;
     if (this.parentNode) {
       this.parentNode.children.remove(this);
     }
@@ -439,10 +438,7 @@ var Game = function () {
   };
 
   GameNode.prototype.addType = function (gestalt, data) {
-    // Add a type to the typeRegistry data should have data.type_data
-    // If the game_type is also defined in typeSettings it will be merged and overwritte with data
-    var gnode = this;
-    var groot = gnode.GameRoot;
+    var groot = this.GameRoot;
     var nodeType = this.getType();
     if (nodeType) {
       if (data.game_type && data.type_data) {
@@ -544,10 +540,7 @@ var Game = function () {
   };
 
   GameNode.prototype.initEventHandlers = function () {
-    // Bind specific eventhandlers (which get triggered by Render.Node)
-    // This is an example implementation and usually gets overwritten by the Subclasses
-    var gnode = this;
-    gnode.on('vclick', function (e) {
+    this.on('vclick', function (e) {
       e.stopPropagation();
     });
     if (this.extendEventHandlers) {
@@ -859,15 +852,11 @@ var Game = function () {
     //this.renderNode.jdomelem.find('*').off();
   };
   GameRoot.prototype.unlock = function () {
-    // UnLock the whole stage
-    // TODO make stage spinner in Render and use proper method to unbind events
-    // Unlock currently wouldn't work since all events are destroyed
-    var groot = this;
-    if (groot.NotificationQueue && groot.NotificationQueue.length < 2) {
+    if (this.NotificationQueue && this.NotificationQueue.length < 2) {
       this.renderNode.unlock();
       this.renderMenu.unlock();
       AniTicker.start();
-    } else if (!groot.NotificationQueue) {
+    } else if (!this.NotificationQueue) {
       this.renderNode.unlock();
       this.renderMenu.unlock();
       AniTicker.start();
@@ -1827,7 +1816,6 @@ var Game = function () {
   };
 
   GameRoot.prototype.initGameValues = function () {
-    var gnode = this;
     var gv = this.data.game_values; // FIXME: Added var; check for side-effects
     this.ap_value = gv.ap_initial;
     this.ap_offset = gv.ap_offset;
@@ -1848,43 +1836,42 @@ var Game = function () {
   };
 
   GameRoot.prototype.updateGameValues = function (game_values, levelup, missions, silent) {
-    var groot = this;
     var gv = game_values;
     if (missions) {
-      groot.Missions.updateMissions(missions, game_values);
+      this.Missions.updateMissions(missions, game_values);
       // FIXME: TESTING when mission completed, do not yet update game_values
       //silent = true;
     }
     if (gv.profiles_max !== undefined) {
-      groot.profiles_max = gv.profiles_max;
+      this.profiles_max = gv.profiles_max;
     }
-    if (gv.profiles_value !== undefined && gv.profiles_value !== groot.profiles_value) {
-      groot.setProfiles(gv.profiles_value, silent);
+    if (gv.profiles_value !== undefined && gv.profiles_value !== this.profiles_value) {
+      this.setProfiles(gv.profiles_value, silent);
     }
-    if (gv.cash_value !== undefined && gv.cash_value !== groot.cash_value) {
-      groot.setCash(gv.cash_value, silent);
+    if (gv.cash_value !== undefined && gv.cash_value !== this.cash_value) {
+      this.setCash(gv.cash_value, silent);
     }
     if (gv.ap_increment) {
-      groot.useAP(gv.ap_increment, silent);
+      this.useAP(gv.ap_increment, silent);
     }
-    if (gv.karma_value !== undefined && gv.karma_value !== groot.karma_value) {
-      groot.setKarma(gv.karma_value, silent);
+    if (gv.karma_value !== undefined && gv.karma_value !== this.karma_value) {
+      this.setKarma(gv.karma_value, silent);
     }
     if (gv.xp_value !== undefined) {
-      groot.setXP(gv.xp_value, silent);
+      this.setXP(gv.xp_value, silent);
     }
     // ap_snapshot is the authoritative engine AP — sync the visible
     // ap_value whenever it differs, not only on levelup. Without this,
     // the statusbar AP bar shows stale text after every chargePerp /
     // integrateCollected (handlers decrement ap_snapshot but Game.js
     // never reapplied it pre-#120 follow-up).
-    if (gv.ap_snapshot !== undefined && gv.ap_snapshot !== groot.ap_value) {
-      groot.setAP(gv.ap_snapshot, silent);
+    if (gv.ap_snapshot !== undefined && gv.ap_snapshot !== this.ap_value) {
+      this.setAP(gv.ap_snapshot, silent);
     }
     // levelup-only side effects.
     if (gv.ap_snapshot !== undefined && levelup === true && !silent) {
-      groot.getDatabase().checkNotifications();
-      groot.makeNotifications({ levelup: groot.xp_level.number });
+      this.getDatabase().checkNotifications();
+      this.makeNotifications({ levelup: this.xp_level.number });
     }
   };
 
@@ -2293,9 +2280,7 @@ var Game = function () {
       if (config.filter_is_query) {
         var is_query = filter_is_query === 'blue';
         addtokens = _.filter(tokens, function (n) {
-          {
-            return n.is_query === is_query;
-          }
+          return n.is_query === is_query;
         });
       }
     }
@@ -2347,6 +2332,7 @@ var Game = function () {
     });
     // sort when locked tokens are marked
 
+    // biome-ignore lint/suspicious/noSelfCompare: legacy always-true guard, removal is a separate refactor
     if (gnode.lockAmountZero || gnode.lockNotInDB || 0 === 0) {
       var sorted = gnode.tokens_set;
       // FIXME: sortBy Gestalt for messed up TokenSets from CMS/Backend (DBQueue and Clients)
@@ -2376,18 +2362,17 @@ var Game = function () {
   extend(ProfileSet, GameNode);
 
   ProfileSet.prototype.updateNewMarker = function () {
-    var ps = this;
     var groot = this.GameRoot;
     var seenMap = (groot.raw_data && groot.raw_data.tokens_seen) || {};
-    _.each(ps.tokens_set, function (token) {
+    _.each(this.tokens_set, function (token) {
       if (!groot.DBTokens.hasOwnProperty(token.gestalt) && !seenMap[token.gestalt]) {
         token.new = true;
       } else {
         token.new = false;
       }
     });
-    if (ps.popupTemplateData) {
-      ps.popupTemplateData.ProfileSet = ps;
+    if (this.popupTemplateData) {
+      this.popupTemplateData.ProfileSet = this;
     }
   };
 
@@ -2486,36 +2471,35 @@ var Game = function () {
   };
 
   Database.prototype.openUpgradesPopup = function () {
-    var gnode = this;
     // Popup instantiated for the first time
-    if (!gnode.popupTemplateData) {
-      gnode.popupTemplateData = {};
-      gnode.popupTemplateData.status_icons = gnode.GameRoot.data.status_icons;
-      gnode.popupTemplateData.states = {};
-      gnode.popupTemplateData.data = gnode.data;
-      gnode.popupTemplateData.data.gestalt = 'Database';
-      gnode.popupTemplateData.data.id = this.id;
-      gnode.popupTemplateData.data.title = _._('database_buytokens title');
-      gnode.popupTemplateData.data.subtitle = _._('database_buytokens subtitle');
-      gnode.popupTemplateData.data.description = _._('database_buytokens description');
-      gnode.popupTemplateData.data.selectortitle = _._('database_buytokens selector title');
-      gnode.popupTemplateData.data.mainsprites_class = 'DBUpgrade';
-      gnode.popupTemplateData.groot = gnode.GameRoot;
+    if (!this.popupTemplateData) {
+      this.popupTemplateData = {};
+      this.popupTemplateData.status_icons = this.GameRoot.data.status_icons;
+      this.popupTemplateData.states = {};
+      this.popupTemplateData.data = this.data;
+      this.popupTemplateData.data.gestalt = 'Database';
+      this.popupTemplateData.data.id = this.id;
+      this.popupTemplateData.data.title = _._('database_buytokens title');
+      this.popupTemplateData.data.subtitle = _._('database_buytokens subtitle');
+      this.popupTemplateData.data.description = _._('database_buytokens description');
+      this.popupTemplateData.data.selectortitle = _._('database_buytokens selector title');
+      this.popupTemplateData.data.mainsprites_class = 'DBUpgrade';
+      this.popupTemplateData.groot = this.GameRoot;
     }
-    gnode.popupTemplateData.data = gnode.data;
+    this.popupTemplateData.data = this.data;
 
     var popupConfig = {
       gameNode: this,
       template: 'popup.html',
-      templateData: gnode.popupTemplateData,
+      templateData: this.popupTemplateData,
       popupContainer: this,
     };
 
     var popup = (this.renderPopup = new Render.Popup(popupConfig));
 
-    gnode.renderNode.addPopup(popup);
+    this.renderNode.addPopup(popup);
 
-    gnode.initPopupEvents();
+    this.initPopupEvents();
 
     return popup;
   };
@@ -2829,17 +2813,15 @@ var Game = function () {
   };
 
   Database.prototype.checkNotifications = function () {
-    // FIXME: this doesn't work;
-    var gnode = this;
     var groot = this.GameRoot;
     var change = false;
-    if (!gnode.data.providedPerps) {
-      gnode.compileSuperTokens();
+    if (!this.data.providedPerps) {
+      this.compileSuperTokens();
       return;
     }
-    var before = _.pluck(_.where(gnode.data.providedPerps, { locked: false }), 'gestalt');
-    gnode.compileSuperTokens();
-    var after = _.pluck(_.where(gnode.data.providedPerps, { locked: false }), 'gestalt');
+    var before = _.pluck(_.where(this.data.providedPerps, { locked: false }), 'gestalt');
+    this.compileSuperTokens();
+    var after = _.pluck(_.where(this.data.providedPerps, { locked: false }), 'gestalt');
     var newbuyable = _.difference(after, before);
     if (newbuyable.length) {
       groot.makeNotifications({
@@ -3023,13 +3005,12 @@ var Game = function () {
   ///////////////////////////////////
 
   GamePerp.prototype.updateTemplateData = function () {
-    var gnode = this;
     var groot = this.GameRoot;
     // Popup instantiated for the first time
     if (!this.popupTemplateData) {
       this.popupTemplateData = {};
-      this.popupTemplateData.states = gnode.states;
-      this.popupTemplateData.status_icons = gnode.GameRoot.data.status_icons;
+      this.popupTemplateData.states = this.states;
+      this.popupTemplateData.status_icons = this.GameRoot.data.status_icons;
       this.popupTemplateData.data = {};
       this.popupTemplateData.data.gestalt = this.gestalt;
       this.popupTemplateData.data.id = this.id;
@@ -3037,7 +3018,7 @@ var Game = function () {
       this.popupTemplateData.groot = groot;
     }
     // highlight Tabs in popups
-    this.popupTemplateData.highlightTabs = gnode.highlightTabs || [];
+    this.popupTemplateData.highlightTabs = this.highlightTabs || [];
     _.extend(this.popupTemplateData.data, this.data);
     // FIXME: make this get game values method on groot
     this.popupTemplateData.game_values = {
@@ -3046,12 +3027,11 @@ var Game = function () {
   };
 
   GamePerp.prototype.openPopup = function () {
-    var gnode = this;
     var groot = this.GameRoot;
     //gnode.renderNode.setFrame('active');
 
     // Update TemplateData with current gnode data
-    gnode.updateTemplateData();
+    this.updateTemplateData();
 
     var popupConfig = {
       // Fixme: gameNode only used for debug info on logo click
@@ -3063,9 +3043,9 @@ var Game = function () {
 
     var popup = (this.renderPopup = new Render.Popup(popupConfig));
 
-    gnode.ViewMap.renderNode.addPopup(popup);
+    this.ViewMap.renderNode.addPopup(popup);
 
-    gnode.initPopupEvents();
+    this.initPopupEvents();
 
     return popup;
   };
@@ -3197,15 +3177,13 @@ var Game = function () {
   };
 
   GamePerp.prototype.updatePopup = function () {
-    var gnode = this;
-
-    if (gnode.popupTemplateData) {
+    if (this.popupTemplateData) {
       //gnode.popupTemplateData.loading = false;
     }
 
     // Update data with current gnode data
     //_.extend(this.popupTemplateData.data,gnode.data);
-    gnode.updateTemplateData();
+    this.updateTemplateData();
 
     var popupConfig = {
       gameNode: this,
@@ -3219,9 +3197,9 @@ var Game = function () {
     }
     var popup = (this.renderPopup = new Render.Popup(popupConfig));
 
-    gnode.ViewMap.renderNode.addPopup(popup);
+    this.ViewMap.renderNode.addPopup(popup);
 
-    gnode.initPopupEvents();
+    this.initPopupEvents();
 
     return popup;
   };
@@ -3302,9 +3280,9 @@ var Game = function () {
                 perp.renderNode,
                 { mode: perp.cableType },
                 function () {
-                  if (perp.cableType == 'in') {
+                  if (perp.cableType === 'in') {
                     perp.renderNode.FXBounce();
-                  } else if (perp.cableType == 'out') {
+                  } else if (perp.cableType === 'out') {
                     gnode.renderNode.FXBounce();
                   } else {
                     gnode.renderNode.FXBounce();
@@ -3341,8 +3319,7 @@ var Game = function () {
 
   // FIXME DEBUG: testpopup for each gameperp (gets overwritten)
   GamePerp.prototype.extendEventHandlers = function () {
-    var gnode = this;
-    gnode.on('vclick', function (e, renderNode) {
+    this.on('vclick', function (e, renderNode) {
       e.stopPropagation();
       var popup = this.openPopup();
     });
@@ -3353,7 +3330,6 @@ var Game = function () {
   ///////////////////////////////////
 
   var Topscores = function (config) {
-    var gnode = this;
     var groot = this.GameRoot;
     this.ViewMap = this;
     this.queue = new Set();
@@ -3369,7 +3345,6 @@ var Game = function () {
   };
 
   Topscores.prototype.initTopscore = function (type) {
-    var gnode = this;
     var groot = this.GameRoot;
     if (type === undefined) return;
 
@@ -3383,7 +3358,7 @@ var Game = function () {
       ViewMap: getByFirstId('Topscores'),
       gameType: 'Topscore',
     });
-    gnode.addChild(score);
+    this.addChild(score);
     score.render();
     score.renderNode.hide();
     return score;
@@ -3592,34 +3567,30 @@ var Game = function () {
   };
 
   Missions.prototype.getActiveMissions = function () {
-    var mroot = this;
     var groot = this.GameRoot;
-    return _.filter(mroot.Missions, function (m) {
+    return _.filter(this.Missions, function (m) {
       return m.states.active === true && m.states.complete === false;
     });
   };
 
   Missions.prototype.getVisibleMissions = function () {
-    var mroot = this;
     var groot = this.GameRoot;
-    return _.filter(mroot.Missions, function (m) {
+    return _.filter(this.Missions, function (m) {
       return m.states.active === true || m.states.complete === true;
     });
   };
 
   Missions.prototype.getCompletedMissions = function () {
-    var mroot = this;
     var groot = this.GameRoot;
-    return _.filter(mroot.Missions, function (m) {
+    return _.filter(this.Missions, function (m) {
       return m.states.active === false && m.states.complete === true;
     });
   };
 
   Missions.prototype.getNextMissions = function () {
-    var mroot = this;
     var groot = this.GameRoot;
     var next_missions = {};
-    var active_missions = _.each(mroot.getActiveMissions(), function (mission) {
+    var active_missions = _.each(this.getActiveMissions(), function (mission) {
       var next = mission.getNext();
       if (next) {
         next_missions[next.gestalt] = next;
@@ -3629,7 +3600,6 @@ var Game = function () {
   };
 
   Missions.prototype.checkProjectGoals = function () {
-    var mroot = this;
     var groot = this.GameRoot;
     var fetch_project_data = {};
     var update_missions = [];
@@ -3643,8 +3613,8 @@ var Game = function () {
       });
     };
 
-    _.each(mroot.getVisibleMissions(), checkMission);
-    _.each(mroot.getNextMissions(), checkMission);
+    _.each(this.getVisibleMissions(), checkMission);
+    _.each(this.getNextMissions(), checkMission);
 
     _.each(fetch_project_data, function (mission, gestalt) {
       groot.fetchProjectPowerupData(gestalt, function () {
@@ -3760,8 +3730,7 @@ var Game = function () {
   };
 
   Mission.prototype.getNext = function (gestalt) {
-    var mission = this;
-    var mroot = mission.parentNode;
+    var mroot = this.parentNode;
     gestalt = gestalt || this.gestalt;
     return _.find(mroot.Missions, function (m) {
       return m.data.required_mission && m.data.required_mission === gestalt;
@@ -3769,9 +3738,8 @@ var Game = function () {
   };
 
   Mission.prototype.updateRender = function () {
-    var mission = this;
-    if (mission.renderNode) {
-      mission.renderNode.render();
+    if (this.renderNode) {
+      this.renderNode.render();
     }
   };
 
@@ -3802,31 +3770,29 @@ var Game = function () {
   };
 
   Mission.prototype.openMissionPopup = function () {
-    var gnode = this;
     var groot = this.GameRoot;
 
     groot.openGenericPopup({
-      states: gnode.states,
-      data: gnode.data,
+      states: this.states,
+      data: this.data,
       template: 'popup_mission.html',
       extendClass: 'Mission',
     });
   };
 
   Mission.prototype.checkTutorial = function () {
-    var gnode = this;
     var groot = this.GameRoot;
     var mroot = groot.Missions;
-    if (gnode.states.active && gnode.data.tutorial) {
+    if (this.states.active && this.data.tutorial) {
       // If the player already dismissed the mission briefing, the NPC coach
       // intro has already been seen — skip re-queuing on reload.
       var seenBriefings = (groot.raw_data && groot.raw_data.mission_briefings_seen) || {};
-      if (seenBriefings[gnode.gestalt]) {
+      if (seenBriefings[this.gestalt]) {
         return false;
       }
       groot.setState('tutorial_active', true);
       // TODO: check each step for completion and delete everything before
-      var steps = gnode.data.tutorial;
+      var steps = this.data.tutorial;
       var deletefrom = 0;
       _.each(steps, function (step, k) {
         if (step.buyPerp && groot.IPerps.hasOwnProperty(step.buyPerp)) {
@@ -3904,8 +3870,7 @@ var Game = function () {
   };
 
   Mission.prototype.extendRender = function () {
-    var gnode = this;
-    if (!gnode.states.active && !gnode.states.complete) {
+    if (!this.states.active && !this.states.complete) {
       //gnode.renderNode.hide();
     }
   };
@@ -4005,9 +3970,9 @@ var Game = function () {
                 perp.renderNode,
                 { mode: perp.cableType },
                 function () {
-                  if (perp.cableType == 'in') {
+                  if (perp.cableType === 'in') {
                     perp.renderNode.FXBounce();
-                  } else if (perp.cableType == 'out') {
+                  } else if (perp.cableType === 'out') {
                     gnode.renderNode.FXBounce();
                   } else {
                     gnode.renderNode.FXBounce();
@@ -4266,11 +4231,9 @@ var Game = function () {
   };
 
   GamePerp.prototype.getProvidedByRequiredPerps = function () {
-    // returns all provided perps by required providers
-    var gnode = this;
     var groot = this.GameRoot;
     var perps = [];
-    _.each(gnode.data.provided_perps, function (gestalt, key) {
+    _.each(this.data.provided_perps, function (gestalt, key) {
       var type = groot.getType(gestalt);
       if (type.type_data.required_providers && !groot.IPerps.hasOwnProperty(gestalt)) {
         _.each(type.type_data.required_providers, function (provided) {
@@ -4299,11 +4262,9 @@ var Game = function () {
   };
 
   GamePerp.prototype.getProvidedByLevel = function () {
-    // returns all available perp gestalten
-    var gnode = this;
     var groot = this.GameRoot;
     var perps = [];
-    _.each(gnode.data.provided_perps, function (gestalt, key) {
+    _.each(this.data.provided_perps, function (gestalt, key) {
       var type = groot.getType(gestalt);
       if (
         type.type_data.required_level <= groot.xp_level.number &&
@@ -4471,7 +4432,6 @@ var Game = function () {
 
   ContactPerp.prototype.collect = function () {
     var gperp = this;
-    var gnode = this;
     var groot = this.GameRoot;
     var deco = this.renderReady;
     var popup = this.renderPopup;
@@ -4665,15 +4625,14 @@ class CollectableClient(CollectablePerpBase):
   };
 
   ClientPerp.prototype.getKarmaPenalty = function () {
-    var gnode = this;
     var groot = this.GameRoot;
     var karma = groot.karma_value;
     var karma_factor = (karma + 100) / 200 + 0.5;
     karma_factor = karma_factor > 1 ? 1 : karma_factor;
     if (karma_factor < 1) {
-      gnode.data.karma_penalty = true;
+      this.data.karma_penalty = true;
     } else {
-      gnode.data.karma_penalty = false;
+      this.data.karma_penalty = false;
     }
     return karma_factor;
   };
@@ -4693,10 +4652,9 @@ class CollectableClient(CollectablePerpBase):
 
   ClientPerp.prototype.getIncome = function (nopenalty) {
     var groot = this.GameRoot;
-    var gnode = this;
-    var base_income = gnode.data.income_base;
-    var base_income_factor = gnode.data.income_factor;
-    var consumed_tokens = gnode.data.consumed_tokens;
+    var base_income = this.data.income_base;
+    var base_income_factor = this.data.income_factor;
+    var consumed_tokens = this.data.consumed_tokens;
     var db_profiles = groot.DBTokens;
     var sum = [];
     _.each(consumed_tokens, function (token, k) {
@@ -4711,10 +4669,10 @@ class CollectableClient(CollectablePerpBase):
       0
     );
     var db_fill_factor = groot.getDBFactorNormalized();
-    var karma_penalty_factor = nopenalty ? 1 : gnode.getKarmaPenalty();
-    amount = Math.pow(amount * db_fill_factor, 0.6);
+    var karma_penalty_factor = nopenalty ? 1 : this.getKarmaPenalty();
+    amount = (amount * db_fill_factor) ** 0.6;
     //var result = parseInt( karma_penalty_factor * Math.round( (base_income + (amount * base_income * (base_income_factor/1000))) /10 ) * 10 );
-    var result = parseInt(
+    var result = Number.parseInt(
       karma_penalty_factor *
         Math.round(base_income + amount * base_income * (base_income_factor / 1000))
     );
@@ -4776,7 +4734,6 @@ class CollectableClient(CollectablePerpBase):
 
   ClientPerp.prototype.collect = function () {
     var gperp = this;
-    var gnode = this;
     var groot = this.GameRoot;
     var deco = gperp.renderReady;
     // No Request when no AP
@@ -4971,17 +4928,16 @@ class CollectableClient(CollectablePerpBase):
   };
 
   ProxyPerp.prototype.updateRenderSlotStatus = function () {
-    var gnode = this;
-    var node = gnode.renderNode;
-    gnode.data.used_slots = gnode.children.set.length;
-    if (gnode.data.used_slots < gnode.data.max_slots) {
+    var node = this.renderNode;
+    this.data.used_slots = this.children.set.length;
+    if (this.data.used_slots < this.data.max_slots) {
       node.addDecorator(
         new Render.DecoratorLabel({
-          text: gnode.data.label + '<br />' + gnode.data.used_slots + '/' + gnode.data.max_slots,
+          text: this.data.label + '<br />' + this.data.used_slots + '/' + this.data.max_slots,
         })
       );
     } else {
-      node.addDecorator(new Render.DecoratorLabel({ text: gnode.data.label }));
+      node.addDecorator(new Render.DecoratorLabel({ text: this.data.label }));
     }
   };
 
@@ -5004,10 +4960,9 @@ class CollectableClient(CollectablePerpBase):
   ProjectPerp.prototype.textNewItems = _._('New Powerups!');
 
   ProjectPerp.prototype.compileProfileSet = function () {
-    var gnode = this;
-    gnode.data.ProfileSet = new ProfileSet(
+    this.data.ProfileSet = new ProfileSet(
       { markNew: true, lockAmountZero: true },
-      gnode.data.tokens
+      this.data.tokens
     );
   };
 
@@ -5051,6 +5006,7 @@ class CollectableClient(CollectablePerpBase):
   ProjectPerp.prototype.fetchPowerups = function (cb) {
     this.GameRoot.fetchProjectPowerupData(this.gestalt, cb);
     return;
+    // biome-ignore lint/correctness/noUnreachable: legacy dead code, kept as reference for future re-enable
     var gnode = this;
     // Register Powerups in typeRegistry if opend for the first time move this to compilePowerupsa
     if (!gnode.data.powerups_compiled) {
@@ -5193,12 +5149,10 @@ class CollectableClient(CollectablePerpBase):
   };
 
   ProjectPerp.prototype.removeProvidedPowerup = function (bgestalt) {
-    // Does not actually remove powerup but flags as bought
-    var gnode = this;
     var provided = {
-      provided_ads: gnode.data.provided_ads,
-      provided_upgrades: gnode.data.provided_upgrades,
-      provided_teammembers: gnode.data.provided_teammembers,
+      provided_ads: this.data.provided_ads,
+      provided_upgrades: this.data.provided_upgrades,
+      provided_teammembers: this.data.provided_teammembers,
     };
     _.each(provided, function (p, key) {
       var deleteme = _.findWhere(p, { gestalt: bgestalt });
@@ -5210,12 +5164,10 @@ class CollectableClient(CollectablePerpBase):
   };
 
   ProjectPerp.prototype.addProvidedPowerup = function (bgestalt) {
-    // Does not actually add powerup but unflags as bought
-    var gnode = this;
     var provided = {
-      provided_ads: gnode.data.provided_ads,
-      provided_upgrades: gnode.data.provided_upgrades,
-      provided_teammembers: gnode.data.provided_teammembers,
+      provided_ads: this.data.provided_ads,
+      provided_upgrades: this.data.provided_upgrades,
+      provided_teammembers: this.data.provided_teammembers,
     };
     _.each(provided, function (p, key) {
       var addme = _.findWhere(p, { gestalt: bgestalt });
@@ -5226,14 +5178,11 @@ class CollectableClient(CollectablePerpBase):
   };
 
   GameNode.prototype.Error = function (errormsg, data) {
-    // TODO: consolidate Error Codes on Backend and parse them with this function
-    // try to display an error or fallback to game root
-    var gnode = this;
     var groot = this.GameRoot;
-    if (gnode.renderPopup && gnode.renderPopup.open) {
-      gnode.renderPopup.trigger('error');
-    } else if (gnode.renderNode) {
-      gnode.renderNode.FXError();
+    if (this.renderPopup && this.renderPopup.open) {
+      this.renderPopup.trigger('error');
+    } else if (this.renderNode) {
+      this.renderNode.FXError();
     } else if (groot) {
       groot.renderNode.FXError();
     }
@@ -5243,20 +5192,18 @@ class CollectableClient(CollectablePerpBase):
   };
 
   GameNode.prototype.NoCash = function () {
-    var gnode = this;
-    if (gnode.renderPopup && gnode.renderPopup.open) {
-      gnode.renderPopup.trigger('no_cash');
+    if (this.renderPopup && this.renderPopup.open) {
+      this.renderPopup.trigger('no_cash');
     } else {
-      gnode.renderNode.FXNoCash();
+      this.renderNode.FXNoCash();
     }
   };
 
   GameNode.prototype.NoAP = function () {
-    var gnode = this;
-    if (gnode.renderPopup && gnode.renderPopup.open) {
-      gnode.renderPopup.trigger('no_AP');
+    if (this.renderPopup && this.renderPopup.open) {
+      this.renderPopup.trigger('no_AP');
     } else {
-      gnode.renderNode.FXNoAP();
+      this.renderNode.FXNoAP();
     }
   };
 
@@ -5334,7 +5281,7 @@ class CollectableClient(CollectablePerpBase):
     // TODO: backendcall and do purchase...
 
     app.remote
-      .sellPowerup(gnode.path, parseInt(bslot), bgestalt)
+      .sellPowerup(gnode.path, Number.parseInt(bslot), bgestalt)
       .done(function (data) {
         if (data.result) {
           if (data.result.error !== undefined) {
@@ -5370,7 +5317,7 @@ class CollectableClient(CollectablePerpBase):
 
   ProjectPerp.prototype.BuySlots = function (num, bgestalt) {
     var pcat = convertPowerupType(bgestalt.split(':')[1]);
-    num = parseInt(num, 10) || 1;
+    num = Number.parseInt(num, 10) || 1;
 
     var gnode = this;
     var groot = this.GameRoot;
@@ -5452,28 +5399,27 @@ class CollectableClient(CollectablePerpBase):
   };
 
   ProjectPerp.prototype.updatePopupGracefully = function (bslot, bgestalt, selling) {
-    var gnode = this;
     var pcat = getPowerupTypeFromGestalt(bgestalt);
-    gnode.updateTemplateData();
-    if (gnode.popupTemplateData) {
-      gnode.popupTemplateData.loading = false;
+    this.updateTemplateData();
+    if (this.popupTemplateData) {
+      this.popupTemplateData.loading = false;
     }
 
-    if (!gnode.renderPopup) {
+    if (!this.renderPopup) {
       return;
     }
 
-    var popup = gnode.renderPopup;
+    var popup = this.renderPopup;
     popup.renderDataTab();
     popup.renderPowerupSelectors(pcat);
 
-    var jpop = gnode.renderPopup.jdomelem;
+    var jpop = this.renderPopup.jdomelem;
     var jtab = jpop.find('.PopupTab[data-tab="' + pcat + '"]');
     if (!selling) {
       // Buying a Powerup
       var slot = jtab.find('.Powerup.free[data-button-data="' + bslot + '"]');
       slot.removeAttr('data-subpop-id');
-      var powerup = _.findWhere(gnode.data.powerups, { gestalt: bgestalt });
+      var powerup = _.findWhere(this.data.powerups, { gestalt: bgestalt });
       var jpowerup = _.renderView('powerup.html', {
         powerup: powerup,
         slot: bslot,
@@ -5512,9 +5458,9 @@ class CollectableClient(CollectablePerpBase):
       slot.removeAttr('data-subpop-id');
       var jpowerup = _.renderView('powerup_free.html', {
         slot: bslot,
-        slot_background: gnode.data.slot_background,
+        slot_background: this.data.slot_background,
         pkey: pcat,
-        data: gnode.popupTemplateData.data,
+        data: this.popupTemplateData.data,
         typelower: convertPowerupType(pcat),
         updating: true,
       });
@@ -5625,7 +5571,6 @@ class CollectableClient(CollectablePerpBase):
 
   ProjectPerp.prototype.collect = function () {
     var gperp = this;
-    var gnode = this;
     var groot = this.GameRoot;
     var deco = this.renderReady;
     var popup = gperp.renderPopup;
@@ -5761,13 +5706,12 @@ class CollectableClient(CollectablePerpBase):
   };
 
   TokenPerp.prototype.updateGear = function () {
-    var gnode = this;
-    if (gnode.data.contained_tokens.length === 0 || gnode.renderNode === undefined) {
+    if (this.data.contained_tokens.length === 0 || this.renderNode === undefined) {
       return;
     }
-    gnode.makeProfileSet();
+    this.makeProfileSet();
     var node = this.renderNode;
-    var av = gnode.getUpgradeAverage();
+    var av = this.getUpgradeAverage();
     var frame = av > 0 ? 'normal' : 'inactive';
     if (!node.DecoratorGear === undefined) {
       node.addDecorator(new Render.DecoratorGear());
@@ -5776,19 +5720,18 @@ class CollectableClient(CollectablePerpBase):
   };
 
   TokenPerp.prototype.getUpgradeAverage = function () {
-    var gnode = this;
-    gnode.setState('zeroresult', true);
-    if (!gnode.data.ProfileSet) {
+    this.setState('zeroresult', true);
+    if (!this.data.ProfileSet) {
       return 0;
     }
     var amounts = [];
-    _.each(gnode.data.ProfileSet.tokens_set, function (token) {
+    _.each(this.data.ProfileSet.tokens_set, function (token) {
       if (!token.locked && token.diffAmount !== undefined) {
         amounts.push(token.diffAmount);
       }
     });
     var len = amounts.length || 1;
-    gnode.data.upgradeAverage =
+    this.data.upgradeAverage =
       Math.round(
         (_.reduce(
           amounts,
@@ -5800,10 +5743,10 @@ class CollectableClient(CollectablePerpBase):
           len) *
           100
       ) / 100;
-    if (gnode.data.upgradeAverage > 0) {
-      gnode.setState('zeroresult', false);
+    if (this.data.upgradeAverage > 0) {
+      this.setState('zeroresult', false);
     }
-    return gnode.data.upgradeAverage;
+    return this.data.upgradeAverage;
   };
 
   TokenPerp.prototype.extendRender = function () {
@@ -5854,15 +5797,14 @@ class CollectableClient(CollectablePerpBase):
   };
 
   TokenPerp.prototype.makeProfileSet = function () {
-    var gnode = this;
-    gnode.data.ProfileSet = new ProfileSet(
+    this.data.ProfileSet = new ProfileSet(
       {
         lockNotInDB: true,
         DBAmounts: true,
         markUpgradeValues: true,
-        lastUpgradeValues: gnode.data.last_upgrade_values,
+        lastUpgradeValues: this.data.last_upgrade_values,
       },
-      gnode.data.contained_tokens
+      this.data.contained_tokens
     );
   };
 

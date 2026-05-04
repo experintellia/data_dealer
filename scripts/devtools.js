@@ -12,7 +12,7 @@
 //   window.__dd.getZoom();                          // current zoom of active ViewMap
 //   window.__dd.setZoom(0.6);                       // jump zoom (no animation)
 
-import { setOverride, clearOverride, advance } from './clock.js';
+import { advance, clearOverride, setOverride } from './clock.js';
 
 if (
   typeof window !== 'undefined' &&

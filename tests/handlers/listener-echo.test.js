@@ -43,24 +43,24 @@
  * unskipped in #120 Phase 2 once the snapshot-based delta convention was
  * applied to every handler. Now the regression suite for the bug class.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  chargePerp,
   buyKarma,
   buyPerp,
+  buyPowerup,
+  buySlots,
+  chargePerp,
   collectPerp,
   integrateCollected,
-  buyPowerup,
   sellPowerup,
-  buySlots,
-  setSendDelta,
   setEmitter,
+  setSendDelta,
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
-import { freshState, applyDelta } from '../../scripts/state.js';
-import { setOverride, clearOverride } from '../../scripts/clock.js';
+import { clearOverride, setOverride } from '../../scripts/clock.js';
 import { materialize } from '../../scripts/materializer.js';
-import { FIXED_NOW, mkGv, mkState, mkNode, mkChargingEntry } from './_fixtures.js';
+import { applyDelta, freshState } from '../../scripts/state.js';
+import { FIXED_NOW, mkChargingEntry, mkGv, mkNode, mkState } from './_fixtures.js';
 
 // ── shared fixtures ─────────────────────────────────────────────────────────
 

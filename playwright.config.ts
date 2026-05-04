@@ -1,5 +1,5 @@
+import { existsSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
-import { existsSync } from 'fs';
 
 // On this dev machine Chromium lives at a fixed path; in CI `playwright install`
 // puts it wherever Playwright decides.  Only override when the path exists so

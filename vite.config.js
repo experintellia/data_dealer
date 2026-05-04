@@ -1,8 +1,8 @@
 import { cpSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { buildXDC } from '@webxdc/vite-plugins';
 import { build, defineConfig } from 'vite';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
-import { buildXDC } from '@webxdc/vite-plugins';
 
 // 'hq' (default): ship the canonical sources as-is — bit-exact lossless
 // cartoon-art pixels.  'casual': ship the pre-quantized counterparts
@@ -38,7 +38,7 @@ function swapInCasualAssets() {
       if (!existsSync(srcImg) || !existsSync(srcIcon)) {
         throw new Error(
           `[swap-in-casual-assets] missing pre-quantized assets at ${srcImg} / ${srcIcon}. ` +
-            `Run \`pnpm quantize-assets\` to (re)generate them.`
+            'Run `pnpm quantize-assets` to (re)generate them.'
         );
       }
       rmSync(distImg, { recursive: true, force: true });

@@ -9,7 +9,7 @@
  * real wall-clock time is never slept on.
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test('boot: loader disappears and game container is visible', async ({ page }) => {
   const jsErrors: string[] = [];

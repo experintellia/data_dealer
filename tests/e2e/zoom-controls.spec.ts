@@ -10,7 +10,7 @@
  * scroller publishes one tween, not two.  This test pins that behavior.
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 interface DDHook {
   __dd?: {

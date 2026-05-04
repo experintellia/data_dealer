@@ -10,15 +10,15 @@
 // resetGame is intentionally absent — in webxdc, reset = re-share the .xdc.
 // Remaining handlers are stubs that return a rejected Promise.
 
-import { getState, setState } from './boot.js';
-import { applyDelta } from './state.js';
-import type { LocalState, Delta, GameValues, GameNode, MissionGoal } from './state.js';
-import { materialize } from './materializer.js';
-import { now as clockNow } from './clock.js';
 import rulesetDe from '../data/ruleset_3.de.json' with { type: 'json' };
 import rulesetEn from '../data/ruleset_3.en.json' with { type: 'json' };
 import i18nDe from '../i18n/de_AT.json' with { type: 'json' };
 import i18nEn from '../i18n/en_US.json' with { type: 'json' };
+import { getState, setState } from './boot.js';
+import { now as clockNow } from './clock.js';
+import { materialize } from './materializer.js';
+import { applyDelta } from './state.js';
+import type { Delta, GameNode, GameValues, LocalState, MissionGoal } from './state.js';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -770,6 +770,7 @@ function _mkDelta(addr: string, op: string, args: unknown[], result: unknown): D
 // ---------------------------------------------------------------------------
 
 // Printable Unicode, 1–30 chars; no ASCII control chars (< 0x20) or DEL (0x7f).
+// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional char-class exclusion for control chars
 var DISPLAY_NAME_RE = /^[^\x00-\x1f\x7f]{1,30}$/;
 
 function validateDisplayName(name: unknown): name is string {
@@ -1259,7 +1260,7 @@ export function buySlots(
   slotType: string,
   num: number | string
 ): Promise<{ result: { error: number } | Record<string, unknown> }> {
-  var nNum = parseInt(String(num), 10) || 1;
+  var nNum = Number.parseInt(String(num), 10) || 1;
   var r = _resolveNode(perpPath);
   if (!r) return Promise.resolve({ result: { error: 0 } });
   var state = r.state,
@@ -1276,7 +1277,7 @@ export function buySlots(
   // function works on plain `number` values.
   var currentSlots: number =
     _readNumber(node.instance_data, slotKey) ?? _readNumber(perpTypeData, slotKey) ?? 0;
-  var maxSlots: number = _readNumber(perpTypeData, maxKey) ?? Infinity;
+  var maxSlots: number = _readNumber(perpTypeData, maxKey) ?? Number.POSITIVE_INFINITY;
 
   if (currentSlots + nNum > maxSlots) return Promise.resolve({ result: { error: 2 } });
 
@@ -2244,7 +2245,7 @@ function _handleKarmaIncident(gv: GameValues, ruleset: Ruleset): KarmaIncident |
   var karma = (gv && gv.karma_value) || 0;
   if (karma >= 0) return null;
 
-  var factor = Math.pow(-karma / 100, 0.5) + 0.05;
+  var factor = (-karma / 100) ** 0.5 + 0.05;
   if (_rng() >= factor) return null;
 
   var level = (gv && gv.xp_level) || 1;
@@ -2423,6 +2424,7 @@ export function collectPerp(
     last_seen_ts: Math.max(now, ms.last_seen_ts || 0),
   });
 
+  // biome-ignore lint/suspicious/noImplicitAnyLet: typed on first assignment below
   var collectMissionResult;
   if (gameType === 'ContactPerp') {
     collectMissionResult = _advanceCollectProfilesMissions(

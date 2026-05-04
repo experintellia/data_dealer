@@ -9,9 +9,9 @@
 // helpers (registered as mixins by app.js), so those calls read `_` from
 // globalThis at call time — long after vendor/underscore.js has loaded.
 
-import setup from './setup.js';
 import deAT from '../i18n/de_AT.json' with { type: 'json' };
 import enUS from '../i18n/en_US.json' with { type: 'json' };
+import setup from './setup.js';
 
 let locale = 'en_US';
 

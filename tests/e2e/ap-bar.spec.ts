@@ -15,7 +15,7 @@
  * game_type=ContactPerp.
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 const GESTALT = 'contact035';
 const PATH = `Imperium.${GESTALT}`;
@@ -45,7 +45,7 @@ test('energy bar: charge action decrements visual AP value and bar width', async
   const readBarWidth = async () =>
     page
       .locator('[data-testid="dd-ap-bar"]')
-      .evaluate((el) => parseFloat((el as HTMLElement).style.width || '0'));
+      .evaluate((el) => Number.parseFloat((el as HTMLElement).style.width || '0'));
   const initialBarWidth = await readBarWidth();
   expect(initialBarWidth).toBeGreaterThan(0);
 

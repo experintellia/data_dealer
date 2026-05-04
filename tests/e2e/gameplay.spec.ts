@@ -24,7 +24,7 @@
  *   game_type:    ContactPerp → produces a db_queue entry on collectPerp
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 // Gestalt and path of the perp used across this spec.
 const GESTALT = 'contact035';

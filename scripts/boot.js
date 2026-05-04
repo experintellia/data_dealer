@@ -26,7 +26,7 @@
 // The underlying state logic (freshState / applyDelta) is fully unit-tested in
 // tests/state/state.test.js.
 
-import { freshState, applyDelta } from './state.js';
+import { applyDelta, freshState } from './state.js';
 
 var _currentState = null;
 var _bootPromise = null;

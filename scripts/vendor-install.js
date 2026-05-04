@@ -26,12 +26,12 @@
 //   zynga-scroller:https://raw.githubusercontent.com/zynga/scroller/dadd850/src/Scroller.js
 //   sprintf:       https://raw.githubusercontent.com/alexei/sprintf.js/192bc60/src/sprintf.js
 
-import { execSync } from 'child_process';
-import { mkdirSync, copyFileSync, existsSync, readdirSync } from 'fs';
-import { join } from 'path';
-import { mkdtempSync } from 'fs';
-import { tmpdir } from 'os';
-import { fileURLToPath } from 'url';
+import { execSync } from 'node:child_process';
+import { copyFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 const vendorDir = join(root, 'vendor');
@@ -54,7 +54,7 @@ function cp(src, dest) {
 }
 
 console.log('Installing npm-sourced vendor packages…');
-run(`npm init -y`);
+run('npm init -y');
 run(
   [
     'npm install --save-exact',

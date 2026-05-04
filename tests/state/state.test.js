@@ -1,6 +1,6 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
-import { describe, it, expect } from 'vitest';
-import { freshState, applyDelta, SCHEMA_VERSION } from '../../scripts/state.js';
+import { describe, expect, it } from 'vitest';
+import { SCHEMA_VERSION, applyDelta, freshState } from '../../scripts/state.js';
 
 // Required acceptance criteria from issue #10:
 //   A. Two divergent replay sequences with the same delta-set converge to identical state.

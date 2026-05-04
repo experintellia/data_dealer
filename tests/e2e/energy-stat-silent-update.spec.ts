@@ -5,7 +5,7 @@
  * `AP_val` prop stale until something else forced a re-render.
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test('energy stat: silent updateGameValues still refreshes statusbar text (issue #153)', async ({
   page,

@@ -1,4 +1,7 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 /**
  * Build-time validation of type_settings.js and the ruleset.
  *
@@ -13,10 +16,7 @@
  * type_settings.js is an AMD module; we analyse it as source text to avoid
  * RequireJS + jQuery dependencies in the Node test environment.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 

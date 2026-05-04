@@ -1,13 +1,13 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
+import { execSync } from 'node:child_process';
+import { existsSync, statSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 // Verifies that `pnpm build:all` completes without errors and produces the
 // expected dist/ layout and both `.xdc` variants. Runs the real build
 // script as a child process so that vite/rollup errors, missing files,
 // pngquant/oxipng failures in the casual pass, etc. are caught.
-import { describe, it, expect, beforeAll } from 'vitest';
-import { execSync } from 'child_process';
-import { existsSync, statSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -69,7 +69,7 @@ describe('dist/ structure', () => {
 
 describe('dist/index.html', () => {
   it('references esm-bundle.js with the vendor <script> chain', async () => {
-    const { readFileSync } = await import('fs');
+    const { readFileSync } = await import('node:fs');
     const html = readFileSync(join(root, 'dist', 'index.html'), 'utf8');
     expect(html).toContain('scripts/esm-bundle.js');
     expect(html).toContain('vendor/jquery.js');
@@ -81,7 +81,7 @@ describe('dist/index.html', () => {
 
 describe('dist/scripts/esm-bundle.js', () => {
   it('contains LocalEngine handler code', async () => {
-    const { readFileSync } = await import('fs');
+    const { readFileSync } = await import('node:fs');
     const bundle = readFileSync(join(root, 'dist', 'scripts', 'esm-bundle.js'), 'utf8');
     // Sanity-check that handler names from LocalEngine survived bundling
     // (they appear as string literals because LocalEngine builds a
@@ -91,7 +91,7 @@ describe('dist/scripts/esm-bundle.js', () => {
   });
 
   it('does NOT contain a `define.amd` AMD-bridge footer', async () => {
-    const { readFileSync } = await import('fs');
+    const { readFileSync } = await import('node:fs');
     const bundle = readFileSync(join(root, 'dist', 'scripts', 'esm-bundle.js'), 'utf8');
     expect(bundle).not.toContain('define.amd');
   });

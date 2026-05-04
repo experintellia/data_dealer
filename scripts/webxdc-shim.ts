@@ -4,11 +4,9 @@
  * To turn this into a proper Node/vitest mock: drop the localStorage calls and
  * export window.webxdc as a module so tests can import and reset it between runs.
  */
-import type { SendingStatusUpdate, ReceivedStatusUpdate } from '@webxdc/types';
+import type { ReceivedStatusUpdate, SendingStatusUpdate } from '@webxdc/types';
 
 (function () {
-  'use strict';
-
   if (window.webxdc) return; // real messenger present — nothing to do
 
   console.log('[webxdc-shim] dev mode');

@@ -36,7 +36,7 @@
  * #120 is implemented.
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 const GESTALT = 'contact035';
 const PATH = `Imperium.${GESTALT}`;

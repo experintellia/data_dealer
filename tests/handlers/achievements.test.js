@@ -11,18 +11,18 @@
  *  - Tier 3 cosmetic milestones fire correctly.
  *  - payload.achievement_kind distinguishes subtypes for consumers.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  buyKarma,
   buyPerp,
   integrateCollected,
-  buyKarma,
+  setEmitter,
   setSendAchievement,
   setSendDelta,
-  setEmitter,
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
+import { clearOverride, setOverride } from '../../scripts/clock.js';
 import { applyDelta, freshState } from '../../scripts/state.js';
-import { setOverride, clearOverride } from '../../scripts/clock.js';
 import { FIXED_NOW, mkGv, mkState } from './_fixtures.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

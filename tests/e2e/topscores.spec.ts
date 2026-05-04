@@ -20,7 +20,7 @@
  * state.peers identity changes).
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 type PeerSeed = {
   display_name: string;

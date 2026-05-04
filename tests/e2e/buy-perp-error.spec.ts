@@ -13,7 +13,7 @@
  * Starting cash: 270 (default_game.json) → 270 < 400 → error 2.
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test('buy-perp: insufficient cash returns error code 2', async ({ page }) => {
   await page.goto('/?devtools=1');

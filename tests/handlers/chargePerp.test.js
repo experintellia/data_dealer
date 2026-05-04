@@ -1,11 +1,11 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { chargePerp, loadGame, setSendDelta, setEmitter } from '../../scripts/LocalEngine.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { chargePerp, loadGame, setEmitter, setSendDelta } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
-import { freshState, applyDelta } from '../../scripts/state.js';
-import { setOverride, clearOverride } from '../../scripts/clock.js';
+import { clearOverride, setOverride } from '../../scripts/clock.js';
 import { materialize } from '../../scripts/materializer.js';
-import { FIXED_NOW, mkNode as _mkNode, mkState as _mkBaseState } from './_fixtures.js';
+import { applyDelta, freshState } from '../../scripts/state.js';
+import { FIXED_NOW, mkState as _mkBaseState, mkNode as _mkNode } from './_fixtures.js';
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 

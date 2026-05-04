@@ -5,7 +5,7 @@
 //
 // Source authority for each rule: docs/async-map.md.
 
-import type { LocalState, ChargingEntry, CollectEntry, GameValues } from './state.js';
+import type { ChargingEntry, CollectEntry, GameValues, LocalState } from './state.js';
 
 // ---------------------------------------------------------------------------
 // Types

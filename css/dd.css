@@ -5,6 +5,7 @@ button {
   user-select: none;
   -o-user-select: none;
   -moz-user-select: none;
+  /* biome-ignore lint/correctness/noUnknownProperty: legacy vendor prefix for KHTML/Konqueror */
   -khtml-user-select: none;
   -webkit-user-select: none;
 }
@@ -14,6 +15,7 @@ input,
   user-select: auto;
   -o-user-select: auto;
   -moz-user-select: auto;
+  /* biome-ignore lint/correctness/noUnknownProperty: legacy vendor prefix for KHTML/Konqueror */
   -khtml-user-select: auto;
   -webkit-user-select: auto;
 }

@@ -17,7 +17,7 @@
  * implementation, so this spec is a regression target for the fix.
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/?devtools=1');
@@ -168,6 +168,7 @@ test('integrating the same profileset twice does not change shares (N = 0 dup re
   });
 
   expect(out.shareAfterFirst).toBeCloseTo(100, 6);
+  // biome-ignore lint/style/noNonNullAssertion: shareAfterFirst is always set by the evaluate block above
   expect(out.shareAfterReplay).toBeCloseTo(out.shareAfterFirst!, 6);
   expect(out.profilesAfterReplay).toBe(out.profilesAfterFirst);
 });

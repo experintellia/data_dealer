@@ -716,7 +716,8 @@ function _applyPeerDelta(state: LocalState, delta: Delta): LocalState {
   var existing: PeerEntry = peers[addr] || {};
 
   // Stale-delta guard: skip if this delta is older than the last we recorded.
-  var prevTs = typeof existing.last_seen_ts === 'number' ? existing.last_seen_ts : -Infinity;
+  var prevTs =
+    typeof existing.last_seen_ts === 'number' ? existing.last_seen_ts : Number.NEGATIVE_INFINITY;
   if (typeof delta.ts === 'number' && delta.ts < prevTs) return state;
 
   var peer: PeerEntry = Object.assign({}, existing);

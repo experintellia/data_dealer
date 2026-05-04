@@ -47,7 +47,7 @@
  *    false.  Both fail before the fix, both pass after.
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 const GESTALT = 'contact035';
 const PATH = `Imperium.${GESTALT}`;
@@ -88,6 +88,7 @@ test('collect-icon: DecoratorReady appears after node_ready emit (no stuck clock
   const midState = await page.evaluate((path) => {
     const appMod = (window as any).require('app');
     const game = appMod.getApplication().game;
+    // biome-ignore lint/style/noNonNullAssertion: split('.').pop() on a non-empty path is always defined
     const last = path.split('.').pop()!;
     const gnode = game && game.getById(last);
     return {
@@ -125,6 +126,7 @@ test('collect-icon: DecoratorReady appears after node_ready emit (no stuck clock
   const postState = await page.evaluate((path) => {
     const appMod = (window as any).require('app');
     const game = appMod.getApplication().game;
+    // biome-ignore lint/style/noNonNullAssertion: split('.').pop() on a non-empty path is always defined
     const last = path.split('.').pop()!;
     const gnode = game && game.getById(last);
     return {

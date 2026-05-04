@@ -6,23 +6,23 @@
  *   { amount: number } — Thread S chargePerp schema (PR #72).
  *   XP gain is derived from ruleset type_data.xp_inc, not stored in result.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  collectPerp,
-  integrateCollected,
-  chargePerp,
   buyPerp,
   buyPowerup,
+  chargePerp,
+  collectPerp,
+  integrateCollected,
   loadGame,
   setEmitter,
   setPrngSeed,
   setSendDelta,
 } from '../../scripts/LocalEngine.js';
-import { setState, getState } from '../../scripts/boot.js';
+import { getState, setState } from '../../scripts/boot.js';
+import { advance, clearOverride, setOverride } from '../../scripts/clock.js';
 import { materialize } from '../../scripts/materializer.js';
 import { applyDelta } from '../../scripts/state.js';
-import { setOverride, clearOverride, advance } from '../../scripts/clock.js';
-import { FIXED_NOW, mkGv, mkState, mkNode, mkChargingEntry } from './_fixtures.js';
+import { FIXED_NOW, mkChargingEntry, mkGv, mkNode, mkState } from './_fixtures.js';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 

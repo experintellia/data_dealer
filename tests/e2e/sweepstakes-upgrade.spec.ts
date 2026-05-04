@@ -21,7 +21,7 @@
  *   provided_upgrades[0]: { gestalt: 'upgrade001', price: 160, required_level: 2 }
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test('sweepstakes: buyPowerup succeeds with sufficient cash after buying project001', async ({
   page,

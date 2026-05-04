@@ -153,8 +153,7 @@ var Render = function () {
 
   DragHandler.prototype.dragVector = {};
   DragHandler.prototype.dragstart = function (e) {
-    var dm = this;
-    dm.state = 'started';
+    this.state = 'started';
     // FIXME: trigger touchhandling broken?!
     var touch;
     if (e.originalEvent) {
@@ -163,25 +162,24 @@ var Render = function () {
         : undefined;
     }
     var userPos = touch ? { x: touch.pageX, y: touch.pageY } : { x: e.pageX, y: e.pageY };
-    dm.dragMovePos = dm.dragStartPos = userPos;
-    dm.dragging = true;
-    delete dm.dragVector.x;
-    delete dm.dragVector.y;
-    dm.dragVector.x = (dm.dragMovePos.x - dm.dragStartPos.x) * dm.scale;
-    dm.dragVector.y = (dm.dragMovePos.y - dm.dragStartPos.y) * dm.scale;
+    this.dragMovePos = this.dragStartPos = userPos;
+    this.dragging = true;
+    delete this.dragVector.x;
+    delete this.dragVector.y;
+    this.dragVector.x = (this.dragMovePos.x - this.dragStartPos.x) * this.scale;
+    this.dragVector.y = (this.dragMovePos.y - this.dragStartPos.y) * this.scale;
   };
 
   DragHandler.prototype.dragend = function (e) {
-    var dm = this;
-    dm.state = 'stopped';
+    this.state = 'stopped';
 
-    for (var i = 0; i < dm.listeners.length; i++) {
-      var node = dm.listeners[i];
+    for (var i = 0; i < this.listeners.length; i++) {
+      var node = this.listeners[i];
       node.dragging = false;
       node.trigger('dragend');
     }
-    dm.listeners.length = 0;
-    dm.dragging = false;
+    this.listeners.length = 0;
+    this.dragging = false;
   };
 
   DragHandler.prototype.on = function (event, func) {
@@ -414,6 +412,7 @@ var Render = function () {
   // An array of Nodes with some shortcuts
   ///////////////////////////////////////////
 
+  // biome-ignore lint/suspicious/noShadowRestrictedNames: legacy collection class predates ES6 Set
   var Set = function (set) {
     if (!set) {
       set = [];
@@ -474,7 +473,6 @@ var Render = function () {
   };
 
   Set.prototype.removeAll = function () {
-    var set = this;
     while (this.set.length > 0) {
       var node = this.set[0];
       this.remove(node);
@@ -599,7 +597,6 @@ var Render = function () {
     // Remove Node from all references and remove Domobject
     Ticker.removeListener(this);
     SlowTicker.removeListener(this);
-    var node = this;
     if (this.decoratedNode) {
       this.decoratedNode.decorators.remove(this);
     }
@@ -616,10 +613,10 @@ var Render = function () {
       this.decorators.removeAll();
     }
     if (this.perpTo) {
-      this.perpTo.cables.remove(node);
+      this.perpTo.cables.remove(this);
     }
     if (this.perpFrom) {
-      this.perpFrom.cables.remove(node);
+      this.perpFrom.cables.remove(this);
     }
     this.jdomelem.remove();
     remove(this._id);
@@ -793,8 +790,7 @@ var Render = function () {
           y: otherPos.y,
           r: cableMaxLength,
         };
-        var scale =
-          circle.r / Math.sqrt(Math.pow(pos.x - circle.x, 2) + Math.pow(pos.y - circle.y, 2));
+        var scale = circle.r / Math.sqrt((pos.x - circle.x) ** 2 + (pos.y - circle.y) ** 2);
         if (scale < 1) {
           return {
             y: Math.round((pos.y - circle.y) * scale + circle.y),
@@ -818,17 +814,15 @@ var Render = function () {
   };
 
   Node.prototype.testParentRadius = function (newPos, radius) {
-    var node = this;
     radius = radius || 400;
-    var otherperp = node.gameNode.parentNode.renderNode;
+    var otherperp = this.gameNode.parentNode.renderNode;
     var dragBoundFunc = function (pos) {
       var circle = {
         x: otherperp.getPosition().x,
         y: otherperp.getPosition().y,
         r: radius,
       };
-      var scale =
-        circle.r / Math.sqrt(Math.pow(pos.x - circle.x, 2) + Math.pow(pos.y - circle.y, 2));
+      var scale = circle.r / Math.sqrt((pos.x - circle.x) ** 2 + (pos.y - circle.y) ** 2);
       if (scale < 1) {
         return {
           y: Math.round((pos.y - circle.y) * scale + circle.y),
@@ -1232,9 +1226,8 @@ var Render = function () {
   };
 
   Node.prototype.FXSimpleLoop = function (config, duration, easing, callback) {
-    var node = this;
-    Ticker.addListener(node);
-    return Tween.get(node, {
+    Ticker.addListener(this);
+    return Tween.get(this, {
       override: true,
       loop: true,
     })
@@ -1366,7 +1359,7 @@ var Render = function () {
 
     var deg = Math.atan(O / Math.abs(A)) * (180 / Math.PI);
 
-    var lenratio = Math.sqrt(Math.pow(oPos.x - nPos.x, 2) + Math.pow(oPos.y - nPos.y, 2)) / 108;
+    var lenratio = Math.sqrt((oPos.x - nPos.x) ** 2 + (oPos.y - nPos.y) ** 2) / 108;
 
     spark.setPosition({ x: oPos.x, y: oPos.y });
     spark.rotate = 180 + (90 - deg) * dir;
@@ -1464,7 +1457,7 @@ var Render = function () {
     var A = nPos.x - oPos.x;
     var O = oPos.y - nPos.y;
     //var lenratio = O * (1/oPos.y);
-    var lenratio = Math.sqrt(Math.pow(oPos.x - nPos.x, 2) + Math.pow(oPos.y - nPos.y, 2)) / 108;
+    var lenratio = Math.sqrt((oPos.x - nPos.x) ** 2 + (oPos.y - nPos.y) ** 2) / 108;
 
     var dir = A > 0 ? 1 : -1;
     //A = Math.abs(A);
@@ -1511,9 +1504,7 @@ var Render = function () {
   };
 
   Node.prototype.FXMeMeMe = function (cb) {
-    // Used on DecoratorReady hover
-    var node = this;
-    node.setFrame('hover');
+    this.setFrame('hover');
     this.FXClearCue();
     this.FXSimpleCue({ scaleX: 1.1, scaleY: 1.1 }, 31, 'easeOut');
     this.FXSimpleCue({ scaleX: 1.07, scaleY: 1.07 }, 31, 'easeOut');
@@ -1525,9 +1516,7 @@ var Render = function () {
   };
 
   Node.prototype.FXNotMeMeMe = function (cb) {
-    // Used on DecoratorReady hover
-    var node = this;
-    node.setFrame('normal');
+    this.setFrame('normal');
     if (cb) {
       cb();
     }
@@ -1695,8 +1684,7 @@ var Render = function () {
   };
 
   Node.prototype.FXPulse = function (cb) {
-    var node = this;
-    node.FXSimpleLoop(
+    this.FXSimpleLoop(
       {
         one: { scaleX: 0.9, scaleY: 0.9 },
         two: { scaleX: 1, scaleY: 1 },
@@ -1712,8 +1700,7 @@ var Render = function () {
   };
 
   Node.prototype.FXSnooze = function (cb) {
-    var node = this;
-    node.FXSimpleLoop(
+    this.FXSimpleLoop(
       {
         one: { scaleX: 0.9, scaleY: 0.9 },
         two: { scaleX: 1, scaleY: 1 },
@@ -1744,10 +1731,9 @@ var Render = function () {
   };
 
   Node.prototype.FXCharge = function (frame, cb) {
-    var node = this;
     // Find out where to render and at which coordinates
-    var nodePos = node.userClickAbsPos || node.getPosition();
-    var renderParent = node.userClickAbsPos ? node : node.parentNode;
+    var nodePos = this.userClickAbsPos || this.getPosition();
+    var renderParent = this.userClickAbsPos ? this : this.parentNode;
     var bling = new Sprite({
       x: nodePos.x,
       y: nodePos.y - 400,
@@ -1783,13 +1769,11 @@ var Render = function () {
   };
 
   Node.prototype.FXKarmaBling = function (karma_points, cb) {
-    var node = this;
     // Find out where to render and at which coordinates
     //var nodePos = node.userClickAbsPos;
-    var nodePos = node.getCenterPosition();
+    var nodePos = this.getCenterPosition();
     nodePos.x += 130;
     nodePos.y = 100;
-    var renderParent = node;
     var bling = new Sprite({
       x: nodePos.x,
       y: nodePos.y,
@@ -1803,7 +1787,7 @@ var Render = function () {
         karma_up: { x: 428, y: 860, width: 96, height: 96, pivotx: 48, pivoty: 48 },
       },
     });
-    renderParent.addChild(bling);
+    this.addChild(bling);
     bling.FXWaitCue(0);
     bling.FXSimpleCue({ scaleX: 0, scaleY: 0, rotate: 720, opacity: 0 }, 0, 'linear', function () {
       bling.FXBling({
@@ -1838,10 +1822,7 @@ var Render = function () {
   };
 
   Node.prototype.FXLevelUpBling = function (xp_level, cb) {
-    // should be invoked on gameroot
-    var node = this;
-    var nodePos = node.getCenterPosition();
-    var renderParent = node;
+    var nodePos = this.getCenterPosition();
     var bling = new Sprite({
       x: nodePos.x,
       y: nodePos.y,
@@ -1855,7 +1836,7 @@ var Render = function () {
         normal: { x: 525, y: 842, width: 138, height: 138, pivotx: 69, pivoty: 69 },
       },
     });
-    renderParent.addChild(bling);
+    this.addChild(bling);
     bling.FXWaitCue(0);
     bling.FXSimpleCue({ scaleX: 0, scaleY: 0, rotate: 720, opacity: 0 }, 0, 'linear', function () {
       /*
@@ -1898,10 +1879,7 @@ var Render = function () {
   };
 
   Node.prototype.FXMissionComplete = function (text, cb) {
-    // should be invoked on gameroot
-    var node = this;
-    var nodePos = node.getCenterPosition();
-    var renderParent = node;
+    var nodePos = this.getCenterPosition();
     var bling = new Sprite({
       x: nodePos.x,
       y: nodePos.y,
@@ -1915,7 +1893,7 @@ var Render = function () {
         normal: { x: 717, y: 764, width: 122, height: 160, pivotx: 55, pivoty: 90 },
       },
     });
-    renderParent.addChild(bling);
+    this.addChild(bling);
     bling.FXWaitCue(0);
     bling.FXSimpleCue({ scaleX: 0, scaleY: 0, rotate: 0, opacity: 0 }, 0, 'linear', function () {});
     bling.FXSimpleCue(
@@ -1943,10 +1921,7 @@ var Render = function () {
   };
 
   Node.prototype.FXMissionGoalComplete = function (text, cb) {
-    // should be invoked on gameroot
-    var node = this;
-    var nodePos = node.getTopRightPosition();
-    var renderParent = node;
+    var nodePos = this.getTopRightPosition();
     var bling = new Sprite({
       x: nodePos.x - 40,
       y: nodePos.y + 50,
@@ -1960,7 +1935,7 @@ var Render = function () {
         normal: { x: 717, y: 764, width: 122, height: 160, pivotx: 55, pivoty: 90 },
       },
     });
-    renderParent.addChild(bling);
+    this.addChild(bling);
     bling.FXWaitCue(100);
     bling.FXSimpleCue({ scaleX: 0.5, scaleY: 0.5, rotate: 1, opacity: 1 }, 250, 'bounceOut');
     bling.FXWaitCue(1000);
@@ -1973,10 +1948,9 @@ var Render = function () {
   };
 
   Node.prototype.FXNoCash = function (frame, cb) {
-    var node = this;
     // Find out where to render and at which coordinates
-    var nodePos = node.userClickAbsPos || node.getPosition();
-    var renderParent = node.userClickAbsPos ? node : node.parentNode;
+    var nodePos = this.userClickAbsPos || this.getPosition();
+    var renderParent = this.userClickAbsPos ? this : this.parentNode;
     var bling = new Sprite({
       x: nodePos.x,
       y: nodePos.y - 400,
@@ -2014,10 +1988,9 @@ var Render = function () {
   };
 
   Node.prototype.FXNoAP = function (frame, cb) {
-    var node = this;
     // Find out where to render and at which coordinates
-    var nodePos = node.userClickAbsPos || node.getPosition();
-    var renderParent = node.userClickAbsPos ? node : node.parentNode;
+    var nodePos = this.userClickAbsPos || this.getPosition();
+    var renderParent = this.userClickAbsPos ? this : this.parentNode;
     var bling = new Sprite({
       x: nodePos.x,
       y: nodePos.y,
@@ -2097,8 +2070,7 @@ var Render = function () {
 
   Node.prototype.FXBling = function (config, cb) {
     config = config || {};
-    var node = this;
-    var nodePos = node.getPosition();
+    var nodePos = this.getPosition();
     config.wait = config.wait || 0;
     config.dur = config.dur || 1000;
     var bling = new Text({
@@ -2112,7 +2084,7 @@ var Render = function () {
     if (config.renderOn) {
       config.renderOn.addChild(bling);
     } else {
-      node.parentNode.addChild(bling);
+      this.parentNode.addChild(bling);
     }
     bling.offsetY = 50;
     bling.FXWaitCue(config.wait);
@@ -2361,9 +2333,8 @@ var Render = function () {
   extend(Perp, Sprite);
 
   Perp.prototype.getCableTo = function (perpTo) {
-    var perp = this;
     var cable;
-    perp.cables.each(function (c) {
+    this.cables.each(function (c) {
       if (c.perpTo === perpTo) {
         cable = c;
       }
@@ -2512,7 +2483,6 @@ var Render = function () {
 
   // FIXME random placement, remove
   Perp.prototype.setRandomPosition = function (originPos) {
-    var node = this;
     var tries = 0;
     var originPos = originPos || { x: 1024, y: 800 };
     var randomPos = function (pos) {
@@ -2524,18 +2494,16 @@ var Render = function () {
     var testPos = this.useDragHandler.getCollisionPos(this, originPos);
     while (tries < 500 && testPos.coll === true) {
       testPos = randomPos(testPos);
-      if (node.placeParentRadius) {
-        testPos = node.testParentRadius(testPos, node.placeParentRadius);
+      if (this.placeParentRadius) {
+        testPos = this.testParentRadius(testPos, this.placeParentRadius);
       }
-      testPos.coll = this.useDragHandler.testCollisions(node, testPos);
+      testPos.coll = this.useDragHandler.testCollisions(this, testPos);
       tries += 1;
     }
     this.setPosition(testPos);
   };
 
   Perp.prototype.onAddInit = function () {
-    // Init stuff when added to a Parent Node
-    var node = this;
     if (this.draggable) {
       this.setDraggable(true);
     }
@@ -2543,7 +2511,7 @@ var Render = function () {
       this.setClickable(true);
     }
     if (this.placeRandom) {
-      node.setRandomPosition(this.placeRandom);
+      this.setRandomPosition(this.placeRandom);
     }
     this.updateRenderProp();
     this.draw();
@@ -2614,7 +2582,6 @@ var Render = function () {
   };
 
   Perp.prototype.FXDataOut = function (cb) {
-    var perp = this;
     var cables = this.getCablesToOrigin();
     // Set duration to FXDataIn Duration
     var duration = 500;
@@ -2707,8 +2674,7 @@ var Render = function () {
   };
 
   PerpSprite.prototype.updatePosition = function () {
-    var node = this;
-    node.setPosition({ x: node.parentNode.offsetX, y: node.parentNode.offsetY });
+    this.setPosition({ x: this.parentNode.offsetX, y: this.parentNode.offsetY });
   };
 
   /////////////////////////////
@@ -2816,7 +2782,6 @@ var Render = function () {
   DecoratorReady.prototype.decoType = 'DecoratorReady';
 
   DecoratorReady.prototype.onAddInit = function () {
-    var node = this;
     if (this.clickable) {
       this.setClickable(true);
     }
@@ -2973,7 +2938,6 @@ var Render = function () {
   DecoratorGear.prototype.draw = Decorator.prototype.draw;
 
   DecoratorGear.prototype.onAddInit = function () {
-    var node = this;
     if (this.decoratedNode.gameNode.data.is_supertoken !== true) {
       this.offsetToParent = {
         x: this.decoratedNode.width / 2 - 11,
@@ -3061,7 +3025,6 @@ var Render = function () {
   DecoratorTimer.prototype.decoType = 'DecoratorTimer';
 
   DecoratorTimer.prototype.onAddInit = function () {
-    var node = this;
     this.offsetToParent = {
       x: this.decoratedNode.width / 2 - 12,
       y: -(this.decoratedNode.height / 2 - 12),
@@ -3204,7 +3167,6 @@ var Render = function () {
   };
 
   DecoratorAmount.prototype.onAddInit = function () {
-    var node = this;
     this.offsetToParent = { x: 0, y: this.decoratedNode.height - this.decoratedNode.offsetY - 8 };
     this.updateRenderProp();
     this.draw();
@@ -3301,24 +3263,22 @@ var Render = function () {
     if (this.mode === 'inout') {
       offset = 4;
     }
-
-    var path = this;
     var p = this.getPoints();
-    path.domelem.width = path.width = Math.abs(p.p1.x - p.p5.x) + path.offsetX * 2;
-    path.domelem.height = path.height = Math.abs(p.p1.y - p.p5.y) + path.offsetY * 2;
+    this.domelem.width = this.width = Math.abs(p.p1.x - p.p5.x) + this.offsetX * 2;
+    this.domelem.height = this.height = Math.abs(p.p1.y - p.p5.y) + this.offsetY * 2;
     var cx = p.p1.x < p.p5.x ? p.p1.x : p.p5.x;
     var cy = p.p1.y < p.p5.y ? p.p1.y : p.p5.y;
 
     //path.setSize({width:this.width,height:this.height});
-    path.setTransform(path.getTransform());
+    this.setTransform(this.getTransform());
     //var modeoff = (this.mode === 'in') ? 0 : 6;
-    path.setPosition({ x: cx, y: cy });
-    var tension = path.tension;
-    var cableMaxLength = path.cableMaxLength;
-    var x = p.p1.x - cx + path.offsetX;
-    var y = p.p1.y - cy + path.offsetY;
-    var x2 = p.p5.x - cx + path.offsetX;
-    var y2 = p.p5.y - cy + path.offsetY;
+    this.setPosition({ x: cx, y: cy });
+    var tension = this.tension;
+    var cableMaxLength = this.cableMaxLength;
+    var x = p.p1.x - cx + this.offsetX;
+    var y = p.p1.y - cy + this.offsetY;
+    var x2 = p.p5.x - cx + this.offsetX;
+    var y2 = p.p5.y - cy + this.offsetY;
     //var xa = p.p2.x-cx;
     //var ya = p.p2.y-cy;
     //var xb = p.p3.x-cx;
@@ -3329,7 +3289,7 @@ var Render = function () {
     var dx = x2 - x,
       dy = y2 - y;
     var len = Math.sqrt(dx * dx + dy * dy);
-    path.length = len;
+    this.length = len;
     //tension = (Math.abs(x-p.p3.x)+Math.abs(y-p.p3.y))/len;
     var sinefreq = 360;
     var dxa = Math.abs(dx);
@@ -3349,7 +3309,7 @@ var Render = function () {
     var da = [seqs, 0];
     //var da = [seqs,0+(1-this.straightness)*10];
 
-    var ctx = path.domelem.getContext('2d');
+    var ctx = this.domelem.getContext('2d');
     var rot = Math.atan2(dy, dx);
     ctx.lineWidth = 6;
 
@@ -3521,47 +3481,41 @@ var Render = function () {
   };
 
   Cable.prototype.FXWobbleTension = function (tension) {
-    var cable = this;
     var duration = tension < 1 ? 300 : 500;
     //this.dataposIn=0;
     //this.dataposOut=0;
     // Cue Tweens like this!!! Finally got it to work;
-    return cable.FXSimpleCue({ tension: tension }, duration, 'easeOut');
+    return this.FXSimpleCue({ tension: tension }, duration, 'easeOut');
   };
 
   Cable.prototype.FXToggleConnect = function (progress) {
-    var cable = this;
     var duration = progress < 1 ? 200 : 800;
-    return cable.FXSimpleCue({ progress: progress }, duration, 'sineInOut');
+    return this.FXSimpleCue({ progress: progress }, duration, 'sineInOut');
   };
 
   Cable.prototype.FXStraighten = function (straightness) {
-    var cable = this;
     var easing = straightness === 1 ? 'easeOut' : 'linear';
     var duration = straightness === 1 ? 200 : 100;
     return this.FXSimpleCue({ straightness: straightness }, duration, easing);
   };
 
   Cable.prototype.FXConnect = function (cb) {
-    var cable = this;
-    cable.progress = 0;
-    cable.show();
+    this.progress = 0;
+    this.show();
     //cable.dataposIn=0;
     //return this.FXSimple({dataposIn:1,progress:1},1000,'sineInOut');
     return this.FXSimpleCue({ progress: 1 }, 1000, 'sineInOut', cb);
   };
 
   Cable.prototype.FXDisconnect = function (cb) {
-    var cable = this;
-    cable.progress = 1;
+    this.progress = 1;
     return this.FXSimpleCue({ progress: 0 }, 500, 'sineInOut', cb);
   };
 
   Cable.prototype.FXDataIn = function (cb) {
-    var cable = this;
-    var duration = cable.length * 2;
-    cable.FXSimpleCue({ dataposIn: 1 }, 0);
-    return cable.FXSimpleCue({ dataposIn: 0 }, duration, 'linear', cb);
+    var duration = this.length * 2;
+    this.FXSimpleCue({ dataposIn: 1 }, 0);
+    return this.FXSimpleCue({ dataposIn: 0 }, duration, 'linear', cb);
     //cable.dataposIn=1;
     //cable.tension=1;
     //return this.FXSimple({datapos:1},1000,'sineInOut',function(){
@@ -3596,10 +3550,9 @@ var Render = function () {
   };
 
   Cable.prototype.FXDataOut = function (cb) {
-    var cable = this;
-    var duration = cable.length * 2;
-    cable.FXSimpleCue({ dataposOut: 0 }, 0);
-    return cable.FXSimpleCue({ dataposOut: 1 }, duration, 'linear', cb);
+    var duration = this.length * 2;
+    this.FXSimpleCue({ dataposOut: 0 }, 0);
+    return this.FXSimpleCue({ dataposOut: 1 }, duration, 'linear', cb);
   };
 
   /////////////////////////////
@@ -3772,23 +3725,19 @@ var Render = function () {
   };
 
   ViewTab.prototype.FXShow = function () {
-    var node = this;
     //node.show();
-    node.jdomelem.addClass('active');
+    this.jdomelem.addClass('active');
   };
 
   ViewTab.prototype.FXHide = function () {
-    var node = this;
     //node.hide();
-    node.jdomelem.removeClass('active');
+    this.jdomelem.removeClass('active');
   };
 
   ViewTab.prototype.updateScroller = function () {
-    // FIXME: do something on resize?
-    var node = this;
     var stage = this.parentNode;
-    var scaleW = stage.width / node.width;
-    var scaleH = stage.height / node.height;
+    var scaleW = stage.width / this.width;
+    var scaleH = stage.height / this.height;
   };
 
   /////////////////////////////
@@ -3942,23 +3891,22 @@ var Render = function () {
   };
 
   ViewMap.prototype.updateScroller = function () {
-    var node = this;
     var stage = this.parentNode;
-    var scaleW = stage.width / node.width;
-    var scaleH = stage.height / node.height;
+    var scaleW = stage.width / this.width;
+    var scaleH = stage.height / this.height;
     var minZoom = scaleW > scaleH ? scaleW : scaleH;
     if (minZoom > 1) {
       minZoom = 1;
     }
-    node.scroller.options.minZoom = minZoom < 0.5 ? 0.5 : minZoom;
-    node.scroller.zoomTo(this.zoomScale);
-    node.scroller.setDimensions(
+    this.scroller.options.minZoom = minZoom < 0.5 ? 0.5 : minZoom;
+    this.scroller.zoomTo(this.zoomScale);
+    this.scroller.setDimensions(
       stage.width,
       stage.height,
-      node.getSize().width,
-      node.getSize().height
+      this.getSize().width,
+      this.getSize().height
     );
-    node._updateZoomButtonsState();
+    this._updateZoomButtonsState();
   };
 
   ViewMap.prototype.initScroller = function () {
@@ -4210,7 +4158,7 @@ var Render = function () {
         // continuous rather than stepped like the +/- buttons.
         var unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
         var delta = Math.max(-400, Math.min(400, e.deltaY * unit));
-        var factor = Math.pow(0.999, delta);
+        var factor = 0.999 ** delta;
         var opts = node.scroller.options;
         var base =
           node._wheelZoomTarget != null
@@ -4233,7 +4181,7 @@ var Render = function () {
   ViewMap.prototype.scrollTo = function (pos, dur) {
     var vpCenter = this.parentNode.getCenterPosition();
     dur = dur !== undefined ? dur : 300;
-    this.scroller.options.animating = dur > 0 ? true : false;
+    this.scroller.options.animating = dur > 0;
     this.scroller.options.animationDuration = dur;
     this.scroller.scrollTo(pos.x - vpCenter.x, pos.y - vpCenter.y, true);
     this.scroller.options.animating = false;
@@ -4268,29 +4216,25 @@ var Render = function () {
   };
 
   ViewMap.prototype.zoomIn = function () {
-    var node = this;
-    var zoomTo = node.zoomScale + 0.25 > 1 ? 1 : node.zoomScale + 0.25;
-    if (zoomTo === node.zoomScale) return;
-    node.scroller.zoomTo(zoomTo, true);
+    var zoomTo = this.zoomScale + 0.25 > 1 ? 1 : this.zoomScale + 0.25;
+    if (zoomTo === this.zoomScale) return;
+    this.scroller.zoomTo(zoomTo, true);
   };
 
   ViewMap.prototype.zoomOut = function () {
-    var node = this;
-    var zoomTo = node.zoomScale - 0.25 < 0.5 ? 0.5 : node.zoomScale - 0.25;
-    if (zoomTo === node.zoomScale) return;
-    node.scroller.zoomTo(zoomTo, true);
+    var zoomTo = this.zoomScale - 0.25 < 0.5 ? 0.5 : this.zoomScale - 0.25;
+    if (zoomTo === this.zoomScale) return;
+    this.scroller.zoomTo(zoomTo, true);
   };
 
   ViewMap.prototype.FXShow = function () {
-    var node = this;
     //node.show();
-    node.jdomelem.addClass('active');
+    this.jdomelem.addClass('active');
   };
 
   ViewMap.prototype.FXHide = function () {
-    var node = this;
     //node.hide();
-    node.jdomelem.removeClass('active');
+    this.jdomelem.removeClass('active');
   };
 
   /////////////////////////////
@@ -4358,8 +4302,7 @@ var Render = function () {
       width: this.width + 'px',
       height: this.height + 'px',
     });
-    var stage = this;
-    stage.children.each(function (node) {
+    this.children.each(function (node) {
       if (node.scroller) {
         node.updateScroller();
       }
@@ -4389,7 +4332,6 @@ var Render = function () {
 
     // Setup Button Events
     var GameRoot = this.gameNode.GameRoot;
-    var menu = this;
     this.jdomelem.on('click touchend', '#LocaleToggle:not(.disabled)', function (e) {
       e.stopPropagation();
       e.preventDefault();
@@ -4419,15 +4361,13 @@ var Render = function () {
   };
 
   MainMenu.prototype.lock = function () {
-    var node = this;
-    node.jdomelem.addClass('locked');
-    node.jdomelem.find('.UserButton, .MainMenuButton').addClass('disabled');
+    this.jdomelem.addClass('locked');
+    this.jdomelem.find('.UserButton, .MainMenuButton').addClass('disabled');
   };
 
   MainMenu.prototype.unlock = function () {
-    var node = this;
-    node.jdomelem.removeClass('locked');
-    node.jdomelem.find('.UserButton, .MainMenuButton').removeClass('disabled');
+    this.jdomelem.removeClass('locked');
+    this.jdomelem.find('.UserButton, .MainMenuButton').removeClass('disabled');
   };
 
   MainMenu.prototype.addButton = function (text, id, states) {
@@ -4473,7 +4413,6 @@ var Render = function () {
 
   var Statusbar = function (config) {
     config = config || {};
-    var node = this;
     this._id = _instances.length;
     this.jdomelem = $("<div class='Statusbar'></div>");
     this.domelem = this.jdomelem[0];
@@ -4677,7 +4616,6 @@ var Render = function () {
 
   var StatusItem = function (config) {
     config = config || {};
-    var node = this;
     this._id = _instances.length;
     this.jdomelem = $("<div class='StatusItem'></div>");
     this.frameSrc = config.frameSrc || 'MainSprites.png';
@@ -4829,7 +4767,6 @@ var Render = function () {
     config = config || {};
 
     this.open = true;
-    var node = this;
     this._id = _instances.length;
     this.jdomelem = $("<div class='Popup'></div>");
     this.domelem = this.jdomelem[0];
@@ -4851,6 +4788,7 @@ var Render = function () {
     if (tdata.data && tdata.data.popup_sprite && !tdata.data.popup_sprite.html) {
       tdata.data.popup_sprite.html = RenderSprite(tdata.data.popup_sprite);
     }
+    // biome-ignore lint/correctness/noSelfAssign: legacy no-op, kept to avoid accidental removal of the property
     tdata.button = tdata.button;
 
     if (this.popupContainer && this.extendClass) {
@@ -4980,10 +4918,10 @@ var Render = function () {
         e.preventDefault();
         var spop = $(this).parents('.Subpop[data-subpop-id="buyslots"]');
         var button = spop.find('.Button[data-button-id="PowerupBuySlotsButton"]');
-        var num = parseInt(button.attr('data-button-data'));
-        var left = parseInt(spop.find('.BuySlotsNumLeft').text());
+        var num = Number.parseInt(button.attr('data-button-data'));
+        var left = Number.parseInt(spop.find('.BuySlotsNumLeft').text());
         var jprice = spop.find('.SlotCost');
-        var price = parseInt(jprice.attr('data-slot-cost'));
+        var price = Number.parseInt(jprice.attr('data-slot-cost'));
         var max_slots = left;
         num = num + 1 > max_slots ? num : num + 1;
         price = price * num;
@@ -5002,9 +4940,9 @@ var Render = function () {
         e.preventDefault();
         var spop = $(this).parents('.Subpop[data-subpop-id="buyslots"]');
         var button = spop.find('.Button[data-button-id="PowerupBuySlotsButton"]');
-        var num = parseInt(button.attr('data-button-data'));
+        var num = Number.parseInt(button.attr('data-button-data'));
         var jprice = spop.find('.SlotCost');
-        var price = parseInt(jprice.attr('data-slot-cost'));
+        var price = Number.parseInt(jprice.attr('data-slot-cost'));
         num = num - 1 < 1 ? 1 : num - 1;
         price = price * num;
         jprice.text(_.toKSNum(price));
@@ -5122,7 +5060,7 @@ var Render = function () {
         var next = Pagination.find('.PopupPageArrowR');
         var prev = Pagination.find('.PopupPageArrowL');
         var active = Pages.filter(':not(.hidden)');
-        var index = parseInt(active.attr('data-page-id'));
+        var index = Number.parseInt(active.attr('data-page-id'));
         Pages.addClass('hidden');
         if (dir_next) {
           index = index + 1;
@@ -5195,7 +5133,6 @@ var Render = function () {
   };
 
   Popup.prototype.renderDataTab = function () {
-    var node = this;
     var htmlPS = app.renderView('profileset.html', this.templateData);
     var htmlButt = app.renderView('buttons_project.html', this.templateData);
     this.jdomelem.find('.PopupTab.data').empty().append(htmlPS).append(htmlButt);
@@ -5205,17 +5142,16 @@ var Render = function () {
     if (!pkey) {
       return;
     }
-    var node = this;
     var pcat = this.templateData.data.powerups_compiled[pkey];
     var html = app.renderView('selector_powerups.html', {
-      D: node.templateData.data,
-      game_values: node.templateData.game_values,
+      D: this.templateData.data,
+      game_values: this.templateData.game_values,
       pcat: pcat,
-      data: node.templateData.data,
+      data: this.templateData.data,
       typelower: pcat.typelower,
       pkey: pkey,
     });
-    var jtab = node.jdomelem.find('.PopupTab.Powerups[data-tab="' + pkey + '"]');
+    var jtab = this.jdomelem.find('.PopupTab.Powerups[data-tab="' + pkey + '"]');
     jtab.find('.Subpop.InSelector').remove();
     jtab.find('.Subpop.Selector').remove();
     jtab.find('.SubpopContainer').append(html);
@@ -5411,8 +5347,6 @@ var Render = function () {
   extend(MissionPerp, Node);
 
   MissionPerp.prototype.onAddInit = function () {
-    // Init stuff when added to a Parent Node
-    var node = this;
     if (this.clickable) {
       this.setClickable(true);
     }
@@ -5501,8 +5435,6 @@ var Render = function () {
   extend(TopscorePerp, Node);
 
   TopscorePerp.prototype.onAddInit = function () {
-    // Init stuff when added to a Parent Node
-    var node = this;
     if (this.clickable) {
       this.setClickable(true);
     }

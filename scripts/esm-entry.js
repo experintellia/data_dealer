@@ -4,9 +4,9 @@
 // `<script>` tags.  All the wiring (boot kick-off, UI hand-off,
 // devtools hooks) lives in the modules imported here as side effects.
 
-import * as bootMod from './boot.js';
 import LocalEngine from './LocalEngine.js';
 import appModule from './app.js';
+import * as bootMod from './boot.js';
 import './devtools.js';
 
 // Test-only shim: the playwright specs reach into engine internals

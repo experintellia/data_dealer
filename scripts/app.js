@@ -5,11 +5,11 @@
 // loaded as plain `<script>` tags in index.html before this bundle
 // runs.
 
-import setup from './setup.js';
-import i18n from './i18n.js';
-import LocalEngine from './LocalEngine.js';
 import { getGame } from './Game.js';
+import LocalEngine from './LocalEngine.js';
 import { getRender } from './Render.js';
+import i18n from './i18n.js';
+import setup from './setup.js';
 
 // All view sources are inlined at bundle time; templates are compiled
 // the first (and only) time the Application factory runs, when
@@ -152,11 +152,11 @@ const Application = function () {
     renderView: app.renderView,
     pad0: function (number, length) {
       // Fastest implementation according to http://jsperf.com/ways-to-0-pad-a-number
-      const N = Math.pow(10, length);
+      const N = 10 ** length;
       return number < N ? ('' + (N + number)).slice(1) : '' + number;
     },
     crlf2html: function (str) {
-      return String(str || '').replace(new RegExp('\r?\n|\r', 'g'), '<br>');
+      return String(str || '').replace(/\r?\n|\r/g, '<br>');
     },
     toKSNum: function (number) {
       // To activate german language set:

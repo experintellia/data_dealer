@@ -8,10 +8,10 @@
  *   3. Property: final state.peers is independent of delta arrival order
  *      (convergence / replay-safety).
  */
-import { describe, it, expect, beforeEach } from 'vitest';
-import { freshState, applyDelta } from '../../scripts/state.js';
-import { getState, setState } from '../../scripts/boot.js';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { getRanking } from '../../scripts/LocalEngine.js';
+import { getState, setState } from '../../scripts/boot.js';
+import { applyDelta, freshState } from '../../scripts/state.js';
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
 
