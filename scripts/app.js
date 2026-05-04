@@ -85,6 +85,23 @@ const Application = function() {
       $(document).trigger(ev, [pl]);
     });
 
+    // Bridge document-level engine events into the in-game event bus the
+    // way the legacy socket.on("node_ready" / "new_items") handlers did
+    // before #142 retired the transport plumbing. Without this,
+    // _scheduleChargeReady's setTimeout publishes node_ready to document
+    // but no per-perp gnode listener (which lives on gnode.jq = $(this),
+    // not on document) ever fires — the timer decorator stays put and
+    // the collect icon never appears.
+    $(document).on('node_ready', function(e, pl) {
+      if (!app.game || !pl || !pl.id) return;
+      const gnode = app.game.getById(pl.id);
+      if (gnode) gnode.trigger('node_ready', [pl.result]);
+    });
+    $(document).on('new_items', function(e, pl) {
+      if (!app.game) return;
+      app.game.trigger('new_items', [pl]);
+    });
+
     $('#loadertext').text('Loading saved game');
     return app.remote.getSessionLocale().then(function(data) {
       const locale = data.result === 'de' ? 'de_AT' : 'en_US';
