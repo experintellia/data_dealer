@@ -16,6 +16,7 @@ export interface JQueryLike {
   trigger(ev: string, args?: unknown[]): unknown;
   append(child: unknown): unknown;
   on(ev: string, handler: (...args: unknown[]) => void): unknown;
+  off(ev?: string): unknown;
   fail(handler: (...args: unknown[]) => unknown): JQueryLike;
   then(
     onResolved?: (...args: unknown[]) => unknown,
@@ -24,7 +25,10 @@ export interface JQueryLike {
 }
 
 export interface JQueryStatic {
-  (selector: string | Element | Document | (() => void)): JQueryLike;
+  // jQuery's call signature is intentionally wide — Game.js wraps every
+  // GameNode (`$(this)`) into a per-node event bus, so the selector
+  // accepts any object identity in addition to the standard CSS/DOM forms.
+  (selector: string | Element | Document | (() => void) | object): JQueryLike;
   when(...args: unknown[]): JQueryLike;
 }
 

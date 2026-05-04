@@ -1,0 +1,491 @@
+// GameNode base class + instance registry, extracted from scripts/Game.js's
+// IIFE in the issue #147 / Phase 7 migration.  Foundation for the
+// per-subclass extractions to come (Topscores, Missions, Imperium, …) —
+// each subclass extends GameNode via the legacy `extend(SubClass, GameNode)`
+// helper from ./util.js.
+//
+// What's here:
+//   - The instance registry (`_instances`, `_ids`) + add/get/remove/clear
+//     helpers.  Mutated by GameNode.init() / GameNode.remove().
+//   - The GameNode class itself.
+//
+// What's not here yet:
+//   - GameRoot, GameNode subclasses, all the helper functions in Game.js
+//     that read from the registry (getById, getByGestalt, …).  Those stay
+//     in Game.js for now and read the registry through the imports below.
+//
+// Vendor globals (`$`, `sprintf`) come from types/env.d.ts.  `Render` and
+// `typeSettings` are pulled lazily inside the methods that need them so we
+// don't crash on module load if those modules haven't initialised yet.
+
+import type { JQueryLike, JQueryStatic } from '../../types/env.d.ts';
+import { getRender } from '../Render.js';
+import { getTypeSettings } from '../type_settings.js';
+import { OrderedSet } from './OrderedSet.js';
+import { mergeData } from './mergeData.js';
+
+function _$(): JQueryStatic {
+  const fn = jQuery ?? globalThis.$;
+  if (!fn) throw new Error('GameNode: jQuery global not found');
+  return fn;
+}
+
+// ---------------------------------------------------------------------------
+// Instance registry
+// ---------------------------------------------------------------------------
+// Module-level state shared with Game.js's in-IIFE helpers.  The registry
+// arrays are exported as live bindings — mutations here are visible to every
+// importer.  Sparse-friendly: `_instances[k]` slots are explicitly cleared
+// to `undefined` rather than spliced out, matching the legacy behaviour
+// (`_instances[_id] = undefined`) so `_id` indices stay stable.
+
+export const _instances: Array<GameNode | undefined> = [];
+export const _ids: Record<string, GameNode> = {};
+
+export function add(node: GameNode): void {
+  _instances[node._id] = node;
+  _ids[node.id] = node;
+}
+
+export function get(_id: number): GameNode | undefined {
+  return _instances[_id];
+}
+
+export function remove(_id: number): void {
+  const n = get(_id);
+  if (n) {
+    delete _ids[n.id];
+  }
+  _instances[_id] = undefined;
+}
+
+export function clear(): void {
+  for (let n = 0; n < _instances.length; n++) {
+    const node = _instances[n];
+    if (node) {
+      node.remove();
+    }
+  }
+  _instances.length = 0;
+}
+
+// ---------------------------------------------------------------------------
+// Internal types
+// ---------------------------------------------------------------------------
+
+export interface GameNodeConfig {
+  id?: string;
+  gestalt?: string;
+  gameType?: string;
+  data?: Record<string, unknown>;
+  states?: Record<string, boolean>;
+  renderNodeParent?: unknown;
+  ViewMap?: unknown;
+  [key: string]: unknown;
+}
+
+interface RenderConfig {
+  id?: string;
+  name?: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  label?: string;
+  zoomScale?: number;
+  perpSprite?: unknown;
+  perpBackground?: Record<string, unknown> | null;
+  background?: unknown;
+  RenderTemplate?: unknown;
+  no_render?: boolean;
+  [key: string]: unknown;
+}
+
+interface RenderData {
+  config?: RenderConfig;
+  parentNode?: unknown;
+  [key: string]: unknown;
+}
+
+interface RenderNodeLike {
+  remove(): void;
+  setAttrs?(attrs: RenderConfig): void;
+  draw?(): void;
+  trigger(ev: string, args?: unknown[]): void;
+  hide?(): void;
+  show?(): void;
+  hidden?: boolean;
+  jdomelem?: unknown;
+  gameNode?: GameNode;
+  [key: string]: unknown;
+}
+
+interface RenderPopupLike {
+  close(): void;
+  trigger(ev: string, args?: unknown[]): void;
+}
+
+// `Render[renderType]` is dynamic — each renderType key resolves to a
+// different constructor.  Captured loosely; the per-subclass extractions in
+// later PRs can tighten this once specific Render types are in scope.
+interface RenderModule {
+  getById(id: unknown): { addChild(node: RenderNodeLike): void } | null;
+  [key: string]: unknown;
+}
+
+// ---------------------------------------------------------------------------
+// GameNode
+// ---------------------------------------------------------------------------
+
+export class GameNode {
+  _id!: number;
+  id!: string;
+  children!: OrderedSet<GameNode>;
+  states!: Record<string, boolean>;
+  /** Backlink to the GameRoot instance (always _instances[0]). */
+  GameRoot!: GameNode;
+  /** jQuery wrapper used as the GameNode's event bus. */
+  jq!: JQueryLike;
+
+  parentNode?: GameNode;
+  renderNode?: RenderNodeLike;
+  renderMenu?: RenderNodeLike;
+  renderPopup?: RenderPopupLike;
+  renderStatusbar?: RenderNodeLike;
+  renderData?: RenderData;
+  renderType?: string;
+  renderNodeParent?: unknown;
+
+  data?: Record<string, unknown>;
+  gestalt?: string;
+  gameType?: string;
+  is_origin?: boolean;
+
+  // Subclass-injected hooks; all optional.  Documented here so the base
+  // class's init() / render() can call them without per-subclass casts.
+  extendEventHandlers?: () => void;
+  extendRender?: () => void;
+  APTick?: () => void;
+  AniTick?: () => void;
+
+  // Used by addType() to write into the type registry.  Real registry
+  // lives on GameRoot in Game.js; the base just mutates whatever object
+  // getType() returns.
+  // (no field — legacy reads via this.GameRoot.getType().)
+
+  constructor(config?: GameNodeConfig) {
+    this.init(config);
+  }
+
+  toString(): string {
+    return sprintf(
+      'GameNode “%s”: %d children',
+      this.renderType || String(this._id),
+      this.children.length
+    );
+  }
+
+  init(config?: GameNodeConfig): void {
+    // Initialize GameNode and register it in the module-level _instances /
+    // _ids registries.  Set children property for tree-structure.  Set
+    // states registry of the GameNode.  Backlink to GameRoot for easy access
+    // to GameRoot API.  setAttrs expands the config via generic setAttrs.
+    // makeRenderConfig does the data crunching for the RenderAPI.  jq is the
+    // jquery wrapper of the GameNode.  Initialise event handlers (usually
+    // overwritten by the subclasses).
+    const cfg = config || {};
+    this._id = _instances.length;
+    this.id = cfg.id || 'GameNode' + this._id;
+    add(this);
+    this.children = new OrderedSet<GameNode>();
+    this.states = { idle: true };
+    // _instances[0] is GameRoot by convention (first GameNode constructed).
+    // Cast away the `| undefined` from get() — by the time any non-Root
+    // GameNode is created, the Root must have been constructed first.
+    this.GameRoot = (get(0) as GameNode | undefined) ?? this;
+    this.setAttrs(cfg);
+    this.makeRenderConfig();
+    this.jq = _$()(this);
+    this.initEventHandlers();
+  }
+
+  remove(): void {
+    if (this.parentNode) {
+      this.parentNode.children.remove(this);
+    }
+    if (this.children) {
+      this.children.each((child) => {
+        delete child.parentNode;
+      });
+    }
+    if (this.renderNode) {
+      this.renderNode.remove();
+    }
+    if (this.renderMenu) {
+      this.renderMenu.remove();
+    }
+    if (this.renderPopup) {
+      this.renderPopup.close();
+    }
+    if (this.renderStatusbar) {
+      this.renderStatusbar.remove();
+    }
+    remove(this._id);
+  }
+
+  addType(
+    gestalt: string,
+    data: { game_type?: string; type_data?: Record<string, unknown> }
+  ): unknown {
+    const groot = this.GameRoot as GameNode & { getTypeData(g: string): Record<string, unknown> };
+    const nodeType = this.getType() as Record<string, unknown> | undefined;
+    if (nodeType) {
+      if (data.game_type && data.type_data) {
+        const typeSettings = getTypeSettings() as Record<
+          string,
+          { type_data?: Record<string, unknown> }
+        >;
+        if (Object.prototype.hasOwnProperty.call(typeSettings, data.game_type)) {
+          const merged = mergeData(typeSettings[data.game_type]?.type_data, data.type_data);
+          merged.gestalt = gestalt;
+          merged.game_type = data.game_type;
+          // expand powerup tokens with their type data
+          const tokens = merged.tokens;
+          if (Array.isArray(tokens) && tokens.length) {
+            tokens.forEach((v: { gestalt?: string; type_data?: unknown }) => {
+              if (v && typeof v.gestalt === 'string') {
+                v.type_data = groot.getTypeData(v.gestalt);
+              }
+            });
+          }
+          data.type_data = merged as Record<string, unknown>;
+        }
+        nodeType[gestalt] = data;
+        return data;
+      }
+    }
+    return undefined;
+  }
+
+  getType(gestalt?: string): unknown {
+    const groot = this.GameRoot as GameNode & {
+      getType(g: string | undefined): Record<string, unknown> | undefined;
+    };
+    const own: Record<string, unknown> = groot.getType(this.gestalt) ?? Object.create(null);
+    if (gestalt) {
+      return own[gestalt];
+    }
+    return own;
+  }
+
+  getTypeData(gestalt?: string): unknown {
+    const t = this.getType(gestalt) as { type_data?: unknown } | undefined;
+    return t ? t.type_data : undefined;
+  }
+
+  setState(state: string, value: boolean): void {
+    // State change triggers event for renderNodes and renderPopups to listen
+    // to.  The event is fed back to the GameNode, so listeners attached to
+    // the GameNode also trigger.
+
+    // do nothing when state is the same
+    if (this.states[state] === value) {
+      return;
+    }
+    this.states[state] = value;
+    // TODO: Eventhook could be more generic but probably we only need
+    // feedback in the popup.
+    this.trigger('local_states', [state, value]);
+    this.trigger('local_states_' + state, [value]);
+    if (this.renderNode) {
+      this.renderNode.trigger('states', [state, value]);
+      this.renderNode.trigger('states_' + state, [value]);
+    }
+    if (this.renderPopup) {
+      this.renderPopup.trigger('states', [state, value]);
+      this.renderPopup.trigger('states_' + state, [value]);
+    }
+  }
+
+  setAttrs(attrs: Record<string, unknown>): void {
+    // Set any attribute(s).  Legacy behaviour: shallow-assign every own
+    // property of `attrs` onto `this` (used to fold the constructor config
+    // and ad-hoc subclass extensions).
+    const self = this as unknown as Record<string, unknown>;
+    for (const key in attrs) {
+      if (Object.prototype.hasOwnProperty.call(attrs, key)) {
+        self[key] = attrs[key];
+      }
+    }
+  }
+
+  load(): void {
+    // FIXME: Do we need this?
+  }
+
+  save(): void {
+    // FIXME: Do we need this?
+  }
+
+  addChild(child: GameNode): GameNode | false {
+    // The GameNode Tree: Append a child to the GameNode.
+    if (!child) {
+      return false;
+    }
+    this.children.add(child);
+    child.parentNode = this;
+    return child;
+  }
+
+  on(event: string, func: (...args: unknown[]) => void): void {
+    this.jq.on(event, func);
+  }
+
+  off(event?: string): void {
+    this.jq.off(event);
+  }
+
+  trigger(event: string, params?: unknown[]): void {
+    this.jq.trigger(event, params);
+  }
+
+  initEventHandlers(): void {
+    this.on('vclick', function (e: unknown) {
+      if (e && typeof (e as { stopPropagation?: () => void }).stopPropagation === 'function') {
+        (e as { stopPropagation: () => void }).stopPropagation();
+      }
+    });
+    if (this.extendEventHandlers) {
+      this.extendEventHandlers();
+    }
+  }
+
+  removeEventHandlers(): void {
+    // Stupidly removes all event handlers.
+    this.off();
+  }
+
+  makeRenderConfig(): RenderConfig {
+    // Crunch data for render initialisation.
+    // FIXME: this is mostly for data compatibility reasons, could be more
+    // streamlined.
+    if (!this.renderData) {
+      this.renderData = {};
+    }
+    // `cfg` is typed as Record<string, unknown> while we assemble it so the
+    // exactOptionalPropertyTypes-wrapped RenderConfig fields can take the
+    // legacy `value || existing` truthy pattern without each line tripping
+    // a "T | undefined not assignable to T" complaint.  Cast back at the end.
+    const cfg = (this.renderData.config || {}) as Record<string, unknown>;
+
+    const data = (this.data || {}) as Record<string, unknown>;
+    cfg.id = this.id;
+    cfg.name = data.name || cfg.name || this.id;
+
+    cfg.x = data.x || cfg.x;
+    cfg.y = data.y || cfg.y;
+
+    cfg.width = data.width || cfg.width;
+    cfg.height = data.height || cfg.height;
+
+    cfg.label = data.label || cfg.label;
+
+    cfg.zoomScale = data.zoom_scale || cfg.zoomScale;
+    cfg.perpSprite = data.perp_sprite || cfg.perpSprite;
+
+    cfg.perpBackground = data.perp_background || cfg.perpBackground;
+    // FIXME: supertoken check with is_supertoken, not gestalt-inspection
+    // (though would work).
+    if (this.gestalt && this.gestalt.substring(0, 10) === 'supertoken') {
+      cfg.perpBackground = data.perp_background2;
+    }
+    if (this.gestalt && this.gestalt.substring(0, 6) === 'origin') {
+      this.is_origin = true;
+      cfg.no_render = true;
+    }
+    if (this.gestalt && this.gestalt.substring(0, 5) === 'token') {
+      const td = this.GameRoot.getTypeData(this.gestalt) as Record<string, unknown> | undefined;
+      if (td) td.is_supertoken = false;
+      if (this.data) (this.data as Record<string, unknown>).is_supertoken = false;
+    }
+    const bg = cfg.perpBackground;
+    if (bg && typeof bg === 'object') {
+      const bgRec = bg as Record<string, unknown>;
+      for (const k in bgRec) {
+        if (Object.prototype.hasOwnProperty.call(bgRec, k)) {
+          cfg[k] = bgRec[k];
+        }
+      }
+    }
+
+    cfg.background = data.background || cfg.background;
+    cfg.RenderTemplate = data.RenderTemplate || cfg.RenderTemplate;
+
+    this.renderData.parentNode = this.renderNodeParent;
+    this.renderData.config = cfg as RenderConfig;
+    return cfg as RenderConfig;
+  }
+
+  updateRenderNode(render?: RenderData): void {
+    // Test method: updates the rendered GameNode to the stored config.
+    // FIXME: this probably is pointless, better to reinit a specific node?
+    if (!this.renderData && !render) {
+      return;
+    }
+    if (render) {
+      this.renderData = render;
+    }
+    const rd = this.renderData;
+    if (rd && Object.prototype.hasOwnProperty.call(rd, 'config') && this.renderNode) {
+      this.renderNode.setAttrs?.(rd.config as RenderConfig);
+    }
+    this.renderNode?.draw?.();
+  }
+
+  render(): void {
+    // Renders GameNode or recursively removes old RenderNodes and renders
+    // anew.  FIXME: currently rerendering stuff has some problems with
+    // decorators etc.
+    if (this.renderNode) {
+      this.renderNode.remove();
+    }
+    const render = this.renderData;
+
+    if (render && render.config && !render.config.no_render) {
+      const Render = getRender() as unknown as RenderModule;
+      const RenderCtor = (Render as Record<string, unknown>)[this.renderType ?? ''] as
+        | (new (
+            cfg: RenderConfig
+          ) => RenderNodeLike)
+        | undefined;
+      if (!RenderCtor) {
+        return;
+      }
+      const node = new RenderCtor(render.config);
+      this.renderNode = node;
+      this.trigger('before_render');
+      node.gameNode = this;
+      // Put RenderNode in its place:
+      if (render.parentNode) {
+        const parentNode = Render.getById(render.parentNode);
+        if (parentNode) {
+          parentNode.addChild(node);
+        }
+      }
+
+      // Execute subclass-specific render function.
+      if (this.extendRender) {
+        this.extendRender();
+      }
+      // after_render is only triggered when node rendered for the first time.
+      this.trigger('after_render');
+    }
+    // FIXME: Recursion, maybe we better get rid of it and do rendering on
+    // init and specific updates of the Tree.
+    if (this.children.length) {
+      this.children.each((child) => {
+        child.render();
+      });
+    }
+  }
+}

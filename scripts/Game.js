@@ -5,7 +5,9 @@ import { getRender } from './Render.js';
 // alongside scripts that run before vendor `<script>` tags execute.
 import appModule from './app.js';
 import * as bootMod from './boot.js';
+import { GameNode, _ids, _instances, add, clear, get, remove } from './game/GameNode.js';
 import { OrderedSet } from './game/OrderedSet.js';
+import { mergeData } from './game/mergeData.js';
 import i18n from './i18n.js';
 import setup from './setup.js';
 import { getTypeSettings } from './type_settings.js';
@@ -43,37 +45,11 @@ var Game = function () {
   /////////////////////////////////////////////
   // Some generic tools and getter functions
   /////////////////////////////////////////////
-
-  var _instances = [];
-
-  var _ids = {};
-
-  var add = function (node) {
-    _instances[node._id] = node;
-    _ids[node.id] = node;
-  };
-
-  var get = function (_id) {
-    return _instances[_id];
-  };
-
-  var remove = function (_id) {
-    if (get(_id)) {
-      delete _ids[get(_id).id];
-    }
-    _instances[_id] = undefined;
-  };
-
-  var clear = function () {
-    // Clear everything that has been instantiated so far
-    for (var n = 0; n < _instances.length; n++) {
-      var node = _instances[n];
-      if (node) {
-        node.remove();
-      }
-    }
-    _instances.length = 0;
-  };
+  //
+  // _instances / _ids registry + add/get/remove/clear were extracted to
+  // scripts/game/GameNode.ts so the GameNode base class can mutate them
+  // without an IIFE-closure round-trip.  The imports above bring them in
+  // as live bindings; the in-IIFE call sites below keep the legacy names.
 
   var init = function (data) {
     // Inits GameRoot as a Singleton, for now.
@@ -152,35 +128,7 @@ var Game = function () {
     return full_type.split(setup.typeSeparator)[1];
   };
 
-  var mergeData = function (type_data, instance_data) {
-    // Merges data objects, second argument overwrites the first ones and returns new merged object
-    var data = {};
-    _.extend(data, type_data);
-    _.extend(data, instance_data);
-    // If the type data is Project-like (has powerups and tokens) merge token amounts
-    if (
-      instance_data &&
-      type_data &&
-      instance_data.hasOwnProperty('powerups') &&
-      type_data.hasOwnProperty('tokens') &&
-      instance_data.hasOwnProperty('tokens')
-    ) {
-      var tokens = [];
-      // No way around this: make a deep copy to avoid messing with token type_data
-      _.each(type_data.tokens, function (v, k) {
-        tokens[k] = _.clone(v);
-      });
-      var instokens = instance_data.tokens;
-      _.each(tokens, function (t, k) {
-        var overwrite = _.findWhere(instokens, { gestalt: t.gestalt });
-        if (overwrite && overwrite.amount) {
-          t.amount = overwrite.amount;
-        }
-      });
-      data.tokens = tokens;
-    }
-    return data;
-  };
+  // mergeData was extracted to scripts/game/mergeData.ts (imported above).
 
   var convertPowerupType = function (game_type) {
     // This costs a beer dudes...
@@ -334,292 +282,15 @@ var Game = function () {
   AniTicker.listeners = new Set();
 
   //////////////////////////////////////////
-  // The GameNode Base Class
+  // GameNode base class
   //////////////////////////////////////////
-
-  var GameNode = function (config) {
-    this.init(config);
-    return this;
-  };
-
-  // RenderType and RenderData for the GameNode's main renderNode to match against Render API
-  GameNode.prototype.renderData = undefined;
-  GameNode.prototype.renderType = undefined;
-
-  GameNode.prototype.toString = function () {
-    return sprintf('GameNode “%s”: %d children', this.renderType || this._id, this.children.length);
-  };
-
-  GameNode.prototype.init = function (config) {
-    // Initialize GameNode and register it in Game _instances (Array) and _ids (Object)
-    // Set children property for tree-structure
-    // Set States registry of the GameNode
-    // Backlink to GameRoot for easy access to GameRoot API
-    // setAttrs expands the Object via generic setAttrs
-    // makeRenderConfig does the data crunching for the RenderAPI
-    // jq is the jquery wrapper of the GameNode
-    // initialize Event Handlers usually overwritten by the SubClasses
-    if (!config) {
-      config = {};
-    }
-    this._id = _instances.length;
-    this.id = config.id || 'GameNode' + this._id;
-    add(this);
-    this.children = new Set();
-    this.states = {
-      idle: true,
-    };
-    this.GameRoot = get(0);
-    this.setAttrs(config);
-    this.makeRenderConfig();
-    this.jq = $(this);
-    // init Event Handlers
-    this.initEventHandlers();
-  };
-
-  GameNode.prototype.remove = function () {
-    if (this.parentNode) {
-      this.parentNode.children.remove(this);
-    }
-    if (this.children) {
-      this.children.each(function (child) {
-        child.parentNode = undefined;
-      });
-    }
-    if (this.renderNode) {
-      this.renderNode.remove();
-    }
-    if (this.renderMenu) {
-      this.renderMenu.remove();
-    }
-    if (this.renderPopup) {
-      this.renderPopup.close();
-    }
-    if (this.renderStatusbar) {
-      this.renderStatusbar.remove();
-    }
-    remove(this._id);
-  };
-
-  GameNode.prototype.addType = function (gestalt, data) {
-    var groot = this.GameRoot;
-    var nodeType = this.getType();
-    if (nodeType) {
-      if (data.game_type && data.type_data) {
-        if (typeSettings.hasOwnProperty(data.game_type)) {
-          data.type_data = mergeData(typeSettings[data.game_type].type_data, data.type_data);
-          data.type_data.gestalt = gestalt;
-          data.type_data.game_type = data.game_type;
-          // expand powerup tokens with their type data
-          if (data.type_data.tokens && data.type_data.tokens.length) {
-            _.each(data.type_data.tokens, function (v, k) {
-              v.type_data = groot.getTypeData(v.gestalt);
-            });
-          }
-        }
-        return (nodeType[gestalt] = data);
-      }
-    }
-  };
-
-  GameNode.prototype.getType = function (gestalt) {
-    // Get (sub)type from node gestalt or return own type
-    if (gestalt) {
-      return this.GameRoot.getType(this.gestalt)[gestalt];
-    } else {
-      return this.GameRoot.getType(this.gestalt);
-    }
-  };
-  GameNode.prototype.getTypeData = function (gestalt) {
-    // Get (sub)type from node gestalt or return own type
-    if (gestalt) {
-      return this.GameRoot.getType(this.gestalt)[gestalt].type_data;
-    } else {
-      return this.GameRoot.getType(this.gestalt).type_data;
-    }
-  };
-
-  GameNode.prototype.setState = function (state, value) {
-    // State change triggers event for renderNodes and renderPopups to listen to
-    // Note: The event is feedbacked to the GameNode. So Listener attached to the GameNode will also be triggered.
-
-    // do nothing when state is the same
-    if (this.states[state] === value) {
-      return;
-    }
-    this.states[state] = value;
-    // TODO: Eventhook could be more generic but probably we only need feedback in the popup
-    this.trigger('local_states', [state, value]);
-    this.trigger('local_states_' + state, [value]);
-    if (this.renderNode) {
-      this.renderNode.trigger('states', [state, value]);
-      this.renderNode.trigger('states_' + state, [value]);
-    }
-    if (this.renderPopup) {
-      this.renderPopup.trigger('states', [state, value]);
-      this.renderPopup.trigger('states_' + state, [value]);
-    }
-  };
-
-  GameNode.prototype.setAttrs = function (attrs) {
-    // Set any attribute(s)
-    for (var key in attrs) {
-      if (attrs.hasOwnProperty(key)) {
-        this[key] = attrs[key];
-      }
-    }
-  };
-
-  GameNode.prototype.load = function () {
-    // FIXME: Do we need this?
-  };
-
-  GameNode.prototype.save = function () {
-    // FIXME: Do we need this?
-  };
-
-  GameNode.prototype.addChild = function (child) {
-    // The GameNode Tree: Append a child to the GameNode
-    if (!child) {
-      return false;
-    }
-    this.children.add(child);
-    child.parentNode = this;
-    return child;
-  };
-
-  GameNode.prototype.on = function (event, func) {
-    // Bind an jQuery Eventhandler to the GameNode
-    // Note: Most of the times this is called by the Renderer
-    // Important: any RenderNode.trigger() will feedback to the GameNode!
-    this.jq.on(event, func);
-  };
-  GameNode.prototype.off = function (event) {
-    // Unbind an jQuery Eventhandler from the GameNode
-    this.jq.off(event);
-  };
-  GameNode.prototype.trigger = function (event, params) {
-    // Trigger an jQuery Eventhandler from the GameNode
-    this.jq.trigger(event, params);
-  };
-
-  GameNode.prototype.initEventHandlers = function () {
-    this.on('vclick', function (e) {
-      e.stopPropagation();
-    });
-    if (this.extendEventHandlers) {
-      this.extendEventHandlers();
-    }
-  };
-
-  GameNode.prototype.removeEventHandlers = function () {
-    // Stupidly removes all event handlers
-    this.off();
-  };
-
-  GameNode.prototype.makeRenderConfig = function () {
-    // Crunch data for render initialisation
-    // FIXME: this is mostly for data compatibility reasons,
-    // could be more streamlined
-    if (!this.renderData) {
-      this.renderData = {};
-    }
-    var config = this.renderData.config || {};
-
-    //var data = mergeData(data.type_data,data.instance_data);
-    var data = this.data || {};
-    config.id = this.id;
-    config.name = data.name || config.name || this.id;
-
-    config.x = data.x || config.x;
-    config.y = data.y || config.y;
-
-    config.width = data.width || config.width;
-    config.height = data.height || config.height;
-
-    config.label = data.label || config.label;
-
-    config.zoomScale = data.zoom_scale || config.zoomScale;
-    config.perpSprite = data.perp_sprite || config.perpSprite;
-
-    config.perpBackground = data.perp_background || config.perpBackground;
-    //FIXME: supertoken check with is_supertoken, not gestaltinspection (though would work)
-    if (this.gestalt && this.gestalt.substring(0, 10) === 'supertoken') {
-      config.perpBackground = data.perp_background2;
-    }
-    if (this.gestalt && this.gestalt.substring(0, 6) === 'origin') {
-      this.is_origin = true;
-      config.no_render = true;
-    }
-    if (this.gestalt && this.gestalt.substring(0, 5) === 'token') {
-      this.GameRoot.getTypeData(this.gestalt).is_supertoken = false;
-      this.data.is_supertoken = false;
-    }
-    if (config.perpBackground) {
-      _.each(config.perpBackground, function (v, k) {
-        config[k] = v;
-      });
-    }
-
-    config.background = data.background || config.background;
-    config.RenderTemplate = data.RenderTemplate || config.RenderTemplate;
-
-    this.renderData.parentNode = this.renderNodeParent;
-    this.renderData.config = config;
-    return config;
-  };
-
-  GameNode.prototype.updateRenderNode = function (render) {
-    // Test Method: Updates the rendered GameNode to the stored config
-    // FIXME: this probably is pointless, better to reinit a specific node?
-    // Need to take care of tree structure and all render specific settings
-    if (!this.renderData && !render) {
-      return;
-    } else if (render) {
-      this.renderData = render;
-    }
-    if (this.renderData.hasOwnProperty('config')) {
-      this.renderNode.setAttrs(this.renderData.config);
-    }
-    this.renderNode.draw();
-  };
-
-  GameNode.prototype.render = function () {
-    // Renders GameNode or recursivly removes old RenderNodes and renders anew.
-    // FIXME: currently rerendering stuff has some problems with decorators etc...
-    // Maybe there's a better way to update stuff or re-init parts of the GameNode-Tree
-    if (this.renderNode) {
-      this.renderNode.remove();
-    }
-    var render = this.renderData;
-
-    if (render && render.config && !render.config.no_render) {
-      var node = new Render[this.renderType](render.config);
-      this.renderNode = node;
-      this.trigger('before_render');
-      node.gameNode = this;
-      // Put RenderNode in its place:
-      if (render.parentNode) {
-        var parentNode = Render.getById(render.parentNode);
-        if (parentNode) {
-          parentNode.addChild(node);
-        }
-      }
-
-      // Execute subclass specific render function
-      if (this.extendRender) {
-        this.extendRender();
-      }
-      // after_render is only triggered when node rendered for the first time
-      this.trigger('after_render');
-    }
-    // FIXME: Recursion, maybe we better get rid of it and do rendering on init and specific updates of the Tree
-    if (this.children.length) {
-      this.children.each(function (child) {
-        child.render();
-      });
-    }
-  };
+  //
+  // Extracted to scripts/game/GameNode.ts (imported above).  Subclasses
+  // below extend it via the legacy `extend(SubClass, GameNode)` helper;
+  // additional GameNode.prototype.X = ... assignments scattered through
+  // this file (openGenericPopup, initPopupEvents, fetchProvided, Error,
+  // NoCash, NoAP) attach to the imported class via live-binding mutation
+  // — the same way they did inside the IIFE.
 
   //////////////////////////////////////////////////
   // The Subclasses
