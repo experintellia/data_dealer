@@ -30,6 +30,7 @@ import { Imperium } from './game/Imperium.js';
 import { Mission } from './game/Mission.js';
 import { Missions } from './game/Missions.js';
 import { OrderedSet } from './game/OrderedSet.js';
+import { ProfileSet } from './game/ProfileSet.js';
 import { Topscore } from './game/Topscore.js';
 import { Topscores } from './game/Topscores.js';
 import { mergeData } from './game/mergeData.js';
@@ -1829,149 +1830,12 @@ var Game = function () {
   ///////////////////////////////////
   // The ProfileSet
   ///////////////////////////////////
-
-  var ProfileSet = function (config, tokens) {
-    // Used both as Template and cued Object in DBQueue
-    this.init(config);
-    var gnode = this;
-    var groot = this.GameRoot;
-
-    tokens = _.clone(tokens);
-    this.data = groot.getTypeData('ProfileSet');
-    var filter_is_query = this.filter_is_query;
-
-    if (this.convertTokens) {
-      _.each(tokens, function (t, k) {
-        tokens[k] = { gestalt: t };
-      });
-    }
-
-    this.tokens_map = {};
-    this.tokens_set = [];
-    var addtokens = [];
-    // Check if tokens is object with keys or array
-    if (tokens.length === undefined && gnode.origin) {
-      // Asuming its a token_map from the queue or collect
-      // FIXME: this messes with sorting, either we use a kind of sort key, or backend can give me an array!
-      _.each(tokens.tokens_map, function (v, k) {
-        var addme = {
-          gestalt: k,
-          amount: v.amount,
-          // collect_amount is profiles value here
-          collect_amount: gnode.profiles_value,
-        };
-        // exclude origin tokens
-        if (addme.gestalt.substring(0, 6) !== 'origin') {
-          addtokens.push(addme);
-        }
-      });
-      this.tokens_map = tokens.tokens_map;
-    } else {
-      // Asuming its from the source perp
-      // exclude origin tokens
-      addtokens = _.filter(tokens, function (n) {
-        if (n.gestalt) {
-          return n.gestalt.substring(0, 6) !== 'origin';
-        }
-      });
-      if (config.filter_is_query) {
-        var is_query = filter_is_query === 'blue';
-        addtokens = _.filter(tokens, function (n) {
-          return n.is_query === is_query;
-        });
-      }
-    }
-
-    // We build and extend the token_set
-    _.each(addtokens, function (token, k) {
-      // don't mess with the original data
-      var t = _.extend({}, token);
-      t.data = groot.getTypeData(token.gestalt);
-      if (gnode.DBAmounts) {
-        t.database_amount = groot.DBTokens[token.gestalt] || 0;
-        t.database_absoluteAmount = groot.DBTokensAbsolute[token.gestalt] || 0;
-      }
-      if (gnode.markNew) {
-        var seenMap = (groot.raw_data && groot.raw_data.tokens_seen) || {};
-        if (!groot.DBTokens.hasOwnProperty(token.gestalt) && !seenMap[token.gestalt]) {
-          t.new = true;
-        }
-      }
-      if (gnode.lockAmountZero && token.amount === 0) {
-        t.locked = true;
-      }
-      if (gnode.lockNotInDB && !groot.DBTokens.hasOwnProperty(token.gestalt)) {
-        t.locked = true;
-      }
-      if (gnode.markUpgradeValues && gnode.lastUpgradeValues && !t.locked) {
-        var lastProfileValues = gnode.lastUpgradeValues.profiles_value;
-        var lastAmount = gnode.lastUpgradeValues.token_map[t.gestalt] || 0;
-        var lastAbsoluteAmount = (lastProfileValues * lastAmount) / 100;
-        var currentAbsoluteAmount = gnode.GameRoot.DBTokensAbsolute[t.gestalt];
-        t.diffAbsoluteAmount = currentAbsoluteAmount - lastAbsoluteAmount;
-        t.doneAbsoluteAmount = t.database_absoluteAmount - t.diffAbsoluteAmount;
-        t.diffAmount = 100 / (groot.profiles_value / t.diffAbsoluteAmount);
-        t.doneAmount = t.database_amount - t.diffAmount;
-      } else if (gnode.markUpgradeValues && !gnode.lastUpgradeValues && !t.locked) {
-        t.diffAbsoluteAmount = groot.DBTokensAbsolute[token.gestalt] || 0;
-        t.diffAmount = groot.DBTokens[token.gestalt] || 0;
-        t.doneAmount = 0;
-        t.doneAbsoluteAmount = 0;
-      }
-
-      // FIXME: Show origin data for debug reasons only
-      if (token.origin_gestalt) {
-        t.data = groot.getTypeData(token.origin_gestalt);
-      }
-      if (t.data) {
-        gnode.tokens_set.push(t);
-      }
-    });
-    // sort when locked tokens are marked
-
-    // biome-ignore lint/suspicious/noSelfCompare: legacy always-true guard, removal is a separate refactor
-    if (gnode.lockAmountZero || gnode.lockNotInDB || 0 === 0) {
-      var sorted = gnode.tokens_set;
-      // FIXME: sortBy Gestalt for messed up TokenSets from CMS/Backend (DBQueue and Clients)
-      if (gnode.sortByGestalt) {
-        sorted = _.sortBy(gnode.tokens_set, function (t) {
-          return t.gestalt;
-        });
-      }
-      var grouped = _.groupBy(sorted, function (t) {
-        return t.locked ? 1 : 0;
-      });
-      gnode.tokens_set = _.flatten(grouped);
-      /*
-        gnode.tokens_set = _(gnode.tokens_set).sortBy(function(t,k){
-          if (t.locked) {
-            return k+gnode.tokens_set.length;
-          }  
-          else {
-            return k;
-          }
-        });
-        */
-    }
-
-    return this;
-  };
-  extend(ProfileSet, GameNode);
-
-  ProfileSet.prototype.updateNewMarker = function () {
-    var groot = this.GameRoot;
-    var seenMap = (groot.raw_data && groot.raw_data.tokens_seen) || {};
-    _.each(this.tokens_set, function (token) {
-      if (!groot.DBTokens.hasOwnProperty(token.gestalt) && !seenMap[token.gestalt]) {
-        token.new = true;
-      } else {
-        token.new = false;
-      }
-    });
-    if (this.popupTemplateData) {
-      this.popupTemplateData.ProfileSet = this;
-    }
-  };
+  //
+  // Extracted to scripts/game/ProfileSet.ts in PR 9 of issue #147.  The
+  // class is imported above; the API publisher at the bottom of this
+  // IIFE re-exposes it as Game.ProfileSet (where applicable) and
+  // Database.cue / Perp BuyToken flows reach it through the imported
+  // identity.
 
   ///////////////////////////////////
   // The Imperium
