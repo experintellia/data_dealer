@@ -995,14 +995,16 @@ var Game = function () {
       gnode.activeView = getById(view_id);
       gnode.activeView.setState('active', true);
       // Refresh the new view's scroller dimensions against the current
-      // stage (it may have been resized while a different tab was active),
-      // then recentre on its content. Without this, switching to Database
-      // leaves the camera wherever the previous view was scrolled.
+      // stage (it may have been resized while a different tab was active).
+      // Auto-recentering used to live here, but it raced with tutorial
+      // scripted events that scrollTo a perp right after switch_view —
+      // the debounced re-center fired ~50ms later and overwrote the
+      // perp focus. Tab switches now keep their last scroll position;
+      // the fullscreen/reset-zoom button is the explicit way to recentre.
       var vm = gnode.activeView && gnode.activeView.renderNode;
       if (vm && typeof vm.updateScroller === 'function') {
         vm.updateScroller();
       }
-      gnode._centerActiveView(true);
     });
 
     gnode.on('toggle_locale', function (e) {
