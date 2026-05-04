@@ -10,9 +10,9 @@
 
 import { getRender } from '../Render.js';
 import appModule from '../app.js';
+import i18n from '../i18n.js';
 import {
   GameNode,
-  type GameNodeConfig,
   getAllByGestalt,
   getByFirstId,
   getFirstId,
@@ -204,8 +204,7 @@ export class GamePerp extends GameNode {
       );
     }
     if (this._loadReady) {
-      const markReady = (this as unknown as { markReady?: () => void }).markReady;
-      if (markReady) markReady.call(this);
+      this.markReady?.();
       delete this._loadReady;
     } else if (this._loadTimer) {
       this.markTimer(this._loadTimer);
@@ -229,35 +228,28 @@ export class GamePerp extends GameNode {
     return true;
   }
 
+  private static _stopProp(e: unknown): void {
+    const fn = (e as { stopPropagation?: () => void } | null | undefined)?.stopPropagation;
+    if (typeof fn === 'function') fn.call(e);
+  }
+
   override initEventHandlers(): void {
     const gnode = this;
     const groot = this.groot;
 
     gnode.on('dragend', function (e: unknown) {
-      if (e && typeof (e as { stopPropagation?: () => void }).stopPropagation === 'function') {
-        (e as { stopPropagation: () => void }).stopPropagation();
-      }
+      GamePerp._stopProp(e);
       // FIXME: Testing Save Coords.
       const pos = (gnode.renderNode as RenderNodeLike | undefined)?.getPosition?.();
       if (gnode.path && pos) {
         groot.trigger('saveCoordsQueue', [gnode.path, pos]);
       }
     });
-    gnode.on('vclick', function (e: unknown) {
-      if (e && typeof (e as { stopPropagation?: () => void }).stopPropagation === 'function') {
-        (e as { stopPropagation: () => void }).stopPropagation();
-      }
-    });
-    gnode.on('vdblclick', function (e: unknown) {
-      if (e && typeof (e as { stopPropagation?: () => void }).stopPropagation === 'function') {
-        (e as { stopPropagation: () => void }).stopPropagation();
-      }
-    });
+    gnode.on('vclick', GamePerp._stopProp);
+    gnode.on('vdblclick', GamePerp._stopProp);
 
     gnode.on('after_buy after_create', function (e: unknown) {
-      if (e && typeof (e as { stopPropagation?: () => void }).stopPropagation === 'function') {
-        (e as { stopPropagation: () => void }).stopPropagation();
-      }
+      GamePerp._stopProp(e);
       const story = gnode.data && (gnode.data as { story?: unknown }).story;
       if (story) {
         groot.makeNotifications({ story: story, storyPerp: gnode });
@@ -266,9 +258,7 @@ export class GamePerp extends GameNode {
 
     if (gnode.AniTick) {
       gnode.on('states_chargeRunning', function (e: unknown, state: unknown) {
-        if (e && typeof (e as { stopPropagation?: () => void }).stopPropagation === 'function') {
-          (e as { stopPropagation: () => void }).stopPropagation();
-        }
+        GamePerp._stopProp(e);
         if (state) {
           _aniTicker?.addListener(gnode);
         } else {
@@ -310,23 +300,24 @@ export class GamePerp extends GameNode {
     };
   }
 
-  openPopup(): RenderPopupLike {
+  private _buildPopup(replaceExisting: boolean): RenderPopupLike {
     const Render = this.getRenderModule();
     this.updateTemplateData();
 
-    const popupConfig = {
+    const popup = new Render.Popup({
       // FIXME: gameNode only used for debug info on logo click.
       gameNode: this,
       template: this.popupTemplate,
       templateData: this.popupTemplateData,
-      popupContainer: (this as unknown as { ViewMap?: GameNode }).ViewMap,
-    };
+      popupContainer: this.ViewMap,
+    });
 
-    const popup = new Render.Popup(popupConfig);
+    if (replaceExisting && this.renderPopup) {
+      (this.renderPopup as RenderPopupLike).remove?.();
+    }
     this.renderPopup = popup;
 
-    const viewMap = (this as unknown as { ViewMap?: GameNode }).ViewMap;
-    const viewMapNode = viewMap?.renderNode as RenderNodeLike | undefined;
+    const viewMapNode = this.ViewMap?.renderNode as RenderNodeLike | undefined;
     viewMapNode?.addPopup?.(popup);
 
     if (this.initPopupEvents) this.initPopupEvents();
@@ -334,30 +325,12 @@ export class GamePerp extends GameNode {
     return popup;
   }
 
+  openPopup(): RenderPopupLike {
+    return this._buildPopup(false);
+  }
+
   updatePopup(): RenderPopupLike {
-    const Render = this.getRenderModule();
-    this.updateTemplateData();
-
-    const popupConfig = {
-      gameNode: this,
-      template: this.popupTemplate,
-      templateData: this.popupTemplateData,
-      popupContainer: (this as unknown as { ViewMap?: GameNode }).ViewMap,
-    };
-
-    if (this.renderPopup) {
-      (this.renderPopup as RenderPopupLike).remove?.();
-    }
-    const popup = new Render.Popup(popupConfig);
-    this.renderPopup = popup;
-
-    const viewMap = (this as unknown as { ViewMap?: GameNode }).ViewMap;
-    const viewMapNode = viewMap?.renderNode as RenderNodeLike | undefined;
-    viewMapNode?.addPopup?.(popup);
-
-    if (this.initPopupEvents) this.initPopupEvents();
-
-    return popup;
+    return this._buildPopup(true);
   }
 
   // -------------------------------------------------------------------
@@ -388,7 +361,7 @@ export class GamePerp extends GameNode {
           } else if (gnode.gameType === 'ProxyPerp' && r.error === 3) {
             gnode.renderPopup.trigger('error');
             groot.makeNotifications({
-              simplemessage: { text: i18nProxySlotsFull() },
+              simplemessage: { text: i18n.gettext('projectbuy_proxyslotsfull') },
             });
           } else {
             gnode.renderPopup.trigger('error');
@@ -456,7 +429,9 @@ export class GamePerp extends GameNode {
       if (perp.path && perpPos) {
         groot.trigger('saveCoords', [perp.path, perpPos]);
       }
-      perpRn?.addDecorator?.(new Render.DecoratorNew({ text: i18nNew(), extendClass: 'NewPerp' }));
+      perpRn?.addDecorator?.(
+        new Render.DecoratorNew({ text: i18n.gettext('New!'), extendClass: 'NewPerp' })
+      );
       perpRn?.hide?.();
       if (perpPos) perpRn?.parentNode?.scrollTo?.(perpPos);
 
@@ -496,9 +471,7 @@ export class GamePerp extends GameNode {
   override extendEventHandlers(): void {
     const gnode = this;
     this.on('vclick', function (e: unknown) {
-      if (e && typeof (e as { stopPropagation?: () => void }).stopPropagation === 'function') {
-        (e as { stopPropagation: () => void }).stopPropagation();
-      }
+      GamePerp._stopProp(e);
       gnode.openPopup();
     });
   }
@@ -514,76 +487,63 @@ export class GamePerp extends GameNode {
        }
     */
     const Render = this.getRenderModule();
-    const text = this.textNewItems || i18nNewItems();
+    const text = this.textNewItems || i18n.gettext('New Items!');
     this.renderApi?.addDecorator?.(new Render.DecoratorNew({ text: text, arrow: true }));
   }
 
-  checkProvidedByRequiredPerps(): void {
-    // Checks for provided perps by required providers.
+  /** Walks `data.provided_perps`, skipping already-owned ones, and calls
+   *  `match` on each gestalt whose `type_data` satisfies `predicate`. */
+  private _walkProvided(
+    predicate: (
+      td: { required_providers?: string[]; required_level?: number } | undefined,
+      groot: GameRootForPerp
+    ) => boolean,
+    match: (gestalt: string) => void
+  ): void {
     const groot = this.groot;
     const provided = (this.data as { provided_perps?: string[] } | undefined)?.provided_perps || [];
     provided.forEach((gestalt) => {
-      const type = groot.getType(gestalt);
-      const td = type?.type_data as { required_providers?: string[] } | undefined;
-      if (td?.required_providers && !Object.prototype.hasOwnProperty.call(groot.IPerps, gestalt)) {
-        td.required_providers.forEach((p) => {
-          if (Object.prototype.hasOwnProperty.call(groot.IPerps, p)) {
-            this.markNewItems();
-          }
-        });
-      }
+      if (Object.prototype.hasOwnProperty.call(groot.IPerps, gestalt)) return;
+      const td = groot.getType(gestalt)?.type_data as
+        | { required_providers?: string[]; required_level?: number }
+        | undefined;
+      if (predicate(td, groot)) match(gestalt);
     });
   }
 
+  private static _hasOwnedRequiredProvider(
+    td: { required_providers?: string[] } | undefined,
+    groot: GameRootForPerp
+  ): boolean {
+    return !!td?.required_providers?.some((p) =>
+      Object.prototype.hasOwnProperty.call(groot.IPerps, p)
+    );
+  }
+
+  checkProvidedByRequiredPerps(): void {
+    this._walkProvided(GamePerp._hasOwnedRequiredProvider, () => this.markNewItems());
+  }
+
   getProvidedByRequiredPerps(): string[] {
-    const groot = this.groot;
     const perps: string[] = [];
-    const provided = (this.data as { provided_perps?: string[] } | undefined)?.provided_perps || [];
-    provided.forEach((gestalt) => {
-      const type = groot.getType(gestalt);
-      const td = type?.type_data as { required_providers?: string[] } | undefined;
-      if (td?.required_providers && !Object.prototype.hasOwnProperty.call(groot.IPerps, gestalt)) {
-        td.required_providers.forEach((p) => {
-          if (Object.prototype.hasOwnProperty.call(groot.IPerps, p)) {
-            perps.push(gestalt);
-          }
-        });
-      }
-    });
+    this._walkProvided(GamePerp._hasOwnedRequiredProvider, (g) => perps.push(g));
     return perps;
   }
 
   checkProvidedByLevel(): void {
-    // Checks for same level.
-    const groot = this.groot;
-    const provided = (this.data as { provided_perps?: string[] } | undefined)?.provided_perps || [];
-    provided.forEach((gestalt) => {
-      const type = groot.getType(gestalt);
-      const td = type?.type_data as { required_level?: number } | undefined;
-      if (
-        td?.required_level === groot.xp_level.number &&
-        !Object.prototype.hasOwnProperty.call(groot.IPerps, gestalt)
-      ) {
-        this.markNewItems();
-      }
-    });
+    this._walkProvided(
+      (td, groot) => td?.required_level === groot.xp_level.number,
+      () => this.markNewItems()
+    );
   }
 
   getProvidedByLevel(): string[] {
-    const groot = this.groot;
     const perps: string[] = [];
-    const provided = (this.data as { provided_perps?: string[] } | undefined)?.provided_perps || [];
-    provided.forEach((gestalt) => {
-      const type = groot.getType(gestalt);
-      const td = type?.type_data as { required_level?: number } | undefined;
-      if (
-        typeof td?.required_level === 'number' &&
-        td.required_level <= groot.xp_level.number &&
-        !Object.prototype.hasOwnProperty.call(groot.IPerps, gestalt)
-      ) {
-        perps.push(gestalt);
-      }
-    });
+    this._walkProvided(
+      (td, groot) =>
+        typeof td?.required_level === 'number' && td.required_level <= groot.xp_level.number,
+      (g) => perps.push(g)
+    );
     return perps;
   }
 
@@ -596,6 +556,7 @@ export class GamePerp extends GameNode {
     };
     dataRec.providedPerps = [];
     if (dataRec.buyablePerps === undefined) return;
+    const buyable = new Set(dataRec.buyablePerps);
     const provided = dataRec.provided_perps || [];
     provided.forEach((p) => {
       // Already-owned perps shouldn't appear in the buy dialog at all —
@@ -606,7 +567,7 @@ export class GamePerp extends GameNode {
       const perp: ProvidedPerpRow = {
         gestalt: p,
         data: type_data,
-        locked: dataRec.buyablePerps?.find((v) => p === v) === undefined,
+        locked: !buyable.has(p),
       };
       if (
         perp.locked &&
@@ -639,16 +600,3 @@ export class GamePerp extends GameNode {
   }
 }
 
-// Lazy i18n string fetches — `_._` reads the i18n.gettext mixin off the
-// underscore global registered by app.ts.  Pulled into helpers because
-// the strings are used at multiple sites inside long callbacks where
-// inlining the global access wouldn't read clean.
-function i18nNew(): string {
-  return (globalThis._ as unknown as { _(s: string): string })._('New!');
-}
-function i18nNewItems(): string {
-  return (globalThis._ as unknown as { _(s: string): string })._('New Items!');
-}
-function i18nProxySlotsFull(): string {
-  return (globalThis._ as unknown as { _(s: string): string })._('projectbuy_proxyslotsfull');
-}

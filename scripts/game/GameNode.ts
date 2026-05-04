@@ -272,6 +272,11 @@ export class GameNode {
   extendRender?(): void;
   APTick?(): void;
   AniTick?(): void;
+  markReady?(): void;
+
+  /** Set by Imperium / Database / Topscores / Missions in their
+   *  constructors so descendant nodes can resolve a popup container. */
+  ViewMap?: GameNode;
 
   // Legacy GameNode prototype mixins still attached from scripts/Game.js
   // (`GameNode.prototype.openGenericPopup` at Game.js:1199, `Error` /
