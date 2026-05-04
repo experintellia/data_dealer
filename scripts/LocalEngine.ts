@@ -495,6 +495,18 @@ export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameRe
   var seededState = _seedMissionGoals(mat.state);
   setState(seededState);
 
+  // Persist as a recheckMissions delta so the repair lands in durable
+  // history; otherwise rewards would be reapplied every materialize pass.
+  var startupRepair = _repairStuckMissionGoals(seededState);
+  if (startupRepair && startupRepair.missions) {
+    var startupGv = _applyRewardsToGv(seededState.game_values || {}, startupRepair.rewards);
+    _persistDelta(_mkDelta(seededState.addr, 'recheckMissions', [], {
+      game_values: startupGv,
+      missions: startupRepair.missions,
+    }));
+    seededState = getState();
+  }
+
   // Re-arm one-shot materializers for any charges still in flight. Clear
   // any prior handles first so calling loadGame twice doesn't queue
   // duplicate node_ready emissions for the same charge.
@@ -1689,6 +1701,32 @@ function _completeMissionsIfReady(
   };
 }
 
+// Flips goals where current_amount >= amount but complete=false (caused by
+// progression handlers that updated current_amount without setting complete).
+// Returns null when nothing needed repair so callers can skip persistence.
+function _repairStuckMissionGoals(state: LocalState): MissionAdvanceResult | null {
+  var goals = state.mission_goals || [];
+  var activeMissions = state.active_missions || [];
+  if (!goals.length || !activeMissions.length) return null;
+
+  var activeSet: Record<string, true> = {};
+  activeMissions.forEach(function (m) { activeSet[m] = true; });
+
+  var changed = false;
+  var updatedGoals = goals.map(function (goal) {
+    if (goal.complete || !activeSet[goal.mission]) return goal;
+    var amount = goal.amount || 0;
+    if (amount > 0 && (goal.current_amount || 0) >= amount) {
+      changed = true;
+      return Object.assign({}, goal, { complete: true, current_amount: amount });
+    }
+    return goal;
+  });
+
+  if (!changed) return null;
+  return _completeMissionsIfReady(updatedGoals, activeMissions);
+}
+
 // Sums up cash / xp / karma rewards across the just-completed missions so
 // the caller can fold them into the new game_values. Without this, mission
 // completion notifications fire but the player never sees the payout.
@@ -2606,6 +2644,29 @@ export function dismissMissionBriefing(gestalt: unknown): Promise<{ result: { er
   return Promise.resolve({ result: { ok: true } });
 }
 
+// On-demand counterpart of the loadGame repair. Called when the player
+// opens the Missions tab. Returns { repaired: false } when nothing was
+// stuck so the caller can skip rerendering.
+export function recheckMissions(): Promise<{
+  result:
+    | { repaired: false }
+    | { repaired: true; missions: MissionUpdate; game_values: GameValues; levelup: false };
+}> {
+  var state = getState();
+  var repair = _repairStuckMissionGoals(state);
+  if (!repair || !repair.missions) {
+    return Promise.resolve({ result: { repaired: false } });
+  }
+  var newGv = _applyRewardsToGv(state.game_values || {}, repair.rewards);
+  _persistDelta(_mkDelta(state.addr, 'recheckMissions', [], {
+    game_values: newGv,
+    missions: repair.missions,
+  }));
+  return Promise.resolve({
+    result: { repaired: true, missions: repair.missions, game_values: newGv, levelup: false },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Stub handlers — Wave 4+ issues fill these in.
 // ---------------------------------------------------------------------------
@@ -2651,6 +2712,7 @@ var LocalEngine = Object.assign({
   integrateCollected: integrateCollected,
   dismissMissionBriefing: dismissMissionBriefing,
   markTokenSeen:      markTokenSeen,
+  recheckMissions:    recheckMissions,
   setEmitter:           setEmitter,
   setSendDelta:         setSendDelta,
   setSendAchievement:   setSendAchievement,

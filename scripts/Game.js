@@ -3362,6 +3362,25 @@ var Game = function() {
       this.GameRoot.renderMenu.addButton(_._('Missions'), this.id,this.states);
     };
 
+    Missions.prototype.extendEventHandlers = function() {
+      var mroot = this;
+      var groot = this.GameRoot;
+      mroot.on('states_active', function(e, params) {
+        if (!params || !app.remote || !app.remote.recheckMissions) { return; }
+        app.remote.recheckMissions().done(function(data) {
+          var r = data && data.result;
+          if (!r || !r.repaired) { return; }
+          if (r.missions.complete_missions && r.missions.complete_missions.length) {
+            groot.updateGameValues(r.game_values, r.levelup, r.missions, true);
+          } else {
+            // Goal flipped without finishing the mission — refresh rows only,
+            // skipping the reward/levelup popup machinery.
+            mroot.updateMissionGoals(r.missions.mission_data.mission_goals);
+          }
+        });
+      });
+    };
+
     Missions.prototype.getMission = function(gestalt) {
       return this.Missions[gestalt] || {};
     };

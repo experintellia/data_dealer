@@ -204,6 +204,7 @@ var OP_NAMES = [
   'setLocale',
   'dismissMissionBriefing',
   'markTokenSeen',
+  'recheckMissions',
 ];
 
 // ---------------------------------------------------------------------------
@@ -629,6 +630,22 @@ reducers.integrateCollected = function integrateCollectedReducer(state, delta) {
     nodes:          newNodes,
     mission_goals: mp.mission_goals,
     active_missions: mp.active_missions
+  });
+};
+
+// Bakes the stuck-goal repair into history so rewards aren't reapplied
+// each materialize pass.
+reducers.recheckMissions = function recheckMissionsReducer(state, delta) {
+  if (!delta || !delta.result) return state;
+  var r = delta.result;
+  var newGv = r.game_values
+    ? Object.assign({}, state.game_values, r.game_values)
+    : state.game_values;
+  var mp = _missionDataFromResult(state, r);
+  return Object.assign({}, state, {
+    game_values: newGv,
+    mission_goals: mp.mission_goals,
+    active_missions: mp.active_missions,
   });
 };
 

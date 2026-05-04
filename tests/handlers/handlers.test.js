@@ -4,7 +4,7 @@ import {
   getToken, ping, getSessionLocale, setLocale, loadGame, getRanking, setEmitter,
   setDisplayName, setPerpCoordinates, buyKarma,
   buyPowerup, sellPowerup, buySlots, buyPerp,
-  dismissMissionBriefing, markTokenSeen
+  dismissMissionBriefing, markTokenSeen, recheckMissions
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { freshState, applyDelta } from '../../scripts/state.js';
@@ -1196,6 +1196,80 @@ describe('buyPerp — loadGame repairs stuck buy_perp goal', () => {
     );
     expect(goal).toBeDefined();
     expect(goal.complete).toBe(false);
+  });
+});
+
+describe('recheckMissions — recovers stuck goals (current_amount >= amount)', () => {
+  it('flips a stuck integrate_profiles goal to complete and finishes the mission', async () => {
+    setState(Object.assign(mkBuyPerpState(), {
+      active_missions: ['mission007'],
+      mission_goals: [
+        { mission: 'mission007', workflow: 'buy_perp',           target: 'contact001', amount: null, position: 1, current_amount: 1,    complete: true  },
+        { mission: 'mission007', workflow: 'collect_profiles',   target: 'contact001', amount: 3000, position: 2, current_amount: 3000, complete: true  },
+        { mission: 'mission007', workflow: 'integrate_profiles', target: 'token017',   amount: 3000, position: 3, current_amount: 3000, complete: false },
+      ],
+    }));
+
+    const { result } = await recheckMissions();
+
+    expect(result.repaired).toBe(true);
+    expect(result.missions.complete_missions).toContain('mission007');
+    const stuck = getState().mission_goals.find(
+      (g) => g.mission === 'mission007' && g.workflow === 'integrate_profiles'
+    );
+    expect(stuck.complete).toBe(true);
+    expect(getState().active_missions).not.toContain('mission007');
+  });
+
+  it('is a no-op when no goal is stuck', async () => {
+    setState(Object.assign(mkBuyPerpState(), {
+      active_missions: ['mission007'],
+      mission_goals: [
+        { mission: 'mission007', workflow: 'collect_profiles',   target: 'contact001', amount: 3000, position: 2, current_amount: 1500, complete: false },
+      ],
+    }));
+
+    const { result } = await recheckMissions();
+    expect(result.repaired).toBe(false);
+    expect(getState().active_missions).toContain('mission007');
+  });
+
+  it('replaying the recheckMissions delta does not double-apply rewards', async () => {
+    setState(Object.assign(mkBuyPerpState(), {
+      active_missions: ['mission007'],
+      mission_goals: [
+        { mission: 'mission007', workflow: 'buy_perp',           target: 'contact001', amount: null, position: 1, current_amount: 1,    complete: true  },
+        { mission: 'mission007', workflow: 'collect_profiles',   target: 'contact001', amount: 3000, position: 2, current_amount: 3000, complete: true  },
+        { mission: 'mission007', workflow: 'integrate_profiles', target: 'token017',   amount: 3000, position: 3, current_amount: 3000, complete: false },
+      ],
+    }));
+
+    await recheckMissions();
+    const xpAfterFirst = getState().game_values.xp_value;
+    // Second recheck after the first persisted: nothing left to repair.
+    await recheckMissions();
+    expect(getState().game_values.xp_value).toBe(xpAfterFirst);
+  });
+});
+
+describe('loadGame — repairs stuck integrate_profiles goal at startup', () => {
+  it('marks goal complete and removes mission from active_missions on load', async () => {
+    setState(Object.assign(mkBuyPerpState(), {
+      active_missions: ['mission007'],
+      mission_goals: [
+        { mission: 'mission007', workflow: 'buy_perp',           target: 'contact001', amount: null, position: 1, current_amount: 1,    complete: true  },
+        { mission: 'mission007', workflow: 'collect_profiles',   target: 'contact001', amount: 3000, position: 2, current_amount: 3000, complete: true  },
+        { mission: 'mission007', workflow: 'integrate_profiles', target: 'token017',   amount: 3000, position: 3, current_amount: 3000, complete: false },
+      ],
+    }));
+
+    await loadGame();
+
+    const stuck = getState().mission_goals.find(
+      (g) => g.mission === 'mission007' && g.workflow === 'integrate_profiles'
+    );
+    expect(stuck.complete).toBe(true);
+    expect(getState().active_missions).not.toContain('mission007');
   });
 });
 
