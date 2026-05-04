@@ -108,10 +108,19 @@ interface GameRootForDatabase {
   updateGears?(): void;
 }
 
+/** Type entry as returned by GameRoot.getType — narrow shape Database
+ *  pushes into ProvidedPerp.data.requiredTokens.  Game.js's typeRegistry
+ *  is loose; tighten when GameRoot is extracted with a typed surface. */
+type TypeEntry = {
+  type_data?: Record<string, unknown>;
+  game_type?: string;
+  [key: string]: unknown;
+};
+
 interface ProvidedPerp {
   gestalt: string;
   data: Record<string, unknown> & {
-    requiredTokens?: unknown[];
+    requiredTokens?: TypeEntry[];
     required_level?: number;
     contained_tokens?: ContainedToken[];
   };
@@ -267,7 +276,7 @@ export class Database extends GameNode {
       contained.forEach((v) => {
         if (v.is_required === true) {
           const subtype = groot.getType(v.gestalt);
-          if (subtype) (provided.data.requiredTokens as unknown[]).push(subtype);
+          if (subtype) provided.data.requiredTokens?.push(subtype);
           // check if all required tokens are there, else set to locked
           if (!Object.prototype.hasOwnProperty.call(groot.DBTokens, v.gestalt)) {
             provided.locked = true;
@@ -574,8 +583,20 @@ export class Database extends GameNode {
 
       const triggerQueue: GameNode[] = [];
       const TokenPerpCtor = lookupPerpClass('TokenPerp');
+      // Precompute gestalt-keyed lookup maps so the inner loop is O(M)
+      // instead of O(M*N) — a profileset with M tokens against a Database
+      // with N children would otherwise scan children.set + all_tokens
+      // linearly per token.
+      const childrenByGestalt = new Map<string, TokenPerpLike>();
+      for (const c of gnode.children.set) {
+        if (c.gestalt) childrenByGestalt.set(c.gestalt, c as TokenPerpLike);
+      }
+      const allTokensByGestalt = new Map<string, (typeof all_tokens)[number]>();
+      for (const n of all_tokens) {
+        if (n.gestalt) allTokensByGestalt.set(n.gestalt, n);
+      }
       Object.keys(ps.tokens_map).forEach((gestalt) => {
-        const token = gnode.getToken(gestalt);
+        const token = childrenByGestalt.get(gestalt);
         if (token) {
           // collect update tokens
           update_tokens.push(token);
@@ -583,7 +604,7 @@ export class Database extends GameNode {
           // create new tokens
           const type = groot.getType(gestalt);
           if (type && type.game_type === 'TokenPerp') {
-            const token_instance = all_tokens.find((n) => n.gestalt === gestalt);
+            const token_instance = allTokensByGestalt.get(gestalt);
             if (token_instance) {
               const newToken = new TokenPerpCtor({
                 id: token_instance.game_id,
@@ -651,7 +672,6 @@ export class Database extends GameNode {
         gnode.checkNotifications();
         groot.updateGears?.();
       }, 500 + wait);
-      window.setTimeout(function () {}, 8000);
     });
   }
 
