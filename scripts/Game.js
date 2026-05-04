@@ -1840,7 +1840,13 @@ var Game = function() {
       sb.AP.val = (this.ap_value < 0) ? 0 : this.ap_value;
       sb.AP.max = this.xp_level.ap_max;
       sb.AP.barsize = Math.min(120, Math.max(0, Math.round((sb.AP.val/this.xp_level.ap_max)*120)));
-      if (this.renderStatusbar && !silent) { this.renderStatusbar.FXUpdateAP(); }
+      // Always propagate to the statusbar's flat props (AP_val, AP_barsize, AP_max)
+      // so the rendered DOM tracks ap_value even on silent paths. The Statusbar
+      // template binds D.AP_val (a node-level property), not D.AP.val, so without
+      // FXUpdateAP() the text would lag until the next animated update — which is
+      // the bug behind issue #153 (energy stat shows stale value until clicked
+      // open, because the popup reads gnode.ap_value directly).
+      if (this.renderStatusbar) { this.renderStatusbar.FXUpdateAP(silent); }
     };
 
     GameRoot.prototype.setCash = function(num,silent) {
@@ -1850,7 +1856,7 @@ var Game = function() {
       sb = this.data.status_bar;
       sb.cash.val = this.cash_value;
       sb.cash.barsize = Math.min(120, Math.max(0, Math.round((this.cash_value/this.cash_max)*120)));
-      if (this.renderStatusbar && !silent) { this.renderStatusbar.FXUpdateCash(); }
+      if (this.renderStatusbar) { this.renderStatusbar.FXUpdateCash(silent); }
     };
 
     GameRoot.prototype.setProfiles = function(num,silent) {
@@ -1868,7 +1874,7 @@ var Game = function() {
       this.getDBTokensLength();
       sb.profiles.tokenslength = this.DBTokensLength;
       sb.profiles.tokenslengthmax = this.DBTokensLengthMax;
-      if (this.renderStatusbar && !silent) { this.renderStatusbar.FXUpdateProfiles(); }
+      if (this.renderStatusbar) { this.renderStatusbar.FXUpdateProfiles(silent); }
     };
 
     GameRoot.prototype.setKarma = function(num,silent) {
@@ -1890,7 +1896,7 @@ var Game = function() {
       //var val_center = 50 - this.karma_value;
       //FIXME: set to correct level not 50;
       sb.karma.barsize = Math.min(59, Math.max(-59, Math.round((this.karma_value/this.karma_max)*59)));
-      if (this.renderStatusbar && !silent) { this.renderStatusbar.FXUpdateKarma(); }
+      if (this.renderStatusbar) { this.renderStatusbar.FXUpdateKarma(silent); }
     };
 
     GameRoot.prototype.setXP = function(num,silent) {
@@ -1909,7 +1915,7 @@ var Game = function() {
       sb.XP.val = this.xp_value;
       sb.XP.level = this.xp_level.number;
       sb.XP.barsize = Math.min(96, Math.max(0, Math.round(((this.xp_value - this.xp_level.xp_min) / (this.xp_level.xp_max - this.xp_level.xp_min)) * 96)));
-      if (this.renderStatusbar && !silent) { this.renderStatusbar.FXUpdateXP(); }
+      if (this.renderStatusbar) { this.renderStatusbar.FXUpdateXP(silent); }
     };
 
 
