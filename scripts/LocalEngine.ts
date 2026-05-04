@@ -906,7 +906,7 @@ export function buyKarma(
     xp_level: newLevel.number,
   });
 
-  if (levelup) newGv.ap_snapshot = newLevel.ap_max;
+  if (levelup) newGv = _applyLevelUp(newGv, newLevel.number);
 
   _persistDelta(_mkDelta(state.addr, 'buyKarma', [karmalauterGestalt], { game_values: newGv }));
 
@@ -1034,6 +1034,26 @@ function _getLevelByXP(xp: number): number {
 
 function _checkLevelup(currentLevel: number, newXp: number): boolean {
   return _getLevelByXP(newXp) > currentLevel;
+}
+
+// Refill AP and raise ap_max/regen rates to the new level's values.
+// Centralised because previously every level-up site (chargePerp,
+// collectPerp, integrateCollected, buyKarma) open-coded a partial copy
+// that forgot to advance ap_max — so the very next materialize() pass
+// clamped ap_snapshot back to the old ceiling and the player visibly
+// lost the energy refill they just earned.
+function _applyLevelUp(gv: GameValues, newLevelNum: number): GameValues {
+  var levels = _getRuleset().levels;
+  var info = levels[newLevelNum - 1] || levels[levels.length - 1];
+  if (!info) return Object.assign({}, gv, { xp_level: newLevelNum });
+  var iv = info as LevelEntry & { ap_inc_value?: number; ap_inc_interval?: number };
+  return Object.assign({}, gv, {
+    xp_level: newLevelNum,
+    ap_inc_value: iv.ap_inc_value !== undefined ? iv.ap_inc_value : gv.ap_inc_value,
+    ap_inc_interval: iv.ap_inc_interval !== undefined ? iv.ap_inc_interval : gv.ap_inc_interval,
+    ap_max: info.ap_max,
+    ap_snapshot: info.ap_max,
+  });
 }
 
 // All delta-emitting handlers funnel through _persistDelta (above). The legacy
@@ -1460,24 +1480,7 @@ export function buyPerp(
   var oldLevel = gv.xp_level || 1;
   var newLevel = _getLevelByXP(newGv.xp_value || 0);
   var levelup = newLevel > oldLevel;
-  if (levelup) {
-    newGv = Object.assign({}, newGv, { xp_level: newLevel });
-    var levelInfo = ruleset.levels[newLevel - 1] as
-      | (LevelEntry & { ap_inc_value?: number; ap_inc_interval?: number })
-      | undefined;
-    if (levelInfo) {
-      newGv = Object.assign({}, newGv, {
-        ap_inc_value: levelInfo.ap_inc_value,
-        ap_inc_interval: levelInfo.ap_inc_interval,
-        ap_max: levelInfo.ap_max,
-        // Refill AP on levelup so the player gets a fresh batch of actions —
-        // matches buyKarma/chargePerp behaviour. Without this, ap_snapshot
-        // stayed at the previous level's value while ap_max grew, so the AP
-        // bar visibly under-filled after a buyPerp-triggered level.
-        ap_snapshot: levelInfo.ap_max,
-      });
-    }
-  }
+  if (levelup) newGv = _applyLevelUp(newGv, newLevel);
 
   var missionResult = _advanceBuyPerpMissions(state, gestalt);
   newGv = _applyRewardsToGv(newGv, missionResult.rewards);
@@ -2093,16 +2096,7 @@ export function chargePerp(
   var oldLevelNum = gv.xp_level || 1;
   var newLevelNum = _getLevelByXP(newGv.xp_value || 0);
   var levelup = newLevelNum > oldLevelNum;
-  if (levelup) {
-    var levels = _getRuleset().levels;
-    var newLevelInfo = levels[newLevelNum - 1] || levels[levels.length - 1];
-    if (newLevelInfo) {
-      newGv = Object.assign({}, newGv, {
-        xp_level: newLevelNum,
-        ap_snapshot: newLevelInfo.ap_max,
-      });
-    }
-  }
+  if (levelup) newGv = _applyLevelUp(newGv, newLevelNum);
 
   var preMissionStateCharge = Object.assign({}, state, {
     nodes: newNodes,
@@ -2405,16 +2399,7 @@ export function collectPerp(
   var oldLevel = (ms.game_values && ms.game_values.xp_level) || 1;
   var newLevel = _getLevelByXP(newGv.xp_value || 0);
   var levelup = newLevel > oldLevel;
-  if (levelup) {
-    var collectLevels = _getRuleset().levels;
-    var collectLevelInfo = collectLevels[newLevel - 1] || collectLevels[collectLevels.length - 1];
-    if (collectLevelInfo) {
-      newGv = Object.assign({}, newGv, {
-        xp_level: newLevel,
-        ap_snapshot: collectLevelInfo.ap_max,
-      });
-    }
-  }
+  if (levelup) newGv = _applyLevelUp(newGv, newLevel);
 
   var preMissionState = Object.assign({}, ms, {
     nodes: newNodes,
@@ -2654,17 +2639,7 @@ export function integrateCollected(
   var oldLevel = (state.game_values && state.game_values.xp_level) || 1;
   var newLevel = _getLevelByXP(newGv.xp_value || 0);
   var levelup = newLevel > oldLevel;
-  if (levelup) {
-    var integrateLevels = _getRuleset().levels;
-    var integrateLevelInfo =
-      integrateLevels[newLevel - 1] || integrateLevels[integrateLevels.length - 1];
-    if (integrateLevelInfo) {
-      newGv = Object.assign({}, newGv, {
-        xp_level: newLevel,
-        ap_snapshot: integrateLevelInfo.ap_max,
-      });
-    }
-  }
+  if (levelup) newGv = _applyLevelUp(newGv, newLevel);
 
   var preMissionState = Object.assign({}, state, {
     db_queue: newQueue,

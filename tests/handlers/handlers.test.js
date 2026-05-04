@@ -21,6 +21,7 @@ import {
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { clearOverride, setOverride } from '../../scripts/clock.js';
+import { materialize } from '../../scripts/materializer.js';
 import { applyDelta, freshState } from '../../scripts/state.js';
 import { FIXED_NOW, mkState } from './_fixtures.js';
 
@@ -431,6 +432,50 @@ describe('buyKarma — failure: insufficient cash', () => {
     const before = getState().game_values.cash_value;
     await buyKarma(KARMA_GESTALT);
     expect(getState().game_values.cash_value).toBe(before);
+  });
+});
+
+// karma001 awards 5 karma_points (also +5 XP). Starting at xp=6/level 1
+// (xp_max=10) crosses to xp=11/level 2 (xp_min=11, ap_max=8) on a single
+// buy — exercising the level-up path that previously refilled
+// ap_snapshot but forgot to raise ap_max, so the very next materialize()
+// pass clamped the player back to the old ceiling.
+describe('buyKarma — level-up raises ap_max so the refill survives materialize', () => {
+  beforeEach(() => {
+    setOverride(FIXED_NOW);
+    setState(
+      mkState({
+        game_values: {
+          xp_value: 6,
+          xp_level: 1,
+          cash_value: 1000,
+          cash_spent: 0,
+          karma_value: 50,
+          ap_snapshot: 2,
+          ap_max: 6,
+          ap_update: FIXED_NOW,
+          ap_inc_value: 1,
+          ap_inc_interval: 120000,
+        },
+      })
+    );
+  });
+
+  afterEach(() => clearOverride());
+
+  it('returns levelup=true and refills ap_snapshot to the new ap_max', async () => {
+    const { result } = await buyKarma(KARMA_GESTALT);
+    expect(result.levelup).toBe(true);
+    expect(result.game_values.xp_level).toBe(2);
+    expect(result.game_values.ap_snapshot).toBe(8);
+    expect(result.game_values.ap_max).toBe(8);
+  });
+
+  it('keeps the refill across a subsequent materialize() pass', async () => {
+    await buyKarma(KARMA_GESTALT);
+    var mat = materialize(getState(), FIXED_NOW + 1);
+    expect(mat.state.game_values.ap_snapshot).toBe(8);
+    expect(mat.state.game_values.ap_max).toBe(8);
   });
 });
 
