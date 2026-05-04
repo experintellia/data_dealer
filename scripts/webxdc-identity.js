@@ -10,9 +10,13 @@
 // setDisplayName) so the change flows through state and observers cleanly.
 
 export function getMessengerDisplayNameChange(user) {
-  if (!user) { return null; }
+  if (!user) {
+    return null;
+  }
   var selfName = globalThis.webxdc.selfName;
-  if (user.display_name === selfName) { return null; }
+  if (user.display_name === selfName) {
+    return null;
+  }
   return selfName;
 }
 

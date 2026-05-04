@@ -1,19 +1,27 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 // Smoke test: verifies the toolchain itself is wired up correctly.
 // Real unit tests for state.js / materializer.js land in #45 / #10 / #11.
-import { describe, it, expect } from 'vitest';
-import { existsSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { describe, expect, it } from 'vitest';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('vendor files', () => {
   // The libs index.html `<script>`-loads, in dependency order.
   const required = [
-    'jquery.js', 'jquery-migrate.js', 'underscore.js', 'numeral.js', 'numeral-de.js',
-    'easeljs.js', 'tweenjs.js', 'soundjs.js',
-    'sprintf.js', 'zynga-animate.js', 'zynga-scroller.js',
+    'jquery.js',
+    'jquery-migrate.js',
+    'underscore.js',
+    'numeral.js',
+    'numeral-de.js',
+    'easeljs.js',
+    'tweenjs.js',
+    'soundjs.js',
+    'sprintf.js',
+    'zynga-animate.js',
+    'zynga-scroller.js',
   ];
   for (const f of required) {
     it(`vendor/${f} exists`, () => {
@@ -22,7 +30,14 @@ describe('vendor files', () => {
   }
 
   // The legacy AMD plumbing must not regress back into vendor/.
-  const removed = ['requirejs.js', 'almond.js', 'text.js', 'tpl.js', 'jquery-mobile.js', 'native-console.js'];
+  const removed = [
+    'requirejs.js',
+    'almond.js',
+    'text.js',
+    'tpl.js',
+    'jquery-mobile.js',
+    'native-console.js',
+  ];
   for (const f of removed) {
     it(`vendor/${f} no longer exists`, () => {
       expect(existsSync(join(root, 'vendor', f))).toBe(false);

@@ -1,8 +1,8 @@
 import { cpSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { buildXDC } from '@webxdc/vite-plugins';
 import { build, defineConfig } from 'vite';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
-import { buildXDC } from '@webxdc/vite-plugins';
 
 // 'hq' (default): ship the canonical sources as-is — bit-exact lossless
 // cartoon-art pixels.  'casual': ship the pre-quantized counterparts
@@ -38,14 +38,16 @@ function swapInCasualAssets() {
       if (!existsSync(srcImg) || !existsSync(srcIcon)) {
         throw new Error(
           `[swap-in-casual-assets] missing pre-quantized assets at ${srcImg} / ${srcIcon}. ` +
-          `Run \`pnpm quantize-assets\` to (re)generate them.`,
+            'Run `pnpm quantize-assets` to (re)generate them.'
         );
       }
       rmSync(distImg, { recursive: true, force: true });
       cpSync(srcImg, distImg, { recursive: true });
       rmSync(distIcon, { force: true });
       cpSync(srcIcon, distIcon);
-      console.log('[swap-in-casual-assets] dist/img/ and dist/icon.png replaced with casual variants');
+      console.log(
+        '[swap-in-casual-assets] dist/img/ and dist/icon.png replaced with casual variants'
+      );
     },
   };
 }
@@ -55,7 +57,7 @@ function swapInCasualAssets() {
 function mockWebxdc() {
   const src = readFileSync(
     fileURLToPath(new URL('./node_modules/@webxdc/vite-plugins/src/webxdc.js', import.meta.url)),
-    'utf-8',
+    'utf-8'
   );
   return {
     name: 'webxdc-mock',
@@ -101,8 +103,9 @@ function bundleEsmDev() {
             },
           },
         });
-        const out = (Array.isArray(result) ? result[0] : result).output
-          .find((o) => o.fileName === 'esm-bundle.js');
+        const out = (Array.isArray(result) ? result[0] : result).output.find(
+          (o) => o.fileName === 'esm-bundle.js'
+        );
         bundleSrc = out ? out.code : null;
       } finally {
         buildPromise = null;
@@ -156,7 +159,6 @@ function bundleEsmDev() {
     },
   };
 }
-
 
 export default defineConfig({
   root: '.',

@@ -26,10 +26,10 @@
 // The underlying state logic (freshState / applyDelta) is fully unit-tested in
 // tests/state/state.test.js.
 
-import { freshState, applyDelta } from './state.js';
+import { applyDelta, freshState } from './state.js';
 
 var _currentState = null;
-var _bootPromise  = null;
+var _bootPromise = null;
 
 // Subscribers notified whenever applyDelta produces a new state.peers
 // reference.  Used by the Topscores view to refresh the leaderboard
@@ -60,9 +60,12 @@ export function boot(options) {
   if (_bootPromise) return _bootPromise;
   options = options || {};
 
-  var selfAddr = options.selfAddr != null
-    ? options.selfAddr
-    : (typeof webxdc !== 'undefined' ? webxdc.selfAddr : '');  // eslint-disable-line no-undef
+  var selfAddr =
+    options.selfAddr != null
+      ? options.selfAddr
+      : typeof webxdc !== 'undefined'
+        ? webxdc.selfAddr
+        : ''; // eslint-disable-line no-undef
 
   // selfAddr MUST be set before the listener is registered.  applyDelta's
   // addr guard rejects any delta whose addr differs from state.addr, including
@@ -80,13 +83,16 @@ export function boot(options) {
       if (_currentState && _currentState.peers !== prevPeers) {
         _notifyPeersChanged();
       }
-      var s = (typeof update.serial     === 'number') ? update.serial     : 0;
-      var m = (typeof update.max_serial === 'number') ? update.max_serial : s;
-      if (s > _replayProgress.serial)     _replayProgress.serial     = s;
+      var s = typeof update.serial === 'number' ? update.serial : 0;
+      var m = typeof update.max_serial === 'number' ? update.max_serial : s;
+      if (s > _replayProgress.serial) _replayProgress.serial = s;
       if (m > _replayProgress.max_serial) _replayProgress.max_serial = m;
       if (typeof options.onReplayProgress === 'function') {
-        try { options.onReplayProgress(_replayProgress.serial, _replayProgress.max_serial); }
-        catch (_) { /* never let the UI hook break replay */ }
+        try {
+          options.onReplayProgress(_replayProgress.serial, _replayProgress.max_serial);
+        } catch (_) {
+          /* never let the UI hook break replay */
+        }
       }
     }, 0);
   }
@@ -120,9 +126,9 @@ export function getBootPromise() {
  */
 export function getReplayProgress() {
   return {
-    serial:     _replayProgress.serial,
+    serial: _replayProgress.serial,
     max_serial: _replayProgress.max_serial,
-    done:       _replayProgress.done
+    done: _replayProgress.done,
   };
 }
 
@@ -171,7 +177,10 @@ export function subscribePeersChanged(fn) {
 
 function _notifyPeersChanged() {
   for (var i = 0; i < _peersChangedSubs.length; i++) {
-    try { _peersChangedSubs[i](_currentState); }
-    catch (_) { /* never let one subscriber break the listener */ }
+    try {
+      _peersChangedSubs[i](_currentState);
+    } catch (_) {
+      /* never let one subscriber break the listener */
+    }
   }
 }

@@ -10,7 +10,7 @@
  * scroller publishes one tween, not two.  This test pins that behavior.
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 interface DDHook {
   __dd?: {
@@ -19,7 +19,9 @@ interface DDHook {
   };
 }
 
-test('zoom-controls: Fullscreen button resets zoom to 1.0 from any zoom level', async ({ page }) => {
+test('zoom-controls: Fullscreen button resets zoom to 1.0 from any zoom level', async ({
+  page,
+}) => {
   await page.goto('/?devtools=1');
   await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
     timeout: 50_000,
@@ -45,7 +47,7 @@ test('zoom-controls: Fullscreen button resets zoom to 1.0 from any zoom level', 
       return typeof w.__dd?.getZoom === 'function' && w.__dd.getZoom() !== null;
     },
     undefined,
-    { timeout: 50_000 },
+    { timeout: 50_000 }
   );
 
   const getZoom = () =>

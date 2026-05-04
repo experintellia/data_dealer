@@ -41,22 +41,28 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     const detail = (err && err.message) || String(err || '');
     $('#loadertext').html(
       'Sorry, the Game failed to start.<br>' +
-      '<small style="opacity:.7">' + message + (detail ? ': ' + detail : '') + '</small>'
+        '<small style="opacity:.7">' +
+        message +
+        (detail ? ': ' + detail : '') +
+        '</small>'
     );
   };
 
   const continueStart = () => {
     clearInterval(progressTimer);
-    app.loadViews().then(() => {
-      console.info('Starting Game');
-      try {
-        app.start().fail(function () {
-          showFatal('app.start rejected', arguments.length ? arguments[0] : null);
-        });
-      } catch (err) {
-        showFatal('app.start threw', err);
-      }
-    }, (err) => showFatal('app.loadViews rejected', err));
+    app.loadViews().then(
+      () => {
+        console.info('Starting Game');
+        try {
+          app.start().fail(function () {
+            showFatal('app.start rejected', arguments.length ? arguments[0] : null);
+          });
+        } catch (err) {
+          showFatal('app.start threw', err);
+        }
+      },
+      (err) => showFatal('app.loadViews rejected', err)
+    );
   };
 
   const bootPromise = getBootPromise();

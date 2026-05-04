@@ -47,7 +47,7 @@
  *    false.  Both fail before the fix, both pass after.
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 const GESTALT = 'contact035';
 const PATH = `Imperium.${GESTALT}`;
@@ -58,7 +58,9 @@ async function waitForGameReady(page: import('@playwright/test').Page) {
   });
 }
 
-test('collect-icon: DecoratorReady appears after node_ready emit (no stuck clock)', async ({ page }) => {
+test('collect-icon: DecoratorReady appears after node_ready emit (no stuck clock)', async ({
+  page,
+}) => {
   await page.goto('/?devtools=1');
   await waitForGameReady(page);
 
@@ -68,7 +70,7 @@ test('collect-icon: DecoratorReady appears after node_ready emit (no stuck clock
   // charge and render the timer.
   await page.evaluate(async (gestalt) => {
     const eng = await new Promise<any>((res, rej) =>
-      (window as any).require(['LocalEngine'], res, rej),
+      (window as any).require(['LocalEngine'], res, rej)
     );
     await eng.buyPerp('Imperium', gestalt);
     await eng.chargePerp(`Imperium.${gestalt}`);
@@ -86,12 +88,13 @@ test('collect-icon: DecoratorReady appears after node_ready emit (no stuck clock
   const midState = await page.evaluate((path) => {
     const appMod = (window as any).require('app');
     const game = appMod.getApplication().game;
+    // biome-ignore lint/style/noNonNullAssertion: split('.').pop() on a non-empty path is always defined
     const last = path.split('.').pop()!;
     const gnode = game && game.getById(last);
     return {
-      exists:        !!gnode,
+      exists: !!gnode,
       chargeRunning: !!(gnode && gnode.states && gnode.states.chargeRunning),
-      hasReady:      !!(gnode && gnode.renderReady),
+      hasReady: !!(gnode && gnode.renderReady),
     };
   }, PATH);
   expect(midState.exists).toBe(true);
@@ -105,12 +108,14 @@ test('collect-icon: DecoratorReady appears after node_ready emit (no stuck clock
   //       publish the event directly rather than waiting 30 s. ──────────
   await page.evaluate((gestalt) => {
     const $ = (window as any).jQuery || (window as any).$;
-    $(document).trigger('node_ready', [{
-      id:     gestalt,
-      type:   'ContactPerp',
-      path:   `Imperium.${gestalt}`,
-      result: { amount: 100 },
-    }]);
+    $(document).trigger('node_ready', [
+      {
+        id: gestalt,
+        type: 'ContactPerp',
+        path: `Imperium.${gestalt}`,
+        result: { amount: 100 },
+      },
+    ]);
   }, GESTALT);
 
   // ── 4. The contract: the collect-ready decorator must appear and the
@@ -121,11 +126,12 @@ test('collect-icon: DecoratorReady appears after node_ready emit (no stuck clock
   const postState = await page.evaluate((path) => {
     const appMod = (window as any).require('app');
     const game = appMod.getApplication().game;
+    // biome-ignore lint/style/noNonNullAssertion: split('.').pop() on a non-empty path is always defined
     const last = path.split('.').pop()!;
     const gnode = game && game.getById(last);
     return {
       chargeRunning: !!(gnode && gnode.states && gnode.states.chargeRunning),
-      hasReady:      !!(gnode && gnode.renderReady),
+      hasReady: !!(gnode && gnode.renderReady),
     };
   }, PATH);
   expect(postState.chargeRunning).toBe(false);

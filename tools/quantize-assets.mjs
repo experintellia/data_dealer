@@ -22,10 +22,14 @@ function sh(cmd, { tolerate = [] } = {}) {
     execSync(cmd, { cwd: root, stdio: 'inherit' });
   } catch (err) {
     if (tolerate.includes(err.status)) {
-      console.warn(`[quantize-assets] ${cmd.split(' ')[0]} exited ${err.status} (some files kept as-is); continuing`);
+      console.warn(
+        `[quantize-assets] ${cmd.split(' ')[0]} exited ${err.status} (some files kept as-is); continuing`
+      );
       return;
     }
-    throw new Error(`[quantize-assets] ${cmd.split(' ')[0]} failed (exit ${err.status}). Is it installed? See README.md.`);
+    throw new Error(
+      `[quantize-assets] ${cmd.split(' ')[0]} failed (exit ${err.status}). Is it installed? See README.md.`
+    );
   }
 }
 
@@ -36,8 +40,10 @@ cpSync(join(root, 'img'), join(root, 'img-casual'), { recursive: true });
 copyFileSync(join(root, 'icon.png'), join(root, 'icon-casual.png'));
 
 console.log('[quantize-assets] pngquant pass');
-sh('pngquant --quality 40-95 --strip --skip-if-larger --force --ext .png img-casual/*.png icon-casual.png',
-  { tolerate: [...TOLERATED_PNGQUANT_EXIT] });
+sh(
+  'pngquant --quality 40-95 --strip --skip-if-larger --force --ext .png img-casual/*.png icon-casual.png',
+  { tolerate: [...TOLERATED_PNGQUANT_EXIT] }
+);
 
 console.log('[quantize-assets] oxipng -o max --strip safe pass');
 sh('oxipng -o max --strip safe img-casual/*.png icon-casual.png');

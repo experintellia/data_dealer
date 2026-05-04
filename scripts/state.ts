@@ -238,7 +238,7 @@ var OP_NAMES = [
  *   integrated_ids  — set of collect_ids already processed by integrateCollected
  */
 export function freshState(selfAddr?: string, seed?: GameSeed): LocalState {
-  var src: GameSeed = (seed || _defaultSeed) || {};
+  var src: GameSeed = seed || _defaultSeed || {};
   var gv: GameValues = Object.assign(
     {
       xp_value: 0,
@@ -293,7 +293,6 @@ export function freshState(selfAddr?: string, seed?: GameSeed): LocalState {
 export function seedNewGame(state: LocalState): LocalState {
   return state;
 }
-
 
 function _seedNodesFromTree(src: GameSeed): GameNode[] {
   var out: GameNode[] = [];
@@ -351,16 +350,24 @@ var reducers: Record<string, Reducer> = {};
 // progression handler shipped them under .missions.mission_data. Returns
 // pass-through values when the delta has no mission update so reducers can
 // always spread the result without a conditional.
-function _missionDataFromResult(state: LocalState, r: any): { mission_goals: MissionGoal[]; active_missions: string[] } {
+function _missionDataFromResult(
+  state: LocalState,
+  r: any
+): { mission_goals: MissionGoal[]; active_missions: string[] } {
   var md = r && r.missions && r.missions.mission_data;
   return {
     mission_goals: (md && md.mission_goals) || state.mission_goals,
-    active_missions: (md && md.active_missions) || state.active_missions
+    active_missions: (md && md.active_missions) || state.active_missions,
   };
 }
 
-function _filterByPath(arr: Array<{ path: string }> | undefined, path: string): Array<{ path: string }> {
-  return (arr || []).filter(function (e) { return e.path !== path; });
+function _filterByPath(
+  arr: Array<{ path: string }> | undefined,
+  path: string
+): Array<{ path: string }> {
+  return (arr || []).filter(function (e) {
+    return e.path !== path;
+  });
 }
 
 reducers.setDisplayName = function setDisplayNameReducer(state, delta) {
@@ -388,7 +395,7 @@ reducers.setPerpCoordinates = function setPerpCoordinatesReducer(state, delta) {
     var entry = updates[i];
     if (!Array.isArray(entry) || entry.length < 2) continue;
     var path = entry[0];
-    var pos  = entry[1];
+    var pos = entry[1];
     if (typeof path !== 'string' || !pos || typeof pos !== 'object') continue;
     coordMap[path] = pos;
   }
@@ -397,7 +404,7 @@ reducers.setPerpCoordinates = function setPerpCoordinatesReducer(state, delta) {
     var pos = coordMap[node.full_path];
     if (!pos) return node;
     return Object.assign({}, node, {
-      instance_data: Object.assign({}, node.instance_data, { x: pos.x, y: pos.y })
+      instance_data: Object.assign({}, node.instance_data, { x: pos.x, y: pos.y }),
     });
   });
 
@@ -408,7 +415,7 @@ reducers.buyKarma = function buyKarmaReducer(state, delta) {
   var gv = delta.result && delta.result.game_values;
   if (!gv) return state;
   return Object.assign({}, state, {
-    game_values: Object.assign({}, state.game_values, gv)
+    game_values: Object.assign({}, state.game_values, gv),
   });
 };
 
@@ -427,16 +434,16 @@ function _nodeGvReducer(state: LocalState, delta: Delta): LocalState {
 
   var mp = _missionDataFromResult(state, res);
   return Object.assign({}, state, {
-    nodes:           newNodes,
-    game_values:     Object.assign({}, state.game_values, res.game_values || {}),
-    mission_goals:   mp.mission_goals,
+    nodes: newNodes,
+    game_values: Object.assign({}, state.game_values, res.game_values || {}),
+    mission_goals: mp.mission_goals,
     active_missions: mp.active_missions,
   });
 }
 
-reducers.buyPowerup  = _nodeGvReducer;
+reducers.buyPowerup = _nodeGvReducer;
 reducers.sellPowerup = _nodeGvReducer;
-reducers.buySlots    = _nodeGvReducer;
+reducers.buySlots = _nodeGvReducer;
 
 // 'buyPerp' replays the state mutations committed by the LocalEngine handler.
 // The delta result carries the full post-mutation values so replay is exact.
@@ -450,7 +457,9 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
 
   // Guard against double-apply on replay.
   var nodes = (state.nodes || []).slice();
-  var alreadyPresent = nodes.some(function (n) { return n.full_path === newNode.full_path; });
+  var alreadyPresent = nodes.some(function (n) {
+    return n.full_path === newNode.full_path;
+  });
   if (!alreadyPresent) {
     nodes = nodes.concat([newNode]);
   }
@@ -458,13 +467,17 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
   var dbQueue = (state.db_queue || []).slice();
   if (r.profile_set) {
     var ps = r.profile_set;
-    var inQueue = dbQueue.some(function (q) { return q.collect_id === ps.collect_id; });
+    var inQueue = dbQueue.some(function (q) {
+      return q.collect_id === ps.collect_id;
+    });
     if (!inQueue) {
-      dbQueue = dbQueue.concat([{
-        origin: ps.origin,
-        collect_id: ps.collect_id,
-        profile_set: ps.profile_set
-      }]);
+      dbQueue = dbQueue.concat([
+        {
+          origin: ps.origin,
+          collect_id: ps.collect_id,
+          profile_set: ps.profile_set,
+        },
+      ]);
     }
   }
 
@@ -473,9 +486,7 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
   // Snapshot pattern: the handler emits the post-mutation node_counter in
   // r.node_counter so listener echo is idempotent. Fallback to incremental
   // for legacy pre-fix deltas (one buyPerp creates exactly one node).
-  var counter = (typeof r.node_counter === 'number')
-    ? r.node_counter
-    : (state.node_counter || 0) + 1;
+  var counter = typeof r.node_counter === 'number' ? r.node_counter : (state.node_counter || 0) + 1;
 
   return Object.assign({}, state, {
     nodes: nodes,
@@ -483,26 +494,26 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
     game_values: r.game_values || state.game_values,
     mission_goals: mp.mission_goals,
     active_missions: mp.active_missions,
-    node_counter: counter
+    node_counter: counter,
   });
 };
 
 reducers.chargePerp = function chargePerpReducer(state, delta) {
-  var r           = delta.result || {};
+  var r = delta.result || {};
   var chargeEntry = r.chargeEntry;
   if (!chargeEntry || !chargeEntry.path) return state;
 
   // Key by path, not positional index: cold-start replay can reorder
   // state.nodes between the handler and the reducer, so a stale index
   // would charge the wrong perp.
-  var path     = chargeEntry.path;
-  var nodes    = state.nodes || [];
-  var newNodes = nodes.map(function(n) {
+  var path = chargeEntry.path;
+  var nodes = state.nodes || [];
+  var newNodes = nodes.map(function (n) {
     if (n.full_path !== path) return n;
     return Object.assign({}, n, {
       instance_data: Object.assign({}, n.instance_data, {
-        charge_start: chargeEntry.charge_start
-      })
+        charge_start: chargeEntry.charge_start,
+      }),
     });
   });
 
@@ -512,27 +523,27 @@ reducers.chargePerp = function chargePerpReducer(state, delta) {
   // game_values in r.game_values; applying it via Object.assign is idempotent
   // under self-echo. The incremental form below remains as a fallback for
   // already-persisted pre-fix deltas so they still replay correctly.
-  var gv    = state.game_values || {};
+  var gv = state.game_values || {};
   var newGv: GameValues;
   if (r.game_values) {
     newGv = Object.assign({}, gv, r.game_values);
   } else {
     var cashDelta = typeof r.cashDelta === 'number' ? r.cashDelta : 0;
-    var xpInc     = typeof r.xpInc    === 'number' ? r.xpInc    : 0;
+    var xpInc = typeof r.xpInc === 'number' ? r.xpInc : 0;
     newGv = Object.assign({}, gv, {
-      cash_value:  (gv.cash_value  || 0) - cashDelta,
-      cash_spent:  (gv.cash_spent  || 0) + cashDelta,
-      xp_value:    (gv.xp_value   || 0) + xpInc,
+      cash_value: (gv.cash_value || 0) - cashDelta,
+      cash_spent: (gv.cash_spent || 0) + cashDelta,
+      xp_value: (gv.xp_value || 0) + xpInc,
       ap_snapshot: Math.max(0, (gv.ap_snapshot || 0) - 1),
     });
   }
 
   var mp = _missionDataFromResult(state, r);
   return Object.assign({}, state, {
-    nodes:           newNodes,
-    nodes_charging:  stillCharging.concat([chargeEntry]),
-    game_values:     newGv,
-    mission_goals:   mp.mission_goals,
+    nodes: newNodes,
+    nodes_charging: stillCharging.concat([chargeEntry]),
+    game_values: newGv,
+    mission_goals: mp.mission_goals,
     active_missions: mp.active_missions,
   });
 };
@@ -556,7 +567,9 @@ reducers.collectPerp = function collectPerpReducer(state, delta) {
 
   var newQueue: DbQueueEntry[] = state.db_queue || [];
   if (r.db_entry) {
-    var inQueue = newQueue.some(function (q) { return q.collect_id === r.db_entry.collect_id; });
+    var inQueue = newQueue.some(function (q) {
+      return q.collect_id === r.db_entry.collect_id;
+    });
     if (!inQueue) newQueue = newQueue.concat([r.db_entry]);
   }
 
@@ -565,20 +578,20 @@ reducers.collectPerp = function collectPerpReducer(state, delta) {
     newNodes = state.nodes.map(function (n) {
       if (n.full_path !== r.token_update.path) return n;
       return Object.assign({}, n, {
-        instance_data: Object.assign({}, n.instance_data, { amount: r.token_update.amount })
+        instance_data: Object.assign({}, n.instance_data, { amount: r.token_update.amount }),
       });
     });
   }
 
   var mp = _missionDataFromResult(state, r);
   return Object.assign({}, state, {
-    nodes_collect:  newCollect,
+    nodes_collect: newCollect,
     nodes_charging: newCharging,
-    game_values:    newGv,
-    db_queue:       newQueue,
-    nodes:          newNodes,
-    mission_goals:  mp.mission_goals,
-    active_missions: mp.active_missions
+    game_values: newGv,
+    db_queue: newQueue,
+    nodes: newNodes,
+    mission_goals: mp.mission_goals,
+    active_missions: mp.active_missions,
   });
 };
 
@@ -602,7 +615,9 @@ reducers.integrateCollected = function integrateCollectedReducer(state, delta) {
   if (r.nodes && r.nodes.length) {
     var existingPaths: Record<string, boolean> = {};
     var updMap: Record<string, any> = {};
-    r.nodes.forEach(function (u: any) { updMap[u.full_path] = u; });
+    r.nodes.forEach(function (u: any) {
+      updMap[u.full_path] = u;
+    });
     newNodes = state.nodes.map(function (n) {
       existingPaths[n.full_path] = true;
       var u = updMap[n.full_path];
@@ -611,25 +626,27 @@ reducers.integrateCollected = function integrateCollectedReducer(state, delta) {
     // Append fresh TokenPerp nodes (first-time integration of a token type).
     r.nodes.forEach(function (u: any) {
       if (existingPaths[u.full_path]) return;
-      newNodes = newNodes.concat([{
-        game_id:       u.game_id,
-        gestalt:       u.gestalt,
-        game_type:     u.game_type,
-        full_type:     u.full_type,
-        full_path:     u.full_path,
-        instance_data: u.instance_data || {}
-      }]);
+      newNodes = newNodes.concat([
+        {
+          game_id: u.game_id,
+          gestalt: u.gestalt,
+          game_type: u.game_type,
+          full_type: u.full_type,
+          full_path: u.full_path,
+          instance_data: u.instance_data || {},
+        },
+      ]);
     });
   }
 
   var mp = _missionDataFromResult(state, r);
   return Object.assign({}, state, {
-    db_queue:       newQueue,
+    db_queue: newQueue,
     integrated_ids: newIntegratedIds,
-    game_values:    newGv,
-    nodes:          newNodes,
+    game_values: newGv,
+    nodes: newNodes,
     mission_goals: mp.mission_goals,
-    active_missions: mp.active_missions
+    active_missions: mp.active_missions,
   });
 };
 
@@ -699,18 +716,19 @@ function _applyPeerDelta(state: LocalState, delta: Delta): LocalState {
   var existing: PeerEntry = peers[addr] || {};
 
   // Stale-delta guard: skip if this delta is older than the last we recorded.
-  var prevTs = typeof existing.last_seen_ts === 'number' ? existing.last_seen_ts : -Infinity;
+  var prevTs =
+    typeof existing.last_seen_ts === 'number' ? existing.last_seen_ts : Number.NEGATIVE_INFINITY;
   if (typeof delta.ts === 'number' && delta.ts < prevTs) return state;
 
   var peer: PeerEntry = Object.assign({}, existing);
 
   var gv = delta.result && delta.result.game_values;
   if (gv) {
-    if (typeof gv.cash_value     === 'number') peer.cash     = gv.cash_value;
+    if (typeof gv.cash_value === 'number') peer.cash = gv.cash_value;
     if (typeof gv.profiles_value === 'number') peer.profiles = gv.profiles_value;
-    if (typeof gv.xp_value       === 'number') peer.xp       = gv.xp_value;
-    if (typeof gv.xp_level       === 'number') peer.level    = gv.xp_level;
-    if (typeof gv.cash_spent     === 'number') peer.spent    = gv.cash_spent;
+    if (typeof gv.xp_value === 'number') peer.xp = gv.xp_value;
+    if (typeof gv.xp_level === 'number') peer.level = gv.xp_level;
+    if (typeof gv.cash_spent === 'number') peer.spent = gv.cash_spent;
   }
 
   if (delta.op === 'setDisplayName') {

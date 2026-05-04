@@ -4,11 +4,9 @@
  * To turn this into a proper Node/vitest mock: drop the localStorage calls and
  * export window.webxdc as a module so tests can import and reset it between runs.
  */
-import type { SendingStatusUpdate, ReceivedStatusUpdate } from "@webxdc/types";
+import type { ReceivedStatusUpdate, SendingStatusUpdate } from '@webxdc/types';
 
 (function () {
-  'use strict';
-
   if (window.webxdc) return; // real messenger present — nothing to do
 
   console.log('[webxdc-shim] dev mode');
@@ -20,11 +18,15 @@ import type { SendingStatusUpdate, ReceivedStatusUpdate } from "@webxdc/types";
   // Restore persisted history so a page reload replays prior updates.
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) { _updates = JSON.parse(stored); }
+    if (stored) {
+      _updates = JSON.parse(stored);
+    }
   } catch (_) {}
 
   function _persist(): void {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(_updates)); } catch (_) {}
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(_updates));
+    } catch (_) {}
   }
 
   // Cast via `any` — this is a minimal dev scaffold, not a full Webxdc
@@ -33,7 +35,7 @@ import type { SendingStatusUpdate, ReceivedStatusUpdate } from "@webxdc/types";
     selfAddr: 'dev@local',
     selfName: 'Dev',
 
-    sendUpdate(update: SendingStatusUpdate<any>, _descr: ""): void {
+    sendUpdate(update: SendingStatusUpdate<any>, _descr: ''): void {
       const serial = _updates.length + 1;
       // payload and other fields are copied in from `update` below; cast
       // to satisfy the required-payload shape before the loop fills it in.
@@ -47,17 +49,21 @@ import type { SendingStatusUpdate, ReceivedStatusUpdate } from "@webxdc/types";
       entry.serial = serial;
       _updates.push(entry);
       _persist();
-      _listeners.forEach(function (cb) { cb(entry); });
+      _listeners.forEach(function (cb) {
+        cb(entry);
+      });
     },
 
     setUpdateListener(cb: (u: ReceivedStatusUpdate<any>) => void, serial?: number): Promise<void> {
-      const after = (typeof serial === 'number') ? serial : 0;
+      const after = typeof serial === 'number' ? serial : 0;
       // Replay history that arrived before this listener was registered.
       _updates.forEach(function (u) {
-        if (u.serial > after) { cb(u); }
+        if (u.serial > after) {
+          cb(u);
+        }
       });
       _listeners = [cb]; // last registration wins — matches real webxdc contract
       return Promise.resolve();
-    }
+    },
   };
-}());
+})();

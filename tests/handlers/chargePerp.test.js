@@ -1,13 +1,11 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import {
-  chargePerp, loadGame, setSendDelta, setEmitter,
-} from '../../scripts/LocalEngine.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { chargePerp, loadGame, setEmitter, setSendDelta } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
-import { freshState, applyDelta } from '../../scripts/state.js';
-import { setOverride, clearOverride } from '../../scripts/clock.js';
+import { clearOverride, setOverride } from '../../scripts/clock.js';
 import { materialize } from '../../scripts/materializer.js';
-import { FIXED_NOW, mkNode as _mkNode, mkState as _mkBaseState } from './_fixtures.js';
+import { applyDelta, freshState } from '../../scripts/state.js';
+import { FIXED_NOW, mkState as _mkBaseState, mkNode as _mkNode } from './_fixtures.js';
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 
@@ -17,31 +15,33 @@ import { FIXED_NOW, mkNode as _mkNode, mkState as _mkBaseState } from './_fixtur
 //   collect_amount:  1100
 //   xp_inc:          1
 //   game_type:       ContactPerp
-const GESTALT     = 'contact035';
+const GESTALT = 'contact035';
 const CHARGE_TIME = 30_000;
 const CHARGE_COST = 60;
-const NODE_PATH   = 'Imperium.CityVienna.Agent0.contact035';
+const NODE_PATH = 'Imperium.CityVienna.Agent0.contact035';
 
 // chargePerp-specific game_values: lower starting cash (500) and AP (3) so
 // tests can exercise deduction and AP failure without extra overrides.
 var BASE_GV = {
-  cash_value:      500,
-  cash_spent:      0,
-  xp_value:        0,
-  ap_snapshot:     3,
+  cash_value: 500,
+  cash_spent: 0,
+  xp_value: 0,
+  ap_snapshot: 3,
   // ap_update at FIXED_NOW so the materialize-on-entry call regenerates
   // zero ticks (elapsed = 0). Tests that exercise regen explicitly
   // override this.
-  ap_update:       FIXED_NOW,
-  ap_inc_value:    1,
+  ap_update: FIXED_NOW,
+  ap_inc_value: 1,
   ap_inc_interval: 120_000,
-  ap_max:          6,
+  ap_max: 6,
 };
 
 function mkState(overrides) {
   overrides = overrides || {};
   var gv = Object.assign({}, BASE_GV, overrides.game_values || {});
-  return _mkBaseState(Object.assign({ nodes: [_mkNode('ContactPerp', NODE_PATH)] }, overrides, { game_values: gv }));
+  return _mkBaseState(
+    Object.assign({ nodes: [_mkNode('ContactPerp', NODE_PATH)] }, overrides, { game_values: gv })
+  );
 }
 
 // Reset injectable hooks after each test.
@@ -163,7 +163,7 @@ describe('chargePerp — delta replay', () => {
 
   it('calls the injected sendDelta function', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkState());
 
     await chargePerp(NODE_PATH);
@@ -173,7 +173,7 @@ describe('chargePerp — delta replay', () => {
 
   it('emitted delta has kind=delta and op=chargePerp', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkState());
 
     await chargePerp(NODE_PATH);
@@ -185,7 +185,7 @@ describe('chargePerp — delta replay', () => {
 
   it('emitted delta carries the charge entry in result', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkState());
 
     await chargePerp(NODE_PATH);
@@ -198,7 +198,7 @@ describe('chargePerp — delta replay', () => {
 
   it('applyDelta replay reconstructs the same state as the handler', async () => {
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
 
     const initial = mkState();
     setState(initial);
@@ -218,8 +218,9 @@ describe('chargePerp — delta replay', () => {
     expect(replayed.nodes_charging).toHaveLength(1);
     expect(replayed.nodes_charging[0]).toEqual(handlerState.nodes_charging[0]);
     // charge_start set on node.
-    expect(replayed.nodes[0].instance_data.charge_start)
-      .toBe(handlerState.nodes[0].instance_data.charge_start);
+    expect(replayed.nodes[0].instance_data.charge_start).toBe(
+      handlerState.nodes[0].instance_data.charge_start
+    );
   });
 });
 
@@ -243,7 +244,7 @@ describe('chargePerp — materialization integration', () => {
 
   it('node_ready event carries the pre-computed charge result', async () => {
     await chargePerp(NODE_PATH);
-    const s        = getState();
+    const s = getState();
     const expected = s.nodes_charging[0].result;
 
     const mat = materialize(s, FIXED_NOW + CHARGE_TIME + 1);
@@ -303,7 +304,7 @@ describe('chargePerp — failure: insufficient cash', () => {
   it('does not call sendDelta on cash failure', async () => {
     setOverride(FIXED_NOW);
     const captured = [];
-    setSendDelta(d => captured.push(d));
+    setSendDelta((d) => captured.push(d));
     setState(mkState({ game_values: { cash_value: 0, ap_snapshot: 3 } }));
 
     await chargePerp(NODE_PATH);
@@ -369,7 +370,7 @@ describe('chargePerp — failure: non-chargeable node (no charge_time)', () => {
     // Use a StoryPerp gestalt (no charge_time in type_data)
     var nonChargeable = Object.assign({}, _mkNode('StoryPerp', 'Imperium.story001'), {
       full_type: 'StoryPerp:13fee24f6edc8f796903e5b1fad001d3000',
-      gestalt:   '13fee24f6edc8f796903e5b1fad001d3000',
+      gestalt: '13fee24f6edc8f796903e5b1fad001d3000',
     });
     var s = mkState({ nodes: [nonChargeable] });
     setState(s);
@@ -388,9 +389,11 @@ describe('chargePerp — failure: non-chargeable node (no charge_time)', () => {
 describe('chargePerp — level-up refills AP and advances xp_level', () => {
   beforeEach(() => {
     setOverride(FIXED_NOW);
-    setState(mkState({
-      game_values: { xp_value: 10, xp_level: 1, ap_snapshot: 3, ap_max: 6 }
-    }));
+    setState(
+      mkState({
+        game_values: { xp_value: 10, xp_level: 1, ap_snapshot: 3, ap_max: 6 },
+      })
+    );
   });
 
   it('returns levelup=true when xp_inc crosses the level threshold', async () => {
@@ -403,7 +406,7 @@ describe('chargePerp — level-up refills AP and advances xp_level', () => {
     expect(result.game_values.xp_level).toBe(2);
   });
 
-  it('refills ap_snapshot to the new level\'s ap_max (not -1 from charging)', async () => {
+  it("refills ap_snapshot to the new level's ap_max (not -1 from charging)", async () => {
     const { result } = await chargePerp(NODE_PATH);
     expect(result.game_values.ap_snapshot).toBe(8);
   });
@@ -412,9 +415,11 @@ describe('chargePerp — level-up refills AP and advances xp_level', () => {
 describe('chargePerp — no level-up keeps xp_level and decrements ap_snapshot', () => {
   it('xp gain inside the same level reports levelup=false and AP-1', async () => {
     setOverride(FIXED_NOW);
-    setState(mkState({
-      game_values: { xp_value: 5, xp_level: 1, ap_snapshot: 4, ap_max: 6 }
-    }));
+    setState(
+      mkState({
+        game_values: { xp_value: 5, xp_level: 1, ap_snapshot: 4, ap_max: 6 },
+      })
+    );
     const { result } = await chargePerp(NODE_PATH);
     expect(result.levelup).toBe(false);
     expect(result.game_values.xp_level).toBe(1);
@@ -446,13 +451,17 @@ describe('chargePerp — live-tick setTimeout', () => {
     const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
     await chargePerp(NODE_PATH);
     // contact035 charge_time = 30000 ms.
-    const matched = setTimeoutSpy.mock.calls.find(function (c) { return c[1] === CHARGE_TIME; });
+    const matched = setTimeoutSpy.mock.calls.find(function (c) {
+      return c[1] === CHARGE_TIME;
+    });
     expect(matched).toBeDefined();
   });
 
   it('emits node_ready when fake timers advance past charge_end', async () => {
     var events = [];
-    setEmitter(function (ev, payload) { events.push({ ev: ev, payload: payload }); });
+    setEmitter(function (ev, payload) {
+      events.push({ ev: ev, payload: payload });
+    });
 
     await chargePerp(NODE_PATH);
     // Advance the host wall clock that setTimeout reads, AND the injectable
@@ -460,7 +469,11 @@ describe('chargePerp — live-tick setTimeout', () => {
     setOverride(FIXED_NOW + CHARGE_TIME + 1);
     vi.advanceTimersByTime(CHARGE_TIME + 1);
 
-    expect(events.some(function (e) { return e.ev === 'node_ready'; })).toBe(true);
+    expect(
+      events.some(function (e) {
+        return e.ev === 'node_ready';
+      })
+    ).toBe(true);
     const s = getState();
     expect(s.nodes_charging.length).toBe(0);
     expect(s.nodes_collect.length).toBe(1);
@@ -469,19 +482,25 @@ describe('chargePerp — live-tick setTimeout', () => {
 
   it('loadGame re-arms timers for charges still in flight', async () => {
     // Seed state with an active charge whose charge_end is 30s from now.
-    setState(mkState({
-      nodes_charging: [{
-        path:         NODE_PATH,
-        result:       { amount: 1100 },
-        charge_start: FIXED_NOW,
-        charge_end:   FIXED_NOW + CHARGE_TIME,
-        game_id:      'node_contact035',
-        game_type:    'ContactPerp'
-      }]
-    }));
+    setState(
+      mkState({
+        nodes_charging: [
+          {
+            path: NODE_PATH,
+            result: { amount: 1100 },
+            charge_start: FIXED_NOW,
+            charge_end: FIXED_NOW + CHARGE_TIME,
+            game_id: 'node_contact035',
+            game_type: 'ContactPerp',
+          },
+        ],
+      })
+    );
 
     var events = [];
-    setEmitter(function (ev, payload) { events.push({ ev: ev, payload: payload }); });
+    setEmitter(function (ev, payload) {
+      events.push({ ev: ev, payload: payload });
+    });
 
     await loadGame();
     // Without rearm, advancing timers would not fire node_ready because no
@@ -489,20 +508,28 @@ describe('chargePerp — live-tick setTimeout', () => {
     setOverride(FIXED_NOW + CHARGE_TIME + 1);
     vi.advanceTimersByTime(CHARGE_TIME + 1);
 
-    expect(events.some(function (e) { return e.ev === 'node_ready'; })).toBe(true);
+    expect(
+      events.some(function (e) {
+        return e.ev === 'node_ready';
+      })
+    ).toBe(true);
   });
 
   it('calling loadGame twice does not duplicate node_ready emits for one charge', async () => {
-    setState(mkState({
-      nodes_charging: [{
-        path:         NODE_PATH,
-        result:       { amount: 1100 },
-        charge_start: FIXED_NOW,
-        charge_end:   FIXED_NOW + CHARGE_TIME,
-        game_id:      'node_contact035',
-        game_type:    'ContactPerp'
-      }]
-    }));
+    setState(
+      mkState({
+        nodes_charging: [
+          {
+            path: NODE_PATH,
+            result: { amount: 1100 },
+            charge_start: FIXED_NOW,
+            charge_end: FIXED_NOW + CHARGE_TIME,
+            game_id: 'node_contact035',
+            game_type: 'ContactPerp',
+          },
+        ],
+      })
+    );
 
     var events = [];
     setEmitter(function (ev, payload) {
@@ -528,16 +555,18 @@ describe('chargePerp — live-tick setTimeout', () => {
 describe('chargePerp — sees AP regen since the last materialize', () => {
   beforeEach(() => {
     setOverride(FIXED_NOW);
-    setState(mkState({
-      // ap_snapshot=0, ap_update set 2 minutes ago → one full tick ready.
-      game_values: Object.assign({}, BASE_GV, {
-        ap_snapshot: 0,
-        ap_update: FIXED_NOW - 120_000,
-        ap_inc_value: 1,
-        ap_inc_interval: 120_000,
-        ap_max: 6
+    setState(
+      mkState({
+        // ap_snapshot=0, ap_update set 2 minutes ago → one full tick ready.
+        game_values: Object.assign({}, BASE_GV, {
+          ap_snapshot: 0,
+          ap_update: FIXED_NOW - 120_000,
+          ap_inc_value: 1,
+          ap_inc_interval: 120_000,
+          ap_max: 6,
+        }),
       })
-    }));
+    );
   });
 
   afterEach(() => {
@@ -565,17 +594,21 @@ describe('chargePerp — ClientPerp uses income_base when collect_amount is miss
 
   beforeEach(() => {
     setOverride(FIXED_NOW);
-    setState(Object.assign({}, freshState('test@local'), {
-      nodes: [{
-        game_id: 'node_client007',
-        game_type: 'ClientPerp',
-        full_type: 'ClientPerp:client007',
-        gestalt: 'client007',
-        full_path: CAR_PATH,
-        instance_data: {}
-      }],
-      game_values: Object.assign({}, BASE_GV, { cash_value: 300, ap_snapshot: 6 })
-    }));
+    setState(
+      Object.assign({}, freshState('test@local'), {
+        nodes: [
+          {
+            game_id: 'node_client007',
+            game_type: 'ClientPerp',
+            full_type: 'ClientPerp:client007',
+            gestalt: 'client007',
+            full_path: CAR_PATH,
+            instance_data: {},
+          },
+        ],
+        game_values: Object.assign({}, BASE_GV, { cash_value: 300, ap_snapshot: 6 }),
+      })
+    );
   });
 
   afterEach(() => {
@@ -640,10 +673,15 @@ describe('chargePerp — clock catch-up: app closed for 7 days', () => {
     // current ap_max (e.g. old save loaded after ap_max was lowered or a
     // replay-order anomaly).  The materializer must enforce ap_snapshot ≤ ap_max.
     const s = mkState({
-      game_values: { ap_snapshot: 20, ap_max: 6, ap_update: FIXED_NOW,
-                     ap_inc_value: 1, ap_inc_interval: 120_000 }
+      game_values: {
+        ap_snapshot: 20,
+        ap_max: 6,
+        ap_update: FIXED_NOW,
+        ap_inc_value: 1,
+        ap_inc_interval: 120_000,
+      },
     });
-    const mat = materialize(s, FIXED_NOW);  // no elapsed time → 0 ticks
+    const mat = materialize(s, FIXED_NOW); // no elapsed time → 0 ticks
     expect(mat.state.game_values.ap_snapshot).toBe(6);
   });
 });
@@ -659,12 +697,12 @@ describe('chargePerp — 100+ simultaneous completed charges in one materialize(
     var charges = [];
     for (var i = 0; i < NUM_CHARGES; i++) {
       charges.push({
-        path:         'Imperium.CityVienna.Agent0.contact' + i,
-        result:       { amount: 1000 + i },
+        path: 'Imperium.CityVienna.Agent0.contact' + i,
+        result: { amount: 1000 + i },
         charge_start: FIXED_NOW,
-        charge_end:   FIXED_NOW + CHARGE_TIME,
-        game_id:      'node-' + i,
-        game_type:    'ContactPerp',
+        charge_end: FIXED_NOW + CHARGE_TIME,
+        game_id: 'node-' + i,
+        game_type: 'ContactPerp',
       });
     }
     const s = mkState({ nodes_charging: charges });
@@ -673,7 +711,9 @@ describe('chargePerp — 100+ simultaneous completed charges in one materialize(
     expect(mat.state.nodes_charging).toHaveLength(0);
     expect(mat.state.nodes_collect).toHaveLength(NUM_CHARGES);
     expect(mat.events).toHaveLength(NUM_CHARGES);
-    var paths = mat.state.nodes_collect.map(function (e) { return e.path; });
+    var paths = mat.state.nodes_collect.map(function (e) {
+      return e.path;
+    });
     expect(new Set(paths).size).toBe(NUM_CHARGES);
   });
 
@@ -682,12 +722,12 @@ describe('chargePerp — 100+ simultaneous completed charges in one materialize(
     var charges = [];
     for (var i = 0; i < NUM_CHARGES; i++) {
       charges.push({
-        path:         'Imperium.CityVienna.Agent0.contact' + i,
-        result:       { amount: 1000 + i },
+        path: 'Imperium.CityVienna.Agent0.contact' + i,
+        result: { amount: 1000 + i },
         charge_start: FIXED_NOW,
-        charge_end:   FIXED_NOW + CHARGE_TIME,
-        game_id:      'node-' + i,
-        game_type:    'ContactPerp',
+        charge_end: FIXED_NOW + CHARGE_TIME,
+        game_id: 'node-' + i,
+        game_type: 'ContactPerp',
       });
     }
     const s = mkState({ nodes_charging: charges });
@@ -710,18 +750,28 @@ describe('chargePerp — 100+ simultaneous completed charges in one materialize(
 describe('chargePerp — mixed-duration charges: events in ascending charge_end order', () => {
   it('shorter charge_end fires first when both charges complete in the same tick', () => {
     const SHORT_END = FIXED_NOW + 5_000;
-    const LONG_END  = FIXED_NOW + 10_000;
+    const LONG_END = FIXED_NOW + 10_000;
 
     // Insert entries out of order (longer first) to verify the sort.
     const s = mkState({
       nodes_charging: [
-        { path: 'Imperium.long',  result: { amount: 1000 },
-          charge_start: FIXED_NOW, charge_end: LONG_END,
-          game_id: 'node-long',  game_type: 'ContactPerp' },
-        { path: 'Imperium.short', result: { amount: 500 },
-          charge_start: FIXED_NOW, charge_end: SHORT_END,
-          game_id: 'node-short', game_type: 'ContactPerp' },
-      ]
+        {
+          path: 'Imperium.long',
+          result: { amount: 1000 },
+          charge_start: FIXED_NOW,
+          charge_end: LONG_END,
+          game_id: 'node-long',
+          game_type: 'ContactPerp',
+        },
+        {
+          path: 'Imperium.short',
+          result: { amount: 500 },
+          charge_start: FIXED_NOW,
+          charge_end: SHORT_END,
+          game_id: 'node-short',
+          game_type: 'ContactPerp',
+        },
+      ],
     });
 
     const mat = materialize(s, FIXED_NOW + 15_000);
@@ -732,19 +782,29 @@ describe('chargePerp — mixed-duration charges: events in ascending charge_end 
 
   it('nodes_collect preserves arrival order (pre-existing first, then by charge_end)', () => {
     const SHORT_END = FIXED_NOW + 5_000;
-    const LONG_END  = FIXED_NOW + 10_000;
+    const LONG_END = FIXED_NOW + 10_000;
 
     const preExisting = { path: 'Imperium.existing', result: { amount: 0 } };
     const s = mkState({
-      nodes_collect:  [preExisting],
+      nodes_collect: [preExisting],
       nodes_charging: [
-        { path: 'Imperium.long',  result: { amount: 1000 },
-          charge_start: FIXED_NOW, charge_end: LONG_END,
-          game_id: 'node-long',  game_type: 'ContactPerp' },
-        { path: 'Imperium.short', result: { amount: 500 },
-          charge_start: FIXED_NOW, charge_end: SHORT_END,
-          game_id: 'node-short', game_type: 'ContactPerp' },
-      ]
+        {
+          path: 'Imperium.long',
+          result: { amount: 1000 },
+          charge_start: FIXED_NOW,
+          charge_end: LONG_END,
+          game_id: 'node-long',
+          game_type: 'ContactPerp',
+        },
+        {
+          path: 'Imperium.short',
+          result: { amount: 500 },
+          charge_start: FIXED_NOW,
+          charge_end: SHORT_END,
+          game_id: 'node-short',
+          game_type: 'ContactPerp',
+        },
+      ],
     });
 
     const mat = materialize(s, FIXED_NOW + 15_000);
@@ -768,19 +828,23 @@ describe('chargePerp — mission003 charge_perp goal completion (end-to-end)', (
   beforeEach(() => setOverride(FIXED_NOW));
 
   it('charging client007 completes the mission003 charge_perp goal', async () => {
-    setState(mkState({
-      nodes: [_mkNode('ContactPerp', NODE_PATH), _mkNode('ClientPerp', CLIENT_PATH)],
-      active_missions: ['mission003'],
-      mission_goals: [{
-        mission:        'mission003',
-        workflow:       'charge_perp',
-        target:         'client007',
-        amount:         null,
-        position:       1,
-        current_amount: 0,
-        complete:       false,
-      }],
-    }));
+    setState(
+      mkState({
+        nodes: [_mkNode('ContactPerp', NODE_PATH), _mkNode('ClientPerp', CLIENT_PATH)],
+        active_missions: ['mission003'],
+        mission_goals: [
+          {
+            mission: 'mission003',
+            workflow: 'charge_perp',
+            target: 'client007',
+            amount: null,
+            position: 1,
+            current_amount: 0,
+            complete: false,
+          },
+        ],
+      })
+    );
 
     const { result } = await chargePerp(CLIENT_PATH);
 
@@ -788,34 +852,44 @@ describe('chargePerp — mission003 charge_perp goal completion (end-to-end)', (
     expect(result.missions).toBeDefined();
     expect(result.missions.complete_missions).toContain('mission003');
 
-    const goal = getState().mission_goals.find(function (g) { return g.mission === 'mission003'; });
+    const goal = getState().mission_goals.find(function (g) {
+      return g.mission === 'mission003';
+    });
     expect(goal).toBeDefined();
     expect(goal.complete).toBe(true);
   });
 
   it('charging a different perp does NOT complete the mission003 goal', async () => {
-    setState(mkState({
-      nodes: [_mkNode('ContactPerp', NODE_PATH)],  // contact035, not client007
-      active_missions: ['mission003'],
-      mission_goals: [{
-        mission:        'mission003',
-        workflow:       'charge_perp',
-        target:         'client007',
-        amount:         null,
-        position:       1,
-        current_amount: 0,
-        complete:       false,
-      }],
-    }));
+    setState(
+      mkState({
+        nodes: [_mkNode('ContactPerp', NODE_PATH)], // contact035, not client007
+        active_missions: ['mission003'],
+        mission_goals: [
+          {
+            mission: 'mission003',
+            workflow: 'charge_perp',
+            target: 'client007',
+            amount: null,
+            position: 1,
+            current_amount: 0,
+            complete: false,
+          },
+        ],
+      })
+    );
 
-    const { result } = await chargePerp(NODE_PATH);  // charges contact035
+    const { result } = await chargePerp(NODE_PATH); // charges contact035
 
     expect(result.error).toBeUndefined();
     // No mission completion — wrong target.
     const missions = result.missions;
-    expect(!missions || !missions.complete_missions || missions.complete_missions.length === 0).toBe(true);
+    expect(
+      !missions || !missions.complete_missions || missions.complete_missions.length === 0
+    ).toBe(true);
 
-    const goal = getState().mission_goals.find(function (g) { return g.mission === 'mission003'; });
+    const goal = getState().mission_goals.find(function (g) {
+      return g.mission === 'mission003';
+    });
     expect(goal.complete).toBe(false);
   });
 });

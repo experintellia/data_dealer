@@ -1,4 +1,7 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 /**
  * Build-time validation of type_settings.js and the ruleset.
  *
@@ -13,10 +16,7 @@
  * type_settings.js is an AMD module; we analyse it as source text to avoid
  * RequireJS + jQuery dependencies in the Node test environment.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -26,16 +26,16 @@ let rulesetDe, rulesetEn, localeDe, localeEn;
 let goalsTextWorkflows, goalsTextMsgids, knownHandlerWorkflows;
 
 beforeAll(() => {
-  rulesetDe      = JSON.parse(readFileSync(join(root, 'data', 'ruleset_3.de.json'), 'utf8'));
-  rulesetEn      = JSON.parse(readFileSync(join(root, 'data', 'ruleset_3.en.json'), 'utf8'));
-  localeDe       = JSON.parse(readFileSync(join(root, 'i18n', 'de_AT.json'), 'utf8'));
-  localeEn       = JSON.parse(readFileSync(join(root, 'i18n', 'en_US.json'), 'utf8'));
+  rulesetDe = JSON.parse(readFileSync(join(root, 'data', 'ruleset_3.de.json'), 'utf8'));
+  rulesetEn = JSON.parse(readFileSync(join(root, 'data', 'ruleset_3.en.json'), 'utf8'));
+  localeDe = JSON.parse(readFileSync(join(root, 'i18n', 'de_AT.json'), 'utf8'));
+  localeEn = JSON.parse(readFileSync(join(root, 'i18n', 'en_US.json'), 'utf8'));
 
   var typeSettingsSrc = readFileSync(join(root, 'scripts', 'type_settings.js'), 'utf8');
-  var localEngineSrc  = readFileSync(join(root, 'scripts', 'LocalEngine.ts'), 'utf8');
-  goalsTextWorkflows     = extractGoalsTextWorkflows(typeSettingsSrc);
-  goalsTextMsgids        = extractGoalsTextMsgids(typeSettingsSrc);
-  knownHandlerWorkflows  = extractHandlerWorkflows(localEngineSrc);
+  var localEngineSrc = readFileSync(join(root, 'scripts', 'LocalEngine.ts'), 'utf8');
+  goalsTextWorkflows = extractGoalsTextWorkflows(typeSettingsSrc);
+  goalsTextMsgids = extractGoalsTextMsgids(typeSettingsSrc);
+  knownHandlerWorkflows = extractHandlerWorkflows(localEngineSrc);
 });
 
 // ── helper: extract goals_texts workflow keys from type_settings.js source ───
@@ -43,11 +43,11 @@ beforeAll(() => {
 function extractGoalsTextWorkflows(src) {
   // Find the goals_texts block and extract its keys.
   // Pattern: "goals_texts": { "key": ..., "key2": ... }
-  var match = src.match(/["']goals_texts["']\s*:\s*\{([^}]+)\}/);
+  var match = src.match(/["']?goals_texts["']?\s*:\s*\{([^}]+)\}/);
   if (!match) return [];
   var block = match[1];
   var keys = [];
-  var keyRe = /["']([a-z_]+)["']\s*:/g;
+  var keyRe = /["']?([a-z_]+)["']?\s*:/g;
   var m;
   while ((m = keyRe.exec(block)) !== null) {
     keys.push(m[1]);
@@ -61,7 +61,7 @@ function extractGoalsTextWorkflows(src) {
 // the msgid strings so we can verify they exist in the locale files.
 
 function extractGoalsTextMsgids(src) {
-  var match = src.match(/["']goals_texts["']\s*:\s*\{([^}]+)\}/);
+  var match = src.match(/["']?goals_texts["']?\s*:\s*\{([^}]+)\}/);
   if (!match) return [];
   var block = match[1];
   var msgids = [];
@@ -119,9 +119,11 @@ describe('LocalEngine.ts — handler workflow extraction', () => {
   });
 
   it('contains the core workflows that have always existed', () => {
-    ['buy_perp', 'charge_perp', 'collect_profiles', 'integrate_profiles', 'collect_cash'].forEach(function (w) {
-      expect(knownHandlerWorkflows.has(w)).toBe(true);
-    });
+    ['buy_perp', 'charge_perp', 'collect_profiles', 'integrate_profiles', 'collect_cash'].forEach(
+      function (w) {
+        expect(knownHandlerWorkflows.has(w)).toBe(true);
+      }
+    );
   });
 });
 
@@ -131,7 +133,9 @@ describe('type_settings.js — goals_texts workflow coverage', () => {
   });
 
   it('every goals_texts workflow key is a known handler workflow', () => {
-    var unknown = goalsTextWorkflows.filter(function (w) { return !knownHandlerWorkflows.has(w); });
+    var unknown = goalsTextWorkflows.filter(function (w) {
+      return !knownHandlerWorkflows.has(w);
+    });
     expect(unknown).toEqual([]);
   });
 
@@ -173,8 +177,8 @@ describe('ruleset (de) — mission-goal workflow validity', () => {
   });
 
   it('every mission-goal target gestalt exists in perps, tokens, or powerups', () => {
-    var allPerps    = Object.keys(rulesetDe.perps    || {});
-    var allTokens   = Object.keys(rulesetDe.tokens   || {});
+    var allPerps = Object.keys(rulesetDe.perps || {});
+    var allTokens = Object.keys(rulesetDe.tokens || {});
     var allPowerups = Object.keys(rulesetDe.powerups || {});
     var catalogue = new Set([].concat(allPerps, allTokens, allPowerups));
 
@@ -198,8 +202,8 @@ describe('ruleset (de) — mission-goal workflow validity', () => {
 
 describe('ruleset (en) — mission-goal target validity', () => {
   it('every mission-goal target gestalt exists in perps, tokens, or powerups', () => {
-    var allPerps    = Object.keys(rulesetEn.perps    || {});
-    var allTokens   = Object.keys(rulesetEn.tokens   || {});
+    var allPerps = Object.keys(rulesetEn.perps || {});
+    var allTokens = Object.keys(rulesetEn.tokens || {});
     var allPowerups = Object.keys(rulesetEn.powerups || {});
     var catalogue = new Set([].concat(allPerps, allTokens, allPowerups));
     var STAT_TARGETS = new Set(['xp_value', 'cash_value', 'karma_value', 'profiles_max']);
@@ -218,10 +222,16 @@ describe('ruleset (en) — mission-goal target validity', () => {
 
 describe('ruleset — mission reward targets', () => {
   it('every mission reward target is a known stat or gestalt (de)', () => {
-    var allPerps    = new Set(Object.keys(rulesetDe.perps  || {}));
-    var allTokens   = new Set(Object.keys(rulesetDe.tokens || {}));
-    var KNOWN_STATS = new Set(['xp_value', 'cash_value', 'karma_value', 'profiles_max',
-                               'ap_snapshot', 'ap_max']);
+    var allPerps = new Set(Object.keys(rulesetDe.perps || {}));
+    var allTokens = new Set(Object.keys(rulesetDe.tokens || {}));
+    var KNOWN_STATS = new Set([
+      'xp_value',
+      'cash_value',
+      'karma_value',
+      'profiles_max',
+      'ap_snapshot',
+      'ap_max',
+    ]);
 
     var invalid = [];
     (rulesetDe.missions || []).forEach(function (m) {
@@ -245,13 +255,17 @@ describe('goals_texts display strings — locale file coverage', () => {
 
   it('every goals_texts display string has a German translation in de_AT.json', () => {
     expect(goalsTextMsgids.length).toBeGreaterThan(0);
-    var missing = goalsTextMsgids.filter(function (id) { return !hasMsgstr(localeDe, id); });
+    var missing = goalsTextMsgids.filter(function (id) {
+      return !hasMsgstr(localeDe, id);
+    });
     expect(missing).toEqual([]);
   });
 
   it('every goals_texts display string has an English translation in en_US.json', () => {
     expect(goalsTextMsgids.length).toBeGreaterThan(0);
-    var missing = goalsTextMsgids.filter(function (id) { return !hasMsgstr(localeEn, id); });
+    var missing = goalsTextMsgids.filter(function (id) {
+      return !hasMsgstr(localeEn, id);
+    });
     expect(missing).toEqual([]);
   });
 });

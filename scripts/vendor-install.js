@@ -26,12 +26,12 @@
 //   zynga-scroller:https://raw.githubusercontent.com/zynga/scroller/dadd850/src/Scroller.js
 //   sprintf:       https://raw.githubusercontent.com/alexei/sprintf.js/192bc60/src/sprintf.js
 
-import { execSync } from 'child_process';
-import { mkdirSync, copyFileSync, existsSync, readdirSync } from 'fs';
-import { join } from 'path';
-import { mkdtempSync } from 'fs';
-import { tmpdir } from 'os';
-import { fileURLToPath } from 'url';
+import { execSync } from 'node:child_process';
+import { copyFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 const vendorDir = join(root, 'vendor');
@@ -45,33 +45,44 @@ function run(cmd) {
 
 function cp(src, dest) {
   const full = join(tmp, 'node_modules', src);
-  if (!existsSync(full)) { console.warn(`  WARN: ${src} not found — skipping`); return; }
+  if (!existsSync(full)) {
+    console.warn(`  WARN: ${src} not found — skipping`);
+    return;
+  }
   copyFileSync(full, join(vendorDir, dest));
   console.log(`  ✓ ${dest}`);
 }
 
 console.log('Installing npm-sourced vendor packages…');
-run(`npm init -y`);
-run([
-  'npm install --save-exact',
-  'jquery', 'jquery-migrate',
-  'underscore@1.5.1', 'numeral@1.4.5',
-  'easeljs', 'tweenjs', 'soundjs',
-  'sprintf-js',
-].join(' '));
+run('npm init -y');
+run(
+  [
+    'npm install --save-exact',
+    'jquery',
+    'jquery-migrate',
+    'underscore@1.5.1',
+    'numeral@1.4.5',
+    'easeljs',
+    'tweenjs',
+    'soundjs',
+    'sprintf-js',
+  ].join(' ')
+);
 
 console.log('\nCopying to vendor/…');
-cp('jquery/dist/jquery.min.js',                  'jquery.js');
-cp('jquery-migrate/dist/jquery-migrate.min.js',  'jquery-migrate.js');
-cp('underscore/underscore.js',                   'underscore.js');
-cp('numeral/numeral.js',                         'numeral.js');
-cp('numeral/languages/de-de.js',                 'numeral-de.js');
-cp('easeljs/lib/easeljs.min.js',                 'easeljs.js');
-cp('tweenjs/lib/tweenjs.min.js',                 'tweenjs.js');
-cp('soundjs/lib/soundjs.min.js',                 'soundjs.js');
-cp('sprintf-js/dist/sprintf.min.js',             'sprintf.js');
+cp('jquery/dist/jquery.min.js', 'jquery.js');
+cp('jquery-migrate/dist/jquery-migrate.min.js', 'jquery-migrate.js');
+cp('underscore/underscore.js', 'underscore.js');
+cp('numeral/numeral.js', 'numeral.js');
+cp('numeral/languages/de-de.js', 'numeral-de.js');
+cp('easeljs/lib/easeljs.min.js', 'easeljs.js');
+cp('tweenjs/lib/tweenjs.min.js', 'tweenjs.js');
+cp('soundjs/lib/soundjs.min.js', 'soundjs.js');
+cp('sprintf-js/dist/sprintf.min.js', 'sprintf.js');
 
 console.log('\nVendor population complete.');
 console.log('Vendored verbatim in repo: zynga-animate.js, zynga-scroller.js');
 console.log('\nFiles in vendor/:');
-readdirSync(vendorDir).sort().forEach(f => console.log('  ' + f));
+readdirSync(vendorDir)
+  .sort()
+  .forEach((f) => console.log('  ' + f));

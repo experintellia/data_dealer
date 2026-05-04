@@ -17,7 +17,7 @@
  * implementation, so this spec is a regression target for the fix.
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/?devtools=1');
@@ -36,7 +36,7 @@ test('integrate dilutes untouched token shares + crosssum stays under 100', asyn
       setState(s: any): void;
     }>((res, rej) => (window as any).require(['boot'], res, rej));
     const eng = await new Promise<any>((res, rej) =>
-      (window as any).require(['LocalEngine'], res, rej),
+      (window as any).require(['LocalEngine'], res, rej)
     );
 
     const state = boot.getState();
@@ -69,9 +69,7 @@ test('integrate dilutes untouched token shares + crosssum stays under 100', asyn
     await eng.integrateCollected('cq_test_a');
     await eng.integrateCollected('cq_test_b');
 
-    const finalNodes = boot.getState().nodes.filter(
-      (n: any) => n.game_type === 'TokenPerp',
-    );
+    const finalNodes = boot.getState().nodes.filter((n: any) => n.game_type === 'TokenPerp');
     const byGestalt: Record<string, number> = {};
     finalNodes.forEach((n: any) => {
       byGestalt[n.gestalt] = (n.instance_data && n.instance_data.amount) || 0;
@@ -79,9 +77,8 @@ test('integrate dilutes untouched token shares + crosssum stays under 100', asyn
     const crosssumDenom = finalNodes.length + 1;
     const crosssum =
       finalNodes.reduce(
-        (acc: number, n: any) =>
-          acc + ((n.instance_data && n.instance_data.amount) || 0),
-        0,
+        (acc: number, n: any) => acc + ((n.instance_data && n.instance_data.amount) || 0),
+        0
       ) / crosssumDenom;
     return {
       shares: byGestalt,
@@ -108,13 +105,13 @@ test('integrate dilutes untouched token shares + crosssum stays under 100', asyn
   expect(result.crosssum).toBeGreaterThan(0);
 });
 
-test('integrating the same profileset twice does not change shares (N = 0 dup replay)', async ({ page }) => {
+test('integrating the same profileset twice does not change shares (N = 0 dup replay)', async ({
+  page,
+}) => {
   const out = await page.evaluate(async () => {
-    const boot = await new Promise<any>((res, rej) =>
-      (window as any).require(['boot'], res, rej),
-    );
+    const boot = await new Promise<any>((res, rej) => (window as any).require(['boot'], res, rej));
     const eng = await new Promise<any>((res, rej) =>
-      (window as any).require(['LocalEngine'], res, rej),
+      (window as any).require(['LocalEngine'], res, rej)
     );
 
     const state = boot.getState();
@@ -122,42 +119,44 @@ test('integrating the same profileset twice does not change shares (N = 0 dup re
       ap_snapshot: 10,
       profiles_value: 0,
     });
-    state.db_queue = [{
-      origin: 'Imperium.test.contactA',
-      collect_id: 'cq_dup_test',
-      profile_set: {
-        profiles_value: 100,
-        tokens_map: { token008: { amount: 100 } },
+    state.db_queue = [
+      {
+        origin: 'Imperium.test.contactA',
+        collect_id: 'cq_dup_test',
+        profile_set: {
+          profiles_value: 100,
+          tokens_map: { token008: { amount: 100 } },
+        },
       },
-    }];
+    ];
     state.integrated_ids = {};
     boot.setState(state);
 
     await eng.integrateCollected('cq_dup_test');
     const afterFirst = boot.getState();
     const shareAfterFirst =
-      afterFirst.nodes.find((n: any) => n.gestalt === 'token008')?.instance_data
-        ?.amount ?? null;
+      afterFirst.nodes.find((n: any) => n.gestalt === 'token008')?.instance_data?.amount ?? null;
     const profilesAfterFirst = afterFirst.game_values.profiles_value;
 
     // Re-queue the same collect_id and replay — handler should treat it as a
     // duplicate (N = 0), neither growing profiles_value nor changing shares.
     const replayState = boot.getState();
-    replayState.db_queue = [{
-      origin: 'Imperium.test.contactA',
-      collect_id: 'cq_dup_test',
-      profile_set: {
-        profiles_value: 100,
-        tokens_map: { token008: { amount: 100 } },
+    replayState.db_queue = [
+      {
+        origin: 'Imperium.test.contactA',
+        collect_id: 'cq_dup_test',
+        profile_set: {
+          profiles_value: 100,
+          tokens_map: { token008: { amount: 100 } },
+        },
       },
-    }];
+    ];
     boot.setState(replayState);
 
     await eng.integrateCollected('cq_dup_test');
     const afterReplay = boot.getState();
     const shareAfterReplay =
-      afterReplay.nodes.find((n: any) => n.gestalt === 'token008')?.instance_data
-        ?.amount ?? null;
+      afterReplay.nodes.find((n: any) => n.gestalt === 'token008')?.instance_data?.amount ?? null;
     const profilesAfterReplay = afterReplay.game_values.profiles_value;
 
     return {
@@ -169,6 +168,7 @@ test('integrating the same profileset twice does not change shares (N = 0 dup re
   });
 
   expect(out.shareAfterFirst).toBeCloseTo(100, 6);
+  // biome-ignore lint/style/noNonNullAssertion: shareAfterFirst is always set by the evaluate block above
   expect(out.shareAfterReplay).toBeCloseTo(out.shareAfterFirst!, 6);
   expect(out.profilesAfterReplay).toBe(out.profilesAfterFirst);
 });

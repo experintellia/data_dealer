@@ -163,19 +163,41 @@ are no longer on npm, a compatibility stub was written in-tree:
 If internet access is available, replace the stubs with their original
 pinned versions using the URLs documented in `scripts/vendor-install.js`.
 
+## Linting and formatting (Biome)
+
+This project uses [Biome](https://biomejs.dev/) for both formatting and linting.
+The config lives in `biome.json`. High-churn style rules are disabled for legacy
+code; the enabled set focuses on catching real bugs in new code.
+
+```bash
+pnpm lint          # check only (what CI runs)
+pnpm lint:fix      # apply safe + unsafe auto-fixes
+pnpm exec biome format --write .  # reformat all files
+```
+
+A `lefthook` pre-commit hook runs `biome check` on staged JS/TS/CSS files
+automatically after `pnpm install`. To install it manually: `pnpm exec lefthook install`.
+
+When suppressing a violation that isn't worth fixing in legacy code, use an
+inline directive with a reason:
+
+```js
+// biome-ignore lint/suspicious/noShadowRestrictedNames: legacy class predates ES6 Set
+var Set = function(set) { … };
+```
+
 ## CI
 
-`.github/workflows/test.yml` runs `pnpm install && pnpm test` on every push
-to `main`/`master` and on every pull request. Coverage is uploaded as a
-workflow artifact.
+`.github/workflows/test.yml` runs on every push to `main`/`master` and on every
+pull request. Required steps: Biome check → tsc --noEmit → build → tests.
+Coverage is uploaded as a workflow artifact.
 
-To make the test check required, a repo admin should enable branch protection
-on `main`: **Settings → Branches → Add rule** → enable
-"Require status checks to pass before merging" → add the `Unit tests` job.
+To make checks required, enable branch protection on `main`:
+**Settings → Branches → Add rule** → "Require status checks to pass before merging"
+→ add the `Unit tests` job.
 
 ## Out of scope in this PR
 
 - Converting `Game.js` / `Render.js` / AMD modules to ESM → issue #58
 - TypeScript adoption → issue #32
-- Biome lint/format → issue #33
 - CI workflow for `.xdc` builds → issue #27

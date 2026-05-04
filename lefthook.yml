@@ -1,0 +1,5 @@
+pre-commit:
+  commands:
+    biome:
+      glob: "*.{js,ts,css}"
+      run: pnpm exec biome check --no-errors-on-unmatched {staged_files}

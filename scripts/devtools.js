@@ -12,7 +12,7 @@
 //   window.__dd.getZoom();                          // current zoom of active ViewMap
 //   window.__dd.setZoom(0.6);                       // jump zoom (no animation)
 
-import { setOverride, clearOverride, advance } from './clock.js';
+import { advance, clearOverride, setOverride } from './clock.js';
 
 if (
   typeof window !== 'undefined' &&
@@ -28,8 +28,8 @@ if (
     return (view && view.renderNode) || null;
   };
   window.__dd = {
-    setNow:          setOverride,
-    advanceNow:      advance,
+    setNow: setOverride,
+    advanceNow: advance,
     clearNowOverride: clearOverride,
     // Test hooks for the zoom-controls e2e spec — read from / write to the
     // active ViewMap's scroller without exposing the whole app surface.

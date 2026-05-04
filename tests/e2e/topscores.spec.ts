@@ -20,7 +20,7 @@
  * state.peers identity changes).
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 type PeerSeed = {
   display_name: string;
@@ -57,12 +57,12 @@ async function waitForGameReady(page: import('@playwright/test').Page) {
 async function seedAndRender(
   page: import('@playwright/test').Page,
   peers: Record<string, PeerSeed>,
-  selfAddr: string,
+  selfAddr: string
 ) {
   return await page.evaluate(
     async ({ peers, selfAddr }) => {
       const boot = await new Promise<any>((res, rej) =>
-        (window as any).require(['boot'], res, rej),
+        (window as any).require(['boot'], res, rej)
       );
       const app = (window as any).require('app').getApplication();
 
@@ -84,13 +84,11 @@ async function seedAndRender(
       await Promise.resolve();
       await new Promise((r) => setTimeout(r, 50));
     },
-    { peers, selfAddr },
+    { peers, selfAddr }
   );
 }
 
-test('topscores: renders one row per peer with addr-keyed testid', async ({
-  page,
-}) => {
+test('topscores: renders one row per peer with addr-keyed testid', async ({ page }) => {
   await page.goto('/?devtools=1');
   await waitForGameReady(page);
 
@@ -117,7 +115,7 @@ test('topscores: renders one row per peer with addr-keyed testid', async ({
         last_seen_ts: Date.now(),
       }),
     },
-    SELF,
+    SELF
   );
 
   // The Topscores ViewTab isn't surfaced until the user clicks the main-menu
@@ -125,23 +123,17 @@ test('topscores: renders one row per peer with addr-keyed testid', async ({
   // and live in the DOM (hidden via .hide()). toBeAttached suffices to prove
   // the rows render — visibility is a separate UI-routing concern.
   await expect(
-    page.locator('[data-testid="dd-leaderboard-row-alice@local"]').first(),
+    page.locator('[data-testid="dd-leaderboard-row-alice@local"]').first()
   ).toBeAttached();
-  await expect(
-    page.locator('[data-testid="dd-leaderboard-row-bob@test"]').first(),
-  ).toBeAttached();
+  await expect(page.locator('[data-testid="dd-leaderboard-row-bob@test"]').first()).toBeAttached();
 
   // Self row is highlighted via the `.user` class (set when score.self===true).
-  const aliceRow = page
-    .locator('[data-testid="dd-leaderboard-row-alice@local"]')
-    .first();
+  const aliceRow = page.locator('[data-testid="dd-leaderboard-row-alice@local"]').first();
   await expect(aliceRow).toHaveClass(/\buser\b/);
 
   // Display names render from the peer entry rather than falling back to addr.
   await expect(aliceRow.locator('.TopscoreDisplayname')).toHaveText('Alice');
-  const bobRow = page
-    .locator('[data-testid="dd-leaderboard-row-bob@test"]')
-    .first();
+  const bobRow = page.locator('[data-testid="dd-leaderboard-row-bob@test"]').first();
   await expect(bobRow.locator('.TopscoreDisplayname')).toHaveText('Bob');
 });
 
@@ -165,7 +157,7 @@ test('topscores: a state.peers mutation refreshes the leaderboard without manual
         last_seen_ts: Date.now(),
       }),
     },
-    SELF,
+    SELF
   );
 
   // Click the cash tab so that a Topscore renderNode is visible.
@@ -176,7 +168,7 @@ test('topscores: a state.peers mutation refreshes the leaderboard without manual
   await page.waitForTimeout(50);
 
   await expect(
-    page.locator('[data-testid="dd-leaderboard-row-alice@local"]').first(),
+    page.locator('[data-testid="dd-leaderboard-row-alice@local"]').first()
   ).toBeAttached();
 
   // Now push a new peer through setState — boot's peers-changed subscription
@@ -184,7 +176,7 @@ test('topscores: a state.peers mutation refreshes the leaderboard without manual
   await page.evaluate(
     async ({ self }) => {
       const boot = await new Promise<any>((res, rej) =>
-        (window as any).require(['boot'], res, rej),
+        (window as any).require(['boot'], res, rej)
       );
       const cur = boot.getState();
       const nextPeers = Object.assign({}, cur.peers, {
@@ -201,17 +193,15 @@ test('topscores: a state.peers mutation refreshes the leaderboard without manual
       });
       boot.setState(Object.assign({}, cur, { addr: self, peers: nextPeers }));
     },
-    { self: SELF },
+    { self: SELF }
   );
 
   // Bob's row should appear automatically — no click, no reload.
-  await expect(
-    page.locator('[data-testid="dd-leaderboard-row-bob@test"]').first(),
-  ).toBeAttached({ timeout: 5_000 });
+  await expect(page.locator('[data-testid="dd-leaderboard-row-bob@test"]').first()).toBeAttached({
+    timeout: 5_000,
+  });
 
   // Bob's cash is 999 → ranked first; check his rendered value contains 999.
-  const bobRow = page
-    .locator('[data-testid="dd-leaderboard-row-bob@test"]')
-    .first();
+  const bobRow = page.locator('[data-testid="dd-leaderboard-row-bob@test"]').first();
   await expect(bobRow.locator('.TopscoreValue')).toContainText('999');
 });

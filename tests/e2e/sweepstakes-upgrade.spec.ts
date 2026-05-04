@@ -21,9 +21,11 @@
  *   provided_upgrades[0]: { gestalt: 'upgrade001', price: 160, required_level: 2 }
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-test('sweepstakes: buyPowerup succeeds with sufficient cash after buying project001', async ({ page }) => {
+test('sweepstakes: buyPowerup succeeds with sufficient cash after buying project001', async ({
+  page,
+}) => {
   await page.goto('/?devtools=1');
   await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
     timeout: 50_000,
@@ -33,9 +35,7 @@ test('sweepstakes: buyPowerup succeeds with sufficient cash after buying project
   // project001 costs 300, upgrade001 costs 160; we need xp_level >= 2 to buy
   // project001 and to unlock upgrade001 in the ruleset.
   await page.evaluate(async () => {
-    const boot = await new Promise<any>((res, rej) =>
-      (window as any).require(['boot'], res, rej),
-    );
+    const boot = await new Promise<any>((res, rej) => (window as any).require(['boot'], res, rej));
     const state = boot.getState();
     boot.setState(
       Object.assign({}, state, {
@@ -44,14 +44,14 @@ test('sweepstakes: buyPowerup succeeds with sufficient cash after buying project
           xp_level: 2,
           xp_value: 20,
         }),
-      }),
+      })
     );
   });
 
   // ── Step 1: Buy project001 (the sweepstakes node) ─────────────────────────
   const buyPerpResult = await page.evaluate(async () => {
     const eng = await new Promise<any>((res, rej) =>
-      (window as any).require(['LocalEngine'], res, rej),
+      (window as any).require(['LocalEngine'], res, rej)
     );
     return eng.buyPerp('Imperium', 'project001');
   });
@@ -63,7 +63,7 @@ test('sweepstakes: buyPowerup succeeds with sufficient cash after buying project
   // ── Step 2: Buy upgrade001 on slot 0 — this is the reported failing path ──
   const buyPowerupResult = await page.evaluate(async () => {
     const eng = await new Promise<any>((res, rej) =>
-      (window as any).require(['LocalEngine'], res, rej),
+      (window as any).require(['LocalEngine'], res, rej)
     );
     // slot is intentionally passed as a string, matching what the browser UI
     // sends via data-button-data attributes.
@@ -92,9 +92,7 @@ test('sweepstakes: buyPowerup returns error 3 when cash is insufficient', async 
   // project001 costs 300; upgrade001 costs 160.  Give exactly 300 so after
   // buying the perp there is 0 cash left.
   await page.evaluate(async () => {
-    const boot = await new Promise<any>((res, rej) =>
-      (window as any).require(['boot'], res, rej),
-    );
+    const boot = await new Promise<any>((res, rej) => (window as any).require(['boot'], res, rej));
     const state = boot.getState();
     boot.setState(
       Object.assign({}, state, {
@@ -103,14 +101,14 @@ test('sweepstakes: buyPowerup returns error 3 when cash is insufficient', async 
           xp_level: 2,
           xp_value: 20,
         }),
-      }),
+      })
     );
   });
 
   // Buy the perp (spends all 300 cash).
   const buyPerpResult = await page.evaluate(async () => {
     const eng = await new Promise<any>((res, rej) =>
-      (window as any).require(['LocalEngine'], res, rej),
+      (window as any).require(['LocalEngine'], res, rej)
     );
     return eng.buyPerp('Imperium', 'project001');
   });
@@ -120,7 +118,7 @@ test('sweepstakes: buyPowerup returns error 3 when cash is insufficient', async 
   // Now try to buy upgrade001 — should fail with error 3 (insufficient cash).
   const buyPowerupResult = await page.evaluate(async () => {
     const eng = await new Promise<any>((res, rej) =>
-      (window as any).require(['LocalEngine'], res, rej),
+      (window as any).require(['LocalEngine'], res, rej)
     );
     return eng.buyPowerup('Imperium.project001', '0', 'upgrade001');
   });
@@ -136,7 +134,7 @@ test('sweepstakes: buyPowerup returns error 0 when node does not exist', async (
   // Do NOT buy project001 first — the node does not exist in state.
   const result = await page.evaluate(async () => {
     const eng = await new Promise<any>((res, rej) =>
-      (window as any).require(['LocalEngine'], res, rej),
+      (window as any).require(['LocalEngine'], res, rej)
     );
     return eng.buyPowerup('Imperium.project001', '0', 'upgrade001');
   });

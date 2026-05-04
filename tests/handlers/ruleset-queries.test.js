@@ -1,6 +1,6 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
-import { describe, it, expect, beforeEach } from 'vitest';
-import { getProvidedPerps, getPowerups } from '../../scripts/LocalEngine.js';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { getPowerups, getProvidedPerps } from '../../scripts/LocalEngine.js';
 import { setState } from '../../scripts/boot.js';
 import { freshState } from '../../scripts/state.js';
 
@@ -13,7 +13,7 @@ function mkNode(gestalt, gameType, fullPath) {
     gestalt: gestalt,
     full_type: gameType + ':' + gestalt,
     full_path: fullPath,
-    instance_data: {}
+    instance_data: {},
   };
 }
 
@@ -41,10 +41,12 @@ const cityNode = mkNode('city002', 'CityPerp', CITY_PATH);
 
 describe('getProvidedPerps — happy path', () => {
   beforeEach(() => {
-    setState(mkState({
-      nodes: [agentNode],
-      game_values: { xp_level: 1 }
-    }));
+    setState(
+      mkState({
+        nodes: [agentNode],
+        game_values: { xp_level: 1 },
+      })
+    );
   });
 
   it('resolves to an object with result.buyable array', async () => {
@@ -57,20 +59,22 @@ describe('getProvidedPerps — happy path', () => {
     // xp_level: 1 — only contact035 (required_level 1) should pass
     const { result } = await getProvidedPerps(AGENT_PATH);
     expect(result.buyable).toContain('contact035');
-    expect(result.buyable).not.toContain('contact001');  // level 3
-    expect(result.buyable).not.toContain('contact019');  // level 4
-    expect(result.buyable).not.toContain('contact022');  // level 6
+    expect(result.buyable).not.toContain('contact001'); // level 3
+    expect(result.buyable).not.toContain('contact019'); // level 4
+    expect(result.buyable).not.toContain('contact022'); // level 6
   });
 
   it('includes additional gestalts when player level is higher', async () => {
-    setState(mkState({
-      nodes: [agentNode],
-      game_values: { xp_level: 3 }
-    }));
+    setState(
+      mkState({
+        nodes: [agentNode],
+        game_values: { xp_level: 3 },
+      })
+    );
     const { result } = await getProvidedPerps(AGENT_PATH);
     expect(result.buyable).toContain('contact035');
     expect(result.buyable).toContain('contact001');
-    expect(result.buyable).not.toContain('contact019');  // level 4
+    expect(result.buyable).not.toContain('contact019'); // level 4
   });
 
   it('result contains gestalt strings, not objects', async () => {
@@ -85,10 +89,12 @@ describe('getProvidedPerps — happy path', () => {
 
 describe('getProvidedPerps — prerequisite filtering', () => {
   it('excludes perps whose required_providers are not owned', async () => {
-    setState(mkState({
-      nodes: [cityNode],
-      game_values: { xp_level: 3 }
-    }));
+    setState(
+      mkState({
+        nodes: [cityNode],
+        game_values: { xp_level: 3 },
+      })
+    );
     const { result } = await getProvidedPerps(CITY_PATH);
     // pusher004 needs project002, contact035, etc. — none owned
     expect(result.buyable).not.toContain('pusher004');
@@ -98,14 +104,16 @@ describe('getProvidedPerps — prerequisite filtering', () => {
 
   it('includes perp once all required_providers are owned', async () => {
     // pusher003 requires contact026 and contact008
-    setState(mkState({
-      nodes: [
-        cityNode,
-        mkNode('contact026', 'ContactPerp', 'Imperium.City.contact026'),
-        mkNode('contact008', 'ContactPerp', 'Imperium.City.contact008')
-      ],
-      game_values: { xp_level: 3 }
-    }));
+    setState(
+      mkState({
+        nodes: [
+          cityNode,
+          mkNode('contact026', 'ContactPerp', 'Imperium.City.contact026'),
+          mkNode('contact008', 'ContactPerp', 'Imperium.City.contact008'),
+        ],
+        game_values: { xp_level: 3 },
+      })
+    );
     const { result } = await getProvidedPerps(CITY_PATH);
     expect(result.buyable).toContain('pusher003');
   });
@@ -130,10 +138,12 @@ describe('getProvidedPerps — edge cases', () => {
   it('returns empty buyable array for a perp with no provided_perps', async () => {
     // ContactPerp nodes have no provided_perps
     const contactNode = mkNode('contact001', 'ContactPerp', 'Imperium.City.contact001');
-    setState(mkState({
-      nodes: [contactNode],
-      game_values: { xp_level: 10 }
-    }));
+    setState(
+      mkState({
+        nodes: [contactNode],
+        game_values: { xp_level: 10 },
+      })
+    );
     const { result } = await getProvidedPerps('Imperium.City.contact001');
     expect(result.buyable).toEqual([]);
   });
@@ -144,13 +154,15 @@ describe('getProvidedPerps — edge cases', () => {
       game_type: 'AgentPerp',
       full_type: 'AgentPerp:agent002',
       full_path: AGENT_PATH,
-      instance_data: {}
+      instance_data: {},
       // intentionally omit gestalt
     };
-    setState(mkState({
-      nodes: [nodeNoGestalt],
-      game_values: { xp_level: 1 }
-    }));
+    setState(
+      mkState({
+        nodes: [nodeNoGestalt],
+        game_values: { xp_level: 1 },
+      })
+    );
     const { result } = await getProvidedPerps(AGENT_PATH);
     expect(Array.isArray(result.buyable)).toBe(true);
     expect(result.buyable).toContain('contact035');
@@ -161,22 +173,26 @@ describe('getProvidedPerps — edge cases', () => {
 
 describe('getProvidedPerps — locale fallback', () => {
   it('uses EN ruleset when state.locale is "en"', async () => {
-    setState(mkState({
-      locale: 'en',
-      nodes: [agentNode],
-      game_values: { xp_level: 1 }
-    }));
+    setState(
+      mkState({
+        locale: 'en',
+        nodes: [agentNode],
+        game_values: { xp_level: 1 },
+      })
+    );
     // EN ruleset has same gesture structure; handler must not throw or error out
     const data = await getProvidedPerps(AGENT_PATH);
     expect(Array.isArray(data.result.buyable)).toBe(true);
   });
 
   it('falls back to DE ruleset for unknown locale values', async () => {
-    setState(mkState({
-      locale: 'fr',  // unknown locale → falls back to DE
-      nodes: [agentNode],
-      game_values: { xp_level: 1 }
-    }));
+    setState(
+      mkState({
+        locale: 'fr', // unknown locale → falls back to DE
+        nodes: [agentNode],
+        game_values: { xp_level: 1 },
+      })
+    );
     const data = await getProvidedPerps(AGENT_PATH);
     expect(Array.isArray(data.result.buyable)).toBe(true);
     expect(data.result.buyable).toContain('contact035');
@@ -229,7 +245,9 @@ describe('getPowerups — happy path', () => {
 
   it('result covers all three slot categories (ads + upgrades + teammembers)', async () => {
     const { result } = await getPowerups('project001', '1');
-    const types = result.map(function (item) { return item.game_type; });
+    const types = result.map(function (item) {
+      return item.game_type;
+    });
     expect(types).toContain('AdPowerup');
     expect(types).toContain('UpgradePowerup');
     expect(types).toContain('TeamMemberPowerup');
@@ -261,7 +279,9 @@ describe('getPowerups — edge cases', () => {
     // project005 has provided_ads: [] in the DE ruleset
     const { result } = await getPowerups('project005', '1');
     expect(result.length).toBeGreaterThan(0);
-    const types = result.map(function (i) { return i.game_type; });
+    const types = result.map(function (i) {
+      return i.game_type;
+    });
     expect(types).not.toContain('AdPowerup');
     expect(types).toContain('UpgradePowerup');
     expect(types).toContain('TeamMemberPowerup');

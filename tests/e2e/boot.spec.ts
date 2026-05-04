@@ -9,7 +9,7 @@
  * real wall-clock time is never slept on.
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test('boot: loader disappears and game container is visible', async ({ page }) => {
   const jsErrors: string[] = [];
@@ -49,7 +49,8 @@ test('boot: window.__dd clock hook is exposed with devtools=1', async ({ page })
   const hasHook = await page.evaluate(() => {
     return (
       typeof (window as Window & { __dd?: unknown }).__dd === 'object' &&
-      typeof (window as Window & { __dd?: { advanceNow?: unknown } }).__dd?.advanceNow === 'function'
+      typeof (window as Window & { __dd?: { advanceNow?: unknown } }).__dd?.advanceNow ===
+        'function'
     );
   });
   expect(hasHook, 'window.__dd.advanceNow should be available with ?devtools=1').toBe(true);

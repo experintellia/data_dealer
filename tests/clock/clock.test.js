@@ -1,8 +1,8 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
-import { describe, it, expect, afterEach } from 'vitest';
-import { now, setOverride, clearOverride, advance } from '../../scripts/clock.js';
-import { freshState, applyDelta } from '../../scripts/state.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import { advance, clearOverride, now, setOverride } from '../../scripts/clock.js';
 import { materialize } from '../../scripts/materializer.js';
+import { applyDelta, freshState } from '../../scripts/state.js';
 
 // Always restore real clock after each test to prevent cross-test pollution.
 afterEach(() => {
@@ -29,7 +29,7 @@ describe('now() — override lifecycle', () => {
     clearOverride();
     const before = Date.now();
     const result = now();
-    const after  = Date.now();
+    const after = Date.now();
     expect(result).toBeGreaterThanOrEqual(before);
     expect(result).toBeLessThanOrEqual(after);
   });
@@ -121,17 +121,20 @@ describe('clock-skew guard survives a backwards override', () => {
 
 describe('materializer integration with clock', () => {
   function baseState(overrides) {
-    return Object.assign({
-      nodes_charging: [],
-      nodes_collect:  [],
-      game_values: {
-        ap_snapshot:      0,
-        ap_update:        0,
-        ap_inc_value:     1,
-        ap_inc_interval:  1_000,
-        ap_max:           50,
-      }
-    }, overrides);
+    return Object.assign(
+      {
+        nodes_charging: [],
+        nodes_collect: [],
+        game_values: {
+          ap_snapshot: 0,
+          ap_update: 0,
+          ap_inc_value: 1,
+          ap_inc_interval: 1_000,
+          ap_max: 50,
+        },
+      },
+      overrides
+    );
   }
 
   function makeCharge(path, charge_end) {
