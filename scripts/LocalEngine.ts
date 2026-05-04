@@ -12,7 +12,7 @@
 
 import { getState, setState } from './boot.js';
 import { applyDelta } from './state.js';
-import type { LocalState, Delta, GameValues, GameNode } from './state.js';
+import type { LocalState, Delta, GameValues, GameNode, MissionGoal } from './state.js';
 import { materialize } from './materializer.js';
 import { now as clockNow } from './clock.js';
 import rulesetDe from '../data/ruleset_3.de.json' with { type: 'json' };
@@ -29,14 +29,17 @@ type Locale = 'de' | 'en';
 
 /** Loose ruleset shape — full schema is the JSON, not enforced here. */
 interface PerpDef {
+  game_type?: string;
   type_data?: PerpTypeData;
   [key: string]: unknown;
 }
 
 /**
- * Loose type for per-perp ruleset data and slot-instance data.  Real schema
- * lives in data/ruleset_3.*.json and is not formalized; the fields below are
- * the ones actually read by the handlers in this module.
+ * Loose type for per-perp ruleset data.  Real schema lives in
+ * data/ruleset_3.*.json and is not formalized; the fields below are the
+ * ones actually read by the handlers in this module.  `[key: string]:
+ * unknown` covers the long tail (description, illustration, etc.) without
+ * forcing typed reads where the handlers don't care.
  */
 interface PerpTypeData {
   required_level?: number;
@@ -52,8 +55,15 @@ interface PerpTypeData {
   charge_time?: number;
   collect_time?: number;
   tokens?: TokenSpec[];
+  contained_tokens?: TokenSpec[];
+  income_base?: number;
   xp_inc?: number;
   price?: number;
+  profileset_size?: number;
+  profiles_max?: number;
+  slot_cost?: number;
+  slot_cost_modifier?: number;
+  max_slots?: number;
   slots?: SlotEntry[];
   origin_full_type?: string;
   origin_gestalt?: string;
@@ -77,6 +87,7 @@ interface TokenSpec {
 
 interface PowerupDef {
   gestalt?: string;
+  slot?: number;
   full_type?: string;
   price?: number;
   charge_cost_modifier?: number;
@@ -85,15 +96,34 @@ interface PowerupDef {
   [key: string]: unknown;
 }
 
+/**
+ * Per-node instance_data fields handlers read.  Persisted into state.nodes
+ * via reducers; not all nodes carry every field.  Open-ended so legacy
+ * fields (x, y, charge_start, etc.) pass through without explicit typing.
+ */
+interface NodeInstanceData {
+  amount?: number;
+  charge_cost?: number;
+  collect_amount?: number;
+  collect_risk?: number;
+  powerups?: PowerupDef[];
+  tokens?: TokenSpec[];
+  charge_start?: number;
+  [key: string]: unknown;
+}
+
 interface MissionDef {
-  type_data?: {
-    gestalt?: string;
-    title?: string;
-    required_mission?: string;
-    goals?: GoalDef[];
-    rewards?: Array<{ target?: string; amount?: number }>;
-    [key: string]: unknown;
-  };
+  game_type?: string;
+  type_data?: MissionTypeData;
+  [key: string]: unknown;
+}
+
+interface MissionTypeData {
+  gestalt?: string;
+  title?: string;
+  required_mission?: string;
+  goals?: GoalDef[];
+  rewards?: Array<{ target?: string; amount?: number }>;
   [key: string]: unknown;
 }
 
@@ -137,6 +167,8 @@ interface Karmalauter {
 interface Karmalizer {
   type_data: {
     gestalt?: string;
+    karma_points?: number;
+    required_level?: number;
     [key: string]: unknown;
   };
   [key: string]: unknown;
@@ -145,12 +177,12 @@ interface Karmalizer {
 interface Ruleset {
   version: string | number;
   perps: Record<string, PerpDef>;
-  tokens: Record<string, unknown>;
-  powerups: Record<string, unknown>;
+  tokens: Record<string, PerpDef | undefined>;
+  powerups: Record<string, { game_type?: string; type_data?: Record<string, unknown> } | undefined>;
   levels: LevelEntry[];
   karmalauters: Karmalauter[];
   karmalizers: Karmalizer[];
-  missions: Record<string, MissionDef>;
+  missions: MissionDef[];
   [key: string]: unknown;
 }
 
@@ -178,31 +210,19 @@ type Emitter = (ev: string, pl: unknown) => void;
 type DeltaSender = (delta: Delta) => void;
 type AchievementSender = (msg: { info: string; payload: AchievementPayload }) => void;
 
-interface MissionGoalRow {
-  mission: string;
-  workflow: string;
-  target: string;
-  amount: number;
-  position?: number;
-  project?: string | null;
-  current_amount: number;
-  goal_id?: string;
-  complete: boolean;
-}
-
 interface MissionUpdate {
   complete_missions: string[];
   updated_missions: string[];
   mission_data: {
     active_missions: string[];
-    mission_goals: MissionGoalRow[];
+    mission_goals: MissionGoal[];
   };
 }
 
 interface MissionAdvanceResult {
   missions: MissionUpdate | null;
   rewards?: RewardSet;
-  mission_goals: MissionGoalRow[];
+  mission_goals: MissionGoal[];
   active_missions: string[];
 }
 
@@ -219,6 +239,16 @@ export function setEmitter(fn: Emitter): void {
 
 function _emit(ev: string, pl: unknown): void {
   if (_emitter) _emitter(ev, pl);
+}
+
+// Typed read for the open-ended `[key: string]: unknown` regions of
+// PerpTypeData / NodeInstanceData / ruleset records.  Returns the number
+// at `key` or undefined if the field is missing or not a number — keeps
+// the cast surface to a single helper instead of scattered `as` reads.
+function _readNumber(rec: object | undefined, key: string): number | undefined {
+  if (!rec) return undefined;
+  var v = (rec as Record<string, unknown>)[key];
+  return typeof v === 'number' ? v : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -585,30 +615,35 @@ export function getProvidedPerps(
   return Promise.resolve({ result: { buyable: buyable } });
 }
 
-export function getPowerups(projectGestalt: string /*, version */): Promise<{ result: unknown[] }> {
+interface PowerupListEntry {
+  game_gestalt: string;
+  game_type: string | undefined;
+  type_data: Record<string, unknown>;
+}
+
+export function getPowerups(
+  projectGestalt: string /*, version */
+): Promise<{ result: PowerupListEntry[] }> {
   var ruleset = _getRuleset();
   var def = ruleset.perps[projectGestalt];
   if (!def) return Promise.resolve({ result: [] });
 
-  var td = (def.type_data || {}) as Record<string, Array<Record<string, unknown>> | undefined>;
-  var entries: Array<Record<string, unknown>> = ([] as Array<Record<string, unknown>>).concat(
-    td.provided_ads || [],
+  var td: PerpTypeData = def.type_data || {};
+  var entries: PowerupDef[] = (td.provided_ads || []).concat(
     td.provided_upgrades || [],
     td.provided_teammembers || []
   );
 
-  var result: Array<{ game_gestalt: unknown; game_type: unknown; type_data: Record<string, unknown> }> = [];
+  var result: PowerupListEntry[] = [];
   for (var i = 0; i < entries.length; i++) {
     var entry = entries[i];
-    if (!entry) continue;
-    var entryGestalt = entry.gestalt;
-    if (typeof entryGestalt !== 'string') continue;
-    var puDef = ruleset.powerups[entryGestalt] as { game_type?: unknown; type_data?: Record<string, unknown> } | undefined;
+    if (!entry || typeof entry.gestalt !== 'string') continue;
+    var puDef = ruleset.powerups[entry.gestalt];
     if (!puDef) continue;
     result.push({
-      game_gestalt: entryGestalt,
+      game_gestalt: entry.gestalt,
       game_type: puDef.game_type,
-      type_data: Object.assign({ gestalt: entryGestalt }, puDef.type_data || {}, entry),
+      type_data: Object.assign({ gestalt: entry.gestalt }, puDef.type_data || {}, entry),
     });
   }
 
@@ -687,12 +722,17 @@ export function getRanking(
 // Build a canonical delta envelope.  Always paired with _persistDelta — never
 // pass the result anywhere else.  Kept as a tiny helper so handler call sites
 // don't repeat the kind/ts boilerplate.
-/** Build a persisted delta object. */
+/**
+ * Build a persisted delta object.
+ *
+ * TODO #147 follow-up: tighten Delta.args / Delta.result in state.ts so this
+ * function can construct the Delta directly without the type-erasure cast.
+ * The current shape `args?: any[] / result?: any` plus exactOptionalPropertyTypes
+ * means an `unknown[]` argument can't be assigned to `args` without the seam.
+ * Narrowing the Delta envelope is gated on typing the reducer family in
+ * state.ts, which the per-handler PRs (4-N) finish off.
+ */
 function _mkDelta(addr: string, op: string, args: unknown[], result: unknown): Delta {
-  // Delta.args / .result are typed as `any[]` / `any` for legacy reducer
-  // compatibility (state.ts:136); the cast is needed under strict because
-  // `unknown` is not assignable to `any[]`.  Issue #147 — narrow once the
-  // reducers themselves are typed.
   return {
     kind:   'delta',
     addr:   addr,
@@ -998,7 +1038,8 @@ export function buyPowerup(
   var puDef = _findPowerupDef(perpTypeData, gestalt);
   if (!puDef) return Promise.resolve({ result: { error: 0 } });
 
-  var powerups: PowerupDef[] = (node.instance_data.powerups as PowerupDef[]) || [];
+  var idata: NodeInstanceData = node.instance_data || {};
+  var powerups: PowerupDef[] = idata.powerups || [];
   var puGameType = _gameTypeFrom(puDef.full_type);
   for (var i = 0; i < powerups.length; i++) {
     var pi = powerups[i];
@@ -1011,9 +1052,9 @@ export function buyPowerup(
   var cashValue = state.game_values.cash_value || 0;
   if (cashValue < price) return Promise.resolve({ result: { error: 3 } });
 
-  var newPowerups: PowerupDef[] = powerups.concat([
-    { slot: slot, gestalt: gestalt, full_type: puDef.full_type } as PowerupDef,
-  ]);
+  var addedPu: PowerupDef = { slot: slot, gestalt: gestalt };
+  if (puDef.full_type !== undefined) addedPu.full_type = puDef.full_type;
+  var newPowerups: PowerupDef[] = powerups.concat([addedPu]);
   var mods = _computeModifiers(perpTypeData, newPowerups);
 
   var newInstanceData = Object.assign({}, node.instance_data, {
@@ -1065,7 +1106,7 @@ export function buyPowerup(
     var mGestalt = _bpuCompletedMissions[_bpuMi];
     if (typeof mGestalt !== 'string') continue;
     var _bpuMDef = _findMissionDef(_getRuleset(), mGestalt);
-    var _bpuMTitle = (_bpuMDef && _bpuMDef.type_data && (_bpuMDef.type_data as { title?: string }).title) || mGestalt;
+    var _bpuMTitle = (_bpuMDef && _bpuMDef.type_data && _bpuMDef.type_data.title) || mGestalt;
     triggerAchievement('mission_done',
       _t('achievement_mission_done', _bpuDisplayName, _bpuMTitle),
       { mission: mGestalt });
@@ -1099,7 +1140,8 @@ export function sellPowerup(
   if (!r) return Promise.resolve({ result: { error: 0 } });
   var state = r.state, nodeIdx = r.nodeIdx, node = r.node, perpTypeData = r.perpTypeData;
 
-  var powerups: PowerupDef[] = (node.instance_data.powerups as PowerupDef[]) || [];
+  var idata: NodeInstanceData = node.instance_data || {};
+  var powerups: PowerupDef[] = idata.powerups || [];
   var puEntry: PowerupDef | null = null;
   for (var i = 0; i < powerups.length; i++) {
     var p0 = powerups[i];
@@ -1176,19 +1218,21 @@ export function buySlots(
   var slotKey = slotType + '_slots';
   var maxKey  = 'max_' + slotType + '_slots';
 
-  var idata = node.instance_data as Record<string, unknown>;
-  var ptd   = perpTypeData as Record<string, unknown>;
+  // PerpTypeData / NodeInstanceData both whitelist their typed fields and
+  // fall through to `[key: string]: unknown` for the long tail. The slot
+  // counters are constructed from `slotType` at runtime so they live on the
+  // open-ended portion — read once via _readNumber and the rest of the
+  // function works on plain `number` values.
   var currentSlots: number =
-    (idata[slotKey] !== undefined && typeof idata[slotKey] === 'number')
-      ? (idata[slotKey] as number)
-      : ((ptd[slotKey] as number) || 0);
-  var maxRaw = ptd[maxKey];
-  var maxSlots: number = (typeof maxRaw === 'number') ? maxRaw : Infinity;
+    _readNumber(node.instance_data, slotKey) ??
+    _readNumber(perpTypeData, slotKey) ??
+    0;
+  var maxSlots: number = _readNumber(perpTypeData, maxKey) ?? Infinity;
 
   if (currentSlots + nNum > maxSlots) return Promise.resolve({ result: { error: 2 } });
 
-  var slotCost = (ptd.slot_cost as number) || 0;
-  var slotCostModifier = (ptd.slot_cost_modifier as number) || 0;
+  var slotCost = perpTypeData.slot_cost || 0;
+  var slotCostModifier = perpTypeData.slot_cost_modifier || 0;
   var totalCost = 0;
   for (var i = 0; i < nNum; i++) {
     totalCost += slotCost + slotCostModifier * (currentSlots + i);
@@ -1197,7 +1241,7 @@ export function buySlots(
   var cashValue = state.game_values.cash_value || 0;
   if (cashValue < totalCost) return Promise.resolve({ result: { error: 3 } });
 
-  var newInstanceData: Record<string, unknown> = Object.assign({}, node.instance_data);
+  var newInstanceData: NodeInstanceData = Object.assign({}, node.instance_data);
   newInstanceData[slotKey] = currentSlots + nNum;
 
   var newXp = (state.game_values.xp_value || 0) + 1;
@@ -1267,9 +1311,9 @@ export function buyPerp(
 ): Promise<{ result: { error: number } | BuyPerpPayload }> {
   var state = getState();
   var ruleset = _getRuleset();
-  var allTypes: Record<string, PerpDef & { game_type?: string }> = Object.assign(
+  var allTypes: Record<string, PerpDef> = Object.assign(
     {}, ruleset.perps, ruleset.tokens
-  ) as Record<string, PerpDef & { game_type?: string }>;
+  );
 
   var perpDef = allTypes[gestalt];
   if (!perpDef) { return Promise.resolve({ result: { error: 1 } }); }
@@ -1305,8 +1349,7 @@ export function buyPerp(
   }
 
   if (parentNode && parentNode.game_type === 'ProxyPerp') {
-    var maxRaw = parentTypeData ? (parentTypeData as Record<string, unknown>).max_slots : undefined;
-    var maxSlots: number = (typeof maxRaw === 'number') ? maxRaw : 0;
+    var maxSlots: number = (parentTypeData && parentTypeData.max_slots) || 0;
     var childPrefix = parentPath + '.';
     var childCount = 0;
     var allNodes = state.nodes || [];
@@ -1342,9 +1385,7 @@ export function buyPerp(
   };
 
   var xpInc = typeof typeData.xp_inc === 'number' ? typeData.xp_inc : 0;
-  var profilesMaxInc = typeof (typeData as Record<string, unknown>).profiles_max === 'number'
-    ? ((typeData as Record<string, unknown>).profiles_max as number)
-    : 0;
+  var profilesMaxInc = typeof typeData.profiles_max === 'number' ? typeData.profiles_max : 0;
   var newGv: GameValues = Object.assign({}, gv, {
     cash_value: cashValue - price,
     cash_spent: (gv.cash_spent || 0) + price,
@@ -1394,9 +1435,8 @@ export function buyPerp(
         tokensMap[tk.gestalt] = { amount: tk.amount || 0 };
       }
     }
-    var rawSize = (typeData as Record<string, unknown>).profileset_size;
-    var profilesValue: number = typeof rawSize === 'number'
-      ? rawSize
+    var profilesValue: number = typeof typeData.profileset_size === 'number'
+      ? typeData.profileset_size
       : (typeof typeData.collect_amount === 'number' ? typeData.collect_amount : 0);
     var generatedProfileSet = { profiles_value: profilesValue, tokens_map: tokensMap };
     profileSetPayload = { profile_set: generatedProfileSet, origin: newFullPath, collect_id: collectId };
@@ -1424,7 +1464,7 @@ export function buyPerp(
     var mGestalt = _bpCompletedMissions[_bpMi];
     if (typeof mGestalt !== 'string') continue;
     var _bpMDef = _findMissionDef(_getRuleset(), mGestalt);
-    var _bpMTitle = (_bpMDef && _bpMDef.type_data && (_bpMDef.type_data as { title?: string }).title) || mGestalt;
+    var _bpMTitle = (_bpMDef && _bpMDef.type_data && _bpMDef.type_data.title) || mGestalt;
     triggerAchievement('mission_done',
       _t('achievement_mission_done', _bpDisplayName, _bpMTitle),
       { mission: mGestalt });
@@ -1435,22 +1475,16 @@ export function buyPerp(
 
 function _findMissionDef(ruleset: Ruleset, gestalt: string): MissionDef | null {
   if (!ruleset || !ruleset.missions || !gestalt) return null;
-  // ruleset.missions can be either an array (legacy) or a record keyed by gestalt.
-  if (Array.isArray(ruleset.missions)) {
-    for (var i = 0; i < (ruleset.missions as MissionDef[]).length; i++) {
-      var def = (ruleset.missions as MissionDef[])[i];
-      if (!def) continue;
-      var td = (def.type_data as { gestalt?: string } | undefined);
-      if (td && td.gestalt === gestalt) return def;
-    }
-    return null;
+  for (var i = 0; i < ruleset.missions.length; i++) {
+    var def = ruleset.missions[i];
+    if (def && def.type_data && def.type_data.gestalt === gestalt) return def;
   }
-  return ruleset.missions[gestalt] || null;
+  return null;
 }
 
 // Canonical mission-goal row shape. One source so adding a field touches one place.
-function _seedGoalRow(missionGestalt: string, g: GoalDef): MissionGoalRow {
-  var row: MissionGoalRow = {
+function _seedGoalRow(missionGestalt: string, g: GoalDef): MissionGoal {
+  var row: MissionGoal = {
     mission: missionGestalt,
     workflow: g.workflow || '',
     target: g.target || '',
@@ -1462,13 +1496,13 @@ function _seedGoalRow(missionGestalt: string, g: GoalDef): MissionGoalRow {
   return row;
 }
 
-function _completeGoal(goal: MissionGoalRow): MissionGoalRow {
+function _completeGoal(goal: MissionGoal): MissionGoal {
   return Object.assign({}, goal, { complete: true, current_amount: goal.amount || 1 });
 }
 
 // Returns the same array reference when nothing changed so callers can use
 // reference equality to detect whether any repairs were made.
-function _autoCompleteBuyPerpGoals(goals: MissionGoalRow[], nodes: GameNode[] | undefined): MissionGoalRow[] {
+function _autoCompleteBuyPerpGoals(goals: MissionGoal[], nodes: GameNode[] | undefined): MissionGoal[] {
   var owned: Record<string, true> = {};
   (nodes || []).forEach(function (n) { if (n.gestalt) owned[n.gestalt] = true; });
   var changed = false;
@@ -1480,24 +1514,11 @@ function _autoCompleteBuyPerpGoals(goals: MissionGoalRow[], nodes: GameNode[] | 
   return changed ? result : goals;
 }
 
-// Iterates ruleset.missions whether stored as record (current) or array (legacy).
 function _eachMissionDef(ruleset: Ruleset, fn: (def: MissionDef) => void): void {
-  var ms = ruleset.missions;
-  if (!ms) return;
-  if (Array.isArray(ms)) {
-    for (var i = 0; i < (ms as MissionDef[]).length; i++) {
-      var d = (ms as MissionDef[])[i];
-      if (d) fn(d);
-    }
-  } else {
-    var keys = Object.keys(ms);
-    for (var k = 0; k < keys.length; k++) {
-      var key = keys[k];
-      if (key !== undefined) {
-        var rec = ms[key];
-        if (rec) fn(rec);
-      }
-    }
+  if (!ruleset.missions) return;
+  for (var i = 0; i < ruleset.missions.length; i++) {
+    var d = ruleset.missions[i];
+    if (d) fn(d);
   }
 }
 
@@ -1509,13 +1530,13 @@ function _seedMissionGoals(state: LocalState): LocalState {
   var ruleset = _getRuleset();
   if (!ruleset || !ruleset.missions) return state;
 
-  var existingGoals = (state.mission_goals as unknown as MissionGoalRow[]) || [];
+  var existingGoals = state.mission_goals || [];
   var existingByMission: Record<string, true> = {};
   existingGoals.forEach(function (g) {
     existingByMission[g.mission] = true;
   });
 
-  var newGoals: MissionGoalRow[] = existingGoals.slice();
+  var newGoals: MissionGoal[] = existingGoals.slice();
   var added = false;
   activeMissions.forEach(function (mGestalt) {
     if (existingByMission[mGestalt]) return;
@@ -1541,7 +1562,7 @@ function _advanceIntegrateProfilesMissions(
   profilesValue: number,
   nodes: GameNode[] | undefined
 ): MissionAdvanceResult {
-  var goals = (state.mission_goals as unknown as MissionGoalRow[]) || [];
+  var goals = state.mission_goals || [];
   var activeMissions = state.active_missions || [];
   if (!goals.length || !activeMissions.length) {
     return { missions: null, mission_goals: goals, active_missions: activeMissions };
@@ -1550,7 +1571,8 @@ function _advanceIntegrateProfilesMissions(
   var amountByGestalt: Record<string, number> = {};
   (nodes || []).forEach(function (n) {
     if (n.game_type === 'TokenPerp' && n.gestalt && n.instance_data) {
-      var amt = (n.instance_data as { amount?: unknown }).amount;
+      var idata: NodeInstanceData = n.instance_data || {};
+      var amt = idata.amount;
       amountByGestalt[n.gestalt] = typeof amt === 'number' ? amt : 0;
     }
   });
@@ -1584,7 +1606,7 @@ function _advanceCollectProfilesMissions(
   contactGestalt: string,
   profilesCollected: number
 ): MissionAdvanceResult {
-  var goals = (state.mission_goals as unknown as MissionGoalRow[]) || [];
+  var goals = state.mission_goals || [];
   var activeMissions = state.active_missions || [];
   if (!goals.length || !activeMissions.length || !profilesCollected || !contactGestalt) {
     return { missions: null, mission_goals: goals, active_missions: activeMissions };
@@ -1612,7 +1634,7 @@ function _advanceCollectProfilesMissions(
 }
 
 function _completeMissionsIfReady(
-  updatedGoals: MissionGoalRow[],
+  updatedGoals: MissionGoal[],
   activeMissions: string[]
 ): MissionAdvanceResult {
   var ruleset = _getRuleset();
@@ -1630,15 +1652,16 @@ function _completeMissionsIfReady(
   var newActive = stillActive.slice();
   if (ruleset && ruleset.missions && completed.length) {
     _eachMissionDef(ruleset, function (def) {
-      if (!def || !def.type_data) return;
-      var td = def.type_data as { required_mission?: string; gestalt?: string; goals?: GoalDef[] };
+      var td = def.type_data;
+      if (!td) return;
       var req = td.required_mission;
       var gestalt = td.gestalt;
       if (!req || !gestalt || newActive.indexOf(gestalt) !== -1) return;
       if (completed.indexOf(req) === -1) return;
-      newActive.push(gestalt);
+      var seededGestalt: string = gestalt;
+      newActive.push(seededGestalt);
       (td.goals || []).forEach(function (g) {
-        updatedGoals = updatedGoals.concat([_seedGoalRow(gestalt as string, g)]);
+        updatedGoals = updatedGoals.concat([_seedGoalRow(seededGestalt, g)]);
       });
     });
     // Auto-complete buy_perp goals for items the player already owns so a
@@ -1669,25 +1692,24 @@ function _completeMissionsIfReady(
 // Sums up cash / xp / karma rewards across the just-completed missions so
 // the caller can fold them into the new game_values. Without this, mission
 // completion notifications fire but the player never sees the payout.
-type RewardTotals = { cash_value: number; xp_value: number; karma_value: number; profiles_max: number };
+type RewardKey = 'cash_value' | 'xp_value' | 'karma_value' | 'profiles_max';
+type RewardTotals = Record<RewardKey, number>;
+
+function _isRewardKey(s: string): s is RewardKey {
+  return s === 'cash_value' || s === 'xp_value' || s === 'karma_value' || s === 'profiles_max';
+}
 
 function _collectMissionRewards(ruleset: Ruleset, completedGestalts: string[]): RewardTotals {
   var totals: RewardTotals = { cash_value: 0, xp_value: 0, karma_value: 0, profiles_max: 0 };
   if (!completedGestalts.length || !ruleset || !ruleset.missions) return totals;
   completedGestalts.forEach(function (mGestalt) {
     var def = _findMissionDef(ruleset, mGestalt);
-    var rewardsRaw = (def && def.type_data && (def.type_data as { rewards?: unknown }).rewards);
-    var rewards: Array<{ target?: string; amount?: number }> = Array.isArray(rewardsRaw)
-      ? rewardsRaw
-      : [];
+    var rewards = (def && def.type_data && def.type_data.rewards) || [];
     rewards.forEach(function (r) {
       if (!r || typeof r.amount !== 'number') return;
       var t = r.target;
-      var amt = r.amount;
-      if (t && Object.prototype.hasOwnProperty.call(totals, t)) {
-        var totalsRec = totals as unknown as Record<string, number>;
-        var prev = totalsRec[t] || 0;
-        totalsRec[t] = prev + amt;
+      if (t && _isRewardKey(t)) {
+        totals[t] += r.amount;
       }
     });
   });
@@ -1709,7 +1731,7 @@ function _applyRewardsToGv(gv: GameValues, rewards: RewardSet | undefined): Game
 
 function _advanceChargePerpMissions(state: LocalState, gestalt: string): MissionAdvanceResult {
   var activeMissions = state.active_missions || [];
-  var missionGoals = (state.mission_goals as unknown as MissionGoalRow[]) || [];
+  var missionGoals = state.mission_goals || [];
 
   if (!activeMissions.length || !missionGoals.length) {
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
@@ -1733,7 +1755,7 @@ function _advanceChargePerpMissions(state: LocalState, gestalt: string): Mission
 
 function _advanceBuyPowerupMissions(state: LocalState, powerupGestalt: string): MissionAdvanceResult {
   var activeMissions = state.active_missions || [];
-  var missionGoals = (state.mission_goals as unknown as MissionGoalRow[]) || [];
+  var missionGoals = state.mission_goals || [];
 
   if (!activeMissions.length || !missionGoals.length) {
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
@@ -1757,7 +1779,7 @@ function _advanceBuyPowerupMissions(state: LocalState, powerupGestalt: string): 
 
 function _advanceUpgradeTokenMissions(state: LocalState, tokenGestalt: string): MissionAdvanceResult {
   var activeMissions = state.active_missions || [];
-  var missionGoals = (state.mission_goals as unknown as MissionGoalRow[]) || [];
+  var missionGoals = state.mission_goals || [];
 
   if (!activeMissions.length || !missionGoals.length) {
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
@@ -1785,7 +1807,7 @@ function _advanceUpgradeTokenMissions(state: LocalState, tokenGestalt: string): 
  */
 function _advanceBuyPerpMissions(state: LocalState, gestalt: string): MissionAdvanceResult {
   var activeMissions = state.active_missions || [];
-  var missionGoals = (state.mission_goals as unknown as MissionGoalRow[]) || [];
+  var missionGoals = state.mission_goals || [];
 
   if (!activeMissions.length || !missionGoals.length) {
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
@@ -1816,7 +1838,7 @@ function _advanceCollectCashMissions(
   cashGain: number
 ): MissionAdvanceResult {
   var activeMissions = state.active_missions || [];
-  var missionGoals = (state.mission_goals as unknown as MissionGoalRow[]) || [];
+  var missionGoals = state.mission_goals || [];
 
   if (!activeMissions.length || !missionGoals.length || !cashGain || !gestalt) {
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
@@ -1873,7 +1895,7 @@ export function chargePerp(
   if (!node) return Promise.resolve({ result: { error: 1 } });
   var gestalt = node.gestalt || _gestaltFrom(node.full_type) || '';
   var perpDef: PerpDef | undefined = gestalt
-    ? (ruleset.perps[gestalt] || (ruleset.tokens[gestalt] as PerpDef | undefined))
+    ? (ruleset.perps[gestalt] || ruleset.tokens[gestalt])
     : undefined;
   var typeData: PerpTypeData | undefined = perpDef ? perpDef.type_data : undefined;
   if (!typeData || typeof typeData.charge_time !== 'number') {
@@ -1887,7 +1909,7 @@ export function chargePerp(
   }
 
   var gv           = state.game_values || {};
-  var instanceData = (node.instance_data || {}) as Record<string, unknown>;
+  var instanceData: NodeInstanceData = node.instance_data || {};
   // charge_cost: instance_data wins (powerup-modified), then type_data, then 0.
   var chargeCost = typeof instanceData.charge_cost === 'number'
     ? instanceData.charge_cost
@@ -1900,11 +1922,10 @@ export function chargePerp(
   // ClientPerps don't carry collect_amount in the ruleset — they ship
   // income_base / income_factor instead. Fall back so charging the car
   // company actually pays out when collected.
-  var incomeBase = (typeData as Record<string, unknown>).income_base;
   var baseAmount = typeof instanceData.collect_amount === 'number'
     ? instanceData.collect_amount
     : (typeof typeData.collect_amount === 'number' ? typeData.collect_amount
-      : (typeof incomeBase === 'number' ? incomeBase : 0));
+      : (typeof typeData.income_base === 'number' ? typeData.income_base : 0));
   var chargeResult = { amount: _getVariatedAmount(baseAmount, now, path) };
 
   var durationMs  = typeData.charge_time;
@@ -2082,17 +2103,15 @@ function _handleKarmaIncident(gv: GameValues, ruleset: Ruleset): KarmaIncident |
 
   var level = (gv && gv.xp_level) || 1;
   var eligible = (ruleset.karmalizers || []).filter(function (k) {
-    var td = k && k.type_data as { required_level?: number } | undefined;
-    return level >= ((td && td.required_level) || 1);
+    return level >= ((k.type_data && k.type_data.required_level) || 1);
   });
   if (!eligible.length) return null;
 
   var k = eligible[Math.floor(_rng() * eligible.length)];
   if (!k) return null;
-  var td = k.type_data as { gestalt?: string; karma_points?: number } | undefined;
   return {
-    gestalt:     (td && td.gestalt) || '',
-    karma_delta: (td && td.karma_points) || -1,
+    gestalt:     (k.type_data && k.type_data.gestalt) || '',
+    karma_delta: (k.type_data && k.type_data.karma_points) || -1,
   };
 }
 
@@ -2156,7 +2175,7 @@ export function collectPerp(
 
   var gestalt = node.gestalt || _gestaltFrom(node.full_type) || '';
   var perpDef: PerpDef | undefined = gestalt
-    ? (ruleset.perps[gestalt] || (ruleset.tokens[gestalt] as PerpDef | undefined))
+    ? (ruleset.perps[gestalt] || ruleset.tokens[gestalt])
     : undefined;
   var typeData: PerpTypeData | undefined = perpDef ? perpDef.type_data : undefined;
 
@@ -2181,8 +2200,7 @@ export function collectPerp(
     // (super-token decomposition) under `contained_tokens` — accept either.
     var tokensMap: Record<string, { amount: number }> = {};
     var contained: TokenSpec[] = (typeData && (
-      typeData.tokens ||
-      ((typeData as Record<string, unknown>).contained_tokens as TokenSpec[] | undefined)
+      typeData.tokens || typeData.contained_tokens
     )) || [];
     for (var ct = 0; ct < contained.length; ct++) {
       var ctEntry = contained[ct];
@@ -2208,8 +2226,8 @@ export function collectPerp(
     innerResult = { cash: newGv.cash_value };
 
   } else if (gameType === 'TokenPerp') {
-    var prevRaw = node.instance_data && (node.instance_data as { amount?: unknown }).amount;
-    var prevAmount = typeof prevRaw === 'number' ? prevRaw : 0;
+    var tpIdata: NodeInstanceData = node.instance_data || {};
+    var prevAmount = typeof tpIdata.amount === 'number' ? tpIdata.amount : 0;
     var newAmount = prevAmount + (cr.amount || 0);
     tokenUpdate = { path: gperpPath, amount: newAmount };
     newNodes = ms.nodes.map(function (n) {
@@ -2347,11 +2365,17 @@ export function collectPerp(
  *   0 — collect_id not in db_queue (already integrated or never collected)
  *   1 — insufficient AP (parity with chargePerp)
  */
-interface DbQueueEntryShape {
-  origin: string;
-  collect_id: string;
-  profile_set?: { profiles_value?: number; tokens_map?: Record<string, { amount?: number }>; xp_gain?: number; karma_gain?: number };
-  collect_dt?: number;
+/**
+ * The persisted shape of state.db_queue[i].profile_set as written by
+ * collectPerp / buyPerp.  state.ts:DbQueueEntry types `profile_set: any`
+ * to keep the reducer free of cross-module schema knowledge; this view
+ * narrows it locally for the integrate path.
+ */
+interface ProfileSetView {
+  profiles_value?: number;
+  tokens_map?: Record<string, { amount?: number }>;
+  xp_gain?: number;
+  karma_gain?: number;
 }
 
 export function integrateCollected(
@@ -2365,16 +2389,18 @@ export function integrateCollected(
     return Promise.resolve({ result: { error: 1 } });
   }
 
-  var entry: DbQueueEntryShape | null = null;
-  var newQueue = (state.db_queue || []).filter(function (q) {
-    if (q.collect_id === collectId) { entry = q as unknown as DbQueueEntryShape; return false; }
-    return true;
-  });
+  var queue = state.db_queue || [];
+  var matchIdx = queue.findIndex(function (q) { return q.collect_id === collectId; });
+  if (matchIdx === -1) {
+    return Promise.resolve({ result: { error: 0 } });
+  }
+  var entry = queue[matchIdx];
   if (!entry) {
     return Promise.resolve({ result: { error: 0 } });
   }
+  var newQueue = queue.slice(0, matchIdx).concat(queue.slice(matchIdx + 1));
 
-  var ps = (entry as DbQueueEntryShape).profile_set || {};
+  var ps: ProfileSetView = (entry.profile_set as ProfileSetView) || {};
   var profilesIncrement = ps.profiles_value || 0;
 
   var integratedIds = state.integrated_ids || {};
@@ -2419,8 +2445,8 @@ export function integrateCollected(
   var newNodes: GameNode[] = (state.nodes || []).map(function (n) {
     if (skipMerge) return n;
     if (n.game_type !== 'TokenPerp' || !n.gestalt) return n;
-    var oldShareRaw = n.instance_data && (n.instance_data as { amount?: unknown }).amount;
-    var oldShare = typeof oldShareRaw === 'number' ? oldShareRaw : 0;
+    var npIdata: NodeInstanceData = n.instance_data || {};
+    var oldShare = typeof npIdata.amount === 'number' ? npIdata.amount : 0;
     var tok = tokensMap[n.gestalt];
     if (tok) seenGestalts[n.gestalt] = true;
     var psContrib = tok ? (tok.amount || 0) * N : 0;
