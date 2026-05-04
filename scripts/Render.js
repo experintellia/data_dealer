@@ -3940,12 +3940,33 @@ var Render = function() {
           x: touch.pageX - parentOffset.left,
           y: touch.pageY - parentOffset.top
         };
+        // Record initial finger distance so non-iOS browsers (which don't
+        // emit GestureEvent.scale) can derive a pinch ratio in touchmove.
+        if (e.touches.length === 2) {
+          var dx = e.touches[0].pageX - e.touches[1].pageX;
+          var dy = e.touches[0].pageY - e.touches[1].pageY;
+          node._pinchStartDist = Math.sqrt(dx * dx + dy * dy) || null;
+        } else {
+          node._pinchStartDist = null;
+        }
         node.scroller.doTouchStart(e.touches, e.timeStamp);
         e.preventDefault();
       }, {passive: false});
 
       node.useDragHandler.domelem.addEventListener("touchmove", function(e) {
-        node.scroller.doTouchMove(e.touches, e.timeStamp, e.scale);
+        // The Scroller expects an absolute pinch scale relative to touchstart
+        // (iOS Safari supplies this as e.scale). Other engines don't, so
+        // derive it from the two-finger distance ratio when needed.
+        var scale = e.scale;
+        if (scale == null && e.touches.length === 2) {
+          var dx = e.touches[0].pageX - e.touches[1].pageX;
+          var dy = e.touches[0].pageY - e.touches[1].pageY;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if (node._pinchStartDist) {
+            scale = dist / node._pinchStartDist;
+          }
+        }
+        node.scroller.doTouchMove(e.touches, e.timeStamp, scale);
         e.preventDefault();
       }, {passive: false});
 
@@ -3956,6 +3977,22 @@ var Render = function() {
       node.useDragHandler.domelem.addEventListener("touchcancel", function(e) {
         node.scroller.doTouchEnd(e.timeStamp);
       }, false);
+
+      // Mouse-wheel zoom: continuous, anchored at the cursor. Each notch
+      // multiplies the current zoom by a small factor so the result feels
+      // smooth instead of stepping in 0.25 increments like the +/- buttons.
+      node.domelem.addEventListener("wheel", function(e) {
+        e.preventDefault();
+        var offset = node.jdomelem.offset();
+        var originLeft = e.pageX - offset.left;
+        var originTop  = e.pageY - offset.top;
+        // Normalize across deltaMode (pixel/line/page) and clamp so a
+        // single trackpad swipe never multiplies zoom by more than ~2x.
+        var unit = (e.deltaMode === 1) ? 16 : (e.deltaMode === 2) ? 400 : 1;
+        var delta = Math.max(-100, Math.min(100, e.deltaY * unit));
+        var factor = Math.pow(0.995, delta);
+        node.scroller.zoomBy(factor, false, originLeft, originTop);
+      }, {passive: false});
     };
 
     ViewMap.prototype.scrollTo = function(pos,dur){

@@ -1669,7 +1669,7 @@ var Game = function() {
     // load and on window resize so the game fills the available space by
     // default rather than sitting in a 960×600 letterbox.
     GameRoot.prototype.fitToWindow = function() {
-      this.setSize($(window).width() - 32, $(window).height() - 64);
+      this.setSize($(window).width(), $(window).height());
       // Refresh the scroller's viewport dimensions so the new stage size is
       // reflected in clamping/zoom math. Without this, scrollTo and the
       // +/- zoom buttons clamp against the previous viewport.
