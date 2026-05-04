@@ -1840,12 +1840,9 @@ var Game = function() {
       sb.AP.val = (this.ap_value < 0) ? 0 : this.ap_value;
       sb.AP.max = this.xp_level.ap_max;
       sb.AP.barsize = Math.min(120, Math.max(0, Math.round((sb.AP.val/this.xp_level.ap_max)*120)));
-      // Always propagate to the statusbar's flat props (AP_val, AP_barsize, AP_max)
-      // so the rendered DOM tracks ap_value even on silent paths. The Statusbar
-      // template binds D.AP_val (a node-level property), not D.AP.val, so without
-      // FXUpdateAP() the text would lag until the next animated update — which is
-      // the bug behind issue #153 (energy stat shows stale value until clicked
-      // open, because the popup reads gnode.ap_value directly).
+      // Always invoke FXUpdate*: the Statusbar template binds the flat
+      // AP_val prop, which only refreshes inside FXUpdateAP. Skipping it
+      // on silent paths leaves the rendered DOM stale (issue #153).
       if (this.renderStatusbar) { this.renderStatusbar.FXUpdateAP(silent); }
     };
 

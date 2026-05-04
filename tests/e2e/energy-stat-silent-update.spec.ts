@@ -1,44 +1,8 @@
 /**
- * Regression test for issue #153 — energy stat displays an incorrect value
- * until the player clicks it.
- *
- * Root cause
- * ----------
- * `GameRoot.setAP/setCash/setProfiles/setKarma/setXP` used to gate the
- * statusbar updater on `!silent`:
- *
- *   if (this.renderStatusbar && !silent) { this.renderStatusbar.FXUpdateAP(); }
- *
- * `updateGameValues` is called *twice* on integrateCollected — first with
- * `silent=true` and then again without silent. The first call updated
- * `groot.ap_value` and `sb.AP.val` but skipped `FXUpdateAP`, so the
- * Statusbar's flat `AP_val` prop (the one bound to the DOM template)
- * never got refreshed. The second call hit the `gv.ap_snapshot ===
- * groot.ap_value` equality guard and short-circuited, so `FXUpdateAP`
- * was never invoked. Result: the statusbar text lagged the engine
- * until something else triggered a re-render.
- *
- * The popup `click_status.AP` handler reads `gnode.ap_value` directly
- * (not `sb.AP.val`), which is why opening the dialog showed the
- * correct number — making the bug look like the dialog was "fixing"
- * the value.
- *
- * Fix
- * ---
- * Always invoke the statusbar updaters; pass `silent` through so the
- * `FXUpdate*` helpers can choose `dur=0` (instant) instead of `dur=250`
- * (animated). The flat statusbar props are then kept in sync on every
- * mutation, silent or not.
- *
- * Strategy
- * --------
- * Reproduce the exact integrateCollected sequence:
- *  1. Read initial AP from the engine, then
- *  2. Drive the in-page Game layer with `updateGameValues({...},_,_,true)`
- *     — i.e. silent — using a different ap_snapshot.
- *  3. Assert the visible statusbar text already reflects the new AP
- *     *without* a follow-up non-silent call. Before the fix it stays at
- *     the old number; after the fix it matches `apAfter/ap_max`.
+ * Regression guard for issue #153: a `silent` updateGameValues must
+ * still refresh the statusbar's DOM. The bug was that `setAP` skipped
+ * `FXUpdateAP` on silent paths, leaving the template-bound flat
+ * `AP_val` prop stale until something else forced a re-render.
  */
 
 import { test, expect } from '@playwright/test';
@@ -50,7 +14,6 @@ test('energy stat: silent updateGameValues still refreshes statusbar text (issue
   });
   await expect(page.locator('[data-testid="dd-ap-counter"]')).toBeVisible();
 
-  // ── 1. Read initial AP from the engine. ──────────────────────────────
   const initial = await page.evaluate(async () => {
     const boot = await new Promise<any>((res, rej) =>
       (window as any).require(['boot'], res, rej),
@@ -60,16 +23,11 @@ test('energy stat: silent updateGameValues still refreshes statusbar text (issue
   });
   expect(initial.ap).toBeGreaterThan(0);
 
-  // Confirm the statusbar's initial render matches.
   await expect(page.locator('[data-testid="dd-ap-value"]')).toHaveText(
     `${initial.ap}/${initial.ap_max}`,
     { timeout: 2_000 },
   );
 
-  // ── 2. Drive a SILENT updateGameValues — the same code path
-  //       integrateCollected uses on the first call. Before the fix
-  //       this would mutate `ap_value` + `sb.AP.val` but never refresh
-  //       the Statusbar's flat `AP_val` prop. ────────────────────────────
   const apAfter = initial.ap - 1;
   await page.evaluate((args) => {
     const appModule: any = (window as any).require('app');
@@ -79,16 +37,11 @@ test('energy stat: silent updateGameValues still refreshes statusbar text (issue
     game.updateGameValues({ ap_snapshot: args.apAfter }, false, undefined, true);
   }, { apAfter });
 
-  // ── 3. The DOM must reflect the silent update without anyone clicking
-  //       the AP indicator. Allow a frame for the dur=0 tween to tick. ───
   await expect(page.locator('[data-testid="dd-ap-value"]')).toHaveText(
     `${apAfter}/${initial.ap_max}`,
     { timeout: 2_000 },
   );
 
-  // Sanity: gnode.ap_value (the popup source) and sb.AP.val (the
-  // statusbar source) must agree — the bug was specifically that the
-  // Statusbar's AP_val prop diverged from both.
   const consistency = await page.evaluate(() => {
     const appModule: any = (window as any).require('app');
     const game: any = appModule.getApplication().game;
