@@ -273,6 +273,21 @@ export class GameNode {
   APTick?(): void;
   AniTick?(): void;
 
+  // Legacy GameNode prototype mixins still attached from scripts/Game.js
+  // (`GameNode.prototype.openGenericPopup` at Game.js:1199, `Error` /
+  // `NoCash` / `NoAP` at 4810/4824/4832, `initPopupEvents` at 2683,
+  // `fetchProvided` at 3767).  Declared here as optional methods so
+  // subclasses (Database, Perp classes) don't need per-call
+  // `as unknown as { method: ... }` reads to call them.  The real
+  // implementations live in Game.js until those mixin blocks are
+  // consolidated into GameNode.ts in a later PR.
+  openGenericPopup?(config: Record<string, unknown>): unknown;
+  initPopupEvents?(popup?: unknown): void;
+  fetchProvided?(cb: (...args: unknown[]) => void): void;
+  Error?(msg: string, data: unknown): void;
+  NoCash?(): void;
+  NoAP?(): void;
+
   // Used by addType() to write into the type registry.  Real registry
   // lives on GameRoot in Game.js; the base just mutates whatever object
   // getType() returns.
