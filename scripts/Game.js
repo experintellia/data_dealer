@@ -5,6 +5,7 @@ import { getRender } from './Render.js';
 // alongside scripts that run before vendor `<script>` tags execute.
 import appModule from './app.js';
 import * as bootMod from './boot.js';
+import { OrderedSet } from './game/OrderedSet.js';
 import i18n from './i18n.js';
 import setup from './setup.js';
 import { getTypeSettings } from './type_settings.js';
@@ -20,6 +21,12 @@ var Game = function () {
   var extend = utilDefault.extend;
   var Render = getRender();
   var typeSettings = getTypeSettings();
+
+  // Legacy in-IIFE alias for the extracted ordered-collection class.
+  // See scripts/game/OrderedSet.ts for the full contract; the rest of
+  // this file calls `new Set()` to retain the historical name.
+  // biome-ignore lint/suspicious/noShadowRestrictedNames: legacy collection class predates ES6 Set
+  var Set = OrderedSet;
 
   //////////////////////////////////////////
   //
@@ -73,49 +80,6 @@ var Game = function () {
     app.game = new GameRoot();
     app.game.loadGame(data);
     return app.game;
-  };
-
-  ////////////////////////////////
-  // The Set
-  ////////////////////////////////
-
-  // biome-ignore lint/suspicious/noShadowRestrictedNames: legacy collection class predates ES6 Set
-  var Set = function (set) {
-    if (!set) {
-      set = [];
-    }
-    this.set = set;
-    this.length = this.set.length;
-    return this;
-  };
-
-  Set.prototype.add = function (node) {
-    this.set.push(node);
-    this.length = this.set.length;
-  };
-
-  Set.prototype.prepend = function (node) {
-    this.set.unshift(node);
-    this.length = this.set.length;
-  };
-
-  Set.prototype.remove = function (node) {
-    var index = this.set.indexOf(node);
-    if (index !== -1) {
-      this.set.splice(index, 1);
-    }
-    this.length = this.set.length;
-  };
-
-  Set.prototype.each = function (func) {
-    if (!func) {
-      return;
-    }
-    for (var n = 0; n < this.set.length; n++) {
-      var node = this.set[n];
-      func(node);
-    }
-    this.length = this.set.length;
   };
 
   //////////////////////////////////////////
