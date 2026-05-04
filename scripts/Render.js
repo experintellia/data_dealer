@@ -4269,31 +4269,66 @@ var Render = function() {
       this.render();
     }
 
+    // Silent paths bypass the Tween machinery: we just assign the flat
+    // template props and re-render once. FXSimpleCue with dur=0 still
+    // queues a Ticker listener and chains onto any active tween, so
+    // letting silent updateGameValues run through it would grow the
+    // tween queue under bursty silent traffic.
     Statusbar.prototype.FXUpdateAP = function(silent){
-      var dur = (silent) ? 0 : 250;
-      this.AP_active = 1;
       this.AP_val = this.AP.val;
-      this.FXSimpleCue({AP_active:0,AP_max:this.AP.max,AP_barsize:this.AP.barsize},dur,'linear');
+      if (silent) {
+        this.AP_active = 0;
+        this.AP_max = this.AP.max;
+        this.AP_barsize = this.AP.barsize;
+        this.render();
+        return;
+      }
+      this.AP_active = 1;
+      this.FXSimpleCue({AP_active:0,AP_max:this.AP.max,AP_barsize:this.AP.barsize},250,'linear');
     };
     Statusbar.prototype.FXUpdateXP = function(silent){
-      var dur = (silent) ? 0 : 250;
       this.XP_level = this.XP.level;
-      this.XP_active = 1;
       this.XP_val = this.XP.val;
-      this.FXSimpleCue({XP_active:0,XP_barsize:this.XP.barsize},dur,'linear');
+      if (silent) {
+        this.XP_active = 0;
+        this.XP_barsize = this.XP.barsize;
+        this.render();
+        return;
+      }
+      this.XP_active = 1;
+      this.FXSimpleCue({XP_active:0,XP_barsize:this.XP.barsize},250,'linear');
     };
     Statusbar.prototype.FXUpdateCash = function(silent){
-      var dur = (silent) ? 0 : 250;
+      if (silent) {
+        this.cash_active = 0;
+        this.cash_val = this.cash.val;
+        this.render();
+        return;
+      }
       this.cash_active = 1;
-      this.FXSimpleCue({cash_active:0,cash_val:this.cash.val},dur,'linear');
+      this.FXSimpleCue({cash_active:0,cash_val:this.cash.val},250,'linear');
     };
     Statusbar.prototype.FXUpdateKarma = function(silent){
-      var dur = (silent) ? 0 : 250;
+      if (silent) {
+        this.karma_active = 0;
+        this.karma_val = this.karma.val;
+        this.karma_barsize = this.karma.barsize;
+        this.render();
+        return;
+      }
       this.karma_active = 1;
-      this.FXSimpleCue({karma_active:0,karma_val:this.karma.val,karma_barsize:this.karma.barsize},dur,'linear');
+      this.FXSimpleCue({karma_active:0,karma_val:this.karma.val,karma_barsize:this.karma.barsize},250,'linear');
     };
     Statusbar.prototype.FXUpdateProfiles = function(silent){
-      var dur = (silent) ? 0 : 500;
+      if (silent) {
+        this.profiles_active = 0;
+        this.profiles_val = this.profiles.val;
+        this.profiles_barsize = this.profiles.barsize;
+        this.profiles_crosssum = this.profiles.crosssum;
+        this.profiles_tokenslength = this.profiles.tokenslength;
+        this.render();
+        return;
+      }
       this.profiles_active = 1;
       this.FXSimpleCue({
         profiles_active:0,
@@ -4301,7 +4336,7 @@ var Render = function() {
         profiles_barsize:this.profiles.barsize,
         profiles_crosssum : this.profiles.crosssum,
         profiles_tokenslength : this.profiles.tokenslength
-      },dur,'linear');
+      },500,'linear');
     };
 
     Statusbar.prototype.startLoop = function(func, time){
