@@ -128,11 +128,23 @@ function bundleEsmDev() {
           });
         }
       });
-      server.middlewares.use((req, res, next) => {
+      server.middlewares.use(async (req, res, next) => {
         if (req.url === '/scripts/esm-bundle.js' || req.url === '/scripts/esm-bundle.js?') {
+          // First request after server start may race with the initial
+          // Rollup build kicked off in configureServer.  Await the
+          // in-flight build (or start one) instead of 503-ing — the
+          // browser's `<script defer>` tag does not auto-retry, so a
+          // 503 here would leave the page silently stuck on the loader.
+          if (!bundleSrc) {
+            try {
+              await (buildPromise || rebuild());
+            } catch (err) {
+              server.config.logger.error('[esm-bundle-dev] build failed: ' + err.message);
+            }
+          }
           if (!bundleSrc) {
             res.statusCode = 503;
-            res.end('// esm-bundle build pending or failed');
+            res.end('// esm-bundle build failed; see vite logs');
             return;
           }
           res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
