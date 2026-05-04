@@ -224,7 +224,24 @@
   width: 100px;
 }
 
+/* CSS-centred overlay (overrides JS-written `transform: translate` +
+ * width/height that go stale on every non-1024 Stage). */
 .Statusbar {
+  transform: none !important;
+  width: 100% !important;
+  left: 0 !important;
+  top: 12px !important;
+  height: auto !important;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  justify-content: center !important;
+  align-items: flex-start;
+  box-sizing: border-box;
+}
+.Statusbar .StatusItem {
+  flex: 0 0 auto;
+  transform-origin: top center;
 }
 
 .StatusItem {
@@ -1224,7 +1241,10 @@
   width: 570px;
   height: auto;
   padding:2px 6px 0px 6px;
-  display: inline-block;
+  /* Block (was inline-block) so `margin: 12px auto` actually centres the
+     card horizontally inside its tab.  Topscores already centres via
+     the same trick on `.TopscoreDiv` (which is naturally display:block). */
+  display: block;
   background: #ECF8FC;
   margin: 12px auto;
   border-radius:12px;
@@ -1346,6 +1366,7 @@
   -moz-transform: scale(0.75);
   -o-transform: scale(0.75);
   transform: scale(0.75);
+  top: -23px;
 }
 
 .MissionGoal.complete .MissionGoalStatus {
@@ -1633,7 +1654,7 @@
   border-radius:16px;
   padding:6px;
   height:auto;
-  width: 588px
+  width: 588px;
   position: relative;
 }
 .PopupHeader {
@@ -3228,4 +3249,556 @@
   background-position: 0px -616px;
   right: -14px;
   left: inherit;
+}
+
+/* ── Mobile / responsive layout ────────────────────────────────────── */
+
+html, body {
+  overscroll-behavior: none;
+}
+
+/* `touch-action: manipulation` removes the 300 ms iOS click delay
+ * without breaking pan/pinch on the playfield. */
+.MainMenuButton,
+.ViewTabMenuButton,
+.UserButton,
+.MainMenuLogo,
+.Button,
+.StatusItem,
+.DatabaseQueueItem,
+.PopupHeader,
+.SubpopHeader,
+.ZoomControls > div,
+.lang-pick,
+button {
+  touch-action: manipulation;
+}
+
+/* ≤ 980 px: hide the brand logo so the tabs reclaim its space. */
+@media (max-width: 980px) {
+  .MainMenuLogo,
+  .MainMenuLogo.en_US,
+  .MainMenuLogo.de_AT {
+    display: none;
+  }
+  /* Tabs reclaim the logo's 228 px left padding. */
+  .MainMenuButtons {
+    padding-left: 0;
+  }
+  .UserActions {
+    top: 6px;
+    right: 6px;
+  }
+}
+
+/* ≤ 926 px: two-row header — tabs drop to row 2, the cloned XP bar
+ * appears in row 1 left, in-stage Statusbar XP is hidden. */
+@media (max-width: 926px) {
+  .MainMenu {
+    border-width: 4px 0 0 0;
+    border-radius: 0;
+    min-height: 96px;
+    padding-top: 48px;
+    box-sizing: border-box;
+    position: relative;
+  }
+  .MainMenuButtons {
+    padding-left: 6px;
+    padding-right: 6px;
+    height: auto;
+    min-height: 39px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: stretch;
+    gap: 4px;
+    box-sizing: border-box;
+    width: 100%;
+  }
+  .MainMenuButtons .MainMenuButton {
+    flex: 1 1 0;
+    min-width: 0;
+    margin-right: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Compact orange (.UserButton) About / locale-toggle buttons in row 1
+     so they sit next to the XP bar without dominating it. */
+  .UserButton {
+
+    padding: 3px 8px;
+    font-size: 13px;
+    margin-left: 4px;
+    box-sizing: border-box;
+  }
+
+  /* Show the cloned XP/level bar in row 1 left.  The in-stage statusbar
+     copy is hidden so the same data isn't shown twice. */
+  .Statusbar .StatusItem.XP {
+    display: none;
+  }
+  .MainMenuXP {
+    display: block;
+    position: absolute;
+    top: 4px;
+    left: 28px;
+    z-index: 5;
+    transform: scale(1.1);
+    transform-origin: top left;
+  }
+  /* Username sits above the bar.  Padded-left to clear the overhanging
+     star, but kept tight so it visually belongs to the bar. */
+  .MainMenuXP .MainMenuXPName {
+    font-family: Bowlby, sans-serif;
+    font-size: 11px;
+    line-height: 12px;
+    color: #FFF;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    margin-bottom: -1px;
+    padding-left: 18px;
+    max-width: 156px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    box-sizing: border-box;
+  }
+  .MainMenuXP .StatusItem.XP .StatusIcon.xp {
+    left: -19px;
+  }
+  .MainMenuXP .StatusItem.XP .StatusTextLevel {
+    /* Centred on the scaled star */
+    left: -14px;
+    width: 28px;
+    height: 25px;
+    line-height: 25px;
+    text-align: center;
+    font-size: 14px;
+    color: #333;
+  }
+  /* XP value text is centred on the bar.  The yellow fill (.StatusGraph)
+     uses its desktop position (left:0 / top:2) so it can grow from
+     under the overhanging star — the star naturally hides the first
+     ~28 px of the bar at low XP, and the fill becomes visible past
+     the star's right edge as XP advances within the level. */
+  .MainMenuXP .StatusItem.XP .StatusText {
+    text-align: center;
+    width: 128px;
+    box-sizing: border-box;
+  }
+}
+
+/* `ViewTab.prototype.css` writes inline width/height to .ViewTabContainer
+ * (not .ViewTab itself), pinning the container at the JS default 960 px.
+ * Force fluid width on mobile so `.MissionPerp` / `.TopscoreDiv` margin:auto
+ * centres against the visible tab.  ViewMap uses .ViewMapContainer instead,
+ * so Imperium / Database playfields are unaffected. */
+@media (max-width: 980px) {
+  .ViewTabContainer {
+    width: 100% !important;
+  }
+}
+
+/* ≤ 768 px: edge-to-edge Stage, viewport-bound dialogs, reflowed
+ * statusbar (overrides the legacy 720-px-design JS translate). */
+@media (max-width: 768px) {
+  body {
+    background-size: cover;
+  }
+
+  .Stage {
+    border-width: 0 0 4px 0;
+    border-radius: 0;
+  }
+
+  .ViewTabMenu {
+    width: auto;
+    max-width: 100%;
+  }
+}
+
+/* ≥ 927 px: hide the mobile XP clone — the in-stage Statusbar XP item
+ * handles every viewport down to 927 px.  Lives in its own min-width
+ * block so we don't have to fight the cascade between two equally-
+ * specific rules. */
+@media (min-width: 927px) {
+  .MainMenuXP {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Tab buttons: smaller padding so the row fits ~360px wide. */
+  .ViewTabMenuButton,
+  .MainMenuButton {
+    padding: 2px 8px 6px 8px;
+    margin-right: 4px;
+    font-size: 14px;
+  }
+}
+
+/* ── Tap targets (≥ 44 px), legibility (≥ 16 px body), :active feedback. */
+
+@media (max-width: 768px) {
+  /* Primary action buttons: meet 44×44 minimum.  Padding gives the visual
+     hit area room without making the rendered button look oversized. */
+  .Button,
+  .inset-button {
+    min-height: 44px;
+    line-height: 38px;
+    padding: 2px 28px;
+  }
+  .ButtonInc,
+  .ButtonDec {
+    min-width: 44px;
+    min-height: 44px;
+    line-height: 36px;
+  }
+
+  /* Header buttons: also 44 tall.  The orange About / locale-toggle pair
+     in the top-right is small (~24px) on desktop. */
+  .UserButton {
+    padding: 4px 12px;
+    font-size: 15px;
+    margin-left: 6px;
+    box-sizing: border-box;
+  }
+
+  /* Tab buttons: bump touch height; padding-bottom accounts for the
+     box-shadow offset that visually anchors the button on desktop. */
+  .ViewTabMenuButton,
+  .MainMenuButton {
+    min-height: 44px;
+    line-height: 28px;
+    padding: 4px 14px 8px 14px;
+  }
+
+  /* Sufficient gap between adjacent tabs so a thumb-tap doesn't land
+     between two buttons. */
+  .ViewTabMenuButton + .ViewTabMenuButton,
+  .MainMenuButton + .MainMenuButton {
+    margin-left: 4px;
+  }
+
+  /* Body / dialog text: minimum 16px so iOS doesn't zoom on focus and
+     readability is comfortable without pinching. */
+  .PopupContentText .PopupParagraph,
+  .PopupParagraph {
+    font-size: 16px;
+    line-height: 22px;
+  }
+  .PopupContentText .PopupList,
+  .PopupList {
+    font-size: 16px;
+  }
+
+  /* DatabaseQueueItem and similar sprite-on-tap elements are already
+     ~100×100 — no change needed. */
+}
+
+/* :active feedback (all viewports — touch devices benefit, desktop is
+ * unaffected because :hover still wins on a real mouse).  Mirrors the
+ * existing :hover scale-up but at a lower scale so a finger-press feels
+ * like a press, not a launch. */
+.Button:active,
+.ButtonInc:active,
+.ButtonDec:active,
+.inset-button:active {
+  transform: scale(0.96);
+  background: #ECF8FC;
+}
+.MainMenuButton:not(.disabled):active,
+.ViewTabMenuButton:not(.disabled):active,
+.UserButton:not(.disabled):active {
+  background: #ECF8FC;
+  transform: scale(0.97);
+}
+.DatabaseQueueItem:not(.disabled):active {
+  transform: scale(1.04);
+}
+
+/* ── Narrow-viewport refinements: progressively tighter at 600/480/380. */
+
+/* --- Tab buttons: progressively tighter padding/font --------------------- */
+@media (max-width: 600px) {
+  .ViewTabMenuButton,
+  .MainMenuButton {
+    padding: 3px 6px 6px 6px;
+    font-size: 15px;
+    line-height: 22px;
+    box-shadow: 2px 2px 0px #009FD9;
+  }
+}
+
+@media (max-width: 530px) {
+  .ViewTabMenuButton,
+  .MainMenuButton {
+    padding: 2px 5px 5px 5px;
+    font-size: 15px;
+    line-height: 22px;
+  }
+}
+
+@media (max-width: 480px) {
+  .ViewTabMenuButton,
+  .MainMenuButton {
+    padding: 2px 4px 5px 4px;
+    font-size: 11px;
+    line-height: 18px;
+    border-width: 2px;
+    border-radius: 6px;
+    box-shadow: 1px 1px 0px #009FD9;
+  }
+  .ViewTabMenuButton + .ViewTabMenuButton,
+  .MainMenuButton + .MainMenuButton {
+    margin-left: 1px;
+  }
+  /* On the active state, the desktop rule `top: 9px;` shifts the active tab
+     down by 4 px (from `top: 13px;`).  Keep a smaller offset on narrow
+     viewports so the active tab still reads as recessed. */
+  .ViewTabMenuButton.active,
+  .MainMenuButton.active {
+    top: 8px;
+  }
+  .ViewTabMenuButton,
+  .MainMenuButton {
+    top: 11px;
+  }
+}
+
+@media (max-width: 380px) {
+  .ViewTabMenuButton,
+  .MainMenuButton {
+    padding: 2px 2px 4px 2px;
+    font-size: 10px;
+    line-height: 16px;
+    margin-right: 1px;
+  }
+}
+
+/* Statusbar: per-item scale + matching margin-right so the layout box
+ * shrinks in lockstep with the visual paint (scale alone leaves the
+ * layout width at 142+140+144+130 ≈ 560 and the row overflows). */
+@media (max-width: 768px) {
+  .Statusbar .StatusItem.Profiles,
+  .Statusbar .StatusItem.Cash,
+  .Statusbar .StatusItem.AP,
+  .Statusbar .StatusItem.Karma {
+    margin: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .Statusbar .StatusItem {
+    transform: scale(0.8);
+    transform-origin: top left;
+    /* Reclaim the visual gap the scale leaves at each item's right edge. */
+    margin-right: calc(-1 * (1 - 0.8) * 144px) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .Statusbar .StatusItem {
+    transform: scale(0.55);
+    transform-origin: top left;
+    margin-right: calc(-1 * (1 - 0.55) * 144px) !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .Statusbar .StatusItem {
+    transform: scale(0.45);
+    transform-origin: top left;
+    margin-right: calc(-1 * (1 - 0.45) * 144px) !important;
+  }
+}
+
+/* --- Database conveyor: fit-to-viewport with side padding ----------------
+ * Desktop layout is fixed-pixel: 720 px wide, with 6 × 100 px items + a
+ * 120 px pipe placed via JS-computed `left: 8 + index*100`.
+ *
+ * On mobile we'd like to keep all six item slots visible and add some
+ * breathing room on either side.  CSS `transform: scale(...)` only
+ * shrinks the visual paint — the layout box stays 720 px wide, which
+ * misaligns absolutely-positioned siblings inside the Database view.
+ *
+ * Modern fix: use a CSS variable that captures the available width and
+ * derive the scale + the layout-correcting negative margins from it.
+ * `clamp()` caps the scale so items don't shrink below readable size
+ * and don't grow past the desktop default on a wide phone.
+ *
+ *   --conv-w  = the on-screen width budget (viewport minus padding)
+ *   --conv-s  = scale factor = budget / native 720 px width, clamped
+ *
+ * This keeps the JS-driven item placement intact and gives us padding
+ * for free.
+ * ----------------------------------------------------------------------- */
+/* Mobile zoom controls: sprite-mapped, so transform-scale (not size) the
+ * stack.  Imperium gets the desktop bottom-corner placement; Database
+ * lifts the stack above the conveyor pipe. */
+@media (max-width: 926px) {
+  .ZoomControls {
+    bottom: 16px;
+    right: 8px;
+    z-index: 20;
+    transform: scale(0.88);
+    transform-origin: bottom right;
+  }
+  /* Extra gap between the three stacked buttons so a thumb doesn't
+     accidentally hit the wrong one. */
+  .ZoomControls > div {
+    margin-bottom: 8px;
+  }
+  .ZoomControls > div:last-child {
+    margin-bottom: 0;
+  }
+  /* Database tab only: lift the stack above the bottom-anchored
+     conveyor pipe.  The pipe extends ~50 px above the belt's bottom
+     edge in viewport coords (in the worst-case conv-scale at ≤480),
+     so 80 px clearance keeps the buttons + their gap free of the
+     pipe sprite. */
+  .Stage.ActiveDatabase .ZoomControls {
+    bottom: 80px;
+  }
+}
+
+/* Mobile conveyor: anchor `.DatabaseQueue` to the visible Stage (the
+ * JS-written translate centres a 720-px box that overflows narrow
+ * viewports), then transform-scale the sprite-backed conveyor to
+ * fit.  `length / length` in calc() yields the unitless scalar that
+ * `scale()` requires. */
+@media (max-width: 926px) {
+  .DatabaseQueue {
+    transform: none !important;
+    width: auto !important;
+    left: 12px !important;
+    right: 12px !important;
+    bottom: 0px !important; /* be exactly on bottom */
+    top: auto !important;
+    /* JS writes inline `height: 100px` on .DatabaseQueue every render —
+       force auto so it sizes to its conveyor child instead of leaving a
+       100-px tall ghost area between the visible conveyor and the
+       Stage's bottom edge. */
+    height: auto !important;
+  }
+  /* Pin the conveyor strip to .DatabaseQueue's bottom so its visual
+     bottom (with `transform-origin: bottom left` shrinking toward the
+     same anchor) sits right at the Stage's bottom-12 line.
+     Cropped to 5 slots wide on mobile (was 6 on desktop): the belt
+     sprite is a fixed 720-px image, so we just shorten the layout box
+     to 620 px (5×100 + 120 pipe) and hide the abrupt right edge of
+     the sprite with `overflow: hidden`.  The .DatabaseQueuePipe
+     overlay sits at `right: 0` of the now-shorter conveyor and masks
+     the cut. */
+  .DatabaseQueueConveyor {
+    --conv-s: clamp(0.4, calc((100vw - 24px) / 620px), 1);
+    transform: scale(var(--conv-s));
+    transform-origin: bottom left;
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: auto !important;
+    /* Box width 620 (= 5×100 + 120 pipe) clips the 720-px belt sprite
+       at its right edge.  We do NOT add `overflow: hidden` here — the
+       items extend upward via `top: -58` (peek above the belt) and
+       overflow:hidden would clip them too.  The belt sprite is a
+       background-image so it's already constrained by the box width;
+       the abrupt right edge sits exactly under the .DatabaseQueuePipe
+       overlay (x=500–620 in design coords), which masks the cut. */
+    width: 620px !important;
+  }
+  /* Wrap caps just inside the pipe so 5 belt slots are visible AND the
+     6th queue item can render under the pipe.  Without item 5 in the
+     DOM, the front pipe's transparency exposes only the PipeBack
+     sprite's red dot — when item 5 (queue full) renders inside the
+     pipe area, its blue colour shows through the transparency and
+     covers the red, giving the "ready to integrate" cue.  Wrap right
+     edge at 608 (= 8 + 6×100) lets item 5 render at left:508–608
+     fully inside the conveyor's 620 design width. */
+  .DatabaseQueueWrap {
+    max-width: 608px !important;
+  }
+  /* The conveyor's `transform: scale` creates a new stacking context,
+   * which traps PipeBack (z-index:-1) ahead of the belt sprite when
+   * the belt is the conveyor's own background.  Move the belt to a
+   * `::before` sibling so PipeBack stacks behind it correctly. */
+  .DatabaseQueueConveyor {
+    background: none !important;
+  }
+  .DatabaseQueueConveyor::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url(../img/MainSprites.png) no-repeat;
+    background-position: 0px -982px;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .DatabaseQueuePipeBack {
+    z-index: -1;
+  }
+}
+
+/* --- Mission + Topscore tab content: centre via margin auto + max-width --
+ * Both views render their content into a tab-wide container.  On desktop
+ * they have a fixed width (570 px etc.) which overflows on phone widths.
+ * Switching to width:auto + max-width keeps the existing `margin: 12px
+ * auto` doing its job all the way down to 320 px.
+ * ----------------------------------------------------------------------- */
+/* Centre the inline-block .MissionGoal.small children. */
+.MissionInline {
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .TopscoreInline,
+  .MissionInline {
+    width: auto;
+    max-width: 92vw;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+
+  .TopscoreDiv,
+  .TopscorePerp,
+  .MissionPerp {
+    width: auto;
+    max-width: 92vw;
+    box-sizing: border-box;
+    box-shadow: 3px 3px 0px #aaa, 3px 5px 8px #000;
+  }
+  .TopscoreRow {
+    width: auto;
+    max-width: 100%;
+    box-sizing: border-box;
+    display: block;
+  }
+  .TopscoreRankBarWrap {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .TopscoreRankBarPerc {
+    width: 100%;
+    left: 0;
+  }
+
+  /* Mission goal cards: 234 px each on desktop, two-up.  Keep two-up on
+     mobile too (the goals have very little content — going one-up wastes
+     a lot of horizontal space).  `width: calc(50% - 4px)` makes them
+     share the parent card row evenly with a 4 px gutter; `max-width:
+     234px` so they never grow past the desktop size on a wide phone. */
+  .MissionGoal.small {
+    width: calc(50% - 16px);
+    max-width: 234px;
+    display: inline-block;
+    margin: 0 4px 6px 0;
+    vertical-align: top;
+    box-sizing: border-box;
+  }
 }

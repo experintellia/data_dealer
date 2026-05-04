@@ -12,8 +12,9 @@ var typeSettings = function () {
         id: 'Game',
         x: 0,
         y: 0,
-        width: 960,
-        height: 600,
+        // Minimum playable Stage size; fitToWindow grows from here.
+        width: 300,
+        height: 480,
         status_icons: {
           profiles: {
             icon: {
