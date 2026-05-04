@@ -633,10 +633,8 @@ reducers.integrateCollected = function integrateCollectedReducer(state, delta) {
   });
 };
 
-// recheckMissions: applies the mission/game_values fix-up baked into the
-// delta so a stuck-goal recovery (set in LocalEngine.recheckMissions) is
-// durable across reloads instead of being reapplied (and rewards re-added)
-// every materialize pass.
+// Bakes the stuck-goal repair into history so rewards aren't reapplied
+// each materialize pass.
 reducers.recheckMissions = function recheckMissionsReducer(state, delta) {
   if (!delta || !delta.result) return state;
   var r = delta.result;

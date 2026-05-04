@@ -3348,30 +3348,18 @@ var Game = function() {
     Missions.prototype.extendEventHandlers = function() {
       var mroot = this;
       var groot = this.GameRoot;
-      // Recover any mission goals that filled to 100% but never flipped to
-      // complete (e.g. integrate_profiles goals where current_amount caught
-      // DBTokensAbsolute via UI math but the delta never marked complete).
-      // Runs each time the player opens the Missions tab so the checkmark
-      // and reward catch up without re-triggering the original action.
       mroot.on('states_active', function(e, params) {
-        if (!params) { return; }
-        if (!app.remote || !app.remote.recheckMissions) { return; }
+        if (!params || !app.remote || !app.remote.recheckMissions) { return; }
         app.remote.recheckMissions().done(function(data) {
-          if (!data || !data.result) { return; }
-          var r = data.result;
-          if (!r.missions) { return; }
-          var hasCompletions = r.missions.complete_missions
-            && r.missions.complete_missions.length;
-          if (!hasCompletions) {
-            // No mission flipped to complete — just refresh the goal rows so
-            // the checkmark on a now-complete goal renders without the
-            // reward/levelup popup machinery.
-            mroot.updateMissionGoals(
-              r.missions.mission_data && r.missions.mission_data.mission_goals
-            );
-            return;
+          var r = data && data.result;
+          if (!r || !r.repaired) { return; }
+          if (r.missions.complete_missions && r.missions.complete_missions.length) {
+            groot.updateGameValues(r.game_values, r.levelup, r.missions, true);
+          } else {
+            // Goal flipped without finishing the mission — refresh rows only,
+            // skipping the reward/levelup popup machinery.
+            mroot.updateMissionGoals(r.missions.mission_data.mission_goals);
           }
-          groot.updateGameValues(r.game_values, r.levelup, r.missions, true);
         });
       });
     };

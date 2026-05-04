@@ -495,26 +495,14 @@ export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameRe
   var seededState = _seedMissionGoals(mat.state);
   setState(seededState);
 
-  // Recover any stuck mission goals (current_amount >= amount but
-  // complete=false) before building the load response. Persisting as a
-  // recheckMissions delta makes the recovery part of the durable history,
-  // so rewards are not re-applied on subsequent loads.
+  // Persist as a recheckMissions delta so the repair lands in durable
+  // history; otherwise rewards would be reapplied every materialize pass.
   var startupRepair = _repairStuckMissionGoals(seededState);
-  if (startupRepair.changed) {
-    var startupGv = startupRepair.rewards
-      ? _applyRewardsToGv(seededState.game_values || {}, startupRepair.rewards)
-      : (seededState.game_values || {});
-    var startupMissions: MissionUpdate = startupRepair.missions || {
-      complete_missions: [],
-      updated_missions: [],
-      mission_data: {
-        active_missions: startupRepair.active_missions,
-        mission_goals: startupRepair.mission_goals,
-      },
-    };
+  if (startupRepair && startupRepair.missions) {
+    var startupGv = _applyRewardsToGv(seededState.game_values || {}, startupRepair.rewards);
     _persistDelta(_mkDelta(seededState.addr, 'recheckMissions', [], {
       game_values: startupGv,
-      missions: startupMissions,
+      missions: startupRepair.missions,
     }));
     seededState = getState();
   }
@@ -1713,55 +1701,30 @@ function _completeMissionsIfReady(
   };
 }
 
-// Recovers mission goals whose current_amount has reached the required amount
-// but whose `complete` flag never flipped (e.g. a prior progression handler
-// updated current_amount without setting complete, or a buggy code path
-// stored partial progress). Run on every load and on mission-tab activation
-// so the UI checkmark and mission completion catch up without forcing the
-// player to re-trigger the original action.
-interface RepairResult {
-  changed: boolean;
-  missions: MissionUpdate | null;
-  rewards: RewardSet | undefined;
-  mission_goals: MissionGoal[];
-  active_missions: string[];
-}
-
-function _repairStuckMissionGoals(state: LocalState): RepairResult {
+// Flips goals where current_amount >= amount but complete=false (caused by
+// progression handlers that updated current_amount without setting complete).
+// Returns null when nothing needed repair so callers can skip persistence.
+function _repairStuckMissionGoals(state: LocalState): MissionAdvanceResult | null {
   var goals = state.mission_goals || [];
   var activeMissions = state.active_missions || [];
-  var unchanged: RepairResult = {
-    changed: false,
-    missions: null,
-    rewards: undefined,
-    mission_goals: goals,
-    active_missions: activeMissions,
-  };
-  if (!goals.length || !activeMissions.length) return unchanged;
+  if (!goals.length || !activeMissions.length) return null;
+
+  var activeSet: Record<string, true> = {};
+  activeMissions.forEach(function (m) { activeSet[m] = true; });
 
   var changed = false;
   var updatedGoals = goals.map(function (goal) {
-    if (goal.complete) return goal;
-    if (activeMissions.indexOf(goal.mission) === -1) return goal;
+    if (goal.complete || !activeSet[goal.mission]) return goal;
     var amount = goal.amount || 0;
-    var current = goal.current_amount || 0;
-    if (amount > 0 && current >= amount) {
+    if (amount > 0 && (goal.current_amount || 0) >= amount) {
       changed = true;
       return Object.assign({}, goal, { complete: true, current_amount: amount });
     }
     return goal;
   });
 
-  if (!changed) return unchanged;
-
-  var advance = _completeMissionsIfReady(updatedGoals, activeMissions);
-  return {
-    changed: true,
-    missions: advance.missions,
-    rewards: advance.rewards,
-    mission_goals: advance.mission_goals,
-    active_missions: advance.active_missions,
-  };
+  if (!changed) return null;
+  return _completeMissionsIfReady(updatedGoals, activeMissions);
 }
 
 // Sums up cash / xp / karma rewards across the just-completed missions so
@@ -2681,43 +2644,26 @@ export function dismissMissionBriefing(gestalt: unknown): Promise<{ result: { er
   return Promise.resolve({ result: { ok: true } });
 }
 
-// ---------------------------------------------------------------------------
-// recheckMissions() — sweep mission goals for current_amount >= amount but
-// complete=false and flip them, then complete any missions whose goals are
-// all done. Called when the player opens the missions tab so a stuck
-// mission catches up without requiring another progression action.
-// Returns the same shape as collectPerp/integrateCollected so the caller
-// can route through GameRoot.updateGameValues unchanged.
-// ---------------------------------------------------------------------------
+// On-demand counterpart of the loadGame repair. Called when the player
+// opens the Missions tab. Returns { repaired: false } when nothing was
+// stuck so the caller can skip rerendering.
 export function recheckMissions(): Promise<{
-  result: {
-    missions: MissionUpdate;
-    game_values: GameValues;
-    levelup: false;
-  };
+  result:
+    | { repaired: false }
+    | { repaired: true; missions: MissionUpdate; game_values: GameValues; levelup: false };
 }> {
   var state = getState();
   var repair = _repairStuckMissionGoals(state);
-  var newGv = state.game_values || {};
-  if (repair.changed && repair.rewards) {
-    newGv = _applyRewardsToGv(newGv, repair.rewards);
+  if (!repair || !repair.missions) {
+    return Promise.resolve({ result: { repaired: false } });
   }
-  var missionUpdate: MissionUpdate = repair.missions || {
-    complete_missions: [],
-    updated_missions: [],
-    mission_data: {
-      active_missions: repair.active_missions,
-      mission_goals: repair.mission_goals,
-    },
-  };
-  if (repair.changed) {
-    _persistDelta(_mkDelta(state.addr, 'recheckMissions', [], {
-      game_values: newGv,
-      missions: missionUpdate,
-    }));
-  }
+  var newGv = _applyRewardsToGv(state.game_values || {}, repair.rewards);
+  _persistDelta(_mkDelta(state.addr, 'recheckMissions', [], {
+    game_values: newGv,
+    missions: repair.missions,
+  }));
   return Promise.resolve({
-    result: { missions: missionUpdate, game_values: newGv, levelup: false },
+    result: { repaired: true, missions: repair.missions, game_values: newGv, levelup: false },
   });
 }
 

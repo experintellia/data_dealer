@@ -1212,6 +1212,7 @@ describe('recheckMissions — recovers stuck goals (current_amount >= amount)', 
 
     const { result } = await recheckMissions();
 
+    expect(result.repaired).toBe(true);
     expect(result.missions.complete_missions).toContain('mission007');
     const stuck = getState().mission_goals.find(
       (g) => g.mission === 'mission007' && g.workflow === 'integrate_profiles'
@@ -1229,7 +1230,7 @@ describe('recheckMissions — recovers stuck goals (current_amount >= amount)', 
     }));
 
     const { result } = await recheckMissions();
-    expect(result.missions.complete_missions).toEqual([]);
+    expect(result.repaired).toBe(false);
     expect(getState().active_missions).toContain('mission007');
   });
 
