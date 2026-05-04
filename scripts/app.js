@@ -85,6 +85,21 @@ const Application = function() {
       $(document).trigger(ev, [pl]);
     });
 
+    // Re-fire engine events onto per-gnode listeners; replaces the
+    // socket bridge removed in #142. Namespaced + .off so a re-entry
+    // into app.start (soft reload) doesn't duplicate handlers.
+    $(document)
+      .off('node_ready.appbridge new_items.appbridge')
+      .on('node_ready.appbridge', function(e, pl) {
+        if (!app.game) return;
+        const gnode = app.game.getById(pl.id);
+        if (gnode) gnode.trigger('node_ready', [pl.result]);
+      })
+      .on('new_items.appbridge', function(e, pl) {
+        if (!app.game) return;
+        app.game.trigger('new_items', [pl]);
+      });
+
     $('#loadertext').text('Loading saved game');
     return app.remote.getSessionLocale().then(function(data) {
       const locale = data.result === 'de' ? 'de_AT' : 'en_US';
