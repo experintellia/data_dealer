@@ -91,7 +91,7 @@ export function boot(options?: BootOptions): Promise<LocalState> {
   if (typeof webxdc !== 'undefined' && webxdc) {
     listenerPromise = webxdc.setUpdateListener(function (update) {
       const prevPeers = _currentState && _currentState.peers;
-      _currentState = applyDelta(_currentState as LocalState, update.payload);
+      _currentState = applyDelta(_state(), update.payload);
       if (_currentState && _currentState.peers !== prevPeers) {
         _notifyPeersChanged();
       }
@@ -115,12 +115,22 @@ export function boot(options?: BootOptions): Promise<LocalState> {
   //   - typeof webxdc === 'undefined' (node) → already resolved
   _bootPromise = Promise.resolve(listenerPromise).then(function () {
     _replayProgress.done = true;
-    const state = _currentState as LocalState;
+    const state = _state();
     if (typeof opts.materializer === 'function') opts.materializer(state);
     if (typeof opts.onReady === 'function') opts.onReady(state);
     return state;
   });
   return _bootPromise;
+}
+
+// Single runtime narrow over the `_currentState: LocalState | null` slot.
+// Every public reader funnels through here so the per-call-site `as LocalState`
+// casts collapse into one assertion.  Throws if called before boot() seeds the
+// slot — never happens in production (boot is the first thing index.html runs)
+// but the throw makes the misuse surface immediately in tests.
+function _state(): LocalState {
+  if (!_currentState) throw new Error('boot.ts: getState/_state called before boot()');
+  return _currentState;
 }
 
 /**
@@ -146,7 +156,7 @@ export function getReplayProgress(): ReplayProgress {
 
 /** Returns the current in-memory state after boot.  Always call boot() first. */
 export function getState(): LocalState {
-  return _currentState as LocalState;
+  return _state();
 }
 
 /**

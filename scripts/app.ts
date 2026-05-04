@@ -2,50 +2,14 @@
 // the Game/Render singletons.  Vendor libs ($, _, numeral, sprintf,
 // createjs) are read off globalThis at factory-body time — they are
 // loaded as plain `<script>` tags in index.html before this bundle
-// runs.
+// runs.  Their typed surfaces are declared once in types/env.d.ts.
 
+import type { JQueryLike, JQueryStatic } from '../types/env.d.ts';
 import { getGame } from './Game.js';
 import LocalEngine from './LocalEngine.js';
 import { getRender } from './Render.js';
 import i18n from './i18n.js';
 import setup from './setup.js';
-
-// ---------------------------------------------------------------------------
-// Vendor-global types — narrow surface that this module touches.  Real
-// jQuery / underscore / numeral types ship with their own packages but the
-// vendored copies in vendor/ aren't on a typed import path; declare what we
-// use locally so the module compiles without pulling DefinitelyTyped.
-// ---------------------------------------------------------------------------
-
-interface JQueryLike {
-  html(content: string): unknown;
-  text(content: string): unknown;
-  trigger(ev: string, args?: unknown[]): unknown;
-  append(child: unknown): unknown;
-  on(ev: string, handler: (...args: unknown[]) => void): unknown;
-  fail(handler: (...args: unknown[]) => unknown): JQueryLike;
-  then(
-    onResolved?: (...args: unknown[]) => unknown,
-    onRejected?: (...args: unknown[]) => unknown
-  ): JQueryLike;
-}
-interface JQueryStatic {
-  (selector: string | Element | Document | (() => void)): JQueryLike;
-  when(...args: unknown[]): JQueryLike;
-}
-
-interface UnderscoreStatic {
-  template(text: string, data: unknown, settings: { variable: string }): (data?: unknown) => string;
-  mixin(mixins: Record<string, unknown>): void;
-  sprintf(template: string, ...subs: unknown[]): string;
-  toKSNum(n: number): string;
-  numeral(n: number): { format(fmt: string): string };
-  pad0(n: number, length: number): string;
-  // Open-ended for the long tail of underscore methods used elsewhere.
-  [key: string]: unknown;
-}
-
-type NumeralStatic = (n: number) => { format(fmt: string): string };
 
 // All view sources are inlined at bundle time; templates are compiled
 // the first (and only) time the Application factory runs, when
@@ -58,7 +22,6 @@ const viewSources = import.meta.glob<string>('../views/*.html', {
 });
 
 function compileTemplates(): Record<string, (data?: unknown) => string> {
-  const _ = (globalThis as unknown as { _: UnderscoreStatic })._;
   const out: Record<string, (data?: unknown) => string> = {};
   for (const path in viewSources) {
     const segments = path.split('/');
@@ -91,17 +54,19 @@ interface ApplicationApi {
 }
 
 function _getJQuery(): JQueryStatic {
-  const g = globalThis as unknown as { jQuery?: JQueryStatic; $?: JQueryStatic };
-  const $ = g.jQuery ?? g.$;
+  const $ = jQuery ?? globalThis.$;
   if (!$) throw new Error('app.ts: jQuery global not found');
   return $;
 }
 
+// Surfaces a small typed seam over `window` for the debug-globals stamp in
+// app.start() so each `window.app = …` line doesn't repeat the cast.
+function _setDebugGlobals(globals: Record<string, unknown>): void {
+  Object.assign(window as unknown as Record<string, unknown>, globals);
+}
+
 const Application = function (): ApplicationApi {
-  const _ = (globalThis as unknown as { _: UnderscoreStatic })._;
   const $ = _getJQuery();
-  const numeral = (globalThis as unknown as { numeral: NumeralStatic }).numeral;
-  const sprintfFn = (window as unknown as { sprintf: (...args: unknown[]) => string }).sprintf;
   const templates = compileTemplates();
 
   // Here we store the stuff we might need throughout the whole application.
@@ -141,7 +106,8 @@ const Application = function (): ApplicationApi {
 
   // Game.js still uses jQuery `.done()/.fail()` chains; wrap each
   // LocalEngine handler so callers get a Deferred instead of a native
-  // Promise.
+  // Promise.  The wrapper is typed to return JQueryLike so call sites in
+  // start() don't need per-call casts on the chained .then() / .fail().
   const INTERNAL_API: Record<string, true> = {
     setEmitter: true,
     setSendDelta: true,
@@ -153,7 +119,7 @@ const Application = function (): ApplicationApi {
     if (INTERNAL_API[name]) return;
     const fn = engineRecord[name];
     if (typeof fn !== 'function') return;
-    app.remote[name] = function (...args: unknown[]) {
+    app.remote[name] = function (...args: unknown[]): JQueryLike {
       return $.when((fn as (...a: unknown[]) => unknown).apply(LocalEngine, args));
     };
   });
@@ -185,7 +151,7 @@ const Application = function (): ApplicationApi {
     $('#loadertext').text('Loading saved game');
     const getSessionLocale = app.remote.getSessionLocale;
     if (!getSessionLocale) throw new Error('app.start: getSessionLocale not wired');
-    return (getSessionLocale() as JQueryLike).then(function (...args: unknown[]) {
+    return getSessionLocale().then(function (...args: unknown[]) {
       const data = args[0] as { result?: unknown } | undefined;
       const locale = data && data.result === 'de' ? 'de_AT' : 'en_US';
       i18n.setLocale(locale);
@@ -195,7 +161,7 @@ const Application = function (): ApplicationApi {
       return i18n.ready().then(function () {
         const loadGame = app.remote.loadGame;
         if (!loadGame) throw new Error('app.start: loadGame not wired');
-        return (loadGame() as JQueryLike).then(function (...lgArgs: unknown[]) {
+        return loadGame().then(function (...lgArgs: unknown[]) {
           const lgData = lgArgs[0] as { result?: { version?: unknown } } | undefined;
           const html = renderView('game.html');
           $('#dd-control').html(html);
@@ -204,13 +170,17 @@ const Application = function (): ApplicationApi {
           app.version = gameData?.version;
           (Game as { init: (data: unknown) => void }).init(gameData);
           if (setup.debug) {
-            (window as unknown as Record<string, unknown>).app = app;
-            (window as unknown as Record<string, unknown>).setup = setup;
-            (window as unknown as Record<string, unknown>).Game = Game;
-            (window as unknown as Record<string, unknown>).Render = getRender();
+            _setDebugGlobals({ app, setup, Game, Render: getRender() });
           }
-        }) as JQueryLike;
-      }) as unknown as JQueryLike;
+          // Expose the live `app` to the devtools surface so e2e tests
+          // (window.__dd.getZoom etc.) can reach app.game without depending
+          // on setup.debug being toggled in setup_local.ts.
+          const dd = (window as unknown as { __dd?: { _app?: unknown } }).__dd;
+          if (dd) {
+            dd._app = app;
+          }
+        });
+      });
     });
   }
 
@@ -227,7 +197,7 @@ const Application = function (): ApplicationApi {
       return {};
     },
     numeral: numeral,
-    sprintf: sprintfFn,
+    sprintf: sprintf,
     renderView: renderView,
     pad0: function (n: number, length: number) {
       // Fastest implementation according to http://jsperf.com/ways-to-0-pad-a-number

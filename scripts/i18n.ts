@@ -16,11 +16,6 @@ import setup from './setup.js';
 type I18nEntry = readonly (string | undefined)[];
 type I18nTable = Record<string, I18nEntry | undefined>;
 
-interface UnderscoreI18nMixins {
-  sprintf(template: string, ...subs: unknown[]): string;
-  toKSNum(n: number): string;
-}
-
 interface I18nApi {
   de_AT: I18nTable;
   en_US: I18nTable;
@@ -72,7 +67,6 @@ const i18n: I18nApi = {
   },
 
   ngettext(msgid: string, msgidPlural: string, amount: number): string {
-    const _ = (globalThis as unknown as { _: UnderscoreI18nMixins })._;
     const language = i18n[locale] as I18nTable | undefined;
     if (language) {
       const message = language[msgid];
