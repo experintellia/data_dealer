@@ -199,8 +199,49 @@ export class Database extends GameNode {
     this.queue = new OrderedSet<ProfileSet>();
   }
 
+  // ---------------------------------------------------------------------
+  // Typed accessors — consolidate the GameRoot / Render forward-ref casts
+  // into one site each.  PR #177 reviewer flagged the previous per-method
+  // `this.GameRoot as unknown as GameRootForDatabase` / `getRender() as
+  // unknown as { Popup: ... }` repetition.  All three accessors retire
+  // when GameRoot is extracted with a typed surface and Render.js is
+  // typed (the casts collapse to direct reads).
+  // ---------------------------------------------------------------------
+
+  private get groot(): GameRootForDatabase {
+    return this.GameRoot as unknown as GameRootForDatabase;
+  }
+
+  private get renderApi(): RenderNodeLike | undefined {
+    return this.renderNode as RenderNodeLike | undefined;
+  }
+
+  private getRenderModule(): {
+    Popup: new (cfg: unknown) => RenderPopupLike;
+    DBQueue: new (
+      cfg: unknown
+    ) => RenderNodeLike & {
+      gameNode?: Database;
+      render(): void;
+    };
+    DecoratorNew: new (cfg: unknown) => unknown;
+    getById(id: unknown): unknown;
+  } {
+    return getRender() as unknown as {
+      Popup: new (cfg: unknown) => RenderPopupLike;
+      DBQueue: new (
+        cfg: unknown
+      ) => RenderNodeLike & {
+        gameNode?: Database;
+        render(): void;
+      };
+      DecoratorNew: new (cfg: unknown) => unknown;
+      getById(id: unknown): unknown;
+    };
+  }
+
   compileSuperTokens(): void {
-    const groot = this.GameRoot as unknown as GameRootForDatabase;
+    const groot = this.groot;
     // FIXME create buyable supertokens for DB
     this.data.providedPerps = [];
     this.data.buyToken_xp_level_min = 99999;
@@ -253,8 +294,8 @@ export class Database extends GameNode {
   }
 
   openUpgradesPopup(): unknown {
-    const Render = getRender() as unknown as { Popup: new (cfg: unknown) => RenderPopupLike };
-    const groot = this.GameRoot as unknown as GameRootForDatabase;
+    const Render = this.getRenderModule();
+    const groot = this.groot;
     // Popup instantiated for the first time
     if (!this.popupTemplateData) {
       this.popupTemplateData = {};
@@ -282,12 +323,11 @@ export class Database extends GameNode {
 
     const popup = new Render.Popup(popupConfig);
     this.renderPopup = popup;
-    (this.renderNode as RenderNodeLike | undefined)?.addPopup?.(popup);
+    this.renderApi?.addPopup?.(popup);
 
     // initPopupEvents lives on GameNode.prototype (added by Game.js's
     // legacy mixin block).  Type loosely until that mixin is consolidated.
-    const initPopupEvents = (this as unknown as { initPopupEvents?: () => void }).initPopupEvents;
-    if (typeof initPopupEvents === 'function') initPopupEvents.call(this);
+    if (this.initPopupEvents) this.initPopupEvents();
 
     return popup;
   }
@@ -299,23 +339,17 @@ export class Database extends GameNode {
   BuyToken(bgestalt: string, placePos?: { x: number; y: number }): void {
     // Buy Supertokens
     const gnode = this;
-    const groot = this.GameRoot as unknown as GameRootForDatabase;
+    const groot = this.groot;
     const remote = appModule.getApplication().remote;
     const buyPerpFn = remote.buyPerp;
     if (!buyPerpFn) return;
-    const Render = getRender() as unknown as {
-      DecoratorNew: new (cfg: unknown) => unknown;
-      getById: (id: unknown) => unknown;
-    };
+    const Render = this.getRenderModule();
     const path = gnode.path || '';
     const call = buyPerpFn(path, bgestalt) as unknown as DoneFailChain<BuyPerpResult>;
     call.done(function (data) {
       if (!data.result) {
         // Server Error
-        (gnode as unknown as { Error: (msg: string, data: unknown) => void }).Error(
-          'The computer says NOOOO',
-          data
-        );
+        gnode.Error?.('The computer says NOOOO', data);
         return;
       }
       const r = data.result;
@@ -395,26 +429,24 @@ export class Database extends GameNode {
   }
 
   override extendRender(): void {
-    const groot = this.GameRoot as unknown as GameRootForDatabase;
-    const Render = getRender() as unknown as {
-      DBQueue: new (cfg: unknown) => RenderNodeLike & { gameNode?: Database; render(): void };
-    };
+    const groot = this.groot;
+    const Render = this.getRenderModule();
     // FIXME: name should be in data
     groot.renderMenu.addButton(i18n.gettext('Database'), this.id, this.states);
     this.compileSuperTokens();
     this.renderDBQueue = new Render.DBQueue({ data: this.data, queue: this.queue });
     this.renderDBQueue.gameNode = this;
-    (this.renderNode as RenderNodeLike | undefined)?.addChild?.(this.renderDBQueue, true);
+    this.renderApi?.addChild?.(this.renderDBQueue, true);
   }
 
   lock(): void {
     // TODO: Lock Profileset Queue etc...
-    (this.renderNode as RenderNodeLike | undefined)?.lock?.();
+    this.renderApi?.lock?.();
   }
 
   unlock(): void {
     // TODO: Unlock Profileset Queue etc...
-    (this.renderNode as RenderNodeLike | undefined)?.unlock?.();
+    this.renderApi?.unlock?.();
   }
 
   cue(
@@ -452,7 +484,7 @@ export class Database extends GameNode {
   mergeCued(psid: string): void {
     // Do the merging/integrate stuff.
     const gnode = this;
-    const groot = this.GameRoot as unknown as GameRootForDatabase;
+    const groot = this.groot;
     const ps = this.getCued(psid);
     if (!ps) return;
     const update_tokens: TokenPerpLike[] = [];
@@ -476,18 +508,12 @@ export class Database extends GameNode {
     const remote = appModule.getApplication().remote;
     const integrateFn = remote.integrateCollected;
     if (!integrateFn) return;
-    const Render = getRender() as unknown as {
-      DecoratorNew: new (cfg: unknown) => unknown;
-      getById(id: unknown): unknown;
-    };
+    const Render = this.getRenderModule();
 
     const call = integrateFn(psid) as unknown as DoneFailChain<IntegrateResult>;
     call.done(function (data) {
       if (!data.result) {
-        (gnode as unknown as { Error: (msg: string, data: unknown) => void }).Error(
-          'The computer says NOOOO',
-          data
-        );
+        gnode.Error?.('The computer says NOOOO', data);
         return;
       }
       const r = data.result;
@@ -630,7 +656,7 @@ export class Database extends GameNode {
   }
 
   checkNotifications(): void {
-    const groot = this.GameRoot as unknown as GameRootForDatabase;
+    const groot = this.groot;
     if (!this.data.providedPerps) {
       this.compileSuperTokens();
       return;
@@ -649,8 +675,8 @@ export class Database extends GameNode {
 
   openProfileSetPopup(ps: ProfileSet): unknown {
     const gnode = this;
-    const groot = this.GameRoot as unknown as GameRootForDatabase;
-    const Render = getRender() as unknown as { Popup: new (cfg: unknown) => RenderPopupLike };
+    const groot = this.groot;
+    const Render = this.getRenderModule();
     const origin = ps.origin;
     if (!origin) return undefined;
     ps.updateNewMarker();
