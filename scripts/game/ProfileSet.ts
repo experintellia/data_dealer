@@ -104,12 +104,18 @@ export class ProfileSet extends GameNode {
     super(config);
     const groot = this.GameRoot as unknown as GameRootForProfileSet;
 
-    // Shallow clone so we don't mutate the caller's tokens.
+    // Shallow clone to match legacy `_.clone(tokens)` — array → slice
+    // (elements shared by reference), object → top-level shallow copy
+    // (`tokens_map` reference shared).  Anything deeper would diverge
+    // from the legacy mutation-propagation behaviour; in practice the
+    // downstream `addtokens.forEach` builds fresh TokenSetEntry objects
+    // so deeper cloning would wash out anyway, but matching legacy is
+    // the safer default for this PR.
     let workTokens: TokensInput;
     if (Array.isArray(tokens)) {
-      workTokens = tokens.map((t) => ({ ...t }));
+      workTokens = tokens.slice();
     } else {
-      workTokens = { tokens_map: { ...tokens.tokens_map } };
+      workTokens = { tokens_map: tokens.tokens_map };
     }
 
     this.data = (groot.getTypeData('ProfileSet') || {}) as Record<string, unknown>;
