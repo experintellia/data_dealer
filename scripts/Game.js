@@ -1630,14 +1630,25 @@ var Game = function() {
     // design home point — for Imperium that's where the seed places the
     // Database (≈1024,800).  Falls back to a no-op if no ViewMap is active.
     GameRoot.prototype.resetZoom = function() {
-      var vm = this.activeView && this.activeView.renderNode;
-      if (!vm || !vm.scroller || typeof vm.scroller.zoomTo !== 'function') return;
+      // activeView is only set after the first switch_view; on initial
+      // boot we need the same Imperium fallback as _centerActiveView.
+      var view = this.activeView || (this.getImperium && this.getImperium());
+      var vm = view && view.renderNode;
+      if (!vm || !vm.scroller || typeof vm.scroller.scrollTo !== 'function') return;
       if (typeof vm.updateScroller === 'function') vm.updateScroller();
-      // Don't toggle options.animating — the zynga-scroller animation reads
-      // the flag every frame, so flipping it back to false synchronously
-      // cancels the zoom mid-animation.
-      vm.scroller.zoomTo(1, true);
-      this._centerActiveView(true);
+      var vp = vm.parentNode;
+      if (!vp) return;
+      // Cancel any debounced re-center so it can't interrupt this animation
+      // 50ms in, which used to freeze zoom mid-tween (zoomTo+scrollTo issue
+      // a single __publish each, and the second one cancels the first).
+      clearTimeout(this._centerActiveViewTimer);
+      // scrollTo with an explicit zoom multiplies left/top by zoom internally
+      // and combines both into one __publish, so we get a single tween from
+      // (current zoom, current scroll) to (1.0, centered) instead of two
+      // animations fighting each other.
+      var sx = Math.max(0, vm.width  / 2 - vp.width  / 2);
+      var sy = Math.max(0, vm.height / 2 - vp.height / 2);
+      vm.scroller.scrollTo(sx, sy, true, 1);
     };
 
     // Re-centers the active ViewMap so the design home point sits in the
@@ -1657,17 +1668,10 @@ var Game = function() {
         if (!vm || !vm.scroller || !vm.parentNode) return;
         var vw = vm.parentNode.width;
         var vh = vm.parentNode.height;
-        // Scroller coordinates operate on scaled content, so the visible
-        // size of the ViewMap is vm.width * zoom, not vm.width. Without
-        // this factor the centering math leaves the map jammed in the
-        // top-left at zoom < 1.
-        var zoom = vm.scroller.__zoomLevel || vm.zoomScale || 1;
-        var contentW = vm.width  * zoom;
-        var contentH = vm.height * zoom;
-        var maxX = Math.max(0, contentW - vw);
-        var maxY = Math.max(0, contentH - vh);
-        var sx = Math.max(0, Math.min(maxX, contentW / 2 - vw / 2));
-        var sy = Math.max(0, Math.min(maxY, contentH / 2 - vh / 2));
+        var maxX = Math.max(0, vm.width  - vw);
+        var maxY = Math.max(0, vm.height - vh);
+        var sx = Math.max(0, Math.min(maxX, vm.width  / 2 - vw / 2));
+        var sy = Math.max(0, Math.min(maxY, vm.height / 2 - vh / 2));
         vm.scroller.scrollTo(sx, sy, animate);
       }, 50);
     };

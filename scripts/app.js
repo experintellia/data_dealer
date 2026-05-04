@@ -124,6 +124,12 @@ const Application = function() {
             window.Game = Game;
             window.Render = getRender();
           }
+          // Expose the live `app` to the devtools surface so e2e tests
+          // (window.__dd.getZoom etc.) can reach app.game without depending
+          // on setup.debug being toggled in setup_local.js.
+          if (window.__dd) {
+            window.__dd._app = app;
+          }
         });
       });
     });
