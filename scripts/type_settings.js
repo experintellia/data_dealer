@@ -1,8 +1,10 @@
-// Some fixtures that are currently not handled or provided by dd_cms
-define(function(require) {
+// Some fixtures that are currently not handled or provided by dd_cms.
+// Underscore is read from globalThis (set by vendor/underscore.js) at
+// call time; getTypeSettings() is invoked after app.start() has run
+// _.mixin({_: i18n.gettext}), so `_._('msgid')` resolves correctly.
 
-  var typeSettings = function() {
-    var _ = require('underscore');
+var typeSettings = function() {
+    var _ = globalThis._;
     var type_settings = {
       "GameRoot": {
         "type_data": {
@@ -982,11 +984,10 @@ define(function(require) {
     };
 
     return type_settings;
-  };
-  
-  return {
-    getTypeSettings: function() {
-      return typeSettings();
-    }
-  };
-});
+};
+
+export function getTypeSettings() {
+  return typeSettings();
+}
+
+export default { getTypeSettings };

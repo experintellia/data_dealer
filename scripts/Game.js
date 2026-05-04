@@ -1,27 +1,25 @@
-define(function(require) {
+// Vendor libs ($, _, sprintf) are read off globalThis at factory-body
+// time, not at module-evaluation time, so this module can be bundled
+// alongside scripts that run before vendor `<script>` tags execute.
+import appModule from './app.js';
+import setup from './setup.js';
+import utilDefault from './util.js';
+import { getTypeSettings } from './type_settings.js';
+import webxdcIdentity from './webxdc-identity.js';
+import * as bootMod from './boot.js';
+import i18n from './i18n.js';
+import { getRender } from './Render.js';
 
-  var Game = function() {
+var Game = function() {
 
-    var _ = require('underscore');
-    var $ = require('jquery');
-    require('sprintf'); // load the vendor file so window.sprintf is populated
-    // vendor/sprintf.js has an anonymous define() that returns an object
-    // ({sprintf, vsprintf}), which RequireJS treats as the module value and
-    // overrides the `exports: 'sprintf'` shim — same JSON3-style trap as
-    // vendor/preloadjs.js.  The script does set window.sprintf to the
-    // function itself, so we read it from there.
+    var _ = globalThis._;
+    var $ = globalThis.jQuery || globalThis.$;
     var sprintf = window.sprintf;
 
-    var app = require('app').getApplication();
-    var setup = require('setup');
-    var extend = require('util').extend;
-    var Render = require('Render').getRender();
-    var typeSettings = require('type_settings').getTypeSettings();
-    var webxdcIdentity = require('webxdcIdentity');
-    // ESM bridge: boot exposes subscribePeersChanged so the Topscores view
-    // can refresh on remote peer deltas without polling. require() is safe
-    // because esm-entry.js define()s 'boot' before bootstrap fires.
-    var bootMod = require('boot');
+    var app = appModule.getApplication();
+    var extend = utilDefault.extend;
+    var Render = getRender();
+    var typeSettings = getTypeSettings();
 
     //////////////////////////////////////////
     //
@@ -871,13 +869,12 @@ define(function(require) {
       groot.lock();
 
       return app.remote.getSessionLocale().then(function(data) {
-        var i18n = require('i18n');
         var locale = data.result === 'de' ? 'de_AT' : 'en_US';
         i18n.setLocale(locale);
         var html = app.renderView('game.html');
         $('#dd-control').html(html);
         return app.remote.loadGame().then(function(data) {
-          var Game = require('Game').getGame();
+          var Game = getGame();
           var gameData = data.result;
           app.version = gameData.version;
           Game.init(gameData);
@@ -5689,15 +5686,13 @@ class CollectableClient(CollectablePerpBase):
     };
 
     return Game;
-  };
+};
 
-  var game;
+var game;
 
-  return {
-    getGame: function() {
-      game = game || Game();
-      return game;
-    }
-  };
+export function getGame() {
+  game = game || Game();
+  return game;
+}
 
-});
+export default { getGame };

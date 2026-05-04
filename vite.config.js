@@ -72,19 +72,10 @@ function mockWebxdc() {
   };
 }
 
-const amdBridgeFooter = `
-if (typeof define === 'function' && define.amd) {
-  Object.keys(__DD).forEach(function(name) {
-    if (name !== '__placeholder') define(name, [], function() { return __DD[name]; });
-  });
-}`;
-
-// In dev (`vite`), `scripts/esm-bundle.js` doesn't exist as a source file —
-// it's only produced by `vite build`.  Without it, the AMD bridge never runs
-// and RequireJS falls back to fetching `webxdcIdentity` / `LocalEngine.js`
-// as plain scripts, which 404s or trips a "Cannot use import statement"
-// error.  This plugin runs the same Rollup pipeline the prod build uses,
-// in-memory, and serves the result via middleware.
+// In dev (`vite`), `scripts/esm-bundle.js` doesn't exist as a source
+// file — it is only produced by `vite build`.  Index.html references
+// it as a `<script>` tag, so this plugin runs the same Rollup pipeline
+// the prod build uses, in-memory, and serves the result via middleware.
 function bundleEsmDev() {
   let bundleSrc = null;
   let buildPromise = null;
@@ -102,12 +93,10 @@ function bundleEsmDev() {
             emptyOutDir: false,
             rollupOptions: {
               input: 'scripts/esm-entry.js',
-              preserveEntrySignatures: 'exports-only',
               output: {
                 format: 'iife',
                 name: '__DD',
                 entryFileNames: 'esm-bundle.js',
-                footer: amdBridgeFooter,
               },
             },
           },
@@ -126,7 +115,10 @@ function bundleEsmDev() {
     name: 'esm-bundle-dev',
     apply: 'serve',
     async configureServer(server) {
-      await rebuild().catch((err) => {
+      // Kick off the initial build but don't block listen() on it —
+      // the middleware below returns 503 until bundleSrc is set, and
+      // the browser will pick up the bundle on its next request.
+      rebuild().catch((err) => {
         server.config.logger.error('[esm-bundle-dev] initial build failed: ' + err.message);
       });
       server.watcher.on('change', (file) => {
@@ -136,11 +128,23 @@ function bundleEsmDev() {
           });
         }
       });
-      server.middlewares.use((req, res, next) => {
+      server.middlewares.use(async (req, res, next) => {
         if (req.url === '/scripts/esm-bundle.js' || req.url === '/scripts/esm-bundle.js?') {
+          // First request after server start may race with the initial
+          // Rollup build kicked off in configureServer.  Await the
+          // in-flight build (or start one) instead of 503-ing — the
+          // browser's `<script defer>` tag does not auto-retry, so a
+          // 503 here would leave the page silently stuck on the loader.
+          if (!bundleSrc) {
+            try {
+              await (buildPromise || rebuild());
+            } catch (err) {
+              server.config.logger.error('[esm-bundle-dev] build failed: ' + err.message);
+            }
+          }
           if (!bundleSrc) {
             res.statusCode = 503;
-            res.end('// esm-bundle build pending or failed');
+            res.end('// esm-bundle build failed; see vite logs');
             return;
           }
           res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
@@ -152,14 +156,6 @@ function bundleEsmDev() {
     },
   };
 }
-
-const amdScripts = [
-  'Game.js', 'Render.js', 'app.js', 'bootstrap.js',
-  'i18n.js', 'util.js', 'setup.js', 'setup_local.js',
-  'type_settings.js', 'require.config.js',
-  // LocalEngine.js is ESM — bundled into esm-bundle.js and registered via
-  // the AMD bridge footer; do NOT copy the raw file alongside AMD modules.
-].map(f => ({ src: `scripts/${f}`, dest: '' }));
 
 
 export default defineConfig({
@@ -180,15 +176,10 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: 'scripts/esm-entry.js',
-      // Preserve entry exports so __DD in the AMD bridge footer can iterate
-      // them.  Vite defaults to false which strips all exports and renders
-      // the bridge a no-op.
-      preserveEntrySignatures: 'exports-only',
       output: {
         format: 'iife',
         name: '__DD',
         entryFileNames: 'scripts/esm-bundle.js',
-        footer: amdBridgeFooter,
       },
     },
   },
@@ -205,6 +196,9 @@ export default defineConfig({
         { src: 'LICENSE.txt', dest: '' },
         { src: 'LICENSE-CODE.txt', dest: '' },
         { src: 'LICENSE-ASSETS.txt', dest: '' },
+        // Vendor libs are loaded as plain `<script>` tags from index.html
+        // and exposed as browser globals (window.jQuery, window._, …)
+        // the ESM bundle reads from globalThis.
         { src: 'vendor', dest: '' },
         { src: 'css', dest: '' },
         { src: 'img', dest: '' },
@@ -215,10 +209,10 @@ export default defineConfig({
         { src: 'font/Skranji-Regular.ttf', dest: '' },
         { src: 'font/SourceSansPro-Black.woff', dest: '' },
         { src: 'font/LICENSE', dest: '' },
-        { src: 'views', dest: '' },
+        // views/*.html templates are now `?raw`-imported and bundled
+        // into esm-bundle.js; the directory itself is no longer shipped.
         { src: 'data', dest: '' },
         { src: 'i18n', dest: '' },
-        ...amdScripts,
       ],
     }),
     swapInCasualAssets(),

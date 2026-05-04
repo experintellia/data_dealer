@@ -1,16 +1,23 @@
-define(function(require) {
+// Vendor libs (window.Scroller, window.core, window.createjs) are read
+// off globalThis at factory-body time on the first getRender() call,
+// so this module is safe to bundle alongside code that runs before
+// the vendor `<script>` tags execute.
+import appModule from './app.js';
+import setup from './setup.js';
+import utilDefault from './util.js';
 
-  var Render = function() {
+var Render = function() {
 
-    var _ = require('underscore');
-    var $ = require('jquery');
+    var _ = globalThis._;
+    var $ = globalThis.jQuery || globalThis.$;
 
-    var Scroller = require('zynga-scroller');
-    var core = require('zynga-animate');
+    var Scroller = globalThis.Scroller;
+    var core = globalThis.core;
 
-    var Easel = require('createjs-easel');
-    var Tween = require('createjs-tween');
-    var Sound = require('createjs-sound');
+    // Tween is the sub-class; Easel and Sound just alias the namespace.
+    var Easel = globalThis.createjs;
+    var Tween = globalThis.createjs.Tween;
+    var Sound = globalThis.createjs;
     var Ticker = Easel.Ticker;
     var Ease = Easel.Ease;
 
@@ -37,9 +44,8 @@ define(function(require) {
     // on every call in current TweenJS builds).
     Ticker.setFPS = function(fps) { Ticker.framerate = fps; };
 
-    var app = require('app').getApplication();
-    var setup = require('setup');
-    var extend = require('util').extend;
+    var app = appModule.getApplication();
+    var extend = utilDefault.extend;
 
     var renderConf = {
       cableResolution : 2,
@@ -5291,15 +5297,13 @@ define(function(require) {
       Statusbar: Statusbar,
       DBQueue: DBQueue
     };
-  }
+};
 
-  var render; // We store our singleton instance here.
+var render; // We store our singleton instance here.
 
-  return {
-    getRender: function() {
-      render = render || Render();
-      return render;
-    }
-  };
+export function getRender() {
+  render = render || Render();
+  return render;
+}
 
-});
+export default { getRender };

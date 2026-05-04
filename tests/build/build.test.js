@@ -24,17 +24,16 @@ beforeAll(() => {
 }, 180_000);
 
 describe('dist/ structure', () => {
+  // RequireJS is gone.  scripts/require.config.js and scripts/bootstrap.js
+  // + every other AMD module are folded into dist/scripts/esm-bundle.js;
+  // views/*.html are inlined as `?raw` imports.
   const required = [
     'index.html',
-    'scripts/require.config.js',
-    'scripts/bootstrap.js',
-    'scripts/app.js',
-    // LocalEngine.js is now ESM — bundled into esm-bundle.js via the AMD
-    // bridge; it is NOT copied as a standalone AMD file any more.
     'scripts/esm-bundle.js',
-    'vendor/requirejs.js',
     'vendor/jquery.js',
     'vendor/underscore.js',
+    'vendor/easeljs.js',
+    'vendor/sprintf.js',
     'css/dd.css',
   ];
 
@@ -43,38 +42,57 @@ describe('dist/ structure', () => {
       expect(existsSync(join(root, 'dist', f))).toBe(true);
     });
   }
+
+  // Negative assertions: the legacy AMD plumbing must not regress back
+  // into the build output.
+  const removed = [
+    'scripts/require.config.js',
+    'scripts/bootstrap.js',
+    'scripts/app.js',
+    'scripts/Game.js',
+    'scripts/Render.js',
+    'vendor/requirejs.js',
+    'vendor/text.js',
+    'vendor/tpl.js',
+    'vendor/jquery-mobile.js',
+    'vendor/almond.js',
+    'vendor/native-console.js',
+  ];
+
+  for (const f of removed) {
+    it(`dist/${f} not shipped`, () => {
+      expect(existsSync(join(root, 'dist', f))).toBe(false);
+    });
+  }
 });
 
 describe('dist/index.html', () => {
-  it('references vendor/requirejs.js (not components/)', async () => {
+  it('references esm-bundle.js with the vendor <script> chain', async () => {
     const { readFileSync } = await import('fs');
     const html = readFileSync(join(root, 'dist', 'index.html'), 'utf8');
-    expect(html).toContain('vendor/requirejs.js');
-    expect(html).not.toContain('components/');
-  });
-});
-
-describe('dist/scripts/require.config.js', () => {
-  it('references vendor/ paths (not components/)', async () => {
-    const { readFileSync } = await import('fs');
-    const cfg = readFileSync(join(root, 'dist', 'scripts', 'require.config.js'), 'utf8');
-    expect(cfg).toContain('../vendor/');
-    expect(cfg).not.toContain('../components/');
+    expect(html).toContain('scripts/esm-bundle.js');
+    expect(html).toContain('vendor/jquery.js');
+    expect(html).toContain('vendor/underscore.js');
+    expect(html).not.toContain('vendor/requirejs.js');
+    expect(html).not.toContain('require.config');
   });
 });
 
 describe('dist/scripts/esm-bundle.js', () => {
-  it('contains the AMD bridge footer', async () => {
+  it('contains LocalEngine handler code', async () => {
     const { readFileSync } = await import('fs');
     const bundle = readFileSync(join(root, 'dist', 'scripts', 'esm-bundle.js'), 'utf8');
-    expect(bundle).toContain('define.amd');
+    // Sanity-check that handler names from LocalEngine survived bundling
+    // (they appear as string literals because LocalEngine builds a
+    // dispatch table over Object.keys(handlers)).
+    expect(bundle).toContain('chargePerp');
+    expect(bundle).toContain('integrateCollected');
   });
 
-  it('registers LocalEngine via the AMD bridge', async () => {
+  it('does NOT contain a `define.amd` AMD-bridge footer', async () => {
     const { readFileSync } = await import('fs');
     const bundle = readFileSync(join(root, 'dist', 'scripts', 'esm-bundle.js'), 'utf8');
-    // The bridge footer emits define("LocalEngine", ...) for the AMD loader.
-    expect(bundle).toContain('LocalEngine');
+    expect(bundle).not.toContain('define.amd');
   });
 });
 
@@ -123,9 +141,11 @@ describe.each([
     expect(listing).toMatch(/\bcss\//);
     expect(listing).toMatch(/\bvendor\//);
     expect(listing).toMatch(/\bscripts\//);
-    expect(listing).toMatch(/\bviews\//);
     expect(listing).toMatch(/\bfont\//);
     expect(listing).toMatch(/\bdata\//);
+    // views/*.html are now `?raw`-imported into esm-bundle.js — the
+    // standalone directory is no longer shipped.
+    expect(listing).not.toMatch(/\bviews\//);
   });
 
   it('contains license and credits files', () => {
@@ -142,5 +162,15 @@ describe.each([
     const listing = listXdc();
     expect(listing).not.toContain('font/BowlbyOne.ttf');
     expect(listing).not.toContain('font/BowlbyOneSC.ttf');
+  });
+
+  it('does NOT contain vendor/requirejs.js or other deleted AMD plumbing', () => {
+    const listing = listXdc();
+    expect(listing).not.toContain('vendor/requirejs.js');
+    expect(listing).not.toContain('vendor/text.js');
+    expect(listing).not.toContain('vendor/tpl.js');
+    expect(listing).not.toContain('vendor/jquery-mobile.js');
+    expect(listing).not.toContain('scripts/require.config.js');
+    expect(listing).not.toContain('scripts/bootstrap.js');
   });
 });
