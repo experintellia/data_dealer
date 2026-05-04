@@ -56,13 +56,6 @@ var Render = function() {
       viewMapStopZone : setup.viewMapStopZone
     };
 
-    /* FIXME: IE checks in renderengine
-    var IE = false;
-    if (!$.support.style) {
-      IE = true;
-    }
-    */
-
     Ticker.setFPS(renderConf.tickerFramerate);
     Ticker.useRAF = true;
 
@@ -912,9 +905,6 @@ var Render = function() {
         "-webkit-transform": "rotateZ("+this.rotate+"deg) scale3d("+this.scaleX+","+this.scaleY+",1) translate3d("+ (this.transX) +"px,"+ (this.transY) +"px,0px)",
         "-moz-transform": "rotateZ("+this.rotate+"deg) scale3d("+this.scaleX+","+this.scaleY+",1) translate3d("+ (this.transX) +"px,"+ (this.transY) +"px,0px)",
         //"-moz-transform": "rotate("+this.rotate+"deg) scale("+this.scaleX+","+this.scaleY+") translate("+ (this.transX) +"px,"+ (this.transY) +"px)",
-        // FIXME IE 2D
-        //"-ms-transform": "rotate("+this.rotate+"deg) scale("+this.scaleX+","+this.scaleY+") translate("+ (this.transX) +"px,"+ (this.transY) +"px)",
-        "-ms-transform": "rotateZ("+this.rotate+"deg) scale3d("+this.scaleX+","+this.scaleY+",1) translate3d("+ (this.transX) +"px,"+ (this.transY) +"px,0px)",
         "-transform": "rotateZ("+this.rotate+"deg) scale3d("+this.scaleX+","+this.scaleY+",1) translate3d("+ (this.transX) +"px,"+ (this.transY) +"px,0px)"
       });
     };
