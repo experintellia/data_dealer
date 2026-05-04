@@ -4175,11 +4175,19 @@ var Game = function() {
         app.remote.chargePerp(gnode.path).done(function(data) {
           if (data.result) {
             if (data.result.error) {
-              // No cash
-              if (gnode.renderPopup && gnode.renderPopup.open) {
-                gnode.renderPopup.trigger('no_cash');
+              // Error 1 = no AP (energy), Error 3 = no cash
+              if (data.result.error === 1) {
+                if (gnode.renderPopup && gnode.renderPopup.open) {
+                  gnode.renderPopup.trigger('no_AP');
+                } else {
+                  gnode.renderNode.FXNoAP();
+                }
               } else {
-                gnode.renderNode.FXNoCash();
+                if (gnode.renderPopup && gnode.renderPopup.open) {
+                  gnode.renderPopup.trigger('no_cash');
+                } else {
+                  gnode.renderNode.FXNoCash();
+                }
               }
               return;
             }
