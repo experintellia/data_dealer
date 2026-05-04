@@ -3852,21 +3852,25 @@ var Render = function() {
       });
       node.jdomelem.on('click touchend','.ZoomControls .ZoomOut', function(e){
         e.stopPropagation();
+        node._cancelWheelZoom();
         node.zoomOut();
       });
       node.jdomelem.on('click touchend','.ZoomControls .ZoomIn', function(e){
         e.stopPropagation();
+        node._cancelWheelZoom();
         node.zoomIn();
       });
 
       node.jdomelem.on('click touchend','.ZoomControls .Fullscreen', function(e){
         e.stopPropagation();
+        node._cancelWheelZoom();
         app.game.resetZoom();
       });
 
 
       node.on('dblclick',function(e){
         e.stopPropagation();
+        node._cancelWheelZoom();
         // Same animating-toggle anti-pattern as zoomIn/zoomOut: don't flip
         // it back to false synchronously, the scroller animation reads the
         // flag every frame.
@@ -3930,12 +3934,33 @@ var Render = function() {
           x: touch.pageX - parentOffset.left,
           y: touch.pageY - parentOffset.top
         };
+        // Record initial finger distance so non-iOS browsers (which don't
+        // emit GestureEvent.scale) can derive a pinch ratio in touchmove.
+        if (e.touches.length === 2) {
+          var dx = e.touches[0].pageX - e.touches[1].pageX;
+          var dy = e.touches[0].pageY - e.touches[1].pageY;
+          node._pinchStartDist = Math.sqrt(dx * dx + dy * dy) || null;
+        } else {
+          node._pinchStartDist = null;
+        }
         node.scroller.doTouchStart(e.touches, e.timeStamp);
         e.preventDefault();
       }, {passive: false});
 
       node.useDragHandler.domelem.addEventListener("touchmove", function(e) {
-        node.scroller.doTouchMove(e.touches, e.timeStamp, e.scale);
+        // The Scroller expects an absolute pinch scale relative to touchstart
+        // (iOS Safari supplies this as e.scale). Other engines don't, so
+        // derive it from the two-finger distance ratio when needed.
+        var scale = e.scale;
+        if (scale == null && e.touches.length === 2) {
+          var dx = e.touches[0].pageX - e.touches[1].pageX;
+          var dy = e.touches[0].pageY - e.touches[1].pageY;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if (node._pinchStartDist) {
+            scale = dist / node._pinchStartDist;
+          }
+        }
+        node.scroller.doTouchMove(e.touches, e.timeStamp, scale);
         e.preventDefault();
       }, {passive: false});
 
@@ -3946,6 +3971,64 @@ var Render = function() {
       node.useDragHandler.domelem.addEventListener("touchcancel", function(e) {
         node.scroller.doTouchEnd(e.timeStamp);
       }, false);
+
+      // Mouse-wheel zoom: continuous and smoothly tweened. We accumulate
+      // wheel deltas into a target zoom level and let a single rAF loop
+      // ease the scroller toward it, which avoids the choppy "step per
+      // notch" feel of calling zoomBy synchronously on every event.
+      node._wheelZoomTarget = null;
+      node._wheelZoomOrigin = null;
+      node._cancelWheelZoom = function() {
+        // Called by the +/-/Fullscreen/dblclick handlers so an in-flight
+        // wheel-zoom rAF doesn't fight their zoomTo (it would otherwise
+        // ease back to the wheel target on the next frame).
+        node._wheelZoomTarget = null;
+        if (node._wheelZoomRaf) {
+          cancelAnimationFrame(node._wheelZoomRaf);
+          node._wheelZoomRaf = 0;
+        }
+      };
+      var stepTowardTarget = function() {
+        node._wheelZoomRaf = 0;
+        var target = node._wheelZoomTarget;
+        var origin = node._wheelZoomOrigin;
+        if (target == null) return;
+        var current = node.scroller.__zoomLevel || node.zoomScale || 1;
+        var next = current + (target - current) * 0.25;
+        if (Math.abs(target - next) < 0.001) {
+          next = target;
+          node._wheelZoomTarget = null;
+        }
+        node.scroller.zoomTo(next, false, origin.x, origin.y);
+        if (node._wheelZoomTarget != null) {
+          node._wheelZoomRaf = requestAnimationFrame(stepTowardTarget);
+        }
+      };
+      node.domelem.addEventListener("wheel", function(e) {
+        e.preventDefault();
+        var offset = node.jdomelem.offset();
+        // Normalize across deltaMode (pixel/line/page) and clamp so a
+        // single trackpad fling never multiplies zoom by more than ~1.5x.
+        // Per-pixel base is intentionally tiny — a typical wheel notch
+        // (~100px) ends up around ~10% zoom, so the change feels
+        // continuous rather than stepped like the +/- buttons.
+        var unit = (e.deltaMode === 1) ? 16 : (e.deltaMode === 2) ? 400 : 1;
+        var delta = Math.max(-400, Math.min(400, e.deltaY * unit));
+        var factor = Math.pow(0.999, delta);
+        var opts = node.scroller.options;
+        var base = (node._wheelZoomTarget != null)
+          ? node._wheelZoomTarget
+          : (node.scroller.__zoomLevel || node.zoomScale || 1);
+        var target = Math.max(opts.minZoom, Math.min(opts.maxZoom, base * factor));
+        node._wheelZoomTarget = target;
+        node._wheelZoomOrigin = {
+          x: e.pageX - offset.left,
+          y: e.pageY - offset.top
+        };
+        if (!node._wheelZoomRaf) {
+          node._wheelZoomRaf = requestAnimationFrame(stepTowardTarget);
+        }
+      }, {passive: false});
     };
 
     ViewMap.prototype.scrollTo = function(pos,dur){
@@ -4096,7 +4179,7 @@ var Render = function() {
       this.domelem = this.jdomelem[0];
       this.position='relative';
       this.width = config.width || 960;
-      this.height = config.height || 42;
+      this.height = config.height || 48;
       this.z = 1000;
       this.data = config.data || { buttons:[] };
       this.data.logo = RenderSprite(this.data.logo);

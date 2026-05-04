@@ -1630,14 +1630,25 @@ var Game = function() {
     // design home point — for Imperium that's where the seed places the
     // Database (≈1024,800).  Falls back to a no-op if no ViewMap is active.
     GameRoot.prototype.resetZoom = function() {
-      var vm = this.activeView && this.activeView.renderNode;
-      if (!vm || !vm.scroller || typeof vm.scroller.zoomTo !== 'function') return;
+      // activeView is only set after the first switch_view; on initial
+      // boot we need the same Imperium fallback as _centerActiveView.
+      var view = this.activeView || (this.getImperium && this.getImperium());
+      var vm = view && view.renderNode;
+      if (!vm || !vm.scroller || typeof vm.scroller.scrollTo !== 'function') return;
       if (typeof vm.updateScroller === 'function') vm.updateScroller();
-      // Don't toggle options.animating — the zynga-scroller animation reads
-      // the flag every frame, so flipping it back to false synchronously
-      // cancels the zoom mid-animation.
-      vm.scroller.zoomTo(1, true);
-      this._centerActiveView(true);
+      var vp = vm.parentNode;
+      if (!vp) return;
+      // Cancel any debounced re-center so it can't interrupt this animation
+      // 50ms in, which used to freeze zoom mid-tween (zoomTo+scrollTo issue
+      // a single __publish each, and the second one cancels the first).
+      clearTimeout(this._centerActiveViewTimer);
+      // scrollTo with an explicit zoom multiplies left/top by zoom internally
+      // and combines both into one __publish, so we get a single tween from
+      // (current zoom, current scroll) to (1.0, centered) instead of two
+      // animations fighting each other.
+      var sx = Math.max(0, vm.width  / 2 - vp.width  / 2);
+      var sy = Math.max(0, vm.height / 2 - vp.height / 2);
+      vm.scroller.scrollTo(sx, sy, true, 1);
     };
 
     // Re-centers the active ViewMap so the design home point sits in the
@@ -1669,7 +1680,13 @@ var Game = function() {
     // load and on window resize so the game fills the available space by
     // default rather than sitting in a 960×600 letterbox.
     GameRoot.prototype.fitToWindow = function() {
-      this.setSize($(window).width() - 32, $(window).height() - 64);
+      // The MainMenu is a sibling of the Stage in #GameContainer (not a
+      // child), so its height eats into the available viewport — without
+      // subtracting it the Stage pushes the page past the bottom edge.
+      var menuH = (this.renderMenu && this.renderMenu.jdomelem)
+        ? this.renderMenu.jdomelem.outerHeight()
+        : 0;
+      this.setSize($(window).width(), $(window).height() - menuH);
       // Refresh the scroller's viewport dimensions so the new stage size is
       // reflected in clamping/zoom math. Without this, scrollTo and the
       // +/- zoom buttons clamp against the previous viewport.
