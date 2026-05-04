@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 /**
  * Tests for collectPerp + integrateCollected handlers (issue #17).
  *

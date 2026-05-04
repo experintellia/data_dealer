@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Verifies that `pnpm build:all` completes without errors and produces the
 // expected dist/ layout and both `.xdc` variants. Runs the real build
 // script as a child process so that vite/rollup errors, missing files,

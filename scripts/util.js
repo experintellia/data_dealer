@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Generic helpers shared across the legacy Game/Render layers.
 // jQuery is loaded as a global from a vendor `<script>` tag in
 // index.html; read lazily off globalThis inside wait() so this

@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 /**
  * Build-time validation of type_settings.js and the ruleset.
  *

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Regenerates vendor/ from npm packages. Run after a fresh clone if the vendor/
 // directory is ever deleted, or to upgrade a pinned lib.
 //

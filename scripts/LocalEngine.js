@@ -1,4 +1,4 @@
-// @ts-check
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // In-process gameplay handlers, consumed by app.js as a default-namespace
 // import.  No DOM globals in handler bodies; safe to import from Node
 // for tests.

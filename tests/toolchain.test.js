@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Smoke test: verifies the toolchain itself is wired up correctly.
 // Real unit tests for state.js / materializer.js land in #45 / #10 / #11.
 import { describe, it, expect } from 'vitest';

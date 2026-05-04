@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 import { describe, it, expect, afterEach } from 'vitest';
 import { now, setOverride, clearOverride, advance } from '../../scripts/clock.js';
 import { freshState, applyDelta } from '../../scripts/state.js';

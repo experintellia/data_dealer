@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Browser-only devtools surface for the injectable clock.
 //
 // Loaded only when the page URL contains ?devtools=1.

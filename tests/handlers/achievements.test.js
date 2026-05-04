@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 /**
  * Tests for the achievement emit system (Phase 7, issue #34).
  *

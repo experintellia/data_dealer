@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // ESM entry point — Vite bundles this into scripts/esm-bundle.js, which
 // index.html loads as a plain `<script>` tag after the vendor library
 // `<script>` tags.  All the wiring (boot kick-off, UI hand-off,

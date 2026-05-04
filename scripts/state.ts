@@ -315,13 +315,19 @@ function _seedNodesFromTree(src: GameSeed): GameNode[] {
       instance_data: Object.assign({}, child.instance_data || {}),
     });
     var grandkids = child.children || [];
-    for (var i = 0; i < grandkids.length; i++) walk(fullPath, grandkids[i]);
+    for (var i = 0; i < grandkids.length; i++) {
+      var gk = grandkids[i];
+      if (gk) walk(fullPath, gk);
+    }
   }
 
   ['Imperium', 'Database'].forEach(function (root) {
     var node = src[root];
     if (!node || !Array.isArray(node.children)) return;
-    for (var i = 0; i < node.children.length; i++) walk(root, node.children[i]);
+    for (var i = 0; i < node.children.length; i++) {
+      var ch = node.children[i];
+      if (ch) walk(root, ch);
+    }
   });
 
   return out;
@@ -437,10 +443,7 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
 
   // Guard against double-apply on replay.
   var nodes = (state.nodes || []).slice();
-  var alreadyPresent = false;
-  for (var i = 0; i < nodes.length; i++) {
-    if (nodes[i].full_path === newNode.full_path) { alreadyPresent = true; break; }
-  }
+  var alreadyPresent = nodes.some(function (n) { return n.full_path === newNode.full_path; });
   if (!alreadyPresent) {
     nodes = nodes.concat([newNode]);
   }
@@ -448,10 +451,7 @@ reducers.buyPerp = function buyPerpReducer(state, delta) {
   var dbQueue = (state.db_queue || []).slice();
   if (r.profile_set) {
     var ps = r.profile_set;
-    var inQueue = false;
-    for (var j = 0; j < dbQueue.length; j++) {
-      if (dbQueue[j].collect_id === ps.collect_id) { inQueue = true; break; }
-    }
+    var inQueue = dbQueue.some(function (q) { return q.collect_id === ps.collect_id; });
     if (!inQueue) {
       dbQueue = dbQueue.concat([{
         origin: ps.origin,

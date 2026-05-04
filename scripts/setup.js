@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // General settings used across the application.  Loaded after the vendor
 // libs are available; mutable so i18n.setLocale() / app.start() can stamp
 // `locale` / `localeShort` onto it for templates that read setup.locale.

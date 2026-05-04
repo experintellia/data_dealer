@@ -1,3 +1,4 @@
+// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Asserts that every file in img/ is referenced from at least one shipped
 // source so that orphaned assets are caught at PR time.
 import { describe, it, expect } from 'vitest';
