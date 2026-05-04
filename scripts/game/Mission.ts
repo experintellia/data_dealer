@@ -51,6 +51,7 @@ interface MissionsParent extends GameNode {
 
 export class Mission extends GameNode {
   declare data: MissionDataShape;
+  popupTemplate = 'popup_mission.html';
 
   getBranch(_gestalt?: string): Mission[] {
     const mroot = this.parentNode as MissionsParent | undefined;
@@ -88,10 +89,13 @@ export class Mission extends GameNode {
   updateGoal(goal: GoalShape): void {
     // TODO: take care of rendering
     const groot = this.GameRoot as unknown as GameRootWithMissions;
-    // Legacy assignment-as-condition: `if ((goal.mission = this.gestalt))` —
-    // the legacy code stamps the mission gestalt onto the goal and uses the
-    // truthy assigned value as the guard.  Preserved bit-for-bit so replay
-    // semantics match.
+    // Legacy: `if ((goal.mission = this.gestalt)) { … }` — assigns the
+    // gestalt onto goal and uses the truthy assigned value as the guard.
+    // The translation below is behaviourally identical when `this.gestalt`
+    // is defined (always true at runtime — `gestalt` is set by the
+    // constructor flow before any subclass method runs); the
+    // `this.gestalt !== undefined` skip exists only to satisfy
+    // exactOptionalPropertyTypes on `goal.mission?: string`.
     if (this.gestalt !== undefined) goal.mission = this.gestalt;
     if (!goal.mission) return;
     const goals = this.data.goals || [];
@@ -213,6 +217,5 @@ export class Mission extends GameNode {
 }
 
 Mission.prototype.renderType = 'MissionPerp';
-(Mission.prototype as unknown as { popupTemplate: string }).popupTemplate = 'popup_mission.html';
 
 void appModule;
