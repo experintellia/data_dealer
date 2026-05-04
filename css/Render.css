@@ -563,8 +563,8 @@
   width: 30px;
   height: 94px;
   position: absolute;
-  bottom: 0px;
-  right: 0px;
+  bottom: 8px;
+  right: 8px;
 }
 .ZoomControls div {
   display: block;
@@ -661,9 +661,6 @@
 .MainMenu {
   overflow:hidden;
   margin:0 auto;
-  border:6px solid #000;
-  border-width:6px 6px 0px 6px;
-  border-radius:6px 6px 0px 0px;
   background: #001111;
   background: -moz-linear-gradient(top,  #001111 0%, #06546c 100%);
   background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#001111), color-stop(100%,#06546c));
