@@ -1311,7 +1311,9 @@ var Render = function () {
   // when present — measuring the outer domelem misses the parent's
   // scroll/zoom translate and the spark starts in the wrong place.
   function computeQueueItemOPos(psid, parentNode, oScale) {
-    var item = document.querySelector('.DatabaseQueue .DatabaseQueueItem[data-psid="' + psid + '"]');
+    var item = document.querySelector(
+      '.DatabaseQueue .DatabaseQueueItem[data-psid="' + psid + '"]'
+    );
     var parentEl = parentNode && (parentNode.domelem1 || parentNode.domelem);
     if (!item || !parentEl) return null;
     var ir = item.getBoundingClientRect();
