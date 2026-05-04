@@ -3862,21 +3862,25 @@ var Render = function() {
       });
       node.jdomelem.on('click touchend','.ZoomControls .ZoomOut', function(e){
         e.stopPropagation();
+        node._cancelWheelZoom();
         node.zoomOut();
       });
       node.jdomelem.on('click touchend','.ZoomControls .ZoomIn', function(e){
         e.stopPropagation();
+        node._cancelWheelZoom();
         node.zoomIn();
       });
 
       node.jdomelem.on('click touchend','.ZoomControls .Fullscreen', function(e){
         e.stopPropagation();
+        node._cancelWheelZoom();
         app.game.resetZoom();
       });
 
 
       node.on('dblclick',function(e){
         e.stopPropagation();
+        node._cancelWheelZoom();
         // Same animating-toggle anti-pattern as zoomIn/zoomOut: don't flip
         // it back to false synchronously, the scroller animation reads the
         // flag every frame.
@@ -3984,6 +3988,16 @@ var Render = function() {
       // notch" feel of calling zoomBy synchronously on every event.
       node._wheelZoomTarget = null;
       node._wheelZoomOrigin = null;
+      node._cancelWheelZoom = function() {
+        // Called by the +/-/Fullscreen/dblclick handlers so an in-flight
+        // wheel-zoom rAF doesn't fight their zoomTo (it would otherwise
+        // ease back to the wheel target on the next frame).
+        node._wheelZoomTarget = null;
+        if (node._wheelZoomRaf) {
+          cancelAnimationFrame(node._wheelZoomRaf);
+          node._wheelZoomRaf = 0;
+        }
+      };
       var stepTowardTarget = function() {
         node._wheelZoomRaf = 0;
         var target = node._wheelZoomTarget;

@@ -1657,10 +1657,17 @@ var Game = function() {
         if (!vm || !vm.scroller || !vm.parentNode) return;
         var vw = vm.parentNode.width;
         var vh = vm.parentNode.height;
-        var maxX = Math.max(0, vm.width  - vw);
-        var maxY = Math.max(0, vm.height - vh);
-        var sx = Math.max(0, Math.min(maxX, vm.width  / 2 - vw / 2));
-        var sy = Math.max(0, Math.min(maxY, vm.height / 2 - vh / 2));
+        // Scroller coordinates operate on scaled content, so the visible
+        // size of the ViewMap is vm.width * zoom, not vm.width. Without
+        // this factor the centering math leaves the map jammed in the
+        // top-left at zoom < 1.
+        var zoom = vm.scroller.__zoomLevel || vm.zoomScale || 1;
+        var contentW = vm.width  * zoom;
+        var contentH = vm.height * zoom;
+        var maxX = Math.max(0, contentW - vw);
+        var maxY = Math.max(0, contentH - vh);
+        var sx = Math.max(0, Math.min(maxX, contentW / 2 - vw / 2));
+        var sy = Math.max(0, Math.min(maxY, contentH / 2 - vh / 2));
         vm.scroller.scrollTo(sx, sy, animate);
       }, 50);
     };
