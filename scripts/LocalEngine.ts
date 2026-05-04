@@ -2390,15 +2390,11 @@ export function integrateCollected(
   }
 
   var queue = state.db_queue || [];
-  var matchIdx = queue.findIndex(function (q) { return q.collect_id === collectId; });
-  if (matchIdx === -1) {
-    return Promise.resolve({ result: { error: 0 } });
-  }
-  var entry = queue[matchIdx];
+  var entry = queue.find(function (q) { return q.collect_id === collectId; });
   if (!entry) {
     return Promise.resolve({ result: { error: 0 } });
   }
-  var newQueue = queue.slice(0, matchIdx).concat(queue.slice(matchIdx + 1));
+  var newQueue = queue.filter(function (q) { return q.collect_id !== collectId; });
 
   var ps: ProfileSetView = (entry.profile_set as ProfileSetView) || {};
   var profilesIncrement = ps.profiles_value || 0;
