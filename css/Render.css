@@ -2031,7 +2031,7 @@
 }
 /* Single unified scroll area: takes the space of the old header + content */
 .PopupBody.About .PopupContent {
-  height: 398px;
+  height: 428px;
   overflow-y: auto;
   overflow-x: hidden;
 }
