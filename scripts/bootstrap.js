@@ -1,118 +1,99 @@
-// Boots the app: render the loader view, await engine replay, preload
-// templates, hand off to app.start().  The original code routed through
-// hash-based routie routes (#load, #downtime) and ran a separate
-// remote.getToken() up front to detect a downed backend; in the webxdc
-// port the local engine is always available, so we go straight to
-// app.start() once boot()'s setUpdateListener promise resolves.
-// Preload list: every vendor lib that ESM modules read off the browser
-// global (window.jQuery, window._, window.numeral, …) MUST appear here so
-// RequireJS has fetched and run its AMD-define side effect before
-// app.getApplication() touches it.  In the AMD original, factory-body
-// `require('name')` strings were auto-discovered and added to the dep
-// list; ESM modules have no such magic so the list is now explicit.
-require([
-  'require',
-  'jquery',
-  'underscore',
-  'numeral',
-  'i18n',
-  'setup',
-  'app',
-  'boot',
-  'native-console',
-  // sprintf must be preloaded because Game.js's factory body issues a
-  // synchronous globalThis.require('sprintf') for its window.sprintf
-  // side effect — formerly auto-discovered via RequireJS's CommonJS
-  // factory string-scan, which ESM modules do not get.
-  'sprintf',
-  // 'Game' is now ESM-bundled and registered through the AMD bridge,
-  // but RequireJS only resolves a bridged module — i.e. invokes its
-  // bridge-factory and caches the result — when something requires it.
-  // Listing it here forces resolution before app.start so the
-  // synchronous globalThis.require('Game').getGame() in app.js's
-  // start path finds it in cache.  Note: the inner Game()-factory
-  // body still does NOT run until getGame() is actually invoked.
-  'Game',
-  // Render is now ESM-bundled; like Game it must be listed here so the
-  // AMD bridge factory is invoked and cached before app.start does a
-  // synchronous globalThis.require('Render').  Render's own factory
-  // body (Ticker setup, render-tree classes) still runs lazily on the
-  // first getRender() call — which only happens once Game's body
-  // calls it.
-  'Render',
-  // Vendor libs Render.js's factory body reaches via synchronous
-  // globalThis.require — formerly auto-discovered through Render's
-  // own AMD `define()` factory string-scan, now explicit:
-  'zynga-scroller',
-  'zynga-animate',
-  'createjs-easel',
-  'createjs-tween',
-  'createjs-sound',
-  'tpl!../views/loader.html'
-], function(require) {
+// Boots the app: render the loader view, await engine replay, hand off
+// to app.start().  ESM (issue #58) — formerly an AMD `require([...], cb)`
+// shell.  Imported as a side effect by scripts/esm-entry.js, so its
+// top-level body runs once the bundle IIFE evaluates, after the vendor
+// <script> tags in index.html have populated window.jQuery / window._.
 
-  var $    = require('jquery');
-  var boot = require('boot');
+import loaderHtml from '../views/loader.html?raw';
+import { getApplication } from './app.js';
+import { boot, getBootPromise, getReplayProgress } from './boot.js';
 
-  function showFatal(message, err) {
-    console.error('Game start failed:', message, err);
-    if (err && err.stack) console.error(err.stack);
-    var detail = (err && err.message) || String(err || '');
-    $('#loadertext').html(
-      'Sorry, the Game failed to start.<br>' +
-      '<small style="opacity:.7">' + message + (detail ? ': ' + detail : '') + '</small>'
-    );
+// In Node (vitest/SSR/import-graph snapshot), there is no DOM or vendor
+// globals, and this whole UI hand-off path is irrelevant.  Skip it so
+// the module is import-safe in test environments without forcing a
+// jsdom dependency.
+if (typeof window === 'undefined' || typeof document === 'undefined') {
+  /* skip browser bootstrap in Node */
+} else {
+  runBrowserBootstrap();
+}
+
+function runBrowserBootstrap() {
+
+// Kick off engine replay as early as possible so setUpdateListener
+// registers before any UI code can interleave.  boot() is idempotent
+// (returns the in-flight promise on subsequent calls), and is also a
+// no-op if the webxdc global is missing (e.g. running outside a host).
+if (typeof webxdc !== 'undefined') {
+  boot();
+}
+
+const $ = globalThis.jQuery || globalThis.$;
+const _ = globalThis._;
+
+function showFatal(message, err) {
+  console.error('Game start failed:', message, err);
+  if (err && err.stack) console.error(err.stack);
+  const detail = (err && err.message) || String(err || '');
+  $('#loadertext').html(
+    'Sorry, the Game failed to start.<br>' +
+    '<small style="opacity:.7">' + message + (detail ? ': ' + detail : '') + '</small>'
+  );
+}
+
+// underscore 1.5.1's signature is `_.template(text, data, settings)`;
+// passing settings as the second argument renders eagerly.  Pass null
+// for data so we get a precompiled function back.
+const loaderView = _.template(loaderHtml, null, { variable: 'D' });
+$('#dd-control').html(loaderView({}));
+
+// While the engine replays history, drive the loader's progress bar from
+// boot.getReplayProgress(). max_serial can grow as live peer updates land
+// mid-replay, so the bar may not visually fill — that's fine; the game
+// still starts at the resolution of the listener promise.
+const loaderEl = document.getElementById('loader');
+let progressTimer = setInterval(function () {
+  const p = getReplayProgress();
+  if (loaderEl) {
+    if (p.max_serial > 0) {
+      loaderEl.value = p.serial;
+      loaderEl.max   = p.max_serial;
+    }
   }
-
-  var loaderView = require('tpl!../views/loader.html');
-  $('#dd-control').html(loaderView());
-
-  // While the engine replays history, drive the loader's progress bar from
-  // boot.getReplayProgress(). max_serial can grow as live peer updates land
-  // mid-replay, so the bar may not visually fill — that's fine; the game
-  // still starts at the resolution of the listener promise.
-  var loaderEl = document.getElementById('loader');
-  var progressTimer = setInterval(function () {
-    var p = boot.getReplayProgress();
-    if (loaderEl) {
-      if (p.max_serial > 0) {
-        loaderEl.value = p.serial;
-        loaderEl.max   = p.max_serial;
-      }
-    }
-    if (p.done) {
-      if (loaderEl && p.max_serial > 0) loaderEl.value = loaderEl.max;
-      clearInterval(progressTimer);
-    }
-  }, 100);
-
-  function continueStart() {
+  if (p.done) {
+    if (loaderEl && p.max_serial > 0) loaderEl.value = loaderEl.max;
     clearInterval(progressTimer);
-    var app = require('app').getApplication();
-    app.loadViews().then(function() {
-      console.info('Starting Game');
-      try {
-        app.start().fail(function() {
-          showFatal('app.start rejected', arguments.length ? arguments[0] : null);
-        });
-      } catch (err) {
-        showFatal('app.start threw', err);
-      }
-    }, function(err) {
-      showFatal('app.loadViews rejected', err);
-    });
   }
+}, 100);
 
-  // boot() was kicked off synchronously in esm-entry.js. If for some
-  // reason the AMD bridge resolves earlier (no webxdc), there's no
-  // promise to await — fall through to the start path immediately.
-  var bootPromise = boot.getBootPromise();
-  if (bootPromise && typeof bootPromise.then === 'function') {
-    bootPromise.then(continueStart, function (err) {
-      clearInterval(progressTimer);
-      showFatal('engine replay failed', err);
-    });
-  } else {
-    continueStart();
-  }
-});
+function continueStart() {
+  clearInterval(progressTimer);
+  const app = getApplication();
+  app.loadViews().then(function() {
+    console.info('Starting Game');
+    try {
+      app.start().fail(function() {
+        showFatal('app.start rejected', arguments.length ? arguments[0] : null);
+      });
+    } catch (err) {
+      showFatal('app.start threw', err);
+    }
+  }, function(err) {
+    showFatal('app.loadViews rejected', err);
+  });
+}
+
+// boot() was kicked off synchronously above.  If for some reason there
+// is no promise to await (e.g. running outside a webxdc host), fall
+// through to the start path immediately.
+const bootPromise = getBootPromise();
+if (bootPromise && typeof bootPromise.then === 'function') {
+  bootPromise.then(continueStart, function (err) {
+    clearInterval(progressTimer);
+    showFatal('engine replay failed', err);
+  });
+} else {
+  continueStart();
+}
+
+}  // end runBrowserBootstrap

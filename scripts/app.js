@@ -1,121 +1,76 @@
 // Application root.  Owns the wiring between the LocalEngine handlers,
-// the i18n layer, and the still-AMD Game/Render singletons.  Exported
-// as ESM (issue #58); Game.js, Render.js and bootstrap.js still
-// require('app') via the AMD bridge in esm-bundle.js.
+// the i18n layer, and the Game/Render singletons.  Pure ESM (issue #58).
 //
-// The Application factory body reads vendor globals ($, _, sprintf) and
-// resolves still-AMD modules (Game, Render, tpl! templates) through
-// `globalThis.require` (i.e. the requirejs global) at call time, so the
-// IIFE bundle can evaluate before vendor/jquery.js, vendor/underscore.js,
-// vendor/sprintf.js, etc., have loaded.
+// Vendor libs ($, _, numeral, sprintf, createjs, etc.) are still global —
+// they are loaded as plain `<script>` tags in index.html before this
+// bundle runs and exposed via window — so we read them off globalThis at
+// factory-body time.  No more RequireJS, no more AMD bridge.
 
 import setup from './setup.js';
 import i18n from './i18n.js';
 import LocalEngine from './LocalEngine.js';
+import { getGame } from './Game.js';
+import { getRender } from './Render.js';
+
+// Pre-compile every <view>.html template at bundle time.  Each entry is
+// a function `(data) => html` that runs through underscore's template
+// engine with the legacy `D` variable name (a holdover from the AMD-era
+// `tpl` plug-in's variable-naming setting).
+const viewSources = import.meta.glob('../views/*.html', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+
+// Map basename ('foo.html') → compiled template fn.  Compilation happens
+// the first time the Application factory runs (after vendor underscore
+// has set window._); doing it here would crash because `_` is not yet
+// defined at module-evaluation time.
+let _templates = null;
+function compileTemplates() {
+  if (_templates) return _templates;
+  const _ = globalThis._;
+  _templates = {};
+  for (const path in viewSources) {
+    const name = path.split('/').pop();
+    // underscore 1.5.1: `_.template(text, data, settings)`; pass null
+    // for data so we get a compiled function rather than eager output.
+    _templates[name] = _.template(viewSources[path], null, { variable: 'D' });
+  }
+  return _templates;
+}
 
 const Application = function() {
 
-  // Native console polyfill must run before any console.* call site;
-  // bootstrap.js lists 'native-console' in its require([...]) dep list
-  // so it is already loaded by the time getApplication() is first called.
-  globalThis.require('native-console');
-
   const _ = globalThis._;
   const $ = globalThis.jQuery || globalThis.$;
-  // numeral, sprintf, etc. are vendor AMD modules that also expose
-  // browser globals on load.  bootstrap.js preloads 'numeral' and
-  // 'underscore' explicitly so the synchronous globalThis.require()
-  // form works here; we still read the browser global for symmetry
-  // with how Game/Render later access window.sprintf.
   const numeral = globalThis.numeral;
+  const templates = compileTemplates();
 
   // Here we store the stuff we might need throughout the whole application.
   const app = {
     debug: {},
   };
 
-  // Preload necessary views using the RequireJS `tpl` plug-in.
+  // Templates are pre-compiled at bundle time; loadViews is retained as
+  // an immediately-resolved Deferred so callers (bootstrap.continueStart,
+  // any Game-internal reset path) keep their `.then(...)` chains.
   app.loadViews = function() {
-    const deferred = new $.Deferred();
-    globalThis.require([
-      'tpl!../views/game.html',
-      'tpl!../views/main.html',
-      'tpl!../views/mainmenu.html',
-      'tpl!../views/noitems.html',
-      'tpl!../views/popup.html',
-      'tpl!../views/levelup.html',
-      'tpl!../views/popup_mission.html',
-      'tpl!../views/popup_mission_complete.html',
-      'tpl!../views/mission.html',
-      'tpl!../views/mission_goal.html',
-      'tpl!../views/mission_goal_small.html',
-      'tpl!../views/mission_rewards.html',
-      'tpl!../views/topscores.html',
-      'tpl!../views/topscore.html',
-      'tpl!../views/topscore_list.html',
-      'tpl!../views/topscore_rank.html',
-      'tpl!../views/notification.html',
-      'tpl!../views/notification_item.html',
-      'tpl!../views/notification_tutorial.html',
-      'tpl!../views/popup_user_data.html',
-      'tpl!../views/popup_status.html',
-      'tpl!../views/popup_karma.html',
-      'tpl!../views/popup_agent.html',
-      'tpl!../views/popup_client.html',
-      'tpl!../views/popup_contact.html',
-      'tpl!../views/popup_proxy.html',
-      'tpl!../views/popup_project.html',
-      'tpl!../views/popup_pusher.html',
-      'tpl!../views/popup_city.html',
-      'tpl!../views/popup_cities.html',
-      'tpl!../views/popup_profileset.html',
-      'tpl!../views/popup_token.html',
-      'tpl!../views/values.html',
-      'tpl!../views/values_details.html',
-      'tpl!../views/values_details_powerup.html',
-      'tpl!../views/profileset.html',
-      'tpl!../views/profileset_client.html',
-      'tpl!../views/profileset_token.html',
-      'tpl!../views/perp.html',
-      'tpl!../views/agent.html',
-      'tpl!../views/client.html',
-      'tpl!../views/pusher.html',
-      'tpl!../views/powerup.html',
-      'tpl!../views/powerup_provided.html',
-      'tpl!../views/powerup_free.html',
-      'tpl!../views/powerup_locked.html',
-      'tpl!../views/buttons_project.html',
-      'tpl!../views/selector_powerups.html',
-      'tpl!../views/subpop_powerup.html',
-      'tpl!../views/subpop_buyslots.html',
-      'tpl!../views/subpop_powerup_provided.html',
-      'tpl!../views/subpop_perp_provided.html',
-      'tpl!../views/subpop_token.html',
-      'tpl!../views/subpop_token_upgrade.html',
-      'tpl!../views/statusbar.html',
-      'tpl!../views/token.html',
-      'tpl!../views/token_consumed.html',
-      'tpl!../views/db_queue.html',
-    ], function() {
-      deferred.resolve();
-    });
-    return deferred.promise();
+    return $.when();
   };
 
   // A nice wrapper for rendering underscore templates.
   app.renderView = function(viewName, data) {
-    function renderView() {
-      const view = globalThis.require('tpl!../views/' + viewName);
-      return view(data || {});
+    const view = templates[viewName];
+    if (!view) {
+      console.warn('Could not render view “%s”: not bundled', viewName);
+      return '';
     }
-    if (typeof window.TypeError !== 'undefined') { // If we have TypeError, we should have try/catch, too.
-      try {
-        return renderView();
-      } catch (ex) {
-        console.warn('Could not render view “%s”: %s', viewName, ex.message);
-      }
-    } else {
-      return renderView();
+    try {
+      return view(data || {});
+    } catch (ex) {
+      console.warn('Could not render view “%s”: %s', viewName, ex.message);
+      return '';
     }
   };
 
@@ -149,7 +104,7 @@ const Application = function() {
         return app.remote.loadGame().then(function(data) {
           const html = app.renderView('game.html');
           $('#dd-control').html(html);
-          const Game = globalThis.require('Game').getGame();
+          const Game = getGame();
           const gameData = data.result;
           app.version = gameData.version;
           Game.init(gameData);
@@ -157,7 +112,7 @@ const Application = function() {
             window.app = app;
             window.setup = setup;
             window.Game = Game;
-            window.Render = globalThis.require('Render').getRender();
+            window.Render = getRender();
           }
         });
       });
@@ -173,10 +128,9 @@ const Application = function() {
       else { return {}; }
     },
     numeral: numeral,
-    // vendor/sprintf.js's anonymous define() shadows its global export, so
-    // require('sprintf') returns an object wrapper.  Game.js loads the
-    // vendor file (which sets window.sprintf = y) before any _.sprintf
-    // call site, so reading from the global is safe here.
+    // vendor/sprintf.js sets window.sprintf when loaded as a plain
+    // <script> tag — its anonymous AMD define is now a no-op since
+    // there is no AMD loader to register with.
     sprintf: window.sprintf,
     renderView: app.renderView,
     pad0: function(number, length) {
@@ -189,8 +143,7 @@ const Application = function() {
     },
     toKSNum: function(number) {
       // To activate german language set:
-      //require('numeral-de');
-      //_.numeral.language('de-de');
+      //_.numeral.language('de-de');  // load vendor/numeral-de.js first
       return _.numeral(number).format('0,0');
     },
     toTime: function(ms) {

@@ -1,7 +1,7 @@
 // Generic helpers shared across the legacy Game/Render layers.
-// jQuery is loaded as a global (vendor/jquery.js via requirejs); read lazily
-// from globalThis inside wait() so this module's top-level evaluation does
-// not require $ to exist yet.
+// jQuery is loaded as a global from a vendor `<script>` tag in
+// index.html; read lazily off globalThis inside wait() so this
+// module's top-level evaluation does not depend on $ existing yet.
 
 export function extend(C, P) {
   var F = function() {};

@@ -1,9 +1,10 @@
-// Render.js — ESM (issue #58).  Wrapper-only port: the AMD `define()`
-// shell + dep block are converted to imports + globalThis lookups; all
-// ~5180 lines of render-tree, draghandler, ticker shim and node classes
-// are byte-identical to master.  Vendor libs (zynga-*, createjs-*)
-// remain AMD-loaded — bootstrap.js preloads them so synchronous
-// globalThis.require resolves at first getRender() call.
+// Render.js — ESM (issue #58).  The legacy AMD wrapper has been
+// replaced with module-top imports + globalThis lookups; all ~5180
+// lines of render-tree, draghandler, ticker shim and node classes are
+// byte-identical to master.  Vendor libs (zynga-*, createjs-*) are
+// loaded as plain `<script>` tags in index.html and expose globals
+// (window.Scroller, window.core, window.createjs) which we read at
+// factory-body time on the first getRender() call.
 import appModule from './app.js';
 import setup from './setup.js';
 import utilDefault from './util.js';
@@ -13,12 +14,15 @@ var Render = function() {
     var _ = globalThis._;
     var $ = globalThis.jQuery || globalThis.$;
 
-    var Scroller = globalThis.require('zynga-scroller');
-    var core = globalThis.require('zynga-animate');
+    var Scroller = globalThis.Scroller;
+    var core = globalThis.core;
 
-    var Easel = globalThis.require('createjs-easel');
-    var Tween = globalThis.require('createjs-tween');
-    var Sound = globalThis.require('createjs-sound');
+    // The legacy AMD shims returned createjs vs createjs.Tween depending
+    // on the module id; preserve the same handles here.  Easel and Sound
+    // alias the whole namespace; Tween is its sub-class.
+    var Easel = globalThis.createjs;
+    var Tween = globalThis.createjs.Tween;
+    var Sound = globalThis.createjs;
     var Ticker = Easel.Ticker;
     var Ease = Easel.Ease;
 

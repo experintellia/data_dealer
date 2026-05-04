@@ -72,19 +72,10 @@ function mockWebxdc() {
   };
 }
 
-const amdBridgeFooter = `
-if (typeof define === 'function' && define.amd) {
-  Object.keys(__DD).forEach(function(name) {
-    if (name !== '__placeholder') define(name, [], function() { return __DD[name]; });
-  });
-}`;
-
-// In dev (`vite`), `scripts/esm-bundle.js` doesn't exist as a source file —
-// it's only produced by `vite build`.  Without it, the AMD bridge never runs
-// and RequireJS falls back to fetching `webxdcIdentity` / `LocalEngine.js`
-// as plain scripts, which 404s or trips a "Cannot use import statement"
-// error.  This plugin runs the same Rollup pipeline the prod build uses,
-// in-memory, and serves the result via middleware.
+// In dev (`vite`), `scripts/esm-bundle.js` doesn't exist as a source
+// file — it is only produced by `vite build`.  Index.html references
+// it as a `<script>` tag, so this plugin runs the same Rollup pipeline
+// the prod build uses, in-memory, and serves the result via middleware.
 function bundleEsmDev() {
   let bundleSrc = null;
   let buildPromise = null;
@@ -102,12 +93,10 @@ function bundleEsmDev() {
             emptyOutDir: false,
             rollupOptions: {
               input: 'scripts/esm-entry.js',
-              preserveEntrySignatures: 'exports-only',
               output: {
                 format: 'iife',
                 name: '__DD',
                 entryFileNames: 'esm-bundle.js',
-                footer: amdBridgeFooter,
               },
             },
           },
@@ -153,16 +142,6 @@ function bundleEsmDev() {
   };
 }
 
-const amdScripts = [
-  'bootstrap.js',
-  'require.config.js',
-  // The following are ESM as of issue #58 and reach AMD callers through the
-  // bridge footer in esm-bundle.js; do NOT copy the raw files:
-  //   util.js, setup.js, setup_local.js, i18n.js, type_settings.js,
-  //   LocalEngine.js, boot.js, state.ts, clock.ts, materializer.ts,
-  //   webxdc-identity.js, devtools.js.
-].map(f => ({ src: `scripts/${f}`, dest: '' }));
-
 
 export default defineConfig({
   root: '.',
@@ -182,15 +161,10 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: 'scripts/esm-entry.js',
-      // Preserve entry exports so __DD in the AMD bridge footer can iterate
-      // them.  Vite defaults to false which strips all exports and renders
-      // the bridge a no-op.
-      preserveEntrySignatures: 'exports-only',
       output: {
         format: 'iife',
         name: '__DD',
         entryFileNames: 'scripts/esm-bundle.js',
-        footer: amdBridgeFooter,
       },
     },
   },
@@ -207,6 +181,13 @@ export default defineConfig({
         { src: 'LICENSE.txt', dest: '' },
         { src: 'LICENSE-CODE.txt', dest: '' },
         { src: 'LICENSE-ASSETS.txt', dest: '' },
+        // Vendor libs are loaded as plain `<script>` tags from index.html
+        // and exposed as browser globals (window.jQuery, window._, …) the
+        // ESM bundle reads from globalThis.  After issue #58 closed,
+        // vendor/requirejs.js, vendor/text.js, vendor/tpl.js and
+        // vendor/jquery-mobile.js (a stub) are no longer used and not
+        // shipped — the directory ships only the libs index.html actually
+        // references.
         { src: 'vendor', dest: '' },
         { src: 'css', dest: '' },
         { src: 'img', dest: '' },
@@ -217,10 +198,10 @@ export default defineConfig({
         { src: 'font/Skranji-Regular.ttf', dest: '' },
         { src: 'font/SourceSansPro-Black.woff', dest: '' },
         { src: 'font/LICENSE', dest: '' },
-        { src: 'views', dest: '' },
+        // views/*.html templates are now `?raw`-imported and bundled
+        // into esm-bundle.js; the directory itself is no longer shipped.
         { src: 'data', dest: '' },
         { src: 'i18n', dest: '' },
-        ...amdScripts,
       ],
     }),
     swapInCasualAssets(),

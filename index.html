@@ -34,8 +34,24 @@
     <!-- dev: served by mockWebxdc() Vite plugin; prod: injected by the messenger -->
     <script src="webxdc.js"></script>
 
-    <script src="vendor/requirejs.js" data-main="scripts/require.config"></script>
-    <script src="scripts/esm-bundle.js"></script>
+    <!-- Vendor libraries: each sets the browser globals our ESM bundle
+         reads ($, _, numeral, sprintf, createjs, core, Scroller).  Order
+         matters: dependents come after their providers. -->
+    <script src="vendor/jquery.js"></script>
+    <script src="vendor/jquery-migrate.js"></script>
+    <script src="vendor/underscore.js"></script>
+    <script src="vendor/numeral.js"></script>
+    <script src="vendor/numeral-de.js"></script>
+    <script src="vendor/sprintf.js"></script>
+    <script src="vendor/easeljs.js"></script>
+    <script src="vendor/tweenjs.js"></script>
+    <script src="vendor/soundjs.js"></script>
+    <script src="vendor/zynga-animate.js"></script>
+    <script src="vendor/zynga-scroller.js"></script>
+
+    <!-- Defer so #dd-control is in the DOM by the time bootstrap.js
+         renders the loader into it. -->
+    <script defer src="scripts/esm-bundle.js"></script>
 
     <title>Data Dealer</title>
   </head>
