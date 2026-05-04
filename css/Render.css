@@ -86,9 +86,6 @@
   font-family:Voltaire;
   font-size:11px;
   background: #999;
-  border:6px solid #000;
-  border-width:0px 6px 6px 6px;
-  border-radius:0px 0px 6px 6px;
   overflow: hidden;
   margin: 0 auto;
 }

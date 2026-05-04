@@ -3978,20 +3978,49 @@ var Render = function() {
         node.scroller.doTouchEnd(e.timeStamp);
       }, false);
 
-      // Mouse-wheel zoom: continuous, anchored at the cursor. Each notch
-      // multiplies the current zoom by a small factor so the result feels
-      // smooth instead of stepping in 0.25 increments like the +/- buttons.
+      // Mouse-wheel zoom: continuous and smoothly tweened. We accumulate
+      // wheel deltas into a target zoom level and let a single rAF loop
+      // ease the scroller toward it, which avoids the choppy "step per
+      // notch" feel of calling zoomBy synchronously on every event.
+      node._wheelZoomTarget = null;
+      node._wheelZoomOrigin = null;
+      var stepTowardTarget = function() {
+        node._wheelZoomRaf = 0;
+        var target = node._wheelZoomTarget;
+        var origin = node._wheelZoomOrigin;
+        if (target == null) return;
+        var current = node.scroller.__zoomLevel || node.zoomScale || 1;
+        var next = current + (target - current) * 0.25;
+        if (Math.abs(target - next) < 0.001) {
+          next = target;
+          node._wheelZoomTarget = null;
+        }
+        node.scroller.zoomTo(next, false, origin.x, origin.y);
+        if (node._wheelZoomTarget != null) {
+          node._wheelZoomRaf = requestAnimationFrame(stepTowardTarget);
+        }
+      };
       node.domelem.addEventListener("wheel", function(e) {
         e.preventDefault();
         var offset = node.jdomelem.offset();
-        var originLeft = e.pageX - offset.left;
-        var originTop  = e.pageY - offset.top;
         // Normalize across deltaMode (pixel/line/page) and clamp so a
         // single trackpad swipe never multiplies zoom by more than ~2x.
         var unit = (e.deltaMode === 1) ? 16 : (e.deltaMode === 2) ? 400 : 1;
         var delta = Math.max(-100, Math.min(100, e.deltaY * unit));
         var factor = Math.pow(0.995, delta);
-        node.scroller.zoomBy(factor, false, originLeft, originTop);
+        var opts = node.scroller.options;
+        var base = (node._wheelZoomTarget != null)
+          ? node._wheelZoomTarget
+          : (node.scroller.__zoomLevel || node.zoomScale || 1);
+        var target = Math.max(opts.minZoom, Math.min(opts.maxZoom, base * factor));
+        node._wheelZoomTarget = target;
+        node._wheelZoomOrigin = {
+          x: e.pageX - offset.left,
+          y: e.pageY - offset.top
+        };
+        if (!node._wheelZoomRaf) {
+          node._wheelZoomRaf = requestAnimationFrame(stepTowardTarget);
+        }
       }, {passive: false});
     };
 
