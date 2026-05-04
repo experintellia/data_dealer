@@ -1,0 +1,14 @@
+<%
+  // Within-level progress: (XP_val − xp_min) / (xp_max − xp_min).
+  var lvl = (_.game() || {}).xp_level || {};
+  var xpMin = lvl.xp_min || 0;
+  var current = Math.max(0, Math.round((D.XP_val || 0) - xpMin));
+  var total = Math.max(1, (lvl.xp_max || 0) - xpMin);
+%>
+<div class="StatusItem XP<% if (D.XP_active > 0.2) { print(' active'); } %>" data-status-id="XP">
+  <div class="StatusBackground"></div>
+  <div class="StatusGraph" data-status-id="XP" style="width:<%= D.XP_barsize %>px;"></div>
+  <div class="StatusIconFX"><div class="StatusIcon xp"></div></div>
+  <div class="StatusText" data-status-id="XP"><%= current %>/<%= total %></div>
+  <div class="StatusTextLevel" data-status-id="XP"><%= D.XP_level %></div>
+</div>

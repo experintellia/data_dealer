@@ -33,11 +33,5 @@
     <!--<div class="StatusText" data-status-id="Karma"><% print(Math.round(D.karma_val)); %>%</div>-->
   </div>
   </div>
-  <div class="StatusItem XP<% if (D.XP_active > 0.2) { print(' active'); } %>" data-status-id="XP">
-    <div class="StatusBackground"></div>
-    <div class="StatusGraph" data-status-id="XP" style="width:<%= D.XP_barsize %>px;"></div>
-    <div class="StatusIconFX"><div class="StatusIcon xp"></div></div>
-    <div class="StatusText" data-status-id="XP"><% print(Math.round(D.XP_val)); %></div>
-    <div class="StatusTextLevel" data-status-id="XP"><%= D.XP_level %></div>
-  </div>
+  <%= _.renderView('xp_bar.html', { XP_active: D.XP_active, XP_barsize: D.XP_barsize, XP_val: D.XP_val, XP_level: D.XP_level }) %>
 

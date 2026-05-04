@@ -1308,8 +1308,24 @@ var Game = function () {
       var vh = vm.parentNode.height;
       var maxX = Math.max(0, vm.width - vw);
       var maxY = Math.max(0, vm.height - vh);
-      var sx = Math.max(0, Math.min(maxX, vm.width / 2 - vw / 2));
-      var sy = Math.max(0, Math.min(maxY, vm.height / 2 - vh / 2));
+
+      // Imperium centres on the DatabasePerp (visual focal point); its
+      // rendered position is offset from vm.width/2 once the type_data
+      // anchor is applied, enough to be visibly off-centre on a phone
+      // viewport.  Other views fall back to geometric centre.
+      var homeX = vm.width / 2;
+      var homeY = vm.height / 2;
+      if (self.getImperium && view === self.getImperium()) {
+        var db = (getByType('DatabasePerp') || [])[0];
+        var dbPos = db && db.renderNode && db.renderNode.getPosition && db.renderNode.getPosition();
+        if (dbPos) {
+          homeX = dbPos.x;
+          homeY = dbPos.y;
+        }
+      }
+
+      var sx = Math.max(0, Math.min(maxX, homeX - vw / 2));
+      var sy = Math.max(0, Math.min(maxY, homeY - vh / 2));
       vm.scroller.scrollTo(sx, sy, animate);
     }, 50);
   };

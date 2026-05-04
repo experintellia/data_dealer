@@ -1306,6 +1306,24 @@ var Render = function () {
       });
   };
 
+  // ViewMap/ViewTab.addChild routes children into jdomelem1 (the
+  // pan/zoom-transformed container), so we measure against domelem1
+  // when present — measuring the outer domelem misses the parent's
+  // scroll/zoom translate and the spark starts in the wrong place.
+  function computeQueueItemOPos(psid, parentNode, oScale) {
+    var item = document.querySelector('.DatabaseQueue .DatabaseQueueItem[data-psid="' + psid + '"]');
+    var parentEl = parentNode && (parentNode.domelem1 || parentNode.domelem);
+    if (!item || !parentEl) return null;
+    var ir = item.getBoundingClientRect();
+    var pr = parentEl.getBoundingClientRect();
+    var ix = ir.left + ir.width / 2;
+    var iy = ir.top + ir.height / 2;
+    return {
+      x: (ix - pr.left) * oScale,
+      y: (iy - pr.top) * oScale,
+    };
+  }
+
   Node.prototype.FXSpark = function (config, cb) {
     var config = config || {};
     var psid = config.psid || undefined;
@@ -1335,19 +1353,9 @@ var Render = function () {
     var oScale = 1;
     if (psid && !oPos) {
       oScale = 1 / node.parentNode.zoomScale;
-      var PSpos = $('.DatabaseQueue')
-        .find('.DatabaseQueueItem[data-psid=' + psid + ']')
-        .position();
-      var PSleft = PSpos ? PSpos.left : 0;
-      oPos = {
-        x:
-          (Math.abs(node.parentNode.x) +
-            ((node.parentNode.parentNode.width - 720) / 2 + 55) +
-            PSleft) *
-          oScale,
-        y: (Math.abs(node.parentNode.y) + node.parentNode.parentNode.height - 78) * oScale,
-      };
-    } else if (!oPos) {
+      oPos = computeQueueItemOPos(psid, node.parentNode, oScale);
+    }
+    if (!oPos) {
       if (cb) {
         cb();
       }
@@ -1434,21 +1442,11 @@ var Render = function () {
     node.parentNode.addChild(spinner);
     var nPos = node.getPosition();
     var oScale = 1;
-    // TODO: make oPos dynamic
     if (psid && !oPos) {
       oScale = 1 / node.parentNode.zoomScale;
-      var PSleft = $('.DatabaseQueue')
-        .find('.DatabaseQueueItem[data-psid=' + psid + ']')
-        .position().left;
-      oPos = {
-        x:
-          (Math.abs(node.parentNode.x) +
-            ((node.parentNode.parentNode.width - 720) / 2 + 55) +
-            PSleft) *
-          oScale,
-        y: (Math.abs(node.parentNode.y) + node.parentNode.parentNode.height - 78) * oScale,
-      };
-    } else if (!oPos) {
+      oPos = computeQueueItemOPos(psid, node.parentNode, oScale);
+    }
+    if (!oPos) {
       return;
     }
     spinner.setPosition(nPos);
@@ -2430,7 +2428,7 @@ var Render = function () {
       });
       perp.dragalong = false;
     });
-    perp.on('mousedown', function (e) {
+    perp.on('mousedown touchstart', function (e) {
       e.stopPropagation();
     });
     perp.on('vmouseover', function (e) {
@@ -4351,6 +4349,16 @@ var Render = function () {
       GameRoot.trigger('switch_view', [$(this).attr('data-button-id')]);
     });
 
+    // Forward MainMenuXP taps to the same `click_status.XP` event the
+    // in-stage Statusbar emits — the cloned bar lives outside the
+    // Statusbar's DOM so its delegated handler doesn't reach.
+    this.jdomelem.on('click touchend', '.MainMenuXP .StatusItem', function (e) {
+      e.stopPropagation();
+      e.preventDefault();
+      var statusid = $(this).attr('data-status-id');
+      if (statusid) GameRoot.trigger('click_status.' + statusid);
+    });
+
     return this;
   };
 
@@ -4361,6 +4369,61 @@ var Render = function () {
   MainMenu.prototype.render = function () {
     var html = app.renderView(this.template, this.data);
     this.jdomelem.html(html);
+    // Invalidate the in-place XP cache so the next renderXP repopulates
+    // the freshly-emptied .MainMenuXPBar slot instead of memo-skipping.
+    this._xpSlot = null;
+    this._xpLast = null;
+  };
+
+  // Update the cloned XP bar in-place — 30 fps Statusbar ticks during
+  // XP animations would otherwise tear down + reinsert DOM each frame
+  // and interrupt any in-flight CSS transition on .StatusGraph width.
+  // Memoised against the last write so unchanged data is a no-op.
+  // `sb` is the Statusbar instance; read its scalars directly to avoid
+  // allocating a payload object per tick.
+  MainMenu.prototype.renderXP = function (sb) {
+    if (!this.jdomelem || !sb) return;
+    var prev = this._xpLast;
+    if (
+      prev &&
+      prev.active === sb.XP_active &&
+      prev.barsize === sb.XP_barsize &&
+      prev.val === sb.XP_val &&
+      prev.level === sb.XP_level
+    ) {
+      return;
+    }
+    this._xpLast = {
+      active: sb.XP_active,
+      barsize: sb.XP_barsize,
+      val: sb.XP_val,
+      level: sb.XP_level,
+    };
+    if (!this._xpSlot) {
+      this._xpSlot = this.jdomelem.find('.MainMenuXPBar')[0];
+      if (!this._xpSlot) return;
+    }
+    var item = this._xpSlot.querySelector('.StatusItem.XP');
+    if (!item) {
+      this._xpSlot.innerHTML = app.renderView('xp_bar.html', {
+        XP_active: sb.XP_active,
+        XP_barsize: sb.XP_barsize,
+        XP_val: sb.XP_val,
+        XP_level: sb.XP_level,
+      });
+      return;
+    }
+    var lvl = (sb.gameNode && sb.gameNode.GameRoot && sb.gameNode.GameRoot.xp_level) || {};
+    var xpMin = lvl.xp_min || 0;
+    var current = Math.max(0, Math.round((sb.XP_val || 0) - xpMin));
+    var total = Math.max(1, (lvl.xp_max || 0) - xpMin);
+    var graph = item.querySelector('.StatusGraph');
+    var text = item.querySelector('.StatusText');
+    var level = item.querySelector('.StatusTextLevel');
+    if (graph) graph.style.width = sb.XP_barsize + 'px';
+    if (text) text.textContent = current + '/' + total;
+    if (level) level.textContent = sb.XP_level;
+    item.classList.toggle('active', sb.XP_active > 0.2);
   };
 
   MainMenu.prototype.lock = function () {
@@ -4474,6 +4537,12 @@ var Render = function () {
     var html = app.renderView(this.template, this);
     this.jdomelem.append(html);
     this.draw();
+
+    // Mirror to the MainMenu's mobile XP slot (CSS hides it on desktop).
+    var groot = this.gameNode && this.gameNode.GameRoot;
+    if (groot && groot.renderMenu && groot.renderMenu.renderXP) {
+      groot.renderMenu.renderXP(this);
+    }
   };
 
   Statusbar.prototype.tick = function () {
@@ -5365,6 +5434,13 @@ var Render = function () {
 
   MissionPerp.prototype.setTransform = function () {
     // FIXME: maybe adapt to allow transforms
+    return;
+  };
+
+  // Stub: sizing is CSS-driven.  The inherited Node.setSize would
+  // otherwise write inline `width: 0px; height: 0px` (Node prototype
+  // defaults) and override the CSS width.
+  MissionPerp.prototype.setSize = function () {
     return;
   };
 

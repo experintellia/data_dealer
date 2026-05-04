@@ -31,27 +31,42 @@
 
   if (_.contains(['buy_perp'], goal.workflow)) {
     /* target only */
-    text = tdata.mgoal_text;
-    text = _.sprintf(text, target_title);
-  } 
+    if (tdata.mgoal_text) {
+      text = _.sprintf(tdata.mgoal_text, target_title);
+    }
+  }
   else if (_.contains(['buy_powerup'], goal.workflow)) {
     /* target and source */
-    text = powerupdata.mgoal_text;
-    text = _.sprintf(text, target_title, project_title);
+    /* Powerup data is loaded on-demand via fetchProjectPowerupData; if
+       a mission popup opens before the project's powerups have been
+       fetched (e.g. "Upgrade raffle" before the raffle project popup
+       has been opened once), `powerupdata.mgoal_text` is undefined and
+       a naked sprintf would throw, killing the whole goals list.  Fall
+       back to the generic `goals_texts.buy_powerup` template if the
+       powerup-specific override isn't loaded yet. */
+    if (powerupdata && powerupdata.mgoal_text) {
+      text = _.sprintf(powerupdata.mgoal_text, target_title, project_title);
+    } else if (text) {
+      text = _.sprintf(text, target_title, project_title);
+    }
   }
   else if (_.contains(['charge_perp'], goal.workflow)) {
     /* target */
-    text = tdata.mgoal_text_charge_perp;
-    text = _.sprintf(text, target_title);
+    if (tdata.mgoal_text_charge_perp) {
+      text = _.sprintf(tdata.mgoal_text_charge_perp, target_title);
+    }
   }
   else if (_.contains(['upgrade_token'], goal.workflow)) {
     /* target */
-    text = tdata.mgoal_text_collect_perp;
-    text = _.sprintf(text, target_title);
+    if (tdata.mgoal_text_collect_perp) {
+      text = _.sprintf(tdata.mgoal_text_collect_perp, target_title);
+    }
   }
   else if (_.contains(['collect_cash','collect_profiles','integrate_profiles'], goal.workflow)) {
     /* atmount and target */
-    text = _.sprintf(text, _.span(_.toKSNum(goal.amount)), target_title);
+    if (text) {
+      text = _.sprintf(text, _.span(_.toKSNum(goal.amount)), target_title);
+    }
   }
 
 %>
