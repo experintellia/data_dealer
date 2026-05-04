@@ -5,20 +5,6 @@
 import { getApplication } from './app.js';
 import { boot, getBootPromise, getReplayProgress } from './boot.js';
 
-// jQuery's Deferred type is wider than its native Promise — Game.js handlers
-// resolve with Deferreds whose `.fail()` arity matches the legacy callbacks.
-interface JQueryDeferred {
-  fail(handler: (...args: unknown[]) => void): JQueryDeferred;
-  then(
-    onResolved?: (...args: unknown[]) => unknown,
-    onRejected?: (...args: unknown[]) => unknown
-  ): JQueryDeferred;
-}
-
-type JQueryStatic = (selector: string | Element | Document) => {
-  html(content: string): unknown;
-};
-
 // In Node (vitest, SSR) there is no DOM and no vendor globals — skip
 // the whole UI hand-off so the module is import-safe without jsdom.
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
@@ -26,8 +12,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     boot();
   }
 
-  const g = globalThis as unknown as { jQuery?: JQueryStatic; $?: JQueryStatic };
-  const $ = g.jQuery ?? g.$;
+  const $ = jQuery ?? globalThis.$;
   if (!$) throw new Error('bootstrap.ts: jQuery global not found');
   const app = getApplication();
 
@@ -69,11 +54,11 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
   const continueStart = (): void => {
     clearInterval(progressTimer);
-    (app.loadViews() as JQueryDeferred).then(
+    app.loadViews().then(
       () => {
         console.info('Starting Game');
         try {
-          (app.start() as JQueryDeferred).fail(function (...args) {
+          app.start().fail(function (...args) {
             showFatal('app.start rejected', args.length ? args[0] : null);
           });
         } catch (err) {
