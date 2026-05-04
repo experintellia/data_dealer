@@ -5,8 +5,30 @@ import { getRender } from './Render.js';
 // alongside scripts that run before vendor `<script>` tags execute.
 import appModule from './app.js';
 import * as bootMod from './boot.js';
-import { GameNode, _ids, _instances, add, clear, get, remove } from './game/GameNode.js';
+import {
+  GameNode,
+  _ids,
+  _instances,
+  add,
+  clear,
+  eachByGestalt,
+  get,
+  getAllByGestalt,
+  getByFirstId,
+  getByGestalt,
+  getById,
+  getByLastId,
+  getByType,
+  getFirstId,
+  getGestalt,
+  getLastId,
+  getParentFromPath,
+  getParentId,
+  remove,
+} from './game/GameNode.js';
 import { OrderedSet } from './game/OrderedSet.js';
+import { Topscore } from './game/Topscore.js';
+import { Topscores } from './game/Topscores.js';
 import { mergeData } from './game/mergeData.js';
 import i18n from './i18n.js';
 import setup from './setup.js';
@@ -61,72 +83,14 @@ var Game = function () {
   //////////////////////////////////////////
   // Some helpers
   //////////////////////////////////////////
-
-  var getById = function (id) {
-    // Returns GameNode by ID
-    return _ids[id];
-  };
-
-  var getByGestalt = function (gestalt) {
-    // Returns GameNodes by gestalt (first found)
-    return _.findWhere(Game._ids, { gestalt: gestalt });
-  };
-
-  var getAllByGestalt = function (gestalt) {
-    // Returns GameNodes by gestalt (all found)
-    return _.where(Game._ids, { gestalt: gestalt });
-  };
-
-  var eachByGestalt = function (gestalt, func) {
-    // Returns GameNodes by gestalt (all found)
-    if (func) {
-      _.each(_.where(Game._ids, { gestalt: gestalt }), function (v, k) {
-        func(v, k);
-      });
-    }
-  };
-
-  var getByType = function (game_type) {
-    // Returns GameNodes by type
-    return _.where(Game._ids, { gameType: game_type });
-  };
-
-  var getLastId = function (path) {
-    // Returns last ID of a Path, usally the ID of the GameNode itself
-    return path.split(setup.pathSeparator).pop();
-  };
-
-  var getByLastId = function (path) {
-    // Returns GameNode by parsing the paths last ID
-    return getById(getLastId(path));
-  };
-
-  var getParentId = function (path) {
-    // Returns the ID of the second last element of a path
-    var parts = path.split(setup.pathSeparator);
-    parts.pop();
-    return parts.pop();
-  };
-
-  var getParentFromPath = function (path) {
-    // Returns the parent GameNode from a Node's full path
-    return getById(getParentId(path));
-  };
-
-  var getFirstId = function (path) {
-    // Returns the root of a Path
-    return path.split(setup.pathSeparator)[0];
-  };
-
-  var getByFirstId = function (path) {
-    // Returns the GameNode of the root of a path
-    return getById(getFirstId(path));
-  };
-
-  var getGestalt = function (full_type) {
-    // Returns the the gestalt from a full type definition
-    return full_type.split(setup.typeSeparator)[1];
-  };
+  //
+  // The id-/gestalt-/path-lookup helpers (getById, getByGestalt,
+  // getAllByGestalt, eachByGestalt, getByType, getLastId, getByLastId,
+  // getParentId, getParentFromPath, getFirstId, getByFirstId, getGestalt)
+  // were extracted to scripts/game/GameNode.ts so subclass extractions
+  // (Topscores/Missions/etc.) can import them without bouncing back
+  // through the IIFE.  The imports above bring them in as live bindings;
+  // the in-IIFE call sites below keep using the legacy names.
 
   // mergeData was extracted to scripts/game/mergeData.ts (imported above).
 
@@ -2958,139 +2922,12 @@ var Game = function () {
   ///////////////////////////////////
   // The Top Scores
   ///////////////////////////////////
-
-  var Topscores = function (config) {
-    var groot = this.GameRoot;
-    this.ViewMap = this;
-    this.queue = new Set();
-    this.init(config);
-    return this;
-  };
-  extend(Topscores, GameNode);
-
-  Topscores.prototype.renderType = 'ViewTab';
-
-  Topscores.prototype.extendRender = function () {
-    this.GameRoot.renderMenu.addButton(_._('Topscores'), this.id, this.states);
-  };
-
-  Topscores.prototype.initTopscore = function (type) {
-    var groot = this.GameRoot;
-    if (type === undefined) return;
-
-    score = new Game.Topscore({
-      id: 'Topscore' + type,
-      gestalt: 'topscore_' + type,
-      states: { complete: false, active: false },
-      scoretype: type,
-      data: groot.getTypeData('Topscore'),
-      renderNodeParent: getFirstId('Topscores'),
-      ViewMap: getByFirstId('Topscores'),
-      gameType: 'Topscore',
-    });
-    this.addChild(score);
-    score.render();
-    score.renderNode.hide();
-    return score;
-  };
-
-  Topscores.prototype.updateScores = function () {
-    this.children.each(function (score) {
-      score.lastFetch = null;
-      score.fetchScore(score.scoretype, true);
-    });
-  };
-
-  Topscores.prototype.extendEventHandlers = function () {
-    var gnode = this;
-    var groot = this.GameRoot;
-
-    gnode.on('viewtab_selected', function (e, type) {
-      var all_hidden = true;
-      gnode.children.each(function (score) {
-        score.fetchScore();
-        if (!score.renderNode.hidden) {
-          all_hidden = false;
-        }
-      });
-      var first = gnode.children.set[0];
-      if (first && all_hidden && gnode.children.length) {
-        first.renderNode.show();
-        gnode.renderNode.jdomelem
-          .find('.ViewTabMenuButton[data-button-gestalt="' + first.scoretype + '"]')
-          .addClass('active');
-      }
-    });
-
-    gnode.on('button_click.ViewTabMenuButton', function (e, type) {
-      e.stopPropagation();
-      var score = getByGestalt('topscore_' + type);
-      gnode.children.each(function (ts) {
-        ts.renderNode.hide();
-      });
-      score.renderNode.show();
-      score.fetchScore();
-    });
-
-    // Live leaderboard refresh on every state.peers ref change.
-    // Topscores lives for the page lifetime; the unsubscribe is dropped.
-    if (bootMod && typeof bootMod.subscribePeersChanged === 'function') {
-      bootMod.subscribePeersChanged(function () {
-        gnode.updateScores();
-      });
-    }
-  };
-
-  //////////////////////////////////
-
-  var Topscore = function (config) {
-    this.init(config);
-    return this;
-  };
-  extend(Topscore, GameNode);
-
-  Topscore.prototype.renderType = 'TopscorePerp';
-
-  Topscore.prototype.fetchScore = function (type, force) {
-    var gnode = this;
-    var groot = this.groot;
-    var type = type || gnode.scoretype;
-    var now = new Date();
-    // cache fetching for 30sec
-    if (!force && gnode.lastFetch && now - gnode.lastFetch < 30000) {
-      gnode.renderNode.jdomelem.removeClass('loading');
-      return;
-    }
-    app.remote
-      .getRanking(type)
-      .done(function (data) {
-        if (data.result && data.result.error === undefined) {
-          gnode.data = mergeData(gnode.data, data.result);
-          gnode.data.user_in_top = _.findWhere(gnode.data.top, { self: true }) !== undefined;
-          gnode.renderNode.renderRank();
-          gnode.renderNode.renderList();
-          gnode.renderNode.jdomelem.removeClass('loading');
-          gnode.lastFetch = new Date();
-        } else {
-          console.error('getRanking failed', data);
-        }
-      })
-      .fail(function (data) {
-        console.error('getRanking failed', data);
-      });
-  };
-
-  Topscore.prototype.extendEventHandlers = function () {
-    var gnode = this;
-    var groot = this.GameRoot;
-    var node = this.renderNode;
-
-    gnode.on('vclick', function (e, renderNode) {
-      e.stopPropagation();
-      gnode.renderNode.jdomelem.addClass('loading');
-      gnode.fetchScore();
-    });
-  };
+  //
+  // Extracted to scripts/game/Topscore.ts and scripts/game/Topscores.ts
+  // in PR 6 of issue #147.  Both classes are imported above; the API
+  // publisher at the bottom of this IIFE re-exposes them as
+  // Game.Topscores / Game.Topscore so callers (GameRoot.loadGame etc.)
+  // keep working unchanged.
 
   ///////////////////////////////////
   // The Missions and Mission Classes

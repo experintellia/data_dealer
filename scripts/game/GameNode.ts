@@ -20,6 +20,7 @@
 
 import type { JQueryLike, JQueryStatic } from '../../types/env.d.ts';
 import { getRender } from '../Render.js';
+import setup from '../setup.js';
 import { getTypeSettings } from '../type_settings.js';
 import { OrderedSet } from './OrderedSet.js';
 import { mergeData } from './mergeData.js';
@@ -67,6 +68,109 @@ export function clear(): void {
     }
   }
   _instances.length = 0;
+}
+
+// ---------------------------------------------------------------------------
+// Id / path helpers
+// ---------------------------------------------------------------------------
+// Read-side helpers over the registry.  Game.js used to inline these in its
+// IIFE; they live here now so subclass extractions (Topscores, Missions, …)
+// can import them without a roundtrip through Game.js.
+
+/** Returns the GameNode registered under `id` (the human-readable id, not _id). */
+export function getById(id: string): GameNode | undefined {
+  return _ids[id];
+}
+
+/** Returns the first segment of a Path (root id). */
+export function getFirstId(path: string): string {
+  const parts = path.split(setup.pathSeparator);
+  return parts[0] ?? '';
+}
+
+/** Returns the last segment of a Path (usually the GameNode's own id). */
+export function getLastId(path: string): string {
+  const parts = path.split(setup.pathSeparator);
+  return parts[parts.length - 1] ?? '';
+}
+
+/** Returns the second-last segment of a Path. */
+export function getParentId(path: string): string {
+  const parts = path.split(setup.pathSeparator);
+  parts.pop();
+  return parts.pop() ?? '';
+}
+
+/** Returns the GameNode at the root of a Path. */
+export function getByFirstId(path: string): GameNode | undefined {
+  return getById(getFirstId(path));
+}
+
+/** Returns the GameNode for the last segment of a Path. */
+export function getByLastId(path: string): GameNode | undefined {
+  return getById(getLastId(path));
+}
+
+/** Returns the parent GameNode of the node at the end of a Path. */
+export function getParentFromPath(path: string): GameNode | undefined {
+  return getById(getParentId(path));
+}
+
+/** Returns the gestalt segment of a `GameType:gestalt` full-type string. */
+export function getGestalt(full_type: string): string | undefined {
+  return full_type.split(setup.typeSeparator)[1];
+}
+
+// ---------------------------------------------------------------------------
+// Gestalt / type queries
+// ---------------------------------------------------------------------------
+// These walk the full registry; O(n) per call — fine for the leaderboard /
+// mission UI flows that already iterated `Game._ids`.
+
+/** First GameNode whose `.gestalt === gestalt`. */
+export function getByGestalt(gestalt: string): GameNode | undefined {
+  for (const id in _ids) {
+    if (Object.prototype.hasOwnProperty.call(_ids, id)) {
+      const node = _ids[id];
+      if (node && node.gestalt === gestalt) return node;
+    }
+  }
+  return undefined;
+}
+
+/** All GameNodes whose `.gestalt === gestalt`. */
+export function getAllByGestalt(gestalt: string): GameNode[] {
+  const out: GameNode[] = [];
+  for (const id in _ids) {
+    if (Object.prototype.hasOwnProperty.call(_ids, id)) {
+      const node = _ids[id];
+      if (node && node.gestalt === gestalt) out.push(node);
+    }
+  }
+  return out;
+}
+
+/** Run `func(node, id)` for every registered node whose `.gestalt === gestalt`. */
+export function eachByGestalt(gestalt: string, func: (node: GameNode, id: string) => void): void {
+  if (!func) return;
+  for (const id in _ids) {
+    if (Object.prototype.hasOwnProperty.call(_ids, id)) {
+      const node = _ids[id];
+      if (node && node.gestalt === gestalt) func(node, id);
+    }
+  }
+}
+
+/** All GameNodes whose `.gameType === game_type`. */
+export function getByType(game_type: string): GameNode[] {
+  const out: GameNode[] = [];
+  for (const id in _ids) {
+    if (Object.prototype.hasOwnProperty.call(_ids, id)) {
+      const node = _ids[id];
+      if (node && node.gameType === game_type) out.push(node);
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -161,12 +265,13 @@ export class GameNode {
   gameType?: string;
   is_origin?: boolean;
 
-  // Subclass-injected hooks; all optional.  Documented here so the base
-  // class's init() / render() can call them without per-subclass casts.
-  extendEventHandlers?: () => void;
-  extendRender?: () => void;
-  APTick?: () => void;
-  AniTick?: () => void;
+  // Subclass-injected hooks; all optional.  Declared as method members
+  // (rather than function-typed properties) so subclasses can `override`
+  // them with normal class-body methods.
+  extendEventHandlers?(): void;
+  extendRender?(): void;
+  APTick?(): void;
+  AniTick?(): void;
 
   // Used by addType() to write into the type registry.  Real registry
   // lives on GameRoot in Game.js; the base just mutates whatever object
