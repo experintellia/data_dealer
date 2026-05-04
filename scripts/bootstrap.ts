@@ -1,6 +1,5 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Boot the browser UI: render the loader, await engine replay, hand off
-// to app.start.  Imported as a side effect by scripts/esm-entry.js, so
+// to app.start.  Imported as a side effect by scripts/esm-entry.ts, so
 // the body runs once the bundle IIFE evaluates.
 
 import { getApplication } from './app.js';
@@ -13,15 +12,16 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     boot();
   }
 
-  const $ = globalThis.jQuery || globalThis.$;
+  const $ = jQuery ?? globalThis.$;
+  if (!$) throw new Error('bootstrap.ts: jQuery global not found');
   const app = getApplication();
 
   $('#dd-control').html(app.renderView('loader.html'));
 
-  const loaderEl = document.getElementById('loader');
+  const loaderEl = document.getElementById('loader') as HTMLProgressElement | null;
   let lastSerial = -1;
   let lastMax = -1;
-  const progressTimer = setInterval(() => {
+  const progressTimer: ReturnType<typeof setInterval> = setInterval(() => {
     const p = getReplayProgress();
     if (loaderEl && p.max_serial > 0 && (p.serial !== lastSerial || p.max_serial !== lastMax)) {
       loaderEl.value = p.serial;
@@ -35,10 +35,14 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     }
   }, 100);
 
-  const showFatal = (message, err) => {
+  const showFatal = (message: string, err: unknown): void => {
     console.error('Game start failed:', message, err);
-    if (err && err.stack) console.error(err.stack);
-    const detail = (err && err.message) || String(err || '');
+    if (err && typeof err === 'object' && 'stack' in err)
+      console.error((err as { stack?: string }).stack);
+    const detail =
+      err && typeof err === 'object' && 'message' in err
+        ? String((err as { message?: unknown }).message)
+        : String(err || '');
     $('#loadertext').html(
       'Sorry, the Game failed to start.<br>' +
         '<small style="opacity:.7">' +
@@ -48,20 +52,20 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     );
   };
 
-  const continueStart = () => {
+  const continueStart = (): void => {
     clearInterval(progressTimer);
     app.loadViews().then(
       () => {
         console.info('Starting Game');
         try {
-          app.start().fail(function () {
-            showFatal('app.start rejected', arguments.length ? arguments[0] : null);
+          app.start().fail(function (...args) {
+            showFatal('app.start rejected', args.length ? args[0] : null);
           });
         } catch (err) {
           showFatal('app.start threw', err);
         }
       },
-      (err) => showFatal('app.loadViews rejected', err)
+      (err: unknown) => showFatal('app.loadViews rejected', err)
     );
   };
 
