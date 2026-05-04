@@ -49,6 +49,7 @@ interface DoneFailChain<T> {
 }
 
 export class Missions extends GameNode {
+  override renderType = 'ViewTab';
   // Each child added in initMissions() is a Mission.
   declare children: OrderedSet<Mission>;
   /** Per-gestalt registry of mission instances; lookup target for getMission(). */
@@ -276,5 +277,3 @@ export class Missions extends GameNode {
     }
   }
 }
-
-Missions.prototype.renderType = 'ViewTab';

@@ -19,6 +19,7 @@ interface ImperiumRenderNode {
 }
 
 export class Imperium extends GameNode {
+  override renderType = 'ViewMap';
   ViewMap?: Imperium;
 
   constructor(config?: ConstructorParameters<typeof GameNode>[0]) {
@@ -42,5 +43,3 @@ export class Imperium extends GameNode {
     (this.renderNode as ImperiumRenderNode | undefined)?.unlock?.();
   }
 }
-
-Imperium.prototype.renderType = 'ViewMap';
