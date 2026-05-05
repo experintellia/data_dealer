@@ -164,21 +164,25 @@
     border-bottom: none;
   }
   /* Tabs grow to fill the row equally — text auto-sizes via the
-   * cascaded font-size media queries below.  `top: 4` shifts each tab
-   * 4 px past the menu's bottom edge so the tab's rounded corners and
-   * box-shadow get clipped, matching the desktop "tabs tucked into the
-   * menu" look.  Active tab sits flush so it reads as recessed. */
+   * cascaded font-size media queries below.  Square bottom corners
+   * (`border-radius: 8px 8px 0 0`) so each tab's bottom edge butts
+   * cleanly against the menu's bottom; without this, the rounded
+   * bottom corners expose the dark menu bg behind active tabs and
+   * read as a gap.  Asymmetric `padding: 2px 8px 8px 8px` matches
+   * the desktop ratio so Bowlby's top-aligned glyph + drop-shadow
+   * sit visually centred. */
   .mm-tabs .mm-tab {
     flex: 1 1 0;
     margin: 0;
-    top: 4px;
+    top: 0;
     height: 44px;
     min-height: 44px;
-    padding: 2px 8px 4px 8px;
-    line-height: 28px;
+    padding: 2px 8px 8px 8px;
+    line-height: 24px;
     font-size: 16px;
     box-sizing: border-box;
     text-align: center;
+    border-radius: 8px 8px 0 0;
   }
   .mm-tabs .mm-tab.active {
     top: 0;
