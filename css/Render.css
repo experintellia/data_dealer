@@ -3609,8 +3609,8 @@ button {
 @media (max-width: 480px) {
   .ViewTabMenuButton,
   .MainMenuButton {
-    padding: 2px 4px 5px 4px;
-    font-size: 11px;
+    padding: 1px 4px 2px 4px;
+    font-size: 15px;
     line-height: 18px;
     border-width: 2px;
     border-radius: 6px;
@@ -3636,8 +3636,8 @@ button {
 @media (max-width: 380px) {
   .ViewTabMenuButton,
   .MainMenuButton {
-    padding: 2px 2px 4px 2px;
-    font-size: 10px;
+    padding: 1px 3px 2px 3px;
+    font-size: 13px;
     line-height: 16px;
     margin-right: 1px;
   }
@@ -3661,26 +3661,34 @@ button {
 
 @media (max-width: 600px) {
   .Statusbar .StatusItem {
-    transform: scale(0.8);
+    transform: scale(0.9);
     transform-origin: top left;
     /* Reclaim the visual gap the scale leaves at each item's right edge. */
-    margin-right: calc(-1 * (1 - 0.8) * 144px) !important;
+    margin-right: calc(-1 * (1 - 0.9) * 144px) !important;
   }
 }
 
+/* ≤ 480 px: items can no longer fit in one row at a readable size, so
+ * allow wrapping to a second row instead of shrinking each item to
+ * thumbnail size.  scale 0.75 keeps ~108 px per item — readable text and
+ * icons — and 5 items wrap to a 3+2 layout on iPhone-SE-class phones.    */
 @media (max-width: 480px) {
+  .Statusbar {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
   .Statusbar .StatusItem {
-    transform: scale(0.55);
+    transform: scale(0.75);
     transform-origin: top left;
-    margin-right: calc(-1 * (1 - 0.55) * 144px) !important;
+    margin-right: calc(-1 * (1 - 0.75) * 144px) !important;
   }
 }
 
 @media (max-width: 380px) {
   .Statusbar .StatusItem {
-    transform: scale(0.45);
+    transform: scale(0.65);
     transform-origin: top left;
-    margin-right: calc(-1 * (1 - 0.45) * 144px) !important;
+    margin-right: calc(-1 * (1 - 0.65) * 144px) !important;
   }
 }
 
@@ -4176,7 +4184,10 @@ button {
  * so the popup has less vertical room than the total viewport.  Switch to
  * `position: fixed` so the popup overlay covers the complete screen —
  * including the header — giving the maximum height for dialog content.
- * z-index 100 is already above the game header's stacking context.        */
+ * z-index 100 is already above the game header's stacking context.
+ *
+ * Also relax the scale budget from 94vw → 100vw so dialogs use the entire
+ * available width with no breathing-room margins on the sides.            */
 @media (max-width: 480px) {
   .PopupContainer.lockOn {
     position: fixed;
@@ -4184,6 +4195,10 @@ button {
     left: 0;
     width: 100%;
     height: 100%;
-    padding: 8px 0;
+    padding: 4px 0;
+  }
+  .Popup {
+    --popup-s: clamp(0.5, calc(100vw / 612), 1);
+    max-width: 100vw;
   }
 }
