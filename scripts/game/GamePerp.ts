@@ -21,7 +21,7 @@ import { lookupPerpClass } from './perpRegistry.js';
 
 type CableType = 'in' | 'out' | 'inout';
 
-interface RenderNodeLike {
+export interface RenderNodeLike {
   sticky?: boolean;
   cableTo?(target: unknown, opts: { mode: CableType }): void;
   cableAnimatedTo?(target: unknown, opts: { mode: CableType }, cb?: () => void): void;
@@ -42,7 +42,7 @@ interface RenderNodeLike {
   DecoratorNew?: { remove?(): void };
 }
 
-interface RenderPopupLike {
+export interface RenderPopupLike {
   open?: boolean;
   trigger(ev: string, args?: unknown[]): void;
   close(): void;
@@ -55,7 +55,7 @@ interface TimerConf {
   serverStart?: number;
 }
 
-interface GameRootForPerp {
+export interface GameRootForPerp {
   data: { status_icons?: unknown; [key: string]: unknown };
   IPerps: Record<string, true>;
   xp_level: { number: number; [key: string]: unknown };
@@ -75,7 +75,7 @@ interface GameRootForPerp {
   getTypeData(gestalt?: string): Record<string, unknown> | undefined;
 }
 
-interface BuyPerpResult {
+export interface BuyPerpResult {
   game_values?: Record<string, unknown>;
   levelup?: boolean;
   missions?: unknown;
@@ -88,7 +88,7 @@ interface BuyPerpResult {
   error?: number;
 }
 
-interface DoneFailChain<T> {
+export interface DoneFailChain<T> {
   done(cb: (data: { result?: T }) => void): DoneFailChain<T>;
   fail(cb: (data: unknown) => void): DoneFailChain<T>;
 }
@@ -99,14 +99,19 @@ interface AniTickerLike {
   removeListener(node: GamePerp): void;
 }
 
-/** ProvidedPerp UI-row shape for the buy dialog (compileProvided). */
-interface ProvidedPerpRow {
+/** ProvidedPerp UI-row shape for the buy dialog (compileProvided).
+ *  CityPerp adds a `bought?` flag to the same shape. */
+export interface ProvidedPerpRow {
   gestalt: string;
-  locked: boolean;
+  locked?: boolean;
+  bought?: boolean;
   data: Record<string, unknown> & {
     required_level?: number;
     required_providers?: string[];
     requiredProviders?: string[];
+    max_instances?: number;
+    title?: string;
+    is_city?: boolean;
     [key: string]: unknown;
   };
 }
@@ -146,7 +151,7 @@ export class GamePerp extends GameNode {
   // Typed accessors (consolidated cast seam, per PR #177 review)
   // -------------------------------------------------------------------
 
-  private get groot(): GameRootForPerp {
+  protected get groot(): GameRootForPerp {
     return this.GameRoot as unknown as GameRootForPerp;
   }
 
@@ -223,7 +228,7 @@ export class GamePerp extends GameNode {
     return true;
   }
 
-  private static _stopProp(e: unknown): void {
+  protected static _stopProp(e: unknown): void {
     const fn = (e as { stopPropagation?: () => void } | null | undefined)?.stopPropagation;
     if (typeof fn === 'function') fn.call(e);
   }

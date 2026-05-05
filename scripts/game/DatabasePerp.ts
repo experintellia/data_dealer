@@ -11,57 +11,26 @@ import { getRender } from '../Render.js';
 import appModule from '../app.js';
 import i18n from '../i18n.js';
 import { getByFirstId, getByType, getFirstId } from './GameNode.js';
-import { GamePerp } from './GamePerp.js';
+import {
+  type BuyPerpResult,
+  type DoneFailChain,
+  GamePerp,
+  type GameRootForPerp,
+  type RenderNodeLike,
+  type RenderPopupLike,
+} from './GamePerp.js';
 import { mergeData } from './mergeData.js';
 import { lookupPerpClass } from './perpRegistry.js';
 
-interface RenderNodeLike {
-  cableAnimatedTo?(target: unknown, opts: { mode: string }, cb?: () => void): void;
-  addDecorator?(deco: unknown): unknown;
-  hide?(): void;
-  getPosition?(): { x: number; y: number };
-  getVectorTo?(target: unknown): unknown;
-  getVectorPos?(vector: unknown, ratio: number): { x: number; y: number };
-  parentNode?: { scrollTo?(pos: { x: number; y: number }): void };
-  FXNoCash?(): void;
-  FXArise?(cb?: () => void): void;
-  FXBounce?(): void;
-}
-
-interface RenderPopupLike {
-  open?: boolean;
-  trigger(ev: string, args?: unknown[]): void;
-}
-
-interface BuyPerpResult {
-  game_values?: Record<string, unknown>;
-  levelup?: boolean;
-  missions?: unknown;
+/** Database BuyPerp returns one extra field (`profile_set`) that the
+ *  generic perp BuyPerp doesn't — the Database queues it after the
+ *  city renders. */
+interface BuyCityResult extends BuyPerpResult {
   profile_set?: { profile_set?: unknown; origin?: unknown; collect_id?: unknown };
-  node?: {
-    game_id?: string;
-    game_type?: string;
-    full_path?: string;
-    instance_data?: Record<string, unknown>;
-  };
-  error?: number;
 }
 
-interface DoneFailChain<T> {
-  done(cb: (data: { result?: T }) => void): DoneFailChain<T>;
-  fail(cb: (data: unknown) => void): DoneFailChain<T>;
-}
-
-interface GameRootForDatabasePerp {
+interface GameRootForDatabasePerp extends GameRootForPerp {
   renderPopup?: RenderPopupLike;
-  updateGameValues(
-    gv: Record<string, unknown>,
-    levelup?: boolean,
-    missions?: unknown,
-    quiet?: boolean
-  ): void;
-  trigger(ev: string, args?: unknown[]): void;
-  getTypeData(gestalt?: string): Record<string, unknown> | undefined;
   getDatabase(): {
     cue(ps: unknown, origin: unknown, collect_id: unknown): unknown;
   };
@@ -70,25 +39,28 @@ interface GameRootForDatabasePerp {
 export class DatabasePerp extends GamePerp {
   override renderType = 'Perp';
 
+  protected override get groot(): GameRootForDatabasePerp {
+    return this.GameRoot as unknown as GameRootForDatabasePerp;
+  }
+
   override extendEventHandlers(): void {
     const gnode = this;
     this.on('vclick', function (e: unknown) {
-      const stop = (e as { stopPropagation?: () => void } | null | undefined)?.stopPropagation;
-      if (typeof stop === 'function') stop.call(e);
+      DatabasePerp._stopProp(e);
       gnode.trigger('switch_view', ['Database']);
     });
   }
 
   BuyCity(bgestalt: string, placePos?: { x: number; y: number }): void {
     const gnode = this;
-    const groot = this.GameRoot as unknown as GameRootForDatabasePerp;
+    const groot = this.groot;
     const Render = getRender() as unknown as {
       DecoratorNew: new (cfg: unknown) => unknown;
     };
     const buyPerpFn = appModule.getApplication().remote.buyPerp;
     if (!buyPerpFn) return;
     const path = gnode.path || '';
-    const call = buyPerpFn(path, bgestalt) as unknown as DoneFailChain<BuyPerpResult>;
+    const call = buyPerpFn(path, bgestalt) as unknown as DoneFailChain<BuyCityResult>;
     call.done(function (data) {
       if (!data.result) {
         gnode.Error?.('The computer says NOOOO', data);
