@@ -508,13 +508,19 @@ reducers.chargePerp = function chargePerpReducer(state, delta) {
   // would charge the wrong perp.
   var path = chargeEntry.path;
   var nodes = state.nodes || [];
+  var lastUpgradeData =
+    chargeEntry.result && chargeEntry.result.last_upgrade_data
+      ? chargeEntry.result.last_upgrade_data
+      : undefined;
   var newNodes = nodes.map(function (n) {
     if (n.full_path !== path) return n;
-    return Object.assign({}, n, {
-      instance_data: Object.assign({}, n.instance_data, {
-        charge_start: chargeEntry.charge_start,
-      }),
+    var newInstance: Record<string, any> = Object.assign({}, n.instance_data, {
+      charge_start: chargeEntry.charge_start,
     });
+    if (lastUpgradeData !== undefined) {
+      newInstance.last_upgrade_values = lastUpgradeData;
+    }
+    return Object.assign({}, n, { instance_data: newInstance });
   });
 
   var stillCharging = _filterByPath(state.nodes_charging, chargeEntry.path) as ChargingEntry[];

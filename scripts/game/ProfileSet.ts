@@ -37,7 +37,7 @@ interface TokenSetEntry {
   [key: string]: unknown;
 }
 
-interface UpgradeValuesShape {
+export interface UpgradeValuesShape {
   profiles_value: number;
   token_map: Record<string, number>;
 }

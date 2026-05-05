@@ -143,6 +143,40 @@ describe('chargePerp — happy path', () => {
     expect(node.instance_data.charge_start).toBe(FIXED_NOW);
   });
 
+  it('omits last_upgrade_values for non-TokenPerp charges', async () => {
+    await chargePerp(NODE_PATH); // contact035 = ContactPerp
+    expect(getState().nodes_charging[0].result.last_upgrade_data).toBeUndefined();
+    expect(getState().nodes[0].instance_data.last_upgrade_values).toBeUndefined();
+  });
+
+  it('snapshots last_upgrade_values for TokenPerp charges', async () => {
+    // supertoken002 is the canonical SuperTokenPerp in the ruleset (charge_time set,
+    // contained_tokens non-empty). Seed two sibling TokenPerps so the snapshot map
+    // is non-trivial.
+    const TP_PATH = 'Database.supertoken002';
+    setState(
+      _mkBaseState({
+        nodes: [
+          _mkNode('TokenPerp', TP_PATH),
+          _mkNode('TokenPerp', 'Database.token018', { amount: 30 }),
+          _mkNode('TokenPerp', 'Database.token125', { amount: 70 }),
+        ],
+        game_values: Object.assign({}, BASE_GV, { profiles_value: 12345 }),
+      })
+    );
+
+    await chargePerp(TP_PATH);
+
+    const node = getState().nodes.find((n) => n.full_path === TP_PATH);
+    expect(node.instance_data.last_upgrade_values).toEqual({
+      profiles_value: 12345,
+      token_map: { supertoken002: 0, token018: 30, token125: 70 },
+    });
+    expect(getState().nodes_charging[0].result.last_upgrade_data).toEqual(
+      node.instance_data.last_upgrade_values
+    );
+  });
+
   it('is deterministic: same ts+path produces same amount on repeated calls', async () => {
     // Charge, collect state, reset to initial, charge again — same result.
     await chargePerp(NODE_PATH);
