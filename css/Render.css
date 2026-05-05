@@ -940,7 +940,7 @@
   -moz-transform-origin:50% 50% !important;
   transform-origin:50% 50% !important;
   height:auto;
-  width:600px;
+  width: var(--popup-w);
 }
 .Popup.close {
   border:6px solid rgba(64,64,64,0);
@@ -1016,7 +1016,7 @@
 .PopupPage {
   display:block;
   float:left;
-  width: 540px;
+  width: var(--content-w);
   height: 254px;
   -webkit-transition: opacity 0.4s ease-out, -webkit-transform 0.4s ease-out;
   -moz-transition: opacity 0.4s ease-out, -moz-transform 0.4s ease-out;
@@ -1119,8 +1119,9 @@
   border: 6px solid #BFE7F5;
   padding: 12px 0px;
   box-shadow: 0px 0px 128px #BDE7F5 inset, 0px 0px 6px #009FD9;
-  height: 242px;
-  width: 540px;
+  min-height: var(--tokens-h);
+  height: auto;
+  width: var(--content-w);
   overflow:hidden;
   text-align:center;
 }
@@ -1654,6 +1655,7 @@
   border-radius:16px;
   padding:6px;
   height:auto;
+  width: var(--popup-body-w);
   position: relative;
 }
 /* `min-height` (not `height`) so the panes can grow if content needs
@@ -1665,14 +1667,14 @@
   border:6px solid #DADADA;
   border-radius:12px;
   box-shadow:0px 0px 2px #404040 inset;
-  min-height:155px;
+  min-height: var(--header-h);
 }
 .PopupContent {
   border:6px solid #DADADA;
   border-radius:12px;
   margin-top:6px;
   box-shadow:0px 0px 2px #404040 inset;
-  min-height:322px;
+  min-height: var(--content-h);
 }
 
 .TokenPerp.SuperToken .PopupHeader {
@@ -1927,7 +1929,7 @@
   top: 146px;
   left:180px;
   left: 50px;
-  width: 600px;
+  width: var(--popup-w);
   text-align: center;
 }
 
@@ -2017,8 +2019,9 @@
   top: 173px;
   left: 6px;
   margin: 12px 6px 6px 6px;
-  width: 576px;
-  height: 322px;
+  width: var(--panel-w);
+  min-height: var(--content-h);
+  height: auto;
   border-radius: 6px;
   box-shadow: 0px 0px 2px #404040 inset;
   -webkit-transition: opacity 0.2s linear 0.2s, visibility 0.2s;
@@ -2028,7 +2031,8 @@
   z-index:10000;
 }
 .SubpopContainer.half {
-  height:220px;
+  min-height: 220px;
+  height: auto;
   top:242px;
 }
 
@@ -2065,7 +2069,8 @@
   background: #FFF;
   border: 6px solid #BFE7F5;
   border-radius: 16px;
-  height: 266px;
+  min-height: var(--subpop-h);
+  height: auto;
   z-index: 10001;
   -webkit-transition: -webkit-transform 0.2s;
   -webkit-transform: scale(0,0);
@@ -2075,15 +2080,16 @@
   transition: transform 0.2s;
   transform: scale(0,0);
   transform-origin: 50% 100%;
-  top: 20px;
-  left: 12px;
-  width: 540px;
+  top: calc(var(--subpop-inset) + var(--gap));
+  left: var(--subpop-inset);
+  width: var(--content-w);
   box-shadow: 0px 0px 64px #BDE7F5 inset, 0px 0px 6px #009FD9;
 }
 
 .Subpop.TokenUpgrade {
-  height: 167px;
-  top: 19px;
+  min-height: 167px;
+  height: auto;
+  top: calc(var(--subpop-inset) + var(--gap) - 1px);
 }
 .Subpop.TokenUpgrade .SubpopSubTitle {
   line-height:20px;
@@ -2120,8 +2126,9 @@
 .PopupSelector {
   background: #BFE7F5;
   box-shadow: 0px 0px 128px #009FD9 inset;
-  width: 540px;
-  height: 266px;
+  width: var(--content-w);
+  min-height: var(--subpop-h);
+  height: auto;
   border-radius: 10px;
   overflow: hidden;
   text-align:center;
@@ -2133,10 +2140,11 @@
   position: absolute;
   border: 6px solid #BFE7F5;
   border-radius: 16px;
-  height: 266px;
-  top: 20px;
-  left: 12px;
-  width: 540px;
+  min-height: var(--subpop-h);
+  height: auto;
+  top: calc(var(--subpop-inset) + var(--gap));
+  left: var(--subpop-inset);
+  width: var(--content-w);
   box-shadow: 0px 0px 128px #009FD9 inset, 0px 0px 6px #009FD9;
 }
 
@@ -3876,10 +3884,28 @@ button {
  * we never up-scale, and to 0.5 so content stays legible on the smallest
  * phones.
  * ----------------------------------------------------------------------- */
+/* ── Popup sizing tokens — single source of truth ─────────────────────
+ * All derived widths below use these four primitives so changing
+ * --popup-w (e.g. for a wider layout) cascades automatically.       */
 .PopupContainer.lockOn {
   display: flex;
   align-items: center;
   justify-content: center;
+
+  --popup-w:       600px;   /* .Popup content width                     */
+  --gap:             6px;   /* base spacing unit (border, padding, inset)*/
+  --popup-body-w:  calc(var(--popup-w)      - 2 * var(--gap));  /* 588 */
+  --panel-w:       calc(var(--popup-body-w) - 2 * var(--gap));  /* 576 */
+  --content-w:     calc(var(--panel-w)      - 6 * var(--gap));  /* 540 */
+  --subpop-inset:  calc(2 * var(--gap));                        /*  12 */
+
+  /* Heights — design-specific, not derived */
+  --header-h:       155px;
+  --content-h:      322px;
+  --subpop-h:       266px;   /* Subpop panel + PopupSelector default height */
+  --page-h:         254px;   /* standard PopupPage                         */
+  --page-h-perp:    280px;   /* PerpPage / PowerupPage                     */
+  --tokens-h:       242px;   /* PopupTokens standard                       */
 }
 
 .Popup {
