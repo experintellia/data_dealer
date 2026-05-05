@@ -4850,10 +4850,6 @@ var Render = function () {
   extend(Popup, Node);
 
   Popup.prototype.template = 'popup.html';
-  Popup.prototype.width = 600;
-  //Popup.prototype.height = 520;
-  Popup.prototype.offsetX = Popup.prototype.width / 2;
-  Popup.prototype.offsetY = Popup.prototype.height / 2 - 10;
 
   Popup.prototype.initBaseUI = function () {
     var node = this;
@@ -5232,25 +5228,22 @@ var Render = function () {
   };
 
   Popup.prototype.onAddInit = function () {
-    this.height = this.jdomelem.height();
+    // Pin the body height once so the close-animation has a stable target
+    // (the keyframe scales `.PopupBody` to (2,0); without a fixed height
+    // the from-state would be `auto` and the transition wouldn't fire).
     var pbody = this.jdomelem.find('.PopupBody');
     pbody.css({ height: pbody.height() });
-    this.offsetY = this.height / 2 - 10;
-    this.updateRenderProp();
     if (this.placeBottom) {
-      this.y = app.game.renderNode.getSize().height - this.height / 2 - 32;
-    } else {
-      this.y = app.game.renderNode.getSize().height / 2;
+      this.jdomelem.addClass('placeBottom');
     }
-    this.x = app.game.renderNode.getSize().width / 2;
     this.draw();
   };
 
+  // Centring is CSS-driven (flex on `.PopupContainer.lockOn`) so we don't
+  // write inline width/height/transform here.  Opacity stays JS-driven
+  // because the rest of the FX pipeline tweens it.
+  Popup.prototype.setPosition = function () {};
   Popup.prototype.draw = function () {
-    // Update domelem to current settings
-    this.setSize(this.getSize());
-    this.setTransform(this.getTransform());
-    this.setPosition(this.getPosition());
     this.setOpacity(this.opacity);
   };
 
