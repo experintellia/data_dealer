@@ -5,7 +5,7 @@
 
 import i18n from '../i18n.js';
 import { type GameNodeConfig } from './GameNode.js';
-import { GamePerp, type GameRootForPerp } from './GamePerp.js';
+import { GamePerp } from './GamePerp.js';
 
 export class AgentPerp extends GamePerp {
   override renderType = 'Perp';
@@ -15,7 +15,7 @@ export class AgentPerp extends GamePerp {
     super(config);
     this.textNewItems = i18n.gettext('New Contacts!');
     if (this.gestalt !== undefined) {
-      (this.GameRoot as unknown as GameRootForPerp).IPerps[this.gestalt] = true;
+      this.groot.IPerps[this.gestalt] = true;
     }
   }
 

@@ -6,7 +6,7 @@
 import { getRender } from '../Render.js';
 import i18n from '../i18n.js';
 import { type GameNodeConfig } from './GameNode.js';
-import { GamePerp, type GameRootForPerp, type RenderNodeLike } from './GamePerp.js';
+import { GamePerp, type RenderNodeLike } from './GamePerp.js';
 
 export class ProxyPerp extends GamePerp {
   override renderType = 'Perp';
@@ -16,7 +16,7 @@ export class ProxyPerp extends GamePerp {
     super(config);
     this.textNewItems = i18n.gettext('New Ventures!');
     if (this.gestalt !== undefined) {
-      (this.GameRoot as unknown as GameRootForPerp).IPerps[this.gestalt] = true;
+      this.groot.IPerps[this.gestalt] = true;
     }
   }
 

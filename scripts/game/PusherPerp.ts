@@ -7,7 +7,7 @@
 
 import i18n from '../i18n.js';
 import { type GameNodeConfig } from './GameNode.js';
-import { GamePerp, type GameRootForPerp } from './GamePerp.js';
+import { GamePerp } from './GamePerp.js';
 
 export class PusherPerp extends GamePerp {
   override renderType = 'Perp';
@@ -19,7 +19,7 @@ export class PusherPerp extends GamePerp {
     super(config);
     this.textNewItems = i18n.gettext('New Clients!');
     if (this.gestalt !== undefined) {
-      (this.GameRoot as unknown as GameRootForPerp).IPerps[this.gestalt] = true;
+      this.groot.IPerps[this.gestalt] = true;
     }
   }
 
