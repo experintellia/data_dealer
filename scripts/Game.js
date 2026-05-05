@@ -5,6 +5,7 @@ import { getRender } from './Render.js';
 // alongside scripts that run before vendor `<script>` tags execute.
 import appModule from './app.js';
 import * as bootMod from './boot.js';
+import { AgentPerp } from './game/AgentPerp.js';
 import { CityPerp } from './game/CityPerp.js';
 import { Database } from './game/Database.js';
 import { DatabasePerp } from './game/DatabasePerp.js';
@@ -35,6 +36,7 @@ import { Mission } from './game/Mission.js';
 import { Missions } from './game/Missions.js';
 import { OrderedSet } from './game/OrderedSet.js';
 import { ProfileSet } from './game/ProfileSet.js';
+import { ProxyPerp } from './game/ProxyPerp.js';
 import { Topscore } from './game/Topscore.js';
 import { Topscores } from './game/Topscores.js';
 import { mergeData } from './game/mergeData.js';
@@ -2079,45 +2081,6 @@ var Game = function () {
   };
 
   ///////////////////////////////////
-  // The Agent
-  ///////////////////////////////////
-
-  var AgentPerp = function (config) {
-    this.init(config);
-    this.GameRoot.IPerps[this.gestalt] = true;
-    return this;
-  };
-
-  extend(AgentPerp, GamePerp);
-
-  AgentPerp.prototype.renderType = 'Perp';
-  AgentPerp.prototype.cableType = 'in';
-  AgentPerp.prototype.popupTemplate = 'popup_agent.html';
-  AgentPerp.prototype.textNewItems = _._('New Contacts!');
-
-  AgentPerp.prototype.extendEventHandlers = function () {
-    var gnode = this;
-    var groot = this.GameRoot;
-
-    gnode.compileProvided();
-
-    gnode.on('after_render', function (e, renderNode) {
-      gnode.checkProvidedByLevel();
-    });
-
-    gnode.on('vclick', function (e, renderNode) {
-      e.stopPropagation();
-      gnode.fetchProvided(function () {
-        gnode.compileProvided();
-        if (gnode.renderPopup) {
-          gnode.updatePopup();
-        }
-      });
-      var popup = this.openPopup();
-    });
-  };
-
-  ///////////////////////////////////
   // The Contact
   ///////////////////////////////////
 
@@ -2669,64 +2632,6 @@ class CollectableClient(CollectablePerpBase):
         .fail(function (data) {
           gnode.Error('The computer says NOOOO', data);
         });
-    }
-  };
-
-  ///////////////////////////////////
-  // The Proxy
-  ///////////////////////////////////
-
-  var ProxyPerp = function (config) {
-    this.init(config);
-    this.GameRoot.IPerps[this.gestalt] = true;
-    return this;
-  };
-
-  extend(ProxyPerp, GamePerp);
-
-  ProxyPerp.prototype.renderType = 'Perp';
-  ProxyPerp.prototype.cableType = 'in';
-  ProxyPerp.prototype.popupTemplate = 'popup_proxy.html';
-  ProxyPerp.prototype.textNewItems = _._('New Ventures!');
-
-  ProxyPerp.prototype.extendEventHandlers = function () {
-    var gnode = this;
-    var groot = this.GameRoot;
-
-    gnode.compileProvided();
-
-    gnode.on('after_render', function (e, renderNode) {
-      gnode.checkProvidedByLevel();
-    });
-
-    gnode.on('vclick', function (e, renderNode) {
-      e.stopPropagation();
-      gnode.data.used_slots = gnode.children.set.length;
-      gnode.fetchProvided(function () {
-        gnode.compileProvided();
-        if (gnode.renderPopup) {
-          gnode.updatePopup();
-        }
-      });
-      var popup = this.openPopup();
-    });
-
-    gnode.on('after_render', function () {
-      gnode.updateRenderSlotStatus();
-    });
-  };
-
-  ProxyPerp.prototype.updateRenderSlotStatus = function () {
-    var node = this.renderNode;
-    this.data.used_slots = this.children.set.length;
-    if (this.data.used_slots < this.data.max_slots) {
-      node.addDecorator(
-        new Render.DecoratorLabel({
-          text: this.data.label + '<br />' + this.data.used_slots + '/' + this.data.max_slots,
-        })
-      );
-    } else {
-      node.addDecorator(new Render.DecoratorLabel({ text: this.data.label }));
     }
   };
 

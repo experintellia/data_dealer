@@ -1,0 +1,68 @@
+// ProxyPerp — proxy perp.  Same shape as AgentPerp (compileProvided
+// at popup-open, IPerps flag at construction), plus a slot-status
+// label decorator that updates after every render.  Extracted from
+// scripts/Game.js's IIFE in PR 13 of issue #147.
+
+import { getRender } from '../Render.js';
+import i18n from '../i18n.js';
+import { type GameNodeConfig } from './GameNode.js';
+import { GamePerp, type GameRootForPerp, type RenderNodeLike } from './GamePerp.js';
+
+export class ProxyPerp extends GamePerp {
+  override renderType = 'Perp';
+  override popupTemplate = 'popup_proxy.html';
+
+  constructor(config: GameNodeConfig) {
+    super(config);
+    this.textNewItems = i18n.gettext('New Ventures!');
+    if (this.gestalt !== undefined) {
+      (this.GameRoot as unknown as GameRootForPerp).IPerps[this.gestalt] = true;
+    }
+  }
+
+  override extendEventHandlers(): void {
+    const gnode = this;
+    gnode.compileProvided();
+
+    gnode.on('after_render', function () {
+      gnode.checkProvidedByLevel();
+    });
+
+    gnode.on('vclick', function (e: unknown) {
+      ProxyPerp._stopProp(e);
+      const dataRec = gnode.data as { used_slots?: number };
+      dataRec.used_slots = gnode.children.set.length;
+      gnode.fetchProvided?.(function () {
+        gnode.compileProvided();
+        if (gnode.renderPopup) {
+          gnode.updatePopup();
+        }
+      });
+      gnode.openPopup();
+    });
+
+    gnode.on('after_render', function () {
+      gnode.updateRenderSlotStatus();
+    });
+  }
+
+  updateRenderSlotStatus(): void {
+    const node = this.renderNode as RenderNodeLike | undefined;
+    if (!node) return;
+    const Render = getRender() as unknown as {
+      DecoratorLabel: new (cfg: { text: string }) => unknown;
+    };
+    const dataRec = this.data as {
+      label?: string;
+      used_slots?: number;
+      max_slots?: number;
+    };
+    dataRec.used_slots = this.children.set.length;
+    const label = dataRec.label ?? '';
+    const text =
+      typeof dataRec.max_slots === 'number' && (dataRec.used_slots ?? 0) < dataRec.max_slots
+        ? `${label}<br />${dataRec.used_slots}/${dataRec.max_slots}`
+        : label;
+    node.addDecorator?.(new Render.DecoratorLabel({ text }));
+  }
+}
