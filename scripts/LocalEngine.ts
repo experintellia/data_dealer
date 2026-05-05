@@ -2704,7 +2704,7 @@ export function integrateCollected(
   }
   var _icOldProfiles = (state.game_values && state.game_values.profiles_value) || 0;
   var _icNewProfiles = newGv.profiles_value || 0;
-  var _icMilestones = [1000, 10000, 100000, 1000000];
+  var _icMilestones = [1000000];
   for (var _icPi = 0; _icPi < _icMilestones.length; _icPi++) {
     var ms2 = _icMilestones[_icPi];
     if (ms2 === undefined) continue;

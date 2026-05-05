@@ -282,17 +282,17 @@ describe('achievement — Tier 3: profile milestone via integrateCollected', () 
     setSendDelta(null);
   });
 
-  it('fires profiles_milestone when crossing the 1k threshold', async () => {
+  it('fires profiles_milestone when crossing the 1M threshold', async () => {
     setState(
       mkState({
         display_name: 'Frank',
         locale: 'en',
-        game_values: mkGv({ profiles_value: 900, ap_snapshot: 6 }),
+        game_values: mkGv({ profiles_value: 999000, ap_snapshot: 6 }),
         db_queue: [
           {
             origin: 'Imperium.City.contact035',
             collect_id: COLLECT_ID,
-            profile_set: { profiles_value: 200, tokens_map: {} },
+            profile_set: { profiles_value: 2000, tokens_map: {} },
             collect_dt: FIXED_NOW,
           },
         ],
@@ -302,9 +302,9 @@ describe('achievement — Tier 3: profile milestone via integrateCollected', () 
     await integrateCollected(COLLECT_ID);
     const calls = callsOfKind(spy, 'profiles_milestone');
     expect(calls).toHaveLength(1);
-    expect(calls[0][0].payload.threshold).toBe(1000);
+    expect(calls[0][0].payload.threshold).toBe(1000000);
     expect(calls[0][0].info).toContain('Frank');
-    expect(calls[0][0].info).toContain('1000');
+    expect(calls[0][0].info).toContain('1000000');
   });
 
   it('does not fire milestone when threshold not reached', async () => {
