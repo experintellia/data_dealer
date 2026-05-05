@@ -2037,6 +2037,17 @@ var Render = function () {
     config = config || {};
     var node = this.gameNode.GameRoot.renderNode;
     var nodePos = this.gameNode.GameRoot.renderStatusbar.getTopLeftPosition();
+    // Statusbar.getTopLeftPosition() returns stage.width/2 - 360 because
+    // the statusbar's logical design width is 720. On viewports narrower
+    // than 720 the value is negative, which would render the bling text
+    // off the left edge of the stage. Statusbar.css already forces the
+    // bar to left:0/width:100%, so clamp x into the visible stage with a
+    // small inset that matches the statusbar's CSS padding-inline.
+    var stageWidth = node.getSize().width;
+    var minX = 8;
+    var maxX = Math.max(minX, stageWidth - 8);
+    if (nodePos.x < minX) nodePos.x = minX;
+    if (nodePos.x > maxX) nodePos.x = maxX;
     config.wait = config.wait || 0;
     if (!node.renderBlings) {
       node.renderBlings = {};
