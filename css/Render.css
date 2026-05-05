@@ -3948,8 +3948,8 @@ button {
     transform-origin: top center;
   }
 
-  /* Show every page at once.  Override the slider transitions and the
-     `hidden` opacity/scale effect that pagination relies on. */
+  /* Disable JS-driven left-slide transitions; horizontal scroll-snap takes
+     over in the fix block below.  width:100% is overridden there too. */
   .PopupPageWrap {
     width: 100%;
     left: 0 !important;
@@ -4079,13 +4079,17 @@ button {
   box-sizing: content-box;
 }
 
-/* --- Mobile: keep action button after all visible content ----------------
- * On narrow viewports the mobile layout reveals every pagination page at
- * once, making .PopupContent grow taller than its designed height.  The
- * absolutely-positioned .PopupButtons then appears in the middle of the
- * expanded content (e.g. Sweepstakes Upgrades showing 5 items).
- * Re-join the normal flow so the button always trails all items. */
+/* --- Mobile pagination: horizontal scroll-snap ≤ 768 px -----------------
+ * Instead of stacking all pages vertically (which caused z-index conflicts
+ * between the absolutely-positioned SubpopContainer and the grid items),
+ * lay pages side by side in a flex row and let native touch scroll handle
+ * page turns.  CSS scroll-snap gives the same one-page-at-a-time feel as
+ * the old JS arrow taps, without any extra JavaScript.
+ *
+ * The action button is pulled into normal flow so it always trails the
+ * (single) visible page, regardless of overall content height. */
 @media (max-width: 768px) {
+  /* Button follows content in normal flow */
   .PopupContent > .PopupTab > .PopupButtons {
     position: static;
     margin: 8px auto;
@@ -4093,10 +4097,47 @@ button {
     width: auto;
   }
 
-  /* On mobile all pagination pages are revealed at once, so the fixed-height
-   * token grid in SuperToken popups clips the second row.  Let it grow. */
+  /* Flex row: override the "show-all" width:100% from the earlier block */
+  .PopupPageWrap {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    width: max-content;
+  }
+
+  /* Each page occupies exactly one viewport of the scroll container */
+  .PopupPage,
+  .PopupPage.PerpPage,
+  .PopupPage.PowerupPage {
+    flex: 0 0 540px;
+    width: 540px;
+    scroll-snap-align: start;
+  }
+
+  /* Scroll container for perp / karma / city upgrade grids */
+  .PopupSelector,
+  .standalone .PopupSelector {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .PopupSelector::-webkit-scrollbar,
+  .standalone .PopupSelector::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Scroll container for token data-type icon grids (SuperToken popup) */
   .Pagination.half .PopupTokens {
-    height: auto;
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    height: 128px;   /* keep original height; scroll instead of expanding */
+  }
+  .Pagination.half .PopupTokens::-webkit-scrollbar {
+    display: none;
   }
 }
