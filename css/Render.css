@@ -1654,7 +1654,6 @@
   border-radius:16px;
   padding:6px;
   height:auto;
-  width: 588px;
   position: relative;
 }
 /* `min-height` (not `height`) so the panes can grow if content needs
