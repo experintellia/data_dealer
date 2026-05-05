@@ -10,6 +10,7 @@ import { getRender } from '../Render.js';
 import appModule from '../app.js';
 import { type GameNodeConfig } from './GameNode.js';
 import {
+  type ChargeResult,
   type DoneFailChain,
   GamePerp,
   type GameRootForPerp,
@@ -42,14 +43,6 @@ interface ClientRenderNodeLike extends RenderNodeLike {
 interface TokenRef {
   gestalt: string;
   amount: number;
-}
-
-interface ChargeResult {
-  error?: number;
-  game_values?: Record<string, unknown>;
-  levelup?: boolean;
-  missions?: unknown;
-  duration?: number;
 }
 
 interface CollectResult {
@@ -102,27 +95,28 @@ export class ClientPerp extends GamePerp {
     return karma_factor;
   }
 
-  getIncome(nopenalty?: boolean): number {
+  /** Computes the karma-independent income base (token-amount sum × DB
+   *  fill factor, raised to the 0.6 exponent).  Extracted so the two
+   *  back-to-back `getIncome()` / `getIncome(true)` calls in the click
+   *  handler share a single token reduction + DB walk. */
+  private getIncomeBase(): number {
     const groot = this.groot;
-    const dataRec = (this.data || {}) as {
-      income_base?: number;
-      income_factor?: number;
-      consumed_tokens?: TokenRef[];
-    };
-    const base_income = dataRec.income_base ?? 0;
-    const base_income_factor = dataRec.income_factor ?? 0;
-    const consumed_tokens = dataRec.consumed_tokens ?? [];
-    let amount = consumed_tokens.reduce((memo, token) => {
+    const dataRec = (this.data || {}) as { consumed_tokens?: TokenRef[] };
+    const sum = (dataRec.consumed_tokens ?? []).reduce((memo, token) => {
       return memo + (groot.getDBTokenAmount(token.gestalt) * token.amount) / 10000;
     }, 0);
-    const db_fill_factor = groot.getDBFactorNormalized();
+    return (sum * groot.getDBFactorNormalized()) ** 0.6;
+  }
+
+  getIncome(nopenalty?: boolean): number {
+    const dataRec = (this.data || {}) as { income_base?: number; income_factor?: number };
+    const base_income = dataRec.income_base ?? 0;
+    const base_income_factor = dataRec.income_factor ?? 0;
+    const amount = this.getIncomeBase();
     const karma_penalty_factor = nopenalty ? 1 : this.getKarmaPenalty();
-    amount = (amount * db_fill_factor) ** 0.6;
-    return Number.parseInt(
-      String(
-        karma_penalty_factor *
-          Math.round(base_income + amount * base_income * (base_income_factor / 1000))
-      )
+    return Math.trunc(
+      karma_penalty_factor *
+        Math.round(base_income + amount * base_income * (base_income_factor / 1000))
     );
   }
 
@@ -219,7 +213,7 @@ export class ClientPerp extends GamePerp {
           deco.setFrame('normal');
           console.warn('collect failed', data.result.error);
         } else {
-          gperp.Error?.('The computer says NOOOO', data);
+          gperp._serverError(data);
         }
       })
       .fail(function () {
@@ -270,7 +264,7 @@ export class ClientPerp extends GamePerp {
     call
       .done(function (data) {
         if (!data.result) {
-          gnode.Error?.('The computer says NOOOO', data);
+          gnode._serverError(data);
           return;
         }
         const r = data.result;
@@ -295,7 +289,7 @@ export class ClientPerp extends GamePerp {
         });
       })
       .fail(function (data) {
-        gnode.Error?.('The computer says NOOOO', data);
+        gnode._serverError(data);
       });
   }
 }

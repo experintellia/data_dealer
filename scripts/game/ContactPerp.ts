@@ -11,6 +11,7 @@ import { getRender } from '../Render.js';
 import appModule from '../app.js';
 import { type GameNodeConfig } from './GameNode.js';
 import {
+  type ChargeResult,
   type DoneFailChain,
   GamePerp,
   type GameRootForPerp,
@@ -37,14 +38,6 @@ interface ContactRenderNodeLike extends RenderNodeLike {
   FXCharge?(): void;
   FXNoAP?(): void;
   FXDataOut?(): void;
-}
-
-interface ChargeResult {
-  error?: number;
-  game_values?: Record<string, unknown>;
-  levelup?: boolean;
-  missions?: unknown;
-  duration?: number;
 }
 
 interface CollectResult {
@@ -131,7 +124,7 @@ export class ContactPerp extends GamePerp {
     call
       .done(function (data) {
         if (!data.result) {
-          gnode.Error?.('The computer says NOOOO', data);
+          gnode._serverError(data);
           return;
         }
         const r = data.result;
@@ -163,7 +156,7 @@ export class ContactPerp extends GamePerp {
         });
       })
       .fail(function (data) {
-        gnode.Error?.('The computer says NOOOO', data);
+        gnode._serverError(data);
       });
   }
 
@@ -220,7 +213,7 @@ export class ContactPerp extends GamePerp {
           deco.setFrame('normal');
           console.warn('collect failed');
         } else {
-          gperp.Error?.('The computer says NOOOO', data);
+          gperp._serverError(data);
         }
       })
       .fail(function () {

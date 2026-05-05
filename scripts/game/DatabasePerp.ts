@@ -63,7 +63,7 @@ export class DatabasePerp extends GamePerp {
     const call = buyPerpFn(path, bgestalt) as unknown as DoneFailChain<BuyCityResult>;
     call.done(function (data) {
       if (!data.result) {
-        gnode.Error?.('The computer says NOOOO', data);
+        gnode._serverError(data);
         return;
       }
       const r = data.result;
