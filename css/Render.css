@@ -3643,9 +3643,14 @@ button {
   }
 }
 
-/* Statusbar: per-item scale + matching margin-right so the layout box
- * shrinks in lockstep with the visual paint (scale alone leaves the
- * layout width at 142+140+144+130 ≈ 560 and the row overflows). */
+/* Statusbar: fluid viewport-based scale so the row of items always fills
+ * the available stage width without leaving large empty gaps between
+ * items.  Replaces the previous step-by-step breakpoint scaling.
+ *
+ * Native total width of all 5 items ≈ 684 px.  We size against 720 px so
+ * a small flex gap remains at every viewport instead of items butting up
+ * edge-to-edge.  clamp() floors the scale at 0.5 so items stay legible
+ * on the very smallest phones, and caps at 1 so we never up-scale.        */
 @media (max-width: 768px) {
   .Statusbar .StatusItem.Profiles,
   .Statusbar .StatusItem.Cash,
@@ -3653,42 +3658,25 @@ button {
   .Statusbar .StatusItem.Karma {
     margin: 0;
   }
-  /* Spread items across the full stage width instead of clustering in center. */
   .Statusbar {
+    --status-s: clamp(0.5, calc(100vw / 720), 1);
     justify-content: space-evenly;
   }
-}
-
-@media (max-width: 600px) {
   .Statusbar .StatusItem {
-    transform: scale(0.9);
+    transform: scale(var(--status-s));
     transform-origin: top left;
-    /* Reclaim the visual gap the scale leaves at each item's right edge. */
-    margin-right: calc(-1 * (1 - 0.9) * 144px) !important;
+    /* Reclaim the layout-box gap the visual scaling leaves on the right. */
+    margin-right: calc((var(--status-s) - 1) * 144px) !important;
   }
 }
 
-/* ≤ 480 px: items can no longer fit in one row at a readable size, so
- * allow wrapping to a second row instead of shrinking each item to
- * thumbnail size.  scale 0.75 keeps ~108 px per item — readable text and
- * icons — and 5 items wrap to a 3+2 layout on iPhone-SE-class phones.    */
-@media (max-width: 480px) {
+/* ≤ 380 px: items at clamp's 0.5 floor still total ~342 px which fits
+ * comfortably in a 320 px viewport, but allow wrap as a safety net for
+ * very narrow viewports or large UI scaling. */
+@media (max-width: 380px) {
   .Statusbar {
     flex-wrap: wrap;
     row-gap: 4px;
-  }
-  .Statusbar .StatusItem {
-    transform: scale(0.75);
-    transform-origin: top left;
-    margin-right: calc(-1 * (1 - 0.75) * 144px) !important;
-  }
-}
-
-@media (max-width: 380px) {
-  .Statusbar .StatusItem {
-    transform: scale(0.65);
-    transform-origin: top left;
-    margin-right: calc(-1 * (1 - 0.65) * 144px) !important;
   }
 }
 
