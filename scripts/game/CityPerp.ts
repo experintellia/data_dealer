@@ -6,22 +6,7 @@
 // Extracted from scripts/Game.js's IIFE in PR 12 of issue #147.
 
 import { type GameNodeConfig, getAllByGestalt, getByGestalt } from './GameNode.js';
-import { GamePerp } from './GamePerp.js';
-
-interface ProvidedPerpRow {
-  gestalt: string;
-  data: Record<string, unknown> & {
-    required_level?: number;
-    required_providers?: string[];
-    requiredProviders?: string[];
-    max_instances?: number;
-    title?: string;
-    is_city?: boolean;
-    [key: string]: unknown;
-  };
-  locked?: boolean;
-  bought?: boolean;
-}
+import { GamePerp, type GameRootForPerp, type ProvidedPerpRow } from './GamePerp.js';
 
 type TabKey = 'AgentPerp' | 'PusherPerp' | 'ProxyPerp' | 'CityPerp';
 
@@ -31,11 +16,8 @@ interface CityType {
   [key: string]: unknown;
 }
 
-interface GameRootForCityPerp {
-  IPerps: Record<string, true>;
-  xp_level: { number: number; [key: string]: unknown };
+interface GameRootForCityPerp extends GameRootForPerp {
   getTypes(gameType: string): Record<string, CityType>;
-  getTypeData(gestalt?: string): ProvidedPerpRow['data'] | undefined;
 }
 
 export class CityPerp extends GamePerp {
@@ -43,15 +25,19 @@ export class CityPerp extends GamePerp {
   override cableType = 'inout' as const;
   override popupTemplate = 'popup_city.html';
 
+  protected override get groot(): GameRootForCityPerp {
+    return this.GameRoot as unknown as GameRootForCityPerp;
+  }
+
   constructor(config: GameNodeConfig) {
     super(config);
     if (this.gestalt !== undefined) {
-      (this.GameRoot as unknown as GameRootForCityPerp).IPerps[this.gestalt] = true;
+      this.groot.IPerps[this.gestalt] = true;
     }
   }
 
   compileProvidedCities(): ProvidedPerpRow[] {
-    const groot = this.GameRoot as unknown as GameRootForCityPerp;
+    const groot = this.groot;
     const dataRec = this.data as {
       providedCities?: ProvidedPerpRow[];
       buyablePerps?: string[];
@@ -79,7 +65,7 @@ export class CityPerp extends GamePerp {
   }
 
   override compileProvided(): void {
-    const groot = this.GameRoot as unknown as GameRootForCityPerp;
+    const groot = this.groot;
     const dataRec = this.data as {
       provided_perps?: string[];
       buyablePerps?: string[];
@@ -87,13 +73,17 @@ export class CityPerp extends GamePerp {
       providedTabs?: Record<string, ProvidedPerpRow[]>;
     };
 
-    const provided = dataRec.provided_perps || [];
     const providedCache: Record<TabKey, string[]> = {
-      AgentPerp: provided.filter((v) => v.substring(0, 5) === 'agent'),
-      ProxyPerp: provided.filter((v) => v.substring(0, 5) === 'proxy'),
-      PusherPerp: provided.filter((v) => v.substring(0, 6) === 'pusher'),
+      AgentPerp: [],
+      ProxyPerp: [],
+      PusherPerp: [],
       CityPerp: this.compileProvidedCities().map((c) => c.gestalt),
     };
+    (dataRec.provided_perps || []).forEach((v) => {
+      if (v.startsWith('agent')) providedCache.AgentPerp.push(v);
+      else if (v.startsWith('proxy')) providedCache.ProxyPerp.push(v);
+      else if (v.startsWith('pusher')) providedCache.PusherPerp.push(v);
+    });
 
     const tabs: Record<TabKey, ProvidedPerpRow[]> = {
       AgentPerp: [],
@@ -101,9 +91,18 @@ export class CityPerp extends GamePerp {
       ProxyPerp: [],
       CityPerp: [],
     };
-    dataRec.providedTabs = tabs;
-    dataRec.providedPerps = dataRec.providedPerps || [];
+    dataRec.providedPerps = [];
     const buyable = new Set(dataRec.buyablePerps || []);
+
+    // Pre-compute gestalt → instance count once instead of walking the
+    // _ids registry per-row.  compileProvided is popup-open-time, not
+    // a render hot path, but the pre-compute is cheap.
+    const instanceCounts = new Map<string, number>();
+    (Object.values(providedCache) as string[][]).forEach((list) => {
+      list.forEach((g) => {
+        if (!instanceCounts.has(g)) instanceCounts.set(g, getAllByGestalt(g).length);
+      });
+    });
 
     (Object.keys(tabs) as TabKey[]).forEach((k) => {
       const tab = tabs[k];
@@ -119,7 +118,7 @@ export class CityPerp extends GamePerp {
         if (!perp.data.max_instances) {
           perp.data.max_instances = 1;
         }
-        if (perp.data.max_instances && getAllByGestalt(p).length >= perp.data.max_instances) {
+        if (perp.data.max_instances && (instanceCounts.get(p) ?? 0) >= perp.data.max_instances) {
           perp.locked = true;
           perp.bought = true;
         }
@@ -151,8 +150,7 @@ export class CityPerp extends GamePerp {
   override extendEventHandlers(): void {
     const gnode = this;
     this.on('vclick', function (e: unknown) {
-      const stop = (e as { stopPropagation?: () => void } | null | undefined)?.stopPropagation;
-      if (typeof stop === 'function') stop.call(e);
+      CityPerp._stopProp(e);
 
       // Empty the Tabs (later used for loader in popup).
       const dataRec = gnode.data as {
