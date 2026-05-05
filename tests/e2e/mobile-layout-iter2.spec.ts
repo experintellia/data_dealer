@@ -22,7 +22,7 @@ test('iter2: all 4 tabs on one row', async ({ page }) => {
   // Group tops into row-bands.  The desktop active-tab CSS bumps the
   // active button by 4 px (top:9 vs top:13), so we bucket by 10-px bands
   // to recognise that the active tab still sits visually in row 1.
-  const rows = await page.locator('.MainMenu .MainMenuButton').evaluateAll((els) => {
+  const rows = await page.locator('.MainMenu .mm-tab').evaluateAll((els) => {
     const tops = els.map((e) => Math.round(e.getBoundingClientRect().top));
     const bands: number[] = [];
     for (const t of tops) {
@@ -33,7 +33,7 @@ test('iter2: all 4 tabs on one row', async ({ page }) => {
   });
   expect(rows.length, `tabs span ${rows.length} row-bands: ${rows.join(',')}`).toBe(1);
 
-  const count = await page.locator('.MainMenu .MainMenuButton').count();
+  const count = await page.locator('.MainMenu .mm-tab').count();
   expect(count).toBe(4);
 });
 
@@ -52,7 +52,7 @@ test('iter2: cloned XP bar is clickable + emits click_status.XP', async ({ page 
     game.on('click_status.XP', () => {
       saw = true;
     });
-    const xpItem = document.querySelector<HTMLElement>('.MainMenuXP .StatusItem.XP');
+    const xpItem = document.querySelector<HTMLElement>('.mm-xp .StatusItem.XP');
     if (!xpItem) throw new Error('cloned XP item not found');
     xpItem.dispatchEvent(
       new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [] as any })
@@ -72,8 +72,8 @@ test('iter2: username label sits above the cloned XP bar', async ({ page }) => {
   });
 
   const layout = await page.evaluate(() => {
-    const name = document.querySelector<HTMLElement>('.MainMenuXP .MainMenuXPName');
-    const bar = document.querySelector<HTMLElement>('.MainMenuXP .StatusItem.XP');
+    const name = document.querySelector<HTMLElement>('.mm-xp .mm-xp-name');
+    const bar = document.querySelector<HTMLElement>('.mm-xp .StatusItem.XP');
     if (!name || !bar) return null;
     return {
       nameBottom: name.getBoundingClientRect().bottom,

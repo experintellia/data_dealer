@@ -43,15 +43,15 @@ test('mobile-touch: tab touch fires view switch (no double-fire)', async ({ page
     timeout: 50_000,
   });
 
-  const databaseTab = page.locator('.MainMenuButton[data-button-id="Database"]');
+  const databaseTab = page.locator('.mm-tab[data-button-id="Database"]');
   await expect(databaseTab).toBeVisible();
 
   // Dispatch a synthetic touch sequence.  page.tap() may stall on hidden
   // ancestors in the canvas-heavy stage, so we drive the DOM event API
-  // directly — the click+touchend pair on .MainMenuButton is what we're
+  // directly — the click+touchend pair on .mm-tab is what we're
   // exercising.
   await page.evaluate(() => {
-    const el = document.querySelector<HTMLElement>('.MainMenuButton[data-button-id="Database"]');
+    const el = document.querySelector<HTMLElement>('.mm-tab[data-button-id="Database"]');
     if (!el) throw new Error('database tab missing');
     el.dispatchEvent(
       new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [] as any })

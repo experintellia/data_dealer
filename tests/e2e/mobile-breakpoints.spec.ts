@@ -25,11 +25,11 @@ async function bootAt(page: import('@playwright/test').Page, w: number, h: numbe
   });
 }
 
-test('breakpoint ≥ 981: logo visible, MainMenuXP hidden', async ({ page }) => {
+test('breakpoint ≥ 981: logo visible, .mm-xp hidden', async ({ page }) => {
   await bootAt(page, 1024, 800);
   const state = await page.evaluate(() => {
     const logo = document.querySelector<HTMLElement>('.MainMenuLogo');
-    const xp = document.querySelector<HTMLElement>('.MainMenuXP');
+    const xp = document.querySelector<HTMLElement>('.mm-xp');
     return {
       logoDisplay: logo ? getComputedStyle(logo).display : null,
       xpDisplay: xp ? getComputedStyle(xp).display : null,
@@ -43,7 +43,7 @@ test('breakpoint ≤ 980: logo hidden, XP NOT yet relocated to header', async ({
   await bootAt(page, 960, 800);
   const state = await page.evaluate(() => {
     const logo = document.querySelector<HTMLElement>('.MainMenuLogo');
-    const xpClone = document.querySelector<HTMLElement>('.MainMenuXP');
+    const xpClone = document.querySelector<HTMLElement>('.mm-xp');
     const inStageXp = document.querySelector<HTMLElement>('.Statusbar .StatusItem.XP');
     return {
       logoDisplay: logo ? getComputedStyle(logo).display : null,
@@ -63,7 +63,7 @@ test('breakpoint ≤ 980: logo hidden, XP NOT yet relocated to header', async ({
 test('breakpoint ≤ 926: cloned XP bar appears + in-stage XP hidden', async ({ page }) => {
   await bootAt(page, 900, 800);
   const state = await page.evaluate(() => {
-    const xpClone = document.querySelector<HTMLElement>('.MainMenuXP');
+    const xpClone = document.querySelector<HTMLElement>('.mm-xp');
     const inStageXp = document.querySelector<HTMLElement>('.Statusbar .StatusItem.XP');
     return {
       xpCloneDisplay: xpClone ? getComputedStyle(xpClone).display : null,
@@ -77,8 +77,8 @@ test('breakpoint ≤ 926: cloned XP bar appears + in-stage XP hidden', async ({ 
 test('breakpoint ≤ 926: two-row header (tabs below XP slot)', async ({ page }) => {
   await bootAt(page, 900, 800);
   const state = await page.evaluate(() => {
-    const xp = document.querySelector<HTMLElement>('.MainMenuXP');
-    const tabs = document.querySelector<HTMLElement>('.MainMenuButtons');
+    const xp = document.querySelector<HTMLElement>('.mm-xp');
+    const tabs = document.querySelector<HTMLElement>('.mm-tabs');
     if (!xp || !tabs) return null;
     const xpRect = xp.getBoundingClientRect();
     const tabsRect = tabs.getBoundingClientRect();

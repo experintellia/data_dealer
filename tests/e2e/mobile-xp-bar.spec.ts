@@ -2,9 +2,9 @@
  * Mobile XP bar clone (issue #80).
  *
  * The XP statusItem is cloned out of the in-stage Statusbar into the
- * MainMenu's `.MainMenuXP` slot on mobile breakpoints (≤ 768 px).  This
+ * MainMenu's `.mm-xp` slot on mobile breakpoints (≤ 768 px).  This
  * spec verifies that:
- *   - the cloned bar exists inside `.MainMenu .MainMenuXP`
+ *   - the cloned bar exists inside `.MainMenu .mm-xp`
  *   - it sits within the MainMenu's row 1 (so it can't visually leak into
  *     the playfield like the previous CSS-magic position:fixed approach
  *     could when the sprite z-index lost the stacking-order race)
@@ -24,7 +24,7 @@ test('mobile-xp: XP bar is cloned into MainMenu and stays in row 1', async ({ pa
 
   const layout = await page.evaluate(() => {
     const menu = document.querySelector<HTMLElement>('.MainMenu');
-    const slot = document.querySelector<HTMLElement>('.MainMenu .MainMenuXP');
+    const slot = document.querySelector<HTMLElement>('.MainMenu .mm-xp');
     const cloneXp = slot?.querySelector<HTMLElement>('.StatusItem.XP') ?? null;
     const inStageXp = document.querySelector<HTMLElement>('.Statusbar .StatusItem.XP');
     if (!menu || !slot || !cloneXp) {

@@ -1,0 +1,269 @@
+/* MainMenu.css — styles scoped exclusively to views/mainmenu.html.
+ *
+ * Classes use a `mm-*` lowercase-dash convention to make it visually
+ * obvious at the call site that they are NOT reused elsewhere — fixes
+ * here cannot leak into the rest of the UI.  The only exception is
+ * `.MainMenuLogo`, which is also used by the About popup (see
+ * views/popup_user_data.html); its sprite-image rule lives in
+ * Render.css and only the in-menu positioning is set here, scoped under
+ * `.MainMenu .MainMenuLogo`.
+ */
+
+.MainMenu {
+  overflow: hidden;
+  margin: 0 auto;
+  background: linear-gradient(to bottom, #001111 0%, #06546c 100%);
+  border-radius: 8px 8px 0 0;
+}
+
+.MainMenu .MainMenuLogo {
+  position: absolute;
+  top: 6px;
+  left: 10px;
+}
+
+/* ── About / locale-toggle pair (top-right) ─────────────────────────── */
+.mm-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.mm-user-btn {
+  display: inline-block;
+  border-radius: 8px;
+  border: 2px solid #c95127;
+  font-family: Bowlby, sans-serif;
+  color: #fceccc;
+  font-size: 13px;
+  line-height: 20px;
+  text-shadow: 2px 2px 0 #963200, -1px -1px 0 #963200, -1px 1px 0 #963200, 1px -1px 0 #963200;
+  background: #e48931;
+  padding: 0 6px;
+  box-shadow: 1px 1px 0 #c95127, 3px 3px 0 #c95127;
+  touch-action: manipulation;
+}
+.mm-user-btn:hover {
+  transform: scale(1.1, 1.1);
+}
+.mm-user-btn.disabled,
+.mm-user-btn.disabled:hover {
+  transform: none;
+  opacity: 0.5;
+}
+.mm-user-btn:not(.disabled):active {
+  background: #ecf8fc;
+  transform: scale(0.97);
+}
+
+/* ── Primary tab row ────────────────────────────────────────────────── */
+.mm-tabs {
+  height: 39px;
+  padding-top: 6px;
+  padding-left: 240px;
+  border-bottom: 3px solid #16a3d7;
+}
+
+.mm-tab {
+  display: inline-block;
+  position: relative;
+  top: 13px;
+  font-family: Bowlby, sans-serif;
+  color: #009fd9;
+  font-size: 16px;
+  background: #b7dded;
+  line-height: 24px;
+  border: 3px solid #009fd9;
+  border-radius: 8px;
+  padding: 2px 16px 8px 16px;
+  margin-right: 8px;
+  box-shadow: 3px 3px 0 #009fd9;
+  text-shadow: 0 0 0 white, 1px 1px 0 white, 2px 2px 0 white, 3px 3px 0 white;
+  transition: top 0.2s linear;
+  touch-action: manipulation;
+  white-space: nowrap;
+}
+.mm-tab.active {
+  background: #ecf8fc;
+  color: #e48931;
+  top: 9px;
+  transition: top 0 linear;
+}
+.mm-tab:hover {
+  background: #ecf8fc;
+}
+.mm-tab.disabled,
+.mm-tab.disabled:hover {
+  transform: none;
+  opacity: 0.5;
+}
+.mm-tab.disabled:hover {
+  background: #b7dded;
+}
+.mm-tab.active.disabled:hover {
+  background: #ecf8fc;
+}
+.mm-tab:not(.disabled):active {
+  background: #ecf8fc;
+  transform: scale(0.97);
+}
+
+/* ── Mobile / responsive layout ─────────────────────────────────────── */
+
+/* ≤ 980 px: hide the brand logo so the tabs reclaim its space. */
+@media (max-width: 980px) {
+  .MainMenu .MainMenuLogo {
+    display: none;
+  }
+  .mm-tabs {
+    padding-left: 0;
+  }
+  .mm-actions {
+    top: 6px;
+    right: 6px;
+  }
+}
+
+/* ≤ 926 px: two-row header — XP bar row on top, tabs below.
+ *
+ * Header height is content-driven via flex column (no min-height /
+ * padding-top constants).  Top corners stay rounded; bottom is flush
+ * against the Stage.  In-stage Statusbar XP hides; the cloned XP item
+ * inside .mm-xp shows instead.
+ */
+@media (max-width: 926px) {
+  .MainMenu {
+    display: flex;
+    flex-direction: column;
+    border-radius: 8px 8px 0 0;
+  }
+  .mm-xp {
+    display: block;
+    align-self: flex-start;
+    margin: 4px 0 4px 28px;
+  }
+  .mm-tabs {
+    padding: 2px 6px;
+    height: auto;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: stretch;
+    gap: 4px;
+    box-sizing: border-box;
+    width: 100%;
+  }
+  .mm-tabs .mm-tab {
+    flex: 0 1 auto;
+    margin-right: 0;
+  }
+  .mm-user-btn {
+    padding: 3px 8px;
+    font-size: 13px;
+    margin-left: 4px;
+    box-sizing: border-box;
+  }
+  .Statusbar .StatusItem.XP {
+    display: none;
+  }
+  .mm-xp .mm-xp-name {
+    font-family: Bowlby, sans-serif;
+    font-size: 11px;
+    line-height: 12px;
+    color: #fff;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    margin-bottom: -1px;
+    padding-left: 18px;
+    max-width: 156px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    box-sizing: border-box;
+  }
+  .mm-xp .StatusItem.XP .StatusIcon.xp {
+    left: -19px;
+  }
+  .mm-xp .StatusItem.XP .StatusTextLevel {
+    left: -14px;
+    width: 28px;
+    height: 25px;
+    line-height: 25px;
+    text-align: center;
+    font-size: 14px;
+    color: #333;
+  }
+  .mm-xp .StatusItem.XP .StatusText {
+    text-align: center;
+    width: 128px;
+    box-sizing: border-box;
+  }
+}
+
+@media (min-width: 927px) {
+  .mm-xp {
+    display: none;
+  }
+}
+
+/* ── Tap-target / mobile sizing for tabs.
+ *
+ * Goal: text as large as fits on one line (no ellipsis, no wrap) and
+ * balanced top/bottom padding so there's no fat empty band below the
+ * text.  44 px tap target is preserved via `min-height`.  The `top:`
+ * offset between active/inactive remains, just smaller — the desktop
+ * "press down" cue still reads on touch.
+ */
+@media (max-width: 768px) {
+  .mm-user-btn {
+    padding: 4px 12px;
+    font-size: 15px;
+    margin-left: 6px;
+  }
+
+  .mm-tab {
+    min-height: 44px;
+    padding: 7px 12px;
+    line-height: 24px;
+    font-size: 16px;
+    box-sizing: border-box;
+    top: 4px;
+  }
+  .mm-tab.active {
+    top: 0;
+  }
+  .mm-tab + .mm-tab {
+    margin-left: 4px;
+  }
+}
+
+@media (max-width: 600px) {
+  .mm-tab {
+    padding: 8px 8px;
+    font-size: 15px;
+    line-height: 22px;
+    box-shadow: 2px 2px 0 #009fd9;
+  }
+}
+
+@media (max-width: 480px) {
+  .mm-tab {
+    padding: 6px 6px;
+    font-size: 11px;
+    line-height: 18px;
+    border-width: 2px;
+    border-radius: 6px;
+    box-shadow: 1px 1px 0 #009fd9;
+  }
+  .mm-tab + .mm-tab {
+    margin-left: 2px;
+  }
+}
+
+@media (max-width: 380px) {
+  .mm-tab {
+    padding: 6px 4px;
+    font-size: 10px;
+    line-height: 16px;
+    margin-right: 1px;
+  }
+}
