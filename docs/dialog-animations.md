@@ -13,7 +13,7 @@ The legacy codebase uses **four distinct animation mechanisms** across dialog UI
 | Mechanism | Files : lines | Affects |
 |---|---|---|
 | **TweenJS (CreateJS)** | `scripts/Render.js:1243–2115` | All canvas-sprite FX overlaid on dialogs: NoCash, NoAP, Error, LevelUp, MissionComplete, KarmaBling, BlingQueue, decorators |
-| **CSS `@keyframes`** | `css/Render.css:2895–3150`, `css/dd.css:103–118` | Popup enter, powerup slot enter/exit, spinner, pulsate, error-text flash, jump, mission-reward pulse |
+| **CSS `@keyframes`** | `css/Render.css:2895–3150`, `css/dd.css:103–118` | Tutorial body enter, powerup slot enter/exit, spinner, pulsate, notification badge rotation pulse, error-text flash, jump, mission-reward pulse |
 | **CSS `transition`** | `css/Render.css` (various) | Popup exit, subpop open/close, backdrop appear, tab/page slide, button active state, SubpopContainer fade |
 | **jQuery `.animate()` / `.fadeIn()` / `.fadeOut()`** | `scripts/Render.js:3151–3156, 4782–4806` · `scripts/Game.js:3492, 3522` | Decorator bar width fills, database queue item moves, powerup slot background crossfade |
 | **`requestAnimationFrame`** | `scripts/Render.js:4146, 4174` | Map zoom step — **not dialog-related; excluded** |
@@ -44,67 +44,90 @@ plugin is loaded.
 - The `lockOn` class is added to the pre-existing `.PopupContainer` div when
   `Popup` is instantiated (`scripts/Render.js:4840`).
 
-**Duration:** 150 ms  
-**Easing:** linear  
-**Properties animated:** `background` (transparent → semi-opaque), `visibility` (hidden → visible), `box-shadow`  
-**Direction:** enter only; the same transition fires in reverse on exit when `.lockOn` is removed.
+**Two variants — duration depends on popup type:**
 
-**CSS translation:**
+| Variant | Duration | Easing | Selector |
+|---|---|---|---|
+| Standard popups (CityPerp, ProjectPerp, UserData, etc.) | **instant** (`transition: none`) | — | `.PopupContainer.lockOn` |
+| Notification variants (Alert, Tutorial, NewItems, Mission, LevelUp) | **150 ms** | linear | `.PopupContainer.lockOn.Alert` etc. (`css/Render.css:654–662`) |
+
+**Properties animated (notification variants only):** `background`, `visibility`, `box-shadow`  
+**Direction:** enter; the same transition fires in reverse on exit when `.lockOn` is removed (standard popups disappear instantly on exit too).
+
+**CSS translation (notification variant):**
 ```css
 .backdrop {
   visibility: hidden;
   background: transparent;
-  transition: background 150ms linear, visibility 150ms linear, box-shadow 150ms linear;
 }
+/* standard popups — no transition on backdrop */
 .backdrop.is-open {
   visibility: visible;
-  background: rgba(0, 0, 0, 0.75); /* match legacy value */
-  box-shadow: /* match legacy value */;
+  transition: none;
+  background: transparent;
+  box-shadow: 0px 0px 256px #000 inset;
+}
+/* notification variants — short fade */
+.backdrop.is-open.is-alert    { background: rgba(255, 0, 0, 0.4); }
+.backdrop.is-open.is-levelup  { background: rgba(255, 255, 255, 0.2); }
+.backdrop.is-open.is-alert,
+.backdrop.is-open.is-mission,
+.backdrop.is-open.is-tutorial,
+.backdrop.is-open.is-new-items,
+.backdrop.is-open.is-levelup {
+  transition: background 150ms linear, visibility 150ms linear, box-shadow 150ms linear;
 }
 ```
 
 ---
 
-### Pattern: dialog body pop-in (`AniPlugIn2`)
+### Pattern: dialog body entrance
 
-**Used by:** every popup and notification dialog on first appearance; also reused
-for individual powerup sprites entering a slot (see [powerup slot enter](#pattern-powerup-slot-enter-aniplugin2)).
+**Used by:** all popups on first appearance.
 
 **Legacy implementation:**  
-CSS `@keyframes AniPlugIn2` — `css/Render.css:3070–3123`.  
-Applied as `animation: AniPlugIn2 0.4s linear` on `.PopupBody` when the
-container gains `.lockOn`, and separately on `.Powerup.updating .PowerupPerp`
-(`css/Render.css:2243–2245`).
+The `.PopupBody` element has **no enter animation** (`css/Render.css:1652–1659` has no `animation` or enter `transition` rule). The body appears as-is when the container becomes visible. The only visual drama on enter comes from:
+- The backdrop transition (instant or 150 ms depending on type, see above)
+- For Tutorial dialogs only: `AniScaleOpacity 0.2s reverse` on `.PopupBody.TutorialBody` (see below)
 
-**Duration:** 400 ms  
-**Easing:** linear (per-keyframe easing controls the feel, not the overall curve)  
-**Properties animated:** `transform: scale(...)`, `opacity`  
-**Direction:** enter
+> `@keyframes AniPlugIn2` is **not** applied to `.PopupBody`. It is only used for powerup sprites within popups — see [powerup slot enter](#pattern-powerup-slot-enter-aniplugin2).
 
-**Full keyframe values (`css/Render.css:3070–3123`):**
+---
+
+### Pattern: tutorial dialog body enter (`AniScaleOpacity` reversed)
+
+**Used by:** Tutorial and LevelUp dialogs (`.PopupBody.TutorialBody`) only.
+
+**Legacy implementation:**  
+CSS `@keyframes AniScaleOpacity` — `css/Render.css:2923–2941`, applied in **reverse** on `.PopupBody.TutorialBody` (`css/Render.css:2663–2665`):  
+`animation: AniScaleOpacity 0.2s reverse`
+
+Playing in reverse means the animation runs end → start: begins at `scale(2,0) opacity 0` and ends at `scale(1,1) opacity 1` — a scale-and-fade **enter** effect.
+
+**Duration:** 200 ms  
+**Easing:** browser default (`ease`)  
+**Properties animated:** `transform: scale(2,0) → scale(1,1)`, `opacity: 0 → 1`  
+**Direction:** enter (reverse playback of a scale-out keyframe)
+
+**Full keyframe values (`css/Render.css:2932–2941`, played in reverse):**
 ```
-  0%  scale(0.0, 0.0)  opacity 0
- 60%  scale(1.2, 1.2)  opacity 1
- 70%  scale(1.0, 1.0)
- 80%  scale(1.1, 1.1)
- 90%  scale(1.0, 1.0)
- 95%  scale(1.05,1.05)
-100%  scale(1.0, 1.0)  opacity 1
+exit definition (forward):
+  0%   scale(1, 1)    opacity 1
+ 100%  scale(2, 0)    opacity 0
+
+enter effect (reverse):
+  0%   scale(2, 0)    opacity 0   ← start
+ 100%  scale(1, 1)    opacity 1   ← end
 ```
 
 **CSS translation:**
 ```css
-@keyframes dialogPopIn {
-  0%   { transform: scale(0,   0);   opacity: 0; }
-  60%  { transform: scale(1.2, 1.2); opacity: 1; }
-  70%  { transform: scale(1.0, 1.0); }
-  80%  { transform: scale(1.1, 1.1); }
-  90%  { transform: scale(1.0, 1.0); }
-  95%  { transform: scale(1.05,1.05); }
-  100% { transform: scale(1.0, 1.0); opacity: 1; }
+@keyframes tutorialBodyEnter {
+  from { transform: scale(2, 0); opacity: 0; }
+  to   { transform: scale(1, 1); opacity: 1; }
 }
-.dialog-body {
-  animation: dialogPopIn 400ms linear;
+.tutorial-body {
+  animation: tutorialBodyEnter 200ms ease;
 }
 ```
 
@@ -161,10 +184,16 @@ AgentPerp, KarmaSelector, TokenPerp (upgrade detail).
   - `.Subpop.open { transform: scale(1, 1); transition: transform 0.1s }`
   - `.SubpopContainer.open { opacity: 1; visibility: visible; transition: 0s }` (instant)
 
-**Duration:** 100 ms (`.Subpop` transform); `SubpopContainer` opacity/visibility instant  
+**Duration:** 100 ms (`.Subpop` transform); `SubpopContainer` opacity/visibility: instant on open  
 **Easing:** browser default (`ease`)  
 **Properties animated:** `transform: scale(0,0) → scale(1,1)`, origin at bottom-centre  
 **Direction:** enter; grows upward from bottom of anchor point
+
+> **`.SubpopContainer` opacity/visibility transition** (`css/Render.css:2020–2035`):
+> Default state has `transition: opacity 0.2s linear 0.2s, visibility 0.2s` (fades in with a 200 ms delay).
+> `.SubpopContainer.open` overrides to `transition: opacity 0s` (instant opacity) so that the
+> container becomes visible immediately when opened. On close (removing `.open`), the 0.2s + 0.2s-delay
+> fade fires, staggering the container's disappearance 200 ms after the `.Subpop` scale-out finishes.
 
 ---
 
@@ -284,6 +313,31 @@ Staggered timing: `0.30s`, `0.31s`, `0.32s`, `0.33s` for successive reward types
 
 ---
 
+### Pattern: notification title badge pulse (`AniNewRot`)
+
+**Used by:** `.NotificationTitle` — the "New!" badge on New Items notifications (New
+Contacts!, New Clients!, New Ventures!, New Powerups!). The badge is positioned
+top-left of the notification card, permanently tilted at −16°.
+
+**Legacy implementation:**  
+CSS `@keyframes AniNewRot` — `css/Render.css:2974–2983`.  
+Applied via `css/Render.css:2560–2564`:  
+`animation: AniNewRot 0.3s linear infinite alternate`
+
+**Duration:** 300 ms per half-cycle, `infinite alternate`  
+**Easing:** linear  
+**Properties animated:** `transform: scale` (while the element's `transform: rotate(-16deg)` base is fixed)
+
+```
+0%   scale(1.08, 1.08) rotate(-16deg)
+100% scale(1.02, 1.02) rotate(-16deg)
+```
+
+> Identical rhythm to `AniPulsate` (0.3 s linear infinite alternate) but applied to a tilted
+> text badge rather than a button — the `rotate(-16deg)` is a static base, not animated.
+
+---
+
 ### Pattern: loading spinner (`AniRotate`)
 
 **Used by:** `.StatusSpinner` (dialog loading states), `.DDLoaderSpinner` (dd.css).
@@ -300,7 +354,7 @@ CSS `@keyframes AniRotate` — `css/Render.css:2895–2920`.
 
 **Duration:** 1 s per cycle  
 **Easing:** linear  
-**Properties animated:** `transform: rotate`, `transform: scale` (breathing effect)
+**Properties animated:** combined `transform: rotate(...) scale(...)` (rotation with breathing scale effect)
 
 `dd.css:103–118` defines `DDSpinnerRotate` — a simpler `from: rotate(0deg)` →
 `to: rotate(360deg)` at 1.2 s linear infinite (no scale breathing).
@@ -328,17 +382,30 @@ CSS `@keyframes AniJump` — `css/Render.css:3028–3067`.
 
 ---
 
-### Pattern: powerup slot enter (`AniPlugIn2` — second usage)
+### Pattern: powerup slot enter (`AniPlugIn2`)
 
 **Used by:** `.Powerup.updating .PowerupPerp` — when a powerup appears in a slot
-inside ProjectPerp or Token popup.
+inside ProjectPerp or Token popup. This is the **only** CSS usage of `AniPlugIn2`.
 
 **Legacy implementation:**  
-Same `@keyframes AniPlugIn2` as [dialog pop-in](#pattern-dialog-body-pop-in-aniplugin2).  
-CSS rule: `css/Render.css:2243–2245` —
+CSS `@keyframes AniPlugIn2` — `css/Render.css:3070–3123`.  
+Applied via `css/Render.css:2243–2245`:  
 `animation: AniPlugIn2 0.4s linear` on `.Powerup.updating .PowerupPerp`.
 
-**Duration:** 400 ms · **Easing:** linear · **Properties:** scale + opacity (same keyframes as dialog pop-in).
+**Duration:** 400 ms  
+**Easing:** linear  
+**Properties animated:** `transform: scale(...)`, `opacity`
+
+**Full keyframe values (`css/Render.css:3094–3123`):**
+```
+  0%  scale(0.0, 0.0)  opacity 0
+ 60%  scale(1.2, 1.2)  opacity 1
+ 70%  scale(1.0, 1.0)
+ 80%  scale(1.1, 1.1)
+ 90%  scale(1.0, 1.0)
+ 95%  scale(1.05,1.05)
+100%  scale(1.0, 1.0)  opacity 1
+```
 
 ---
 
@@ -411,11 +478,14 @@ classes (no separate CSS animation; the class changes colour/state only).
 **CSS/WAAPI translation for DOM-only reimplementation:**
 ```css
 @keyframes noCashEnter {
-  from { transform: scale(5) rotate(-360deg); opacity: 0; translate: 0 -400px; }
-  to   { transform: scale(1) rotate(0deg);    opacity: 1; translate: 0 0; }
+  /* NOTE: the canvas original positions the sprite at nodeY-400 (absolute canvas coord).
+     In a DOM reimplementation, translateY(-400px) is relative to the element's
+     natural position — adjust if the element's starting position differs from the button. */
+  from { transform: scale(5) rotate(-360deg) translateY(-400px); opacity: 0; }
+  to   { transform: scale(1) rotate(0deg)    translateY(0);      opacity: 1; }
 }
 @keyframes noCashExit {
-  from { transform: scale(1);   opacity: 1; }
+  from { transform: scale(1);                opacity: 1; }
   to   { transform: scale(1.5) rotate(360deg); opacity: 0; }
 }
 ```
@@ -590,13 +660,17 @@ TweenJS text node (`scripts/Render.js:2071–2100`).
 | `extendClass` | `''` | Extra CSS class (e.g. `LevelUpBlingBig`, `KarmaUpBling`) |
 | `renderOn` | parent node | Override for parent container |
 
-**Sequence:** wait → snap to `scale(0.5)` → animate to `scale(1.0)` + `opacity 0`
-over `dur` ms (easeOut).  
+**Sequence:** wait → snap to `scale(0.5)` → simultaneously scale to `scale(1.0)` while fading out (`opacity: 0`) over `dur` ms (easeOut). Text appears small, grows, and fades out in a single motion.  
 Start position: `nodePos.x, nodePos.y − 50`.
 
 ---
 
 ### Pattern: FXBlingQueue — database queue notifications
+
+> **Scope note:** FXBlingQueue renders at the status bar's top-left corner
+> (`renderStatusbar.getTopLeftPosition()`), which is an always-visible HUD element.
+> It is listed here for completeness but is **out of scope** for the dialog/overlay
+> Preact refactor. Address with the HUD refactor instead.
 
 **Used by:** profile sync and database queue updates; `scripts/Render.js:2035–2069`.
 
@@ -654,9 +728,8 @@ jQuery `.animate({ width: targetPx }, 600)` on `.DecoratorAmountValue`.
 
 ## Per-dialog override table
 
-The table lists any deviation from the universal default pattern
-(pop-in via AniPlugIn2 400 ms · exit via `.Popup.close` 200 ms ·
-backdrop via `.PopupContainer.lockOn` 150 ms).
+The table lists any deviation from the universal default pattern:
+**no body enter animation · exit via `.Popup.close` 200 ms · backdrop instant** (`transition: none` on standard `.PopupContainer.lockOn`).
 
 | Dialog | Additional / overriding animations | Notes |
 |---|---|---|
@@ -671,12 +744,12 @@ backdrop via `.PopupContainer.lockOn` 150 ms).
 | **Karma selector** | FXKarmaBling canvas (1 750 ms icon + 1 300 ms text) fires on karma change | Canvas layer stays |
 | **Profile-set import** | None beyond default | — |
 | **Buy slots sub-form** | None beyond default (inside ProjectPerp Subpop) | — |
-| **LevelUp overlay** | FXLevelUpBling canvas (1 950 ms icon + 1 800 ms text) fires on appearance | Longest animation in UI |
-| **Mission Complete** | FXMissionComplete canvas (1 700 ms) fires 1 000 ms after dialog appears · AniNew (0.3–0.33 s) on reward sprites | Reward pulse is infinite; stops on close |
-| **Mission Briefing** | AniJump (6 s) on attention icons · FXMissionGoalComplete (1 550 ms) on goal ticks | AniJump loops until closed |
-| **New Items notification** | AniNew (0.3 s) on item thumbnails | Stops on close |
-| **Karma Incident notification** | None beyond default | — |
-| **Tutorial sequence** | None beyond default (tap-anywhere dismiss, no extra anim) | Event-handler detach on close |
+| **LevelUp overlay** | Backdrop 150 ms fade (LevelUp variant) · TutorialBody enter: AniScaleOpacity 0.2s reverse · FXLevelUpBling canvas (1 950 ms icon + 1 800 ms text) fires on appearance | Longest animation in UI |
+| **Mission Complete** | Backdrop 150 ms (Mission variant) · FXMissionComplete canvas (1 700 ms) fires 1 000 ms after dialog appears · AniNew (0.3–0.33 s) on reward sprites | Reward pulse is infinite; stops on close |
+| **Mission Briefing** | Backdrop 150 ms (Mission variant) · AniJump (6 s) on attention icons · FXMissionGoalComplete (1 550 ms) on goal ticks | AniJump loops until closed |
+| **New Items notification** | Backdrop 150 ms (NewItems variant) · AniNew (0.3 s) on item thumbnails · AniNewRot (0.3 s) on `.NotificationTitle` badge | Badge pulses while tilted −16° |
+| **Karma Incident notification** | Backdrop 150 ms (Alert variant) | — |
+| **Tutorial sequence** | Backdrop 150 ms (Tutorial variant) · TutorialBody enter: AniScaleOpacity 0.2s reverse | Event-handler detach on close |
 | **User data / settings** | Tab slide (400 ms ease-out) | 2-tab variant |
 | **FXNoCash** | TweenJS canvas 1 550 ms · DOM button `.disabled.no_cash` | No CSS anim on DOM side |
 | **FXNoAP** | TweenJS canvas 1 500 ms · DOM button `.disabled.no_AP` | — |
@@ -767,7 +840,7 @@ export function useExitAnimation(open: boolean, durationMs = 250) {
       }, durationMs);
     }
     return () => clearTimeout(timer.current);
-  }, [open]);
+  }, [open, visible]);
 
   return { visible, closing };
 }
