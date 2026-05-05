@@ -2704,17 +2704,12 @@ export function integrateCollected(
   }
   var _icOldProfiles = (state.game_values && state.game_values.profiles_value) || 0;
   var _icNewProfiles = newGv.profiles_value || 0;
-  var _icMilestones = [1000000];
-  for (var _icPi = 0; _icPi < _icMilestones.length; _icPi++) {
-    var ms2 = _icMilestones[_icPi];
-    if (ms2 === undefined) continue;
-    if (_icOldProfiles < ms2 && _icNewProfiles >= ms2) {
-      triggerAchievement(
-        'profiles_milestone',
-        _t('achievement_profiles_milestone', _icDisplayName, String(ms2)),
-        { threshold: ms2 }
-      );
-    }
+  if (_icOldProfiles < 1000000 && _icNewProfiles >= 1000000) {
+    triggerAchievement(
+      'profiles_milestone',
+      _t('achievement_profiles_milestone', _icDisplayName, '1000000'),
+      { threshold: 1000000 }
+    );
   }
   var _icOldKarma = (state.game_values && state.game_values.karma_value) || 0;
   var _icNewKarma = newGv.karma_value || 0;
