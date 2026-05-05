@@ -3831,6 +3831,7 @@ button {
   --popup-s: clamp(0.5, calc(94vw / 612), 1);
   transform: scale(var(--popup-s));
   transform-origin: center center;
+  max-width: calc(100vw - 25px);
 }
 
 /* Tutorial / levelup popups pin to the Stage's bottom edge instead of
