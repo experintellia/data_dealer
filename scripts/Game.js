@@ -27,6 +27,7 @@ import {
   getParentId,
   remove,
 } from './game/GameNode.js';
+import { GamePerp, setAniTicker } from './game/GamePerp.js';
 import { Imperium } from './game/Imperium.js';
 import { Mission } from './game/Mission.js';
 import { Missions } from './game/Missions.js';
@@ -1889,151 +1890,14 @@ var Game = function () {
   ///////////////////////////////////
   // The GamePerp Base Class
   ///////////////////////////////////
-
-  var GamePerp = function (config) {
-    this.init(config);
-
-    return this;
-  };
-
-  extend(GamePerp, GameNode);
-
-  GamePerp.prototype.cableType = 'in';
-  GamePerp.prototype.labelClass = undefined;
-  GamePerp.prototype.sticky = true;
-  GamePerp.prototype.popupTemplate = 'popup.html';
-
-  GamePerp.prototype.extendRender = function () {
-    var render = this.renderData || {};
-    var node = this.renderNode;
-    node.sticky = this.sticky;
-
-    // TODO: Some mixed Renderer rules, review/rewrite and split up to subclasses when we know how to better handle this
-    if (
-      !this.noConnect &&
-      this.renderType === 'Perp' &&
-      this.parentNode &&
-      this.parentNode.renderType === 'Perp'
-    ) {
-      this.parentNode.renderNode.cableTo(node, { mode: this.cableType });
-    }
-    if (render.config.label) {
-      node.addDecorator(
-        new Render.DecoratorLabel({ text: render.config.label, extendClass: this.labelClass })
-      );
-    }
-    if (this._loadReady) {
-      this.markReady();
-      this._loadReady = undefined;
-    } else if (this._loadTimer) {
-      this.markTimer(this._loadTimer);
-      this._loadTimer = undefined;
-    }
-  };
-
-  GamePerp.prototype.markTimer = function (conf) {
-    if (!conf) {
-      return false;
-    }
-    this.setState('idle', false);
-    this.setState('chargeRunning', true);
-    this.renderTimer = this.renderNode.addDecorator(
-      new Render.DecoratorTimer({
-        duration: conf.duration,
-        serverTime: conf.serverTime,
-        serverStartTime: conf.serverStart,
-      })
-    );
-    this.renderTimer.FXSproing();
-  };
-
-  GamePerp.prototype.initEventHandlers = function () {
-    var gnode = this;
-    var groot = this.GameRoot;
-    gnode.on('dragend', function (e) {
-      e.stopPropagation();
-      // FIXME: Testing Save Coords...
-      gnode.GameRoot.trigger('saveCoordsQueue', [gnode.path, gnode.renderNode.getPosition()]);
-    });
-    gnode.on('vclick', function (e) {
-      e.stopPropagation();
-    });
-    gnode.on('vdblclick', function (e) {
-      e.stopPropagation();
-    });
-
-    gnode.on('after_buy after_create', function (e) {
-      e.stopPropagation();
-      if (gnode.data.story) {
-        groot.makeNotifications({ story: gnode.data.story, storyPerp: gnode });
-      }
-    });
-
-    if (gnode.AniTick) {
-      gnode.on('states_chargeRunning', function (e, state) {
-        e.stopPropagation();
-        if (state) {
-          AniTicker.addListener(gnode);
-        } else {
-          AniTicker.removeListener(gnode);
-        }
-      });
-    }
-
-    if (this.extendEventHandlers) {
-      this.extendEventHandlers();
-    }
-  };
-
-  ///////////////////////////////////
-  // GamePerp open a Popup
-  ///////////////////////////////////
-
-  GamePerp.prototype.updateTemplateData = function () {
-    var groot = this.GameRoot;
-    // Popup instantiated for the first time
-    if (!this.popupTemplateData) {
-      this.popupTemplateData = {};
-      this.popupTemplateData.states = this.states;
-      this.popupTemplateData.status_icons = this.GameRoot.data.status_icons;
-      this.popupTemplateData.data = {};
-      this.popupTemplateData.data.gestalt = this.gestalt;
-      this.popupTemplateData.data.id = this.id;
-      this.popupTemplateData.loading = true;
-      this.popupTemplateData.groot = groot;
-    }
-    // highlight Tabs in popups
-    this.popupTemplateData.highlightTabs = this.highlightTabs || [];
-    _.extend(this.popupTemplateData.data, this.data);
-    // FIXME: make this get game values method on groot
-    this.popupTemplateData.game_values = {
-      xp_level: groot.xp_level,
-    };
-  };
-
-  GamePerp.prototype.openPopup = function () {
-    var groot = this.GameRoot;
-    //gnode.renderNode.setFrame('active');
-
-    // Update TemplateData with current gnode data
-    this.updateTemplateData();
-
-    var popupConfig = {
-      // Fixme: gameNode only used for debug info on logo click
-      gameNode: this,
-      template: this.popupTemplate,
-      templateData: this.popupTemplateData,
-      popupContainer: this.ViewMap,
-    };
-
-    var popup = (this.renderPopup = new Render.Popup(popupConfig));
-
-    this.ViewMap.renderNode.addPopup(popup);
-
-    this.initPopupEvents();
-
-    return popup;
-  };
+  //
+  // Extracted to scripts/game/GamePerp.ts in PR 11 of issue #147.  The
+  // class is imported above; the API publisher at the bottom of this
+  // IIFE re-exposes it as Game.GamePerp.  The dynamic
+  // `Game[node.game_type]` lookup in BuyPerp is routed through
+  // scripts/game/perpRegistry.ts (registered via setPerpClasses(Game)
+  // at the IIFE's tail).  AniTicker is injected via setAniTicker(AniTicker)
+  // at the same spot so GamePerp can subscribe to charge-running animations.
 
   GameNode.prototype.initPopupEvents = function (popup) {
     var gnode = this;
@@ -2158,155 +2022,6 @@ var Game = function () {
     popup.on('button_click.RefreshButton', function (e) {
       e.stopPropagation();
       gnode.GameRoot.refresh();
-    });
-  };
-
-  GamePerp.prototype.updatePopup = function () {
-    if (this.popupTemplateData) {
-      //gnode.popupTemplateData.loading = false;
-    }
-
-    // Update data with current gnode data
-    //_.extend(this.popupTemplateData.data,gnode.data);
-    this.updateTemplateData();
-
-    var popupConfig = {
-      gameNode: this,
-      template: this.popupTemplate,
-      templateData: this.popupTemplateData,
-      popupContainer: this.ViewMap,
-    };
-
-    if (this.renderPopup) {
-      this.renderPopup.remove();
-    }
-    var popup = (this.renderPopup = new Render.Popup(popupConfig));
-
-    this.ViewMap.renderNode.addPopup(popup);
-
-    this.initPopupEvents();
-
-    return popup;
-  };
-
-  GamePerp.prototype.BuyPerp = function (bgestalt, placePos) {
-    var gnode = this;
-    var groot = this.GameRoot;
-    // TODO: backendcall and do purchase...
-    app.remote.buyPerp(gnode.path, bgestalt).done(function (data) {
-      if (data.result) {
-        if (data.result.error !== undefined) {
-          // Probably no cash
-          if (gnode.renderPopup && gnode.renderPopup.open) {
-            if (data.result.error === 2 || data.result === 2) {
-              gnode.renderPopup.trigger('no_cash');
-            } else if (gnode.gameType === 'ProxyPerp' && data.result.error === 3) {
-              gnode.renderPopup.trigger('error');
-              groot.makeNotifications({
-                simplemessage: { text: _._('projectbuy_proxyslotsfull') },
-              });
-            } else {
-              gnode.renderPopup.trigger('error');
-            }
-          } else {
-            gnode.renderNode.FXNoCash();
-          }
-          return;
-        }
-        if (gnode.renderPopup) {
-          gnode.renderPopup.trigger('popup_close');
-        }
-        if (data.result.node) {
-          groot.updateGameValues(
-            data.result.game_values,
-            data.result.levelup,
-            data.result.missions
-          );
-          var node = data.result.node;
-          var node_data = groot.getTypeData(bgestalt);
-          var perp = new Game[node.game_type]({
-            id: node.game_id,
-            gestalt: bgestalt,
-            path: node.full_path,
-            noConnect: true,
-            data: mergeData(node_data, node.instance_data),
-            // Render perps to first item in path (Imperium or Database)
-            renderNodeParent: getFirstId('Imperium'),
-            ViewMap: getByFirstId('Imperium'),
-            gameType: node.game_type,
-          });
-          gnode.addChild(perp);
-          // FIXME: fishy but works?
-          var perpNode = gnode.renderNode;
-          var vector = gnode.parentNode.renderNode.getVectorTo(gnode.renderNode);
-          // golden ratio:
-          if (placePos) {
-          } else {
-            placePos = gnode.renderNode.getVectorPos(vector, 0.61803398875);
-            perp.renderData.config.placeRandom = placePos;
-            perp.renderData.config.placeParentRadius = 320;
-          }
-
-          perp.renderData.config.placeRandom = placePos;
-          perp.renderData.config.placeParentRadius = 0;
-          perp.renderData.config.hidden = true;
-
-          perp.render();
-          groot.trigger('saveCoords', [perp.path, perp.renderNode.getPosition()]);
-          perp.renderNode.addDecorator(
-            new Render.DecoratorNew({ text: _._('New!'), extendClass: 'NewPerp' })
-          );
-          perp.renderNode.hide();
-          perp.renderNode.parentNode.scrollTo(perp.renderNode.getPosition());
-          //perp.renderNode.hide();
-          window.setTimeout(function () {
-            perp.renderNode.FXArise(function () {
-              gnode.renderNode.cableAnimatedTo(
-                perp.renderNode,
-                { mode: perp.cableType },
-                function () {
-                  if (perp.cableType === 'in') {
-                    perp.renderNode.FXBounce();
-                  } else if (perp.cableType === 'out') {
-                    gnode.renderNode.FXBounce();
-                  } else {
-                    gnode.renderNode.FXBounce();
-                    perp.renderNode.FXBounce();
-                  }
-                  if (perp.data.provided_perps && perp.data.provided_perps.length) {
-                    var n = {};
-                    if (perp.gameType === 'PusherPerp') {
-                      n.perps = perp.getProvidedByRequiredPerps();
-                    } else {
-                      n.perps = perp.getProvidedByLevel();
-                    }
-                    var thefirst = getAllByGestalt(perp.gestalt).length <= 1;
-                    if (thefirst) {
-                      groot.makeNotifications(n);
-                    } else {
-                      perp.markNewItems();
-                    }
-                  }
-                }
-              );
-            });
-          }, 300);
-          // save coords to backend
-          perp.trigger('after_buy');
-          return perp;
-        }
-      } else {
-        // Server Error
-        gnode.Error('The computer says NOOOO', data);
-      }
-    });
-  };
-
-  // FIXME DEBUG: testpopup for each gameperp (gets overwritten)
-  GamePerp.prototype.extendEventHandlers = function () {
-    this.on('vclick', function (e, renderNode) {
-      e.stopPropagation();
-      var popup = this.openPopup();
     });
   };
 
@@ -2654,134 +2369,6 @@ var Game = function () {
       });
       var popup = this.openPopup();
     });
-  };
-
-  // FIXME: move this to the GamePerp section
-
-  GamePerp.prototype.markNewItems = function () {
-    /* FIXME? no decorator when max_slots is full?
-      if (this.data && this.data.max_slots) {
-        if (this.children.length >= this.data.max_slots) {
-          return;
-        }
-      }
-      */
-    var text = this.textNewItems || _._('New Items!');
-    this.renderNode.addDecorator(new Render.DecoratorNew({ text: text, arrow: true }));
-  };
-
-  GamePerp.prototype.checkProvidedByRequiredPerps = function () {
-    // checks for provided perps by required providers
-    var gnode = this;
-    var groot = this.GameRoot;
-    _.each(gnode.data.provided_perps, function (gestalt, key) {
-      var type = groot.getType(gestalt);
-      if (type.type_data.required_providers && !groot.IPerps.hasOwnProperty(gestalt)) {
-        _.each(type.type_data.required_providers, function (provided) {
-          if (groot.IPerps.hasOwnProperty(provided)) {
-            gnode.markNewItems();
-          }
-        });
-      }
-    });
-  };
-
-  GamePerp.prototype.getProvidedByRequiredPerps = function () {
-    var groot = this.GameRoot;
-    var perps = [];
-    _.each(this.data.provided_perps, function (gestalt, key) {
-      var type = groot.getType(gestalt);
-      if (type.type_data.required_providers && !groot.IPerps.hasOwnProperty(gestalt)) {
-        _.each(type.type_data.required_providers, function (provided) {
-          if (groot.IPerps.hasOwnProperty(provided)) {
-            perps.push(gestalt);
-          }
-        });
-      }
-    });
-    return perps;
-  };
-
-  GamePerp.prototype.checkProvidedByLevel = function () {
-    // checks for same level
-    var gnode = this;
-    var groot = this.GameRoot;
-    _.each(gnode.data.provided_perps, function (gestalt, key) {
-      var type = groot.getType(gestalt);
-      if (
-        type.type_data.required_level === groot.xp_level.number &&
-        !groot.IPerps.hasOwnProperty(gestalt)
-      ) {
-        gnode.markNewItems();
-      }
-    });
-  };
-
-  GamePerp.prototype.getProvidedByLevel = function () {
-    var groot = this.GameRoot;
-    var perps = [];
-    _.each(this.data.provided_perps, function (gestalt, key) {
-      var type = groot.getType(gestalt);
-      if (
-        type.type_data.required_level <= groot.xp_level.number &&
-        !groot.IPerps.hasOwnProperty(gestalt)
-      ) {
-        perps.push(gestalt);
-      }
-    });
-    return perps;
-  };
-
-  GamePerp.prototype.compileProvided = function () {
-    var gnode = this;
-    var groot = this.GameRoot;
-    gnode.data.providedPerps = [];
-    if (gnode.data.buyablePerps === undefined) {
-      return;
-    }
-    _.each(gnode.data.provided_perps, function (p, key) {
-      var perp = {};
-      var type_data = groot.getTypeData(p);
-      perp.data = type_data;
-      perp.gestalt = p;
-      // Already-owned perps shouldn't appear in the buy dialog at all —
-      // backend `provided_perps` is a static list per-provider, so the
-      // UI is the only place that knows about ownership.
-      if (groot.IPerps.hasOwnProperty(perp.gestalt)) {
-        return;
-      }
-      perp.locked =
-        _.find(gnode.data.buyablePerps, function (v) {
-          return perp.gestalt === v;
-        }) === undefined;
-      if (
-        perp.locked &&
-        perp.data.required_level &&
-        !perp.data.required_providers &&
-        perp.data.required_level <= groot.xp_level.number
-      ) {
-        perp.locked = false;
-      }
-      if (perp.locked) {
-        if (perp.data.required_providers && perp.data.required_providers.length) {
-          perp.data.requiredProviders = [];
-          _.each(perp.data.required_providers, function (v, k) {
-            var tdata = groot.getTypeData(v);
-            if (tdata && tdata.title) {
-              perp.data.requiredProviders.push(tdata.title);
-            }
-          });
-        }
-      }
-      gnode.data.providedPerps.push(perp);
-    });
-    var sorted = _.sortBy(gnode.data.providedPerps, function (v) {
-      return v.data.required_level;
-    });
-    var grouped = _.groupBy(sorted, function (v) {
-      return v.locked ? 1 : 0;
-    });
-    gnode.data.providedPerps = _.flatten(grouped);
   };
 
   ///////////////////////////////////
@@ -4542,6 +4129,11 @@ class CollectableClient(CollectablePerpBase):
   // `Game.TokenPerp` references without an IIFE-closure roundtrip.
   // Disposable seam — retired with the IIFE in the final PR (#147).
   setPerpClasses(Game);
+  // Inject AniTicker into GamePerp so its initEventHandlers can register
+  // listeners on the legacy ticker singleton (which still lives in this
+  // IIFE). Disposable seam alongside setPerpClasses; retires when AniTicker
+  // is itself extracted from Game.js.
+  setAniTicker(AniTicker);
 
   return Game;
 };
