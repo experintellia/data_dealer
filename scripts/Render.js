@@ -4842,7 +4842,9 @@ var Render = function () {
 
     this.open = true;
     this._id = _instances.length;
-    this.jdomelem = $("<div class='Popup'></div>");
+    // tabindex=-1 lets `Popup.initBaseUI` focus the dialog
+    // programmatically without surfacing it in the tab order.
+    this.jdomelem = $("<div class='Popup' role='dialog' aria-modal='true' tabindex='-1'></div>");
     this.domelem = this.jdomelem[0];
     this.init(config);
     this.initBaseUI();
@@ -4884,6 +4886,28 @@ var Render = function () {
           node.trigger('popup_cancel');
         }
       });
+
+      // ESC closes the popup (matches X-button semantic, not the
+      // container's NoClose click-outside policy).  Document-scoped
+      // because focus may be on a button inside the popup; namespaced
+      // by _id so stacked popups don't fight.
+      node._escHandlerNs = 'keydown.popupEsc' + node._id;
+      $(document).on(node._escHandlerNs, function (e) {
+        if (e.key !== 'Escape' && e.keyCode !== 27) return;
+        if (!node.open) return;
+        node.trigger('popup_close');
+        node.trigger('popup_cancel');
+      });
+
+      // Programmatically focus the dialog for screen readers and
+      // keyboard users; deferred because the popup isn't yet visible.
+      setTimeout(function () {
+        if (node.domelem && node.open) {
+          try {
+            node.domelem.focus({ preventScroll: true });
+          } catch (e) {}
+        }
+      }, 0);
     }
 
     node.on('no_cash', function (e) {
@@ -5239,6 +5263,8 @@ var Render = function () {
     this.updateRenderProp();
     if (this.placeBottom) {
       this.y = app.game.renderNode.getSize().height - this.height / 2 - 32;
+      // Tag for the mobile CSS to skip flex-centering this popup.
+      this.jdomelem.addClass('placeBottom');
     } else {
       this.y = app.game.renderNode.getSize().height / 2;
     }
@@ -5257,6 +5283,9 @@ var Render = function () {
   Popup.prototype.close = function (cb) {
     var popup = this;
     popup.open = false;
+    if (popup._escHandlerNs) {
+      $(document).off(popup._escHandlerNs);
+    }
     // uncomment below to reset lastTab
     //popup.templateData.lastTab = undefined;
     // Transitionend test

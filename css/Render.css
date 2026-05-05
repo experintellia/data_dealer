@@ -3420,6 +3420,81 @@ button {
   }
 }
 
+/* ≤ 926 px dialog cleanup: drop the desktop's three nested
+ * border/radius layers (.Popup/.PopupBody/.PopupContent) and force a
+ * single scroll container on .Popup. */
+@media (max-width: 926px) {
+  .Popup {
+    width: auto;
+    max-width: 92vw;
+    max-height: 96vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 0;
+    border-radius: 14px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+    background: #FFF;
+    padding-top: 0;
+  }
+  .Popup .PopupBody {
+    max-width: 92vw;
+    border-radius: 14px;
+    background: transparent;
+    /* JS sets an inline `height: <natural>` on PopupBody to lock the
+       desktop popup at a fixed height.  On mobile we want the body to
+       grow with its content so the outer `.Popup` is the only scroll
+       context.  `!important` overrides the inline style. */
+    height: auto !important;
+  }
+  .Popup .PopupContent {
+    border: 0;
+    box-shadow: none;
+    border-radius: 0 0 12px 12px;
+    /* Strip the inner scroll + fixed-height container that the desktop
+       About dialog adds (`.PopupBody.About .PopupContent`).  With the
+       outer Popup scrolling, an inner scroller produces a redundant
+       second scrollbar. */
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .Popup .PopupHeader {
+    border-radius: 12px 12px 0 0;
+    border: 0;
+    box-shadow: none;
+  }
+  /* Close X: the desktop position of `top: -6; right: -6` overhangs the
+     popup's top edge so it sits in the gap of the desktop frame.  With
+     no frame on mobile and `overflow: hidden auto` clipping anything
+     above the popup top, pull the X inside. */
+  .Popup .PopupClose {
+    top: 4px;
+    right: 4px;
+    z-index: 10;
+  }
+  /* Tutorial NPC bubbles (`.Popup.placeBottom`, `.Popup.Tutorial`) have a
+     hard-coded `.PopupBody.TutorialBody { height: 174 }` and small fixed
+     content — they should never scroll on mobile.  Override the generic
+     `.Popup { max-height: 96vh; overflow-y: auto }` for these variants
+     and let their body keep its inline height. */
+  .Popup.placeBottom,
+  .Popup.Tutorial {
+    max-height: none;
+    overflow: visible;
+  }
+  .Popup.placeBottom .PopupBody,
+  .Popup.Tutorial .PopupBody {
+    height: auto !important;
+  }
+  /* Inner content row (.PopupMenu has fixed width: 600) on city/project
+     popups overflows narrower viewports.  Constrain it to fit. */
+  .Popup .PopupMenu {
+    width: auto !important;
+    max-width: 92vw;
+    left: 0 !important;
+    box-sizing: border-box;
+  }
+}
+
 /* ≥ 927 px: hide the mobile XP clone — the in-stage Statusbar XP item
  * handles every viewport down to 927 px.  Lives in its own min-width
  * block so we don't have to fight the cascade between two equally-
@@ -3430,7 +3505,50 @@ button {
   }
 }
 
+/* Mobile: flex-centre popups (overrides the JS-written translate which
+ * goes stale on rotation / software-keyboard / resize).  `!important`
+ * beats Node.setPosition's inline transform on .Popup.  The close-anim
+ * transform is on .Popup.close .PopupBody (a different element). */
+@media (max-width: 768px) {
+  .PopupContainer.lockOn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Centre regular popups but skip `.placeBottom` ones (tutorial NPC
+     bubbles, level-up cues) — those should anchor to the bottom of the
+     viewport on every device. */
+  .PopupContainer.lockOn > .Popup:not(.placeBottom) {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
+    margin: auto;
+  }
+  /* Bottom-anchored popups (placeBottom): pin to the bottom edge with the
+     same flex container.  align-self: flex-end overrides the parent
+     `align-items: center`. */
+  .PopupContainer.lockOn > .Popup.placeBottom {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
+    margin: 0 auto 12px auto;
+    align-self: flex-end;
+  }
+}
+
 @media (max-width: 480px) {
+  /* Phone portrait: even tighter constraints. */
+  .Popup {
+    max-width: 96vw;
+    max-height: 94vh;
+    border-width: 4px;
+  }
+  .PopupBody {
+    max-width: 96vw;
+  }
+
   /* Tab buttons: smaller padding so the row fits ~360px wide. */
   .ViewTabMenuButton,
   .MainMenuButton {
