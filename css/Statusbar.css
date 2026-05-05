@@ -1,14 +1,8 @@
-/* ─────────────────────────────────────────────────────────────────────────
- * Status bar — in-stage HUD: Profiles / Cash / AP / Karma / XP.
+/* Status bar — in-stage HUD: Profiles / Cash / AP / Karma / XP.
  *
- * Centered with flexbox (modern, no transform).  Mobile sizing scales
- * items up via CSS `zoom` so they reflow at the larger size — no
- * negative-margin compensation hacks like transform: scale would need.
- *
- * Render.js' Node base class still writes inline width/transform/left/top
- * via setSize/setTransform/setPosition.  The layout rule uses !important
- * to opt out of those legacy JS-driven inline styles.
- * ───────────────────────────────────────────────────────────────────────── */
+ * !important on layout properties opts out of inline width/transform/
+ * left/top that Render.js' Node base class still writes on every tick
+ * via setSize/setTransform/setPosition. */
 
 .Statusbar {
   position: absolute;
@@ -19,7 +13,6 @@
   transform: none !important;
 
   display: flex !important;
-  flex-direction: row;
   flex-wrap: nowrap;
   justify-content: center;
   align-items: flex-start;
@@ -37,18 +30,22 @@
   margin: 0;
   display: inline-block;
   position: relative;
+  font-family: Bowlby, sans-serif;
   touch-action: manipulation;
 }
 
-.StatusBackground {
+.StatusBackground,
+.StatusIcon {
   background-image: url(../img/MainSprites.png);
+}
+
+.StatusBackground {
   width: 131px;
   height: 28px;
   background-position: -36px -580px;
 }
 
 .StatusBackground.profiles {
-  background-image: url(../img/MainSprites.png);
   width: 130px;
   height: 34px;
   background-position: -2px -942px;
@@ -68,9 +65,6 @@
   width: 130px;
   margin: 0 6px 0 -7px;
 }
-.StatusItem.XP {
-  width: 128px;
-}
 
 .StatusBackground,
 .StatusRemain,
@@ -85,19 +79,22 @@
 }
 
 .StatusRemain,
-.StatusText {
-  font-family: Bowlby, sans-serif;
-  font-size: 14px;
+.StatusText,
+.StatusTextSmall {
   color: #fff;
-  line-height: 23px;
   width: 128px;
   text-align: center;
   text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5), -1px -1px 0 rgba(0, 0, 0, 0.5), -1px 1px 0
     rgba(0, 0, 0, 0.5), 1px -1px 0 rgba(0, 0, 0, 0.5);
 }
 
+.StatusRemain,
+.StatusText {
+  font-size: 14px;
+  line-height: 23px;
+}
+
 .StatusTextLevel {
-  font-family: Bowlby, sans-serif;
   font-size: 12px;
   color: #666;
   line-height: 24px;
@@ -107,21 +104,13 @@
 }
 
 .StatusTextSmall {
-  font-family: Bowlby, sans-serif;
   font-size: 11px;
-  color: #fff;
   line-height: 16px;
-  width: 128px;
-  text-align: center;
-  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5), -1px -1px 0 rgba(0, 0, 0, 0.5), -1px 1px 0
-    rgba(0, 0, 0, 0.5), 1px -1px 0 rgba(0, 0, 0, 0.5);
   top: 21px;
   left: 6px;
 }
 
 .StatusRemain {
-  position: absolute;
-  font-family: Bowlby, sans-serif;
   top: 23px;
   left: 6px;
   color: #ffd800;
@@ -140,16 +129,12 @@
   color: #fff;
 }
 
-.StatusItem.Profiles .StatusText {
-  text-align: right;
-  width: 116px;
-}
+.StatusItem.Profiles .StatusText,
 .StatusItem.Cash .StatusText {
   text-align: right;
   width: 116px;
 }
 .StatusItem.AP .StatusText {
-  text-align: center;
   width: 122px;
 }
 .StatusItem.XP .StatusText {
@@ -157,7 +142,6 @@
 }
 
 .StatusIcon.profiles {
-  background-image: url(../img/MainSprites.png);
   width: 38px;
   height: 38px;
   left: -18px;
@@ -165,7 +149,6 @@
   background-position: -331px -616px;
 }
 .StatusIcon.cash {
-  background-image: url(../img/MainSprites.png);
   width: 45px;
   height: 34px;
   left: -14px;
@@ -173,7 +156,6 @@
   background-position: -369px -616px;
 }
 .StatusIcon.ap {
-  background-image: url(../img/MainSprites.png);
   width: 32px;
   height: 38px;
   left: -12px;
@@ -181,7 +163,6 @@
   background-position: -292px -655px;
 }
 .StatusIcon.karmaup {
-  background-image: url(../img/MainSprites.png);
   width: 34px;
   height: 34px;
   left: 102px;
@@ -189,7 +170,6 @@
   background-position: -374px -689px;
 }
 .StatusIcon.karmaup_inactive {
-  background-image: url(../img/MainSprites.png);
   width: 34px;
   height: 34px;
   left: 102px;
@@ -197,7 +177,6 @@
   background-position: 0 -702px;
 }
 .StatusIcon.karmadown {
-  background-image: url(../img/MainSprites.png);
   width: 34px;
   height: 34px;
   left: -10px;
@@ -205,7 +184,6 @@
   background-position: -374px -655px;
 }
 .StatusIcon.karmadown_inactive {
-  background-image: url(../img/MainSprites.png);
   width: 34px;
   height: 34px;
   left: -10px;
@@ -213,7 +191,6 @@
   background-position: 0 -668px;
 }
 .StatusIcon.xp {
-  background-image: url(../img/MainSprites.png);
   width: 47px;
   height: 46px;
   left: 92px;
@@ -300,9 +277,8 @@
   font-size: 14px;
 }
 
-/* ── Cloned XP / level bar shown next to the tabs on narrow viewports
- *    (≤ 926 px).  The in-stage Statusbar XP item is hidden in the same
- *    breakpoint so the same data isn't shown twice. */
+/* Cloned XP / level bar shown next to the tabs ≤ 926 px (the in-stage
+ * Statusbar XP item is hidden in the same band). */
 
 @media (max-width: 926px) {
   .Statusbar .StatusItem.XP {
@@ -356,15 +332,13 @@
   }
 }
 
-/* ── Mobile: scale items up so they fill the available horizontal
- *    space (with a few px of side margin via .Statusbar's padding).
- *    Uses CSS `zoom` rather than `transform: scale` — `zoom` affects
- *    layout, so items still pack tight without negative-margin hacks.
+/* Mobile sizing: scale items up via CSS `zoom` (which reflows layout —
+ * unlike transform: scale, no negative-margin compensation needed) so
+ * the row fills the viewport with ~8 px reserved for side padding.
  *
- *    Natural width of the 4 items (XP hidden ≤ 926 px):
- *      142 + 140 + 144 + 130 = 556 px.
- *    Each breakpoint picks the largest zoom that still fits at the
- *    breakpoint's lower bound (with ~8 px reserved for side padding). */
+ * Natural width of the 4 visible items (XP hidden ≤ 926 px) is
+ * 142 + 140 + 144 + 130 = 556 px; each band picks the largest zoom
+ * that still fits at the band's lower bound. */
 
 @media (max-width: 926px) {
   .Statusbar .StatusItem.Profiles,
@@ -376,42 +350,36 @@
 }
 
 @media (max-width: 926px) and (min-width: 651px) {
-  /* (651 − 8) / 556 ≈ 1.15 */
   .Statusbar .StatusItem {
     zoom: 1.15;
   }
 }
 
 @media (max-width: 650px) and (min-width: 581px) {
-  /* (581 − 8) / 556 ≈ 1.03 */
   .Statusbar .StatusItem {
     zoom: 1.03;
   }
 }
 
 @media (max-width: 580px) and (min-width: 501px) {
-  /* (501 − 8) / 556 ≈ 0.88 */
   .Statusbar .StatusItem {
     zoom: 0.88;
   }
 }
 
 @media (max-width: 500px) and (min-width: 421px) {
-  /* (421 − 8) / 556 ≈ 0.74 */
   .Statusbar .StatusItem {
     zoom: 0.74;
   }
 }
 
 @media (max-width: 420px) and (min-width: 351px) {
-  /* (351 − 8) / 556 ≈ 0.61 */
   .Statusbar .StatusItem {
     zoom: 0.61;
   }
 }
 
 @media (max-width: 350px) {
-  /* Smallest band — keep 8 px reserved at 320 px viewport. */
   .Statusbar .StatusItem {
     zoom: 0.56;
   }
