@@ -224,271 +224,6 @@
   width: 100px;
 }
 
-/* CSS-centred overlay (overrides JS-written `transform: translate` +
- * width/height that go stale on every non-1024 Stage). */
-.Statusbar {
-  transform: none !important;
-  width: 100% !important;
-  left: 0 !important;
-  top: 12px !important;
-  height: auto !important;
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: nowrap !important;
-  justify-content: center !important;
-  align-items: flex-start;
-  box-sizing: border-box;
-}
-.Statusbar .StatusItem {
-  flex: 0 0 auto;
-  transform-origin: top center;
-}
-
-.StatusItem {
-  width: 128px;
-  height: 25px;
-  margin:0;
-  display: inline-block;
-  position: relative;
-}
-
-.StatusBackground {
-  background-image: url(../img/MainSprites.png);
-  width: 131px;
-  height: 28px;
-  background-position: -36px -580px;
-}
-
-.StatusBackground.profiles {
-  background-image: url(../img/MainSprites.png);
-  width: 130px;
-  height: 34px;
-  background-position: -2px -942px;
-}
-.StatusItem.Profiles {
-  width:142px;
-  margin-left:6px;
-}
-.StatusItem.Cash {
-  width:140px;
-}
-.StatusItem.AP {
-  width:144px;
-}
-.StatusItem.Karma {
-  width:130px;
-  margin: 0 6px 0 -7px
-}
-.StatusItem.XP {
-  width:128px;
-}
-.StatusBackground,
-.StatusRemain,
-.StatusText,
-.StatusTextLevel,
-.StatusTextSmall,
-.StatusGraph,
-.StatusIcon {
- position:absolute;
- top:0;
- left:0;
-}
-.StatusRemain,
-.StatusText {
-  font-family: Bowlby;
-  font-size:14px;
-  color:#FFF;
-  line-height:23px;
-  width:128px;
-  text-align:center;
-  text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5), -1px -1px 0px rgba(0, 0, 0, 0.5), -1px 1px 0px rgba(0, 0, 0, 0.5), 1px -1px 0px rgba(0, 0, 0, 0.5);
-}
-.StatusTextLevel {
-  font-family: Bowlby;
-  font-size: 12px;
-  color: #666;
-  line-height: 24px;
-  text-align: center;
-  width: 38px;
-  left: 92px;
-}
-.StatusTextSmall {
-  font-family: Bowlby;
-  font-size:11px;
-  color:#FFF;
-  line-height:16px;
-  width:128px;
-  text-align:center;
-  text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5), -1px -1px 0px rgba(0, 0, 0, 0.5), -1px 1px 0px rgba(0, 0, 0, 0.5), 1px -1px 0px rgba(0, 0, 0, 0.5);
-  top:21px;
-  left:6px;
-}
-.StatusRemain {
-  position: absolute;
-  font-family: Bowlby;
-  top: 23px;
-  left: 6px;
-  color: #ffd800;
-  background: #6a6a6a;
-  line-height: 14px;
-  padding: 4px 4px 2px 4px;
-  border: 2px solid #404040;
-  font-size: 13px;
-  display: none;
-  border-width: 0px 6px 4px 2px;
-  border-radius: 0px 0px 8px 8px;
-  width: 102px;
-}
-.StatusRemain .highlight {
-  color:#FFF;
-}
-.StatusItem.Profiles .StatusText {
-  text-align:right;
-  width:116px;
-}
-.StatusItem.Cash .StatusText {
-  text-align:right;
-  width:116px;
-}
-.StatusItem.AP .StatusText {
-  text-align: center;
-  width: 122px;
-}
-
-.StatusItem.AP .StatusText {
-}
-.StatusItem.Karma .StatusText {
-}
-.StatusItem.XP .StatusText {
-  width:106px;
-}
-
-.StatusIcon.profiles {
-  background-image: url(../img/MainSprites.png);
-  width: 38px;
-  height: 38px;
-  left: -18px;
-  top: -7px;
-  background-position: -331px -616px;
-}
-.StatusIcon.cash {
-  background-image: url(../img/MainSprites.png);
-  width: 45px; height: 34px; left: -14px; top: -5px; background-position: -369px -616px;
-}
-.StatusIcon.ap {
-  background-image: url(../img/MainSprites.png);
-  width: 32px; height: 38px; left: -12px; top: -7px; background-position: -292px -655px;
-}
-.StatusIcon.karmaup {
-  background-image: url(../img/MainSprites.png);
-  width: 34px; height: 34px; left: 102px; top: -4px; background-position: -374px -689px;
-}
-.StatusIcon.karmaup_inactive {
-  background-image: url(../img/MainSprites.png);
-  width: 34px; height: 34px; left: 102px; top: -4px; background-position: 0px -702px;
-}
-.StatusIcon.karmadown {
-  background-image: url(../img/MainSprites.png);
-  width: 34px; height: 34px; left: -10px; top: -4px; background-position: -374px -655px;
-}
-.StatusIcon.karmadown_inactive {
-  background-image: url(../img/MainSprites.png);
-  width: 34px; height: 34px; left: -10px; top: -4px; background-position: 0px -668px;
-}
-.StatusIcon.xp {
-  background-image: url(../img/MainSprites.png);
-  width: 47px; height: 46px; left: 92px; top: -10px; background-position: -325px -655px;
-}
-
-.StatusItem:hover .StatusTextLevel,
-.StatusItem:hover .StatusIcon {
-  -webkit-transform:scale(1.1,1.1);
-  -moz-transform:scale(1.1,1.1);
-  transform:scale(1.1,1.1);
-}
-
-.StatusIcon.inactive,
-.StatusItem:hover .StatusIcon.inactive,
-.StatusItem.active .StatusIcon.inactive {
-  -webkit-transform:scale(1,1);
-  -moz-transform:scale(1,1);
-  transform:scale(1,1);
-}
-
-.StatusItem.active .StatusIcon {
-  -webkit-transform:scale(1.15,1.15);
-  -moz-transform:scale(1.15,1.15);
-  transform:scale(1.15,1.15);
-}
-
-.StatusGraph {
-  width:64px;
-  height:12px;
-  background:#F00;
-  display:block;
-  border-radius:6px;
-  top: 2px;
-  left: 2px;
-  height: 19px;
-  /*-webkit-transition: width 0.5s linear, background 0.5s linear;*/
-}
-
-.StatusItem.Profiles .StatusGraph {
-  background:#009fd9;
-}
-.StatusItem.Profiles.active .StatusGraph {
-  background:#c0e7f5;
-}
-
-.StatusItem.Cash .StatusGraph {
-  background:#5da445;
-  width:120px;
-}
-.StatusItem.Cash.active .StatusGraph {
-  background:#b5d7a8;
-}
-
-.StatusItem.AP .StatusGraph {
-  background:#e48931;
-}
-.StatusItem.AP.active .StatusGraph {
-  background:#ffd800;
-}
-
-.StatusItem.Karma .StatusGraph {
-  background:#cd495d;
-}
-.StatusItem.Karma.active .StatusGraph {
-  background:#ea9999;
-}
-.StatusItem.Karma .StatusGraph.pos {
-  background:#31B6A2;
-}
-.StatusItem.Karma.active .StatusGraph.pos {
-  background:#98DAD0;
-}
-.StatusGraph.neg {
-  left: inherit;
-  right: 67px;
-  border-radius: 6px 0px 0px 6px;
-  border-right:2px solid #FFF;
-}
-.StatusGraph.pos {
-  left: 61px;
-  border-radius: 0px 6px 6px 0px;
-  border-left:2px solid #FFF;
-}
-
-
-.StatusItem.XP .StatusGraph {
-  background:#ffff00;
-}
-.StatusItem.XP.active .StatusGraph {
-  background:#fcfcd4;
-}
-.StatusItem.XP.active .StatusTextLevel {
-  font-size:14px;
-}
 .ViewTab,
 .ViewMap {
   position:absolute;
@@ -3264,7 +2999,6 @@ html, body {
 .UserButton,
 .MainMenuLogo,
 .Button,
-.StatusItem,
 .DatabaseQueueItem,
 .PopupHeader,
 .SubpopHeader,
@@ -3291,8 +3025,8 @@ button {
   }
 }
 
-/* ≤ 926 px: two-row header — tabs drop to row 2, the cloned XP bar
- * appears in row 1 left, in-stage Statusbar XP is hidden. */
+/* ≤ 926 px: two-row header — tabs drop to row 2 so the cloned XP bar
+ * (see css/Statusbar.css for .MainMenuXP rules) gets row 1 to itself. */
 @media (max-width: 926px) {
   .MainMenu {
     border-width: 4px 0 0 0;
@@ -3336,59 +3070,6 @@ button {
     box-sizing: border-box;
   }
 
-  /* Show the cloned XP/level bar in row 1 left.  The in-stage statusbar
-     copy is hidden so the same data isn't shown twice. */
-  .Statusbar .StatusItem.XP {
-    display: none;
-  }
-  .MainMenuXP {
-    display: block;
-    position: absolute;
-    top: 4px;
-    left: 28px;
-    z-index: 5;
-    transform: scale(1.1);
-    transform-origin: top left;
-  }
-  /* Username sits above the bar.  Padded-left to clear the overhanging
-     star, but kept tight so it visually belongs to the bar. */
-  .MainMenuXP .MainMenuXPName {
-    font-family: Bowlby, sans-serif;
-    font-size: 11px;
-    line-height: 12px;
-    color: #FFF;
-    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
-    margin-bottom: -1px;
-    padding-left: 18px;
-    max-width: 156px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    box-sizing: border-box;
-  }
-  .MainMenuXP .StatusItem.XP .StatusIcon.xp {
-    left: -19px;
-  }
-  .MainMenuXP .StatusItem.XP .StatusTextLevel {
-    /* Centred on the scaled star */
-    left: -14px;
-    width: 28px;
-    height: 25px;
-    line-height: 25px;
-    text-align: center;
-    font-size: 14px;
-    color: #333;
-  }
-  /* XP value text is centred on the bar.  The yellow fill (.StatusGraph)
-     uses its desktop position (left:0 / top:2) so it can grow from
-     under the overhanging star — the star naturally hides the first
-     ~28 px of the bar at low XP, and the fill becomes visible past
-     the star's right edge as XP advances within the level. */
-  .MainMenuXP .StatusItem.XP .StatusText {
-    text-align: center;
-    width: 128px;
-    box-sizing: border-box;
-  }
 }
 
 /* `ViewTab.prototype.css` writes inline width/height to .ViewTabContainer
@@ -3417,16 +3098,6 @@ button {
   .ViewTabMenu {
     width: auto;
     max-width: 100%;
-  }
-}
-
-/* ≥ 927 px: hide the mobile XP clone — the in-stage Statusbar XP item
- * handles every viewport down to 927 px.  Lives in its own min-width
- * block so we don't have to fight the cascade between two equally-
- * specific rules. */
-@media (min-width: 927px) {
-  .MainMenuXP {
-    display: none;
   }
 }
 
@@ -3576,43 +3247,6 @@ button {
     font-size: 10px;
     line-height: 16px;
     margin-right: 1px;
-  }
-}
-
-/* Statusbar: per-item scale + matching margin-right so the layout box
- * shrinks in lockstep with the visual paint (scale alone leaves the
- * layout width at 142+140+144+130 ≈ 560 and the row overflows). */
-@media (max-width: 768px) {
-  .Statusbar .StatusItem.Profiles,
-  .Statusbar .StatusItem.Cash,
-  .Statusbar .StatusItem.AP,
-  .Statusbar .StatusItem.Karma {
-    margin: 0;
-  }
-}
-
-@media (max-width: 600px) {
-  .Statusbar .StatusItem {
-    transform: scale(0.8);
-    transform-origin: top left;
-    /* Reclaim the visual gap the scale leaves at each item's right edge. */
-    margin-right: calc(-1 * (1 - 0.8) * 144px) !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .Statusbar .StatusItem {
-    transform: scale(0.55);
-    transform-origin: top left;
-    margin-right: calc(-1 * (1 - 0.55) * 144px) !important;
-  }
-}
-
-@media (max-width: 380px) {
-  .Statusbar .StatusItem {
-    transform: scale(0.45);
-    transform-origin: top left;
-    margin-right: calc(-1 * (1 - 0.45) * 144px) !important;
   }
 }
 
