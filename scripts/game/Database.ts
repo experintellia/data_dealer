@@ -2,11 +2,10 @@
 // (pending profilesets to integrate) and the integrated TokenPerps.
 // Extracted from scripts/Game.js's IIFE in PR 10 of issue #147.
 //
-// The biggest UI subclass extracted so far (~500 LOC).  GameRoot's surface
-// is narrowed via a local `GameRootForDatabase` interface; the dynamic
-// `Game[node.game_type]` and direct `Game.TokenPerp` lookups are routed
-// through ./perpRegistry.ts so Database can land before every Perp class
-// is extracted in PR 11+.
+// GameRoot's surface is narrowed via a local `GameRootForDatabase`
+// interface.  The dynamic `Game[node.game_type]` lookup is resolved via
+// `perpCtors[name]` (typed direct map, PR 17 of issue #147); the
+// known-name `Game.TokenPerp` reference uses a direct import.
 
 import { getRender } from '../Render.js';
 import appModule from '../app.js';
@@ -23,8 +22,9 @@ import {
 } from './GameNode.js';
 import { OrderedSet } from './OrderedSet.js';
 import { ProfileSet } from './ProfileSet.js';
+import { TokenPerp } from './TokenPerp.js';
 import { mergeData } from './mergeData.js';
-import { lookupPerpClass } from './perpRegistry.js';
+import { perpCtors } from './perpCtors.js';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -379,7 +379,7 @@ export class Database extends GameNode {
         const node = r.node;
         const nodeGameType = node.game_type;
         if (!nodeGameType) return;
-        const Ctor = lookupPerpClass(nodeGameType);
+        const Ctor = perpCtors[nodeGameType];
         if (!Ctor) return;
         const node_data = groot.getTypeData(bgestalt);
         const perp = new Ctor({
@@ -582,7 +582,6 @@ export class Database extends GameNode {
       });
 
       const triggerQueue: GameNode[] = [];
-      const TokenPerpCtor = lookupPerpClass('TokenPerp');
       // Precompute gestalt-keyed lookup maps so the inner loop is O(M)
       // instead of O(M*N) — a profileset with M tokens against a Database
       // with N children would otherwise scan children.set + all_tokens
@@ -600,13 +599,13 @@ export class Database extends GameNode {
         if (token) {
           // collect update tokens
           update_tokens.push(token);
-        } else if (TokenPerpCtor) {
+        } else {
           // create new tokens
           const type = groot.getType(gestalt);
           if (type && type.game_type === 'TokenPerp') {
             const token_instance = allTokensByGestalt.get(gestalt);
             if (token_instance) {
-              const newToken = new TokenPerpCtor({
+              const newToken = new TokenPerp({
                 id: token_instance.game_id,
                 gestalt: gestalt,
                 path: token_instance.full_path,
@@ -614,7 +613,7 @@ export class Database extends GameNode {
                 renderNodeParent: getFirstId('Database'),
                 ViewMap: getByFirstId('Database'),
                 gameType: type.game_type,
-              }) as TokenPerpLike;
+              } as ConstructorParameters<typeof TokenPerp>[0]) as TokenPerpLike;
               gnode.addChild(newToken);
               triggerQueue.push(newToken);
               new_tokens.push(newToken);

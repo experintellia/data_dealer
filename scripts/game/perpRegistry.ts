@@ -1,30 +1,34 @@
 // Cross-class constructor registry for the Perp class hierarchy.
 //
-// Background: scripts/Game.js's IIFE used to expose every subclass on a
-// shared `Game` object so that `Game[node.game_type]` lookups could
-// resolve to the right class.  As subclasses migrate to scripts/game/*.ts,
-// the dynamic lookup needs a way to keep working without each subclass
-// having to know about every other.  This module is that hub:
+// Used by `GamePerp.BuyPerp` to resolve `Game[node.game_type]` lookups
+// without GamePerp.ts having to import its own subclasses (each of
+// which extends GamePerp — direct imports would be a load-time cycle).
 //
-//   - Game.js calls `setPerpClasses(Game)` after the IIFE assembles the
-//     public API object — this registers every class identity (extracted
-//     and still-in-IIFE alike) under their game-type name.
-//   - Database / future-extracted classes call `lookupPerpClass(name)` to
-//     get a constructor by name.  Returns `undefined` if the class hasn't
-//     been registered yet (caller decides how to handle that).
+// Population: `scripts/game/perpCtors.ts` calls `setPerpClasses` as a
+// side effect at module load.  `perpCtors.ts` is imported by
+// `Game.js` (and by `Database.ts` / `DatabasePerp.ts` via their
+// per-call lookups), so the registry is seeded before any BuyPerp
+// flow runs.
 //
-// Disposable seam: when every Perp class is extracted to its own .ts file
-// in PR 11+, callers can switch to direct imports and the registry is
-// retired with the IIFE.
+// Direct callers (Database, DatabasePerp) prefer `perpCtors[name]`
+// from the perpCtors module — this registry exists only for
+// GamePerp's cycle-bound case.  Retires fully when GamePerp's
+// dynamic-by-name construction can be turned into a free function
+// (likely after GameRoot extracts).
 
 import type { GameNode } from './GameNode.js';
 
+// Constructor parameter is `unknown` (not `GameNodeConfig`) because
+// callers (Database / GamePerp.BuyPerp) build config objects from
+// server-response shapes whose individual fields are `string |
+// undefined` rather than absent — `exactOptionalPropertyTypes: true`
+// would reject the assignment under a tighter type without
+// per-call-site narrowing.  The Perp constructors themselves accept
+// `GameNodeConfig` and validate at the seam.
 export type PerpCtor = new (config: unknown) => GameNode;
 
 let _classes: Record<string, PerpCtor> = {};
 
-/** Replaces the registry.  Called once by Game.js after the IIFE
- *  assembles the API object. */
 export function setPerpClasses(classes: Record<string, PerpCtor>): void {
   _classes = classes;
 }

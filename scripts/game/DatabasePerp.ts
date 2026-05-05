@@ -20,7 +20,7 @@ import {
   type RenderPopupLike,
 } from './GamePerp.js';
 import { mergeData } from './mergeData.js';
-import { lookupPerpClass } from './perpRegistry.js';
+import { perpCtors } from './perpCtors.js';
 
 /** Database BuyPerp returns one extra field (`profile_set`) that the
  *  generic perp BuyPerp doesn't — the Database queues it after the
@@ -90,7 +90,7 @@ export class DatabasePerp extends GamePerp {
       const node = r.node;
       const nodeGameType = node.game_type;
       if (!nodeGameType) return;
-      const Ctor = lookupPerpClass(nodeGameType);
+      const Ctor = perpCtors[nodeGameType];
       if (!Ctor) return;
       const node_data = groot.getTypeData(bgestalt);
       const perp = new Ctor({
