@@ -4366,6 +4366,25 @@ var Render = function () {
 
   extend(MainMenu, Stage);
 
+  // Don't pin height/display inline — let CSS drive them.  Desktop
+  // sets a fixed 48 px height with `display: block`; the mobile
+  // breakpoints switch to a flex column that grows to fit the
+  // two-row content.  Width still goes inline because the desktop
+  // layout uses a 960 px design width that JS scales for narrower
+  // viewports.
+  MainMenu.prototype.setSize = function (size) {
+    this.setAttrs(size);
+    this.css({ width: this.width + 'px' });
+  };
+  MainMenu.prototype.updateRenderProp = function () {
+    this.css({
+      'z-index': this.z,
+      position: this.position,
+      top: 0,
+      left: 0,
+    });
+  };
+
   MainMenu.prototype.template = 'mainmenu.html';
 
   MainMenu.prototype.render = function () {

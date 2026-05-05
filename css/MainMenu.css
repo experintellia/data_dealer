@@ -10,6 +10,7 @@
  */
 
 .MainMenu {
+  height: 48px;
   overflow: hidden;
   margin: 0 auto;
   background: linear-gradient(to bottom, #001111 0%, #06546c 100%);
@@ -135,6 +136,8 @@
   .MainMenu {
     display: flex;
     flex-direction: column;
+    height: auto;
+    overflow: visible;
     border-radius: 8px 8px 0 0;
   }
   .mm-xp {

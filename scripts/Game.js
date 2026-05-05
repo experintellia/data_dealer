@@ -1815,6 +1815,16 @@ var Game = function () {
           game.fitToWindow();
         }, 100)
       );
+    // The mobile MainMenu grows after the XP bar gets cloned in and on
+    // CSS-driven reflows (orientation, font load); refit the Stage
+    // whenever the header's measured height changes so we don't push
+    // the playfield past the bottom of the viewport.
+    if (game.renderMenu && game.renderMenu.domelem && typeof ResizeObserver === 'function') {
+      var refit = _.debounce(function () {
+        game.fitToWindow();
+      }, 50);
+      new ResizeObserver(refit).observe(game.renderMenu.domelem);
+    }
 
     return game;
   };
