@@ -6,12 +6,10 @@
  * every rule because they render identically.
  *
  * Layout cascade:
- *   desktop      inline-block row, decorative offsets
+ *   desktop      inline-block row, decorative top-offset
  *   ≤ 980 px     logo hidden → tabs reclaim its space
- *   ≤ 926 px     two-row header → tabs become equal-flex
- *   ≤ 768 px     touch-friendly minimum hit size
- *   ≤ 600 px     tighter padding, smaller font
- *   ≤ 480 px     compact phone layout
+ *   ≤ 926 px     two-row header → flex row, top-offset cancelled
+ *   ≤ 600 px     compact phone size
  *   ≤ 380 px     tightest layout for the smallest screens
  *
  * Note: `touch-action: manipulation` (300 ms iOS tap-delay fix) is
@@ -42,8 +40,6 @@
   margin-right: 8px;
   box-shadow: 3px 3px 0px #009FD9;
   text-shadow: 0px 0px 0px white, 1px 1px 0px white, 2px 2px 0px white, 3px 3px 0px white;
-  -webkit-transition: top 0.2s linear;
-  -moz-transition: top 0.2s linear;
   transition: top 0.2s linear;
 }
 
@@ -61,8 +57,6 @@
   background: #ECF8FC;
   color: #E48931;
   top: 9px;
-  -webkit-transition: top 0 linear;
-  -moz-transition: top 0 linear;
   transition: top 0 linear;
 }
 
@@ -79,8 +73,6 @@
 
 .MainMenuButton.disabled,
 .MainMenuButton.disabled:hover {
-  -webkit-transform: inherit;
-  -moz-transform: inherit;
   transform: inherit;
   opacity: 0.5;
 }
@@ -98,79 +90,42 @@
   }
 }
 
-/* ── ≤ 926 px: two-row header → equal-flex tab buttons ─────── */
+/* ── ≤ 926 px: flex row, equal-width tabs, top-offset cancelled ─ */
 @media (max-width: 926px) {
   .MainMenuButtons {
     width: 100%;
     height: auto;
-    min-height: 32px;
-    padding: 2px 6px;
+    min-height: 36px;
+    padding: 4px 6px 0;
     display: flex;
-    flex-direction: row;
     justify-content: center;
-    align-items: stretch;
+    align-items: flex-end;
     gap: 4px;
     box-sizing: border-box;
   }
-  .MainMenuButtons .MainMenuButton {
+  /* Cancel the desktop top-offset; colour change still signals active */
+  .MainMenuButtons .MainMenuButton,
+  .MainMenuButtons .MainMenuButton.active {
     flex: 1 1 0;
     min-width: 0;
+    top: 0;
     margin-right: 0;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
   }
 }
 
-/* ── ≤ 768 px: touch-friendly minimum hit size ─────────────── */
-@media (max-width: 768px) {
-  .ViewTabMenuButton,
-  .MainMenuButton {
-    min-height: 44px;
-    line-height: 28px;
-    padding: 4px 14px 8px 14px;
-  }
-  .ViewTabMenuButton + .ViewTabMenuButton,
-  .MainMenuButton + .MainMenuButton {
-    margin-left: 4px;
-  }
-}
-
-/* ── ≤ 600 px: tighter padding, smaller font ───────────────── */
+/* ── ≤ 600 px: compact size for small phones ────────────────── */
 @media (max-width: 600px) {
   .ViewTabMenuButton,
   .MainMenuButton {
-    padding: 3px 6px 6px 6px;
+    padding: 4px 6px;
     font-size: 15px;
-    line-height: 22px;
-    box-shadow: 2px 2px 0px #009FD9;
-  }
-}
-
-/* ── ≤ 480 px: compact phone layout ────────────────────────── */
-@media (max-width: 480px) {
-  .ViewTabMenuButton,
-  .MainMenuButton {
-    padding: 1px 2px;
-    font-size: 17px;
-    line-height: 18px;
-    min-height: 24px;
+    line-height: 20px;
     border-width: 2px;
     border-radius: 6px;
-    box-shadow: 1px 1px 0px #009FD9;
-    top: 7px;
-  }
-  .ViewTabMenuButton.active,
-  .MainMenuButton.active {
-    top: 5px;
-  }
-  .ViewTabMenuButton + .ViewTabMenuButton,
-  .MainMenuButton + .MainMenuButton {
-    margin-left: 1px;
-  }
-  .MainMenuButtons {
-    padding-top: 2px;
-    padding-bottom: 2px;
+    box-shadow: 2px 2px 0px #009FD9;
   }
 }
 
@@ -178,8 +133,8 @@
 @media (max-width: 380px) {
   .ViewTabMenuButton,
   .MainMenuButton {
-    padding: 1px 3px 2px 3px;
+    padding: 3px 4px;
     font-size: 13px;
-    margin-right: 1px;
+    line-height: 18px;
   }
 }
