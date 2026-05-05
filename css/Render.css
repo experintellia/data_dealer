@@ -3609,8 +3609,8 @@ button {
 @media (max-width: 480px) {
   .ViewTabMenuButton,
   .MainMenuButton {
-    padding: 1px 4px 2px 4px;
-    font-size: 15px;
+    padding: 1px 2px 1px 2px;
+    font-size: 17px;
     line-height: 18px;
     border-width: 2px;
     border-radius: 6px;
@@ -3620,16 +3620,22 @@ button {
   .MainMenuButton + .MainMenuButton {
     margin-left: 1px;
   }
-  /* On the active state, the desktop rule `top: 9px;` shifts the active tab
-     down by 4 px (from `top: 13px;`).  Keep a smaller offset on narrow
-     viewports so the active tab still reads as recessed. */
+  /* Smaller `top` offsets so the tab row is shorter overall — the desktop
+     11/8 px values waste vertical space on phones. */
   .ViewTabMenuButton.active,
   .MainMenuButton.active {
-    top: 8px;
+    top: 5px;
   }
   .ViewTabMenuButton,
   .MainMenuButton {
-    top: 11px;
+    top: 7px;
+  }
+  /* Trim the tab-row container to match: less min-height + tighter padding
+     so the bar isn't taller than the tab content needs. */
+  .MainMenuButtons {
+    min-height: 30px;
+    padding-top: 2px;
+    padding-bottom: 2px;
   }
 }
 
@@ -3647,10 +3653,12 @@ button {
  * the available stage width without leaving large empty gaps between
  * items.  Replaces the previous step-by-step breakpoint scaling.
  *
- * Native total width of all 5 items ≈ 684 px.  We size against 720 px so
- * a small flex gap remains at every viewport instead of items butting up
- * edge-to-edge.  clamp() floors the scale at 0.5 so items stay legible
- * on the very smallest phones, and caps at 1 so we never up-scale.        */
+ * Native total width of all 5 items ≈ 684 px.  We size against 760 px so
+ * items always leave a small flex gap at every viewport (and never push
+ * past the screen edge).  clamp() floors the scale at 0.45 so items stay
+ * legible on the very smallest phones, and caps at 1 so we never up-scale.
+ * Wrap as a safety net at ≤ 480 px in case anything else (zoom, scrollbar)
+ * eats into the available width.                                          */
 @media (max-width: 768px) {
   .Statusbar .StatusItem.Profiles,
   .Statusbar .StatusItem.Cash,
@@ -3659,7 +3667,7 @@ button {
     margin: 0;
   }
   .Statusbar {
-    --status-s: clamp(0.5, calc(100vw / 720), 1);
+    --status-s: clamp(0.45, calc(100vw / 760), 1);
     justify-content: space-evenly;
   }
   .Statusbar .StatusItem {
@@ -3670,10 +3678,7 @@ button {
   }
 }
 
-/* ≤ 380 px: items at clamp's 0.5 floor still total ~342 px which fits
- * comfortably in a 320 px viewport, but allow wrap as a safety net for
- * very narrow viewports or large UI scaling. */
-@media (max-width: 380px) {
+@media (max-width: 480px) {
   .Statusbar {
     flex-wrap: wrap;
     row-gap: 4px;
