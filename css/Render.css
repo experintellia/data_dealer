@@ -1657,31 +1657,36 @@
   width: 588px;
   position: relative;
 }
+/* `min-height` (not `height`) so the panes can grow if content needs
+ * more room — eg. wrapped text on mobile, longer translations.  Inner
+ * absolute-positioned children (PopupSummary, PopupButtons) still
+ * anchor to the same top/bottom edges since they reference the panel's
+ * box, not its measured height. */
 .PopupHeader {
   border:6px solid #DADADA;
   border-radius:12px;
   box-shadow:0px 0px 2px #404040 inset;
-  height:155px;
+  min-height:155px;
 }
 .PopupContent {
   border:6px solid #DADADA;
   border-radius:12px;
   margin-top:6px;
   box-shadow:0px 0px 2px #404040 inset;
-  height:322px;
+  min-height:322px;
 }
 
 .TokenPerp.SuperToken .PopupHeader {
-  height:224px;
+  min-height:224px;
 }
 .TokenPerp.SuperToken .PopupContent {
-  height:220px;
+  min-height:220px;
 }
 .TokenPerp .PopupHeader {
-  height:310px;
+  min-height:310px;
 }
 .TokenPerp .PopupContent {
-  height:197px;
+  min-height:197px;
 }
 
 .SubpopClose,
