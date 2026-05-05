@@ -143,6 +143,11 @@
      * tabs' rounded bottoms read as a rounded bottom on the menu. */
     overflow: hidden;
     border-radius: 8px 8px 0 0;
+    /* Cyan separator stripe at the menu's bottom edge — matches the
+     * desktop look where the same colour runs across the bottom of
+     * the tab strip. */
+    border-bottom: 3px solid #16a3d7;
+    box-sizing: border-box;
   }
   .mm-xp {
     display: block;
@@ -151,7 +156,9 @@
   }
   .mm-tabs {
     /* No padding-bottom — tabs flush against the menu's bottom edge
-     * (and beyond, getting clipped by .MainMenu's `overflow: hidden`). */
+     * (and beyond, getting clipped by .MainMenu's `overflow: hidden`).
+     * Keep the desktop-style cyan separator line beneath the tab row
+     * so the menu has a clear edge against the Stage. */
     padding: 0 6px;
     height: auto;
     display: flex;
@@ -161,7 +168,6 @@
     gap: 4px;
     box-sizing: border-box;
     width: 100%;
-    border-bottom: none;
   }
   /* Tabs grow to fill the row equally — text auto-sizes via the
    * cascaded font-size media queries below.  Square bottom corners
