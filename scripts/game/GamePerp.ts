@@ -594,3 +594,17 @@ export class GamePerp extends GameNode {
     dataRec.providedPerps = unlocked.concat(locked);
   }
 }
+
+// Prototype-default shim — TS class field initializers (`sticky = true`,
+// `cableType = 'in'`, `popupTemplate = 'popup.html'`) compile to
+// constructor assignments under target ES2020.  The 10 perp subclasses
+// in scripts/Game.js extend this class via the legacy `extend(SubClass,
+// GamePerp)` helper from scripts/util.js, whose `function (config) {
+// this.init(config); }` constructors never reach `super()` — so the
+// field assignments never run and `instance.sticky` etc. resolve to
+// `undefined`.  Restoring the defaults on the prototype reinstates the
+// pre-#178 inherit-through-the-prototype-chain behaviour.  Retires when
+// the legacy subclasses are migrated to proper TS classes (issue #187).
+GamePerp.prototype.cableType = 'in';
+GamePerp.prototype.sticky = true;
+GamePerp.prototype.popupTemplate = 'popup.html';
