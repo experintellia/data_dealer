@@ -15,7 +15,12 @@
     project_title = _.span(project_title);
     var powerupdata =  { title: goal.target };
     if (ptype[goal.target]) {
-      powerupdata = ptype[goal.target].type_data;
+      /* Keep the `{title: goal.target}` fallback if the subtype hasn't
+         been hydrated yet (powerup data is loaded on-demand via
+         fetchProjectPowerupData; mission popups can render before the
+         project's powerups are fetched).  Without this fallback,
+         `target_sprite = powerupdata.popup_sprite` throws. */
+      powerupdata = ptype[goal.target].type_data || powerupdata;
     }
     var target_sprite = powerupdata.popup_sprite;
     var target_title = powerupdata.title;
