@@ -111,8 +111,8 @@
     top: 0;
     margin-right: 0;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    text-align: center;
+    font-size: 13px;
   }
 }
 

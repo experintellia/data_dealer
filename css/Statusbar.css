@@ -1,0 +1,277 @@
+/* ============================================================
+ * Statusbar — the row of stat items (Profiles, Cash, AP, Karma, XP)
+ * ============================================================
+ * The JS game engine writes inline transform + width/height onto
+ * .Statusbar on every resize.  The base rules here override those
+ * stale values so the bar always fills its container correctly.
+ *
+ * Layout cascade:
+ *   desktop    flex row, centred, no-wrap
+ *   ≤ 768 px   fluid scale via CSS custom property --status-s
+ *   ≤ 480 px   wrap to two rows as safety net
+ *
+ * Note: `.Statusbar .StatusItem.XP { display: none }` at ≤ 926 px
+ * lives in Render.css inside the two-row header block.
+ * ============================================================ */
+
+/* ── Override JS-written inline styles ─────────────────────── */
+.Statusbar {
+  transform: none !important;
+  width: 100% !important;
+  left: 0 !important;
+  top: 12px !important;
+  height: auto !important;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  justify-content: center !important;
+  align-items: flex-start;
+  box-sizing: border-box;
+}
+.Statusbar .StatusItem {
+  flex: 0 0 auto;
+  transform-origin: top center;
+}
+
+/* ── StatusItem base ────────────────────────────────────────── */
+.StatusItem {
+  width: 128px;
+  height: 25px;
+  margin: 0;
+  display: inline-block;
+  position: relative;
+}
+
+.StatusBackground {
+  background-image: url(../img/MainSprites.png);
+  width: 131px;
+  height: 28px;
+  background-position: -36px -580px;
+}
+
+.StatusBackground.profiles {
+  background-image: url(../img/MainSprites.png);
+  width: 130px;
+  height: 34px;
+  background-position: -2px -942px;
+}
+.StatusItem.Profiles {
+  width: 142px;
+  margin-left: 6px;
+}
+.StatusItem.Cash {
+  width: 140px;
+}
+.StatusItem.AP {
+  width: 144px;
+}
+.StatusItem.Karma {
+  width: 130px;
+  margin: 0 6px 0 -7px;
+}
+.StatusItem.XP {
+  width: 128px;
+}
+.StatusBackground,
+.StatusRemain,
+.StatusText,
+.StatusTextLevel,
+.StatusTextSmall,
+.StatusGraph,
+.StatusIcon {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.StatusRemain,
+.StatusText {
+  font-family: Bowlby;
+  font-size: 14px;
+  color: #FFF;
+  line-height: 23px;
+  width: 128px;
+  text-align: center;
+  text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5), -1px -1px 0px rgba(0, 0, 0, 0.5), -1px 1px 0px rgba(0, 0, 0, 0.5), 1px -1px 0px rgba(0, 0, 0, 0.5);
+}
+.StatusTextLevel {
+  font-family: Bowlby;
+  font-size: 12px;
+  color: #666;
+  line-height: 24px;
+  text-align: center;
+  width: 38px;
+  left: 92px;
+}
+.StatusTextSmall {
+  font-family: Bowlby;
+  font-size: 11px;
+  color: #FFF;
+  line-height: 16px;
+  width: 128px;
+  text-align: center;
+  text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5), -1px -1px 0px rgba(0, 0, 0, 0.5), -1px 1px 0px rgba(0, 0, 0, 0.5), 1px -1px 0px rgba(0, 0, 0, 0.5);
+  top: 21px;
+  left: 6px;
+}
+.StatusRemain {
+  position: absolute;
+  font-family: Bowlby;
+  top: 23px;
+  left: 6px;
+  color: #ffd800;
+  background: #6a6a6a;
+  line-height: 14px;
+  padding: 4px 4px 2px 4px;
+  border: 2px solid #404040;
+  font-size: 13px;
+  display: none;
+  border-width: 0px 6px 4px 2px;
+  border-radius: 0px 0px 8px 8px;
+  width: 102px;
+}
+.StatusRemain .highlight {
+  color: #FFF;
+}
+.StatusItem.Profiles .StatusText {
+  text-align: right;
+  width: 116px;
+}
+.StatusItem.Cash .StatusText {
+  text-align: right;
+  width: 116px;
+}
+.StatusItem.AP .StatusText {
+  text-align: center;
+  width: 122px;
+}
+.StatusItem.Karma .StatusText {
+}
+.StatusItem.XP .StatusText {
+  width: 106px;
+}
+
+/* ── Status icons ───────────────────────────────────────────── */
+.StatusIcon.profiles {
+  background-image: url(../img/MainSprites.png);
+  width: 38px;
+  height: 38px;
+  left: -18px;
+  top: -7px;
+  background-position: -331px -616px;
+}
+.StatusIcon.cash {
+  background-image: url(../img/MainSprites.png);
+  width: 45px; height: 34px; left: -14px; top: -5px; background-position: -369px -616px;
+}
+.StatusIcon.ap {
+  background-image: url(../img/MainSprites.png);
+  width: 32px; height: 38px; left: -12px; top: -7px; background-position: -292px -655px;
+}
+.StatusIcon.karmaup {
+  background-image: url(../img/MainSprites.png);
+  width: 34px; height: 34px; left: 102px; top: -4px; background-position: -374px -689px;
+}
+.StatusIcon.karmaup_inactive {
+  background-image: url(../img/MainSprites.png);
+  width: 34px; height: 34px; left: 102px; top: -4px; background-position: 0px -702px;
+}
+.StatusIcon.karmadown {
+  background-image: url(../img/MainSprites.png);
+  width: 34px; height: 34px; left: -10px; top: -4px; background-position: -374px -655px;
+}
+.StatusIcon.karmadown_inactive {
+  background-image: url(../img/MainSprites.png);
+  width: 34px; height: 34px; left: -10px; top: -4px; background-position: 0px -668px;
+}
+.StatusIcon.xp {
+  background-image: url(../img/MainSprites.png);
+  width: 47px; height: 46px; left: 92px; top: -10px; background-position: -325px -655px;
+}
+
+/* ── Hover / active states ──────────────────────────────────── */
+.StatusItem:hover .StatusTextLevel,
+.StatusItem:hover .StatusIcon {
+  transform: scale(1.1, 1.1);
+}
+
+.StatusIcon.inactive,
+.StatusItem:hover .StatusIcon.inactive,
+.StatusItem.active .StatusIcon.inactive {
+  transform: scale(1, 1);
+}
+
+.StatusItem.active .StatusIcon {
+  transform: scale(1.15, 1.15);
+}
+
+/* ── Status graphs (progress bars) ─────────────────────────── */
+.StatusGraph {
+  width: 64px;
+  height: 19px;
+  background: #F00;
+  display: block;
+  border-radius: 6px;
+  top: 2px;
+  left: 2px;
+}
+
+.StatusItem.Profiles .StatusGraph  { background: #009fd9; }
+.StatusItem.Profiles.active .StatusGraph { background: #c0e7f5; }
+
+.StatusItem.Cash .StatusGraph      { background: #5da445; width: 120px; }
+.StatusItem.Cash.active .StatusGraph { background: #b5d7a8; }
+
+.StatusItem.AP .StatusGraph        { background: #e48931; }
+.StatusItem.AP.active .StatusGraph { background: #ffd800; }
+
+.StatusItem.Karma .StatusGraph     { background: #cd495d; }
+.StatusItem.Karma.active .StatusGraph { background: #ea9999; }
+.StatusItem.Karma .StatusGraph.pos { background: #31B6A2; }
+.StatusItem.Karma.active .StatusGraph.pos { background: #98DAD0; }
+
+.StatusGraph.neg {
+  left: inherit;
+  right: 67px;
+  border-radius: 6px 0px 0px 6px;
+  border-right: 2px solid #FFF;
+}
+.StatusGraph.pos {
+  left: 61px;
+  border-radius: 0px 6px 6px 0px;
+  border-left: 2px solid #FFF;
+}
+
+.StatusItem.XP .StatusGraph        { background: #ffff00; }
+.StatusItem.XP.active .StatusGraph { background: #fcfcd4; }
+.StatusItem.XP.active .StatusTextLevel { font-size: 14px; }
+
+/* ── ≤ 768 px: fluid scale — items always fill available width ─ */
+/* Native total width of all 5 items ≈ 684 px.  We size against 760 px so
+ * items always leave a small flex gap at every viewport.  clamp() floors
+ * the scale at 0.45 for the smallest phones and caps at 1.              */
+@media (max-width: 768px) {
+  .Statusbar .StatusItem.Profiles,
+  .Statusbar .StatusItem.Cash,
+  .Statusbar .StatusItem.AP,
+  .Statusbar .StatusItem.Karma {
+    margin: 0;
+  }
+  .Statusbar {
+    --status-s: clamp(0.45, calc(100vw / 760), 1);
+    justify-content: space-evenly;
+  }
+  .Statusbar .StatusItem {
+    transform: scale(var(--status-s));
+    transform-origin: top left;
+    /* Reclaim the layout-box gap the visual scaling leaves on the right. */
+    margin-right: calc((var(--status-s) - 1) * 144px) !important;
+  }
+}
+
+/* ── ≤ 480 px: wrap to two rows as safety net ──────────────── */
+@media (max-width: 480px) {
+  .Statusbar {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+}
