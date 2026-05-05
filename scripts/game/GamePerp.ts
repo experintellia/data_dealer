@@ -47,7 +47,8 @@ export interface RenderNodeLike {
 export interface RenderPopupLike {
   open?: boolean;
   trigger(ev: string, args?: unknown[]): void;
-  close(): void;
+  close(cb?: () => void): void;
+  on(ev: string, handler: (...args: unknown[]) => void): void;
   remove?(): void;
 }
 

@@ -1150,51 +1150,6 @@ var Game = function () {
     });
   };
 
-  GameNode.prototype.openGenericPopup = function (config) {
-    var gnode = config.gnode || this;
-    var groot = this.GameRoot;
-    var config = config || {};
-    var data = config.data || gnode.data;
-
-    gnode.popupTemplateData = {};
-    gnode.popupTemplateData.status_icons = gnode.GameRoot.data.status_icons;
-    gnode.popupTemplateData.states = config.states || {};
-    gnode.popupTemplateData.data = data;
-    //gnode.popupTemplateData.data.gestalt = 'Database';
-    //gnode.popupTemplateData.data.id = this.id;
-    gnode.popupTemplateData.groot = groot;
-    gnode.popupTemplateData.data = data;
-
-    var popupConfig = {
-      gameNode: this,
-      template: config.template || 'popup.html',
-      extendClass: config.extendClass || '',
-      templateData: gnode.popupTemplateData,
-      popupContainer: this,
-    };
-
-    var popup = (this.renderPopup = new Render.Popup(popupConfig));
-
-    gnode.renderNode.addPopup(popup);
-
-    gnode.initPopupEvents();
-
-    /*
-      popup.on('button_click.MainButton',function(e) {
-        e.stopPropagation();
-        popup.close();
-      });
-
-      popup.on('popup_close',function(e) {
-        e.stopPropagation();
-        popup.close();
-        delete gnode.renderPopup;
-      });
-      */
-
-    return popup;
-  };
-
   GameRoot.prototype.openNotification = function (notification) {
     var gnode = this;
     var groot = this;
@@ -1883,132 +1838,6 @@ var Game = function () {
   // via setAniTicker(AniTicker) at the IIFE's tail so GamePerp can
   // subscribe to charge-running animations.
 
-  GameNode.prototype.initPopupEvents = function (popup) {
-    var gnode = this;
-    var groot = this.GameRoot;
-
-    var popup = popup || gnode.renderPopup;
-
-    if (!popup) {
-      return;
-    }
-
-    popup.on('button_click.MainButton', function (e) {
-      e.stopPropagation();
-      popup.trigger('popup_close');
-    });
-
-    popup.on('button_click.ChargeButton', function (e) {
-      e.stopPropagation();
-      gnode.Charge();
-    });
-
-    popup.on('button_click.CollectButton', function (e) {
-      e.stopPropagation();
-      gnode.collect();
-    });
-
-    popup.on('popup_close', function (e) {
-      e.stopPropagation();
-      if (popup.notificationMission) {
-        var gestalt = popup.notificationMission;
-        popup.notificationMission = null;
-        // No optimistic raw_data write: dismissMissionBriefing emits a
-        // delta whose listener echo lands synchronously in this tick
-        // (closes #116 race window under the #120 architectural fix).
-        if (app.remote && app.remote.dismissMissionBriefing) {
-          app.remote.dismissMissionBriefing(gestalt);
-        }
-      }
-      if (gnode.highlightTabs) {
-        gnode.highlightTabs = [];
-      }
-      if (gnode.renderNode && gnode.renderNode.DecoratorNew) {
-        _.each(getAllByGestalt(gnode.gestalt), function (gn) {
-          gn.renderNode.DecoratorNew.remove();
-        });
-      }
-      if (popup.callback) {
-        popup.close(popup.callback);
-      } else {
-        popup.close();
-      }
-      delete gnode.renderPopup;
-    });
-
-    popup.on('button_click.PowerupBuyButton', function (e, bgestalt, bslot) {
-      e.stopPropagation();
-      gnode.BuyPowerup(bgestalt, bslot);
-    });
-
-    popup.on('button_click.PowerupBuySlotsButton', function (e, bgestalt, bslot) {
-      e.stopPropagation();
-      gnode.BuySlots(bslot, bgestalt);
-    });
-
-    popup.on('button_click.PowerupSellButton', function (e, bgestalt, bslot) {
-      e.stopPropagation();
-      gnode.SellPowerup(bgestalt, bslot);
-    });
-
-    popup.on('popup_token_seen', function (e, gestalt) {
-      e.stopPropagation();
-      if (!gestalt) {
-        return;
-      }
-      // No optimistic raw_data write: markTokenSeen emits a delta whose
-      // listener echo lands synchronously (closes #116 race window
-      // under the #120 architectural fix). The handler itself short-
-      // circuits when the gestalt is already in tokens_seen, so calling
-      // it twice is a no-op delta.
-      if (app.remote && app.remote.markTokenSeen) {
-        app.remote.markTokenSeen(gestalt);
-      }
-    });
-
-    popup.on('button_click.PerpBuyButton', function (e, bgestalt) {
-      e.stopPropagation();
-      var gtype = groot.getTypeFromGestalt(bgestalt);
-      if (gtype === 'CityPerp') {
-        var DBPerp = getByType('DatabasePerp');
-        if (DBPerp.length) {
-          DBPerp = DBPerp[0];
-        } else {
-          return;
-        }
-        return DBPerp.BuyCity(bgestalt);
-      } else {
-        gnode.BuyPerp(bgestalt);
-      }
-    });
-
-    popup.on('button_click.UpgradeButton', function (e) {
-      e.stopPropagation();
-      gnode.Charge();
-    });
-
-    popup.jdomelem.on('click touchend', 'a.ml', function (e) {
-      e.stopPropagation();
-      e.preventDefault();
-      var link = $(this).attr('href');
-      // FIX for FF open link in external window to prevent socketloss
-      //document.location.href = link;
-      window.open(link);
-    });
-
-    popup.jdomelem.on('click touchend', 'a.mln', function (e) {
-      e.stopPropagation();
-      e.preventDefault();
-      var link = $(this).attr('href');
-      window.open(link);
-    });
-
-    popup.on('button_click.RefreshButton', function (e) {
-      e.stopPropagation();
-      gnode.GameRoot.refresh();
-    });
-  };
-
   ///////////////////////////////////
   // The Top Scores
   ///////////////////////////////////
@@ -2032,33 +1861,6 @@ var Game = function () {
   //
   // DatabasePerp + CityPerp similarly extracted to scripts/game/
   // DatabasePerp.ts / CityPerp.ts in PR 12 of issue #147.
-
-  GameNode.prototype.fetchProvided = function (cb) {
-    var gnode = this;
-    gnode.data.providedPerps = [];
-    if (gnode.popupTemplateData) {
-      gnode.popupTemplateData.loading = true;
-    }
-
-    app.remote
-      .getProvidedPerps(gnode.path)
-      .done(function (data) {
-        if (data.result && data.result.buyable) {
-          gnode.data.buyablePerps = data.result.buyable;
-          if (gnode.popupTemplateData) {
-            gnode.popupTemplateData.loading = false;
-          }
-          if (cb) {
-            cb();
-          }
-        }
-      })
-      .fail(function (data) {
-        if (cb) {
-          cb();
-        }
-      });
-  };
 
   GameRoot.prototype.getCityOriginAmounts = function () {
     var cities = _.where(this.DBOriginTokens, { originGameType: 'CityPerp' });
@@ -2111,36 +1913,6 @@ var Game = function () {
           cb();
         }
       });
-    }
-  };
-
-  GameNode.prototype.Error = function (errormsg, data) {
-    var groot = this.GameRoot;
-    if (this.renderPopup && this.renderPopup.open) {
-      this.renderPopup.trigger('error');
-    } else if (this.renderNode) {
-      this.renderNode.FXError();
-    } else if (groot) {
-      groot.renderNode.FXError();
-    }
-    if (setup.debug) {
-      console.error(errormsg, data);
-    }
-  };
-
-  GameNode.prototype.NoCash = function () {
-    if (this.renderPopup && this.renderPopup.open) {
-      this.renderPopup.trigger('no_cash');
-    } else {
-      this.renderNode.FXNoCash();
-    }
-  };
-
-  GameNode.prototype.NoAP = function () {
-    if (this.renderPopup && this.renderPopup.open) {
-      this.renderPopup.trigger('no_AP');
-    } else {
-      this.renderNode.FXNoAP();
     }
   };
 

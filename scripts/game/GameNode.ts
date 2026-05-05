@@ -20,6 +20,7 @@
 
 import type { JQueryLike, JQueryStatic } from '../../types/env.d.ts';
 import { getRender } from '../Render.js';
+import appModule from '../app.js';
 import setup from '../setup.js';
 import { getTypeSettings } from '../type_settings.js';
 import { OrderedSet } from './OrderedSet.js';
@@ -221,12 +222,32 @@ interface RenderNodeLike {
   hidden?: boolean;
   jdomelem?: unknown;
   gameNode?: GameNode;
+  addPopup?(popup: unknown): void;
+  FXError?(): void;
+  FXNoCash?(): void;
+  FXNoAP?(): void;
+  DecoratorNew?: { remove(): void };
   [key: string]: unknown;
 }
 
 interface RenderPopupLike {
-  close(): void;
+  open?: boolean;
+  close(cb?: () => void): void;
   trigger(ev: string, args?: unknown[]): void;
+  on(ev: string, handler: (...args: unknown[]) => void): void;
+  jdomelem?: { on(ev: string, sel: string, handler: (e: unknown) => void): void };
+  notificationMission?: string | null;
+  callback?: () => void;
+}
+
+/** GameRoot surface this base class touches in its mixin methods.
+ *  Narrow forward-ref interface; collapses when GameRoot itself
+ *  extracts to its own typed module. */
+interface GameRootForGameNode {
+  data: { status_icons?: unknown; [key: string]: unknown };
+  renderNode?: RenderNodeLike;
+  refresh(): void;
+  getTypeFromGestalt(gestalt: string): string | undefined;
 }
 
 // `Render[renderType]` is dynamic — each renderType key resolves to a
@@ -278,20 +299,10 @@ export class GameNode {
    *  constructors so descendant nodes can resolve a popup container. */
   ViewMap?: GameNode;
 
-  // Legacy GameNode prototype mixins still attached from scripts/Game.js
-  // (`GameNode.prototype.openGenericPopup` at Game.js:1199, `Error` /
-  // `NoCash` / `NoAP` at 4810/4824/4832, `initPopupEvents` at 2683,
-  // `fetchProvided` at 3767).  Declared here as optional methods so
-  // subclasses (Database, Perp classes) don't need per-call
-  // `as unknown as { method: ... }` reads to call them.  The real
-  // implementations live in Game.js until those mixin blocks are
-  // consolidated into GameNode.ts in a later PR.
-  openGenericPopup?(config: Record<string, unknown>): unknown;
-  initPopupEvents?(popup?: unknown): void;
-  fetchProvided?(cb: (...args: unknown[]) => void): void;
-  Error?(msg: string, data: unknown): void;
-  NoCash?(): void;
-  NoAP?(): void;
+  // GameNode prototype mixin implementations live further down the
+  // class body (extracted from scripts/Game.js's IIFE in PR 18 of
+  // issue #147).  Subclasses (Database / the 10 Perp subclasses) call
+  // these as regular methods.
 
   // Used by addType() to write into the type registry.  Real registry
   // lives on GameRoot in Game.js; the base just mutates whatever object
@@ -613,4 +624,251 @@ export class GameNode {
       });
     }
   }
+
+  // -------------------------------------------------------------------
+  // Mixin methods (extracted from scripts/Game.js's IIFE in PR 18 of
+  // issue #147).  Used by Database, the 10 Perp subclasses, and other
+  // GameNode descendants.  All forward-ref types live above the class
+  // body; collapse when GameRoot / Render.js extract.
+  // -------------------------------------------------------------------
+
+  openGenericPopup(config: {
+    gnode?: GameNode;
+    data?: Record<string, unknown>;
+    states?: Record<string, boolean>;
+    template?: string;
+    extendClass?: string;
+  }): RenderPopupLike {
+    const gnode = config.gnode || this;
+    const groot = this.GameRoot as unknown as GameRootForGameNode;
+    const data = config.data || gnode.data;
+
+    const ptd: Record<string, unknown> = {};
+    ptd.status_icons = groot.data.status_icons;
+    ptd.states = config.states || {};
+    ptd.data = data;
+    ptd.groot = groot;
+    gnode.popupTemplateData = ptd;
+
+    const Render = getRender() as unknown as {
+      Popup: new (cfg: unknown) => RenderPopupLike;
+    };
+    const popup = new Render.Popup({
+      gameNode: this,
+      template: config.template || 'popup.html',
+      extendClass: config.extendClass || '',
+      templateData: gnode.popupTemplateData,
+      popupContainer: this,
+    });
+    this.renderPopup = popup;
+
+    (gnode.renderNode as RenderNodeLike | undefined)?.addPopup?.(popup);
+
+    gnode.initPopupEvents();
+
+    return popup;
+  }
+
+  initPopupEvents(popup?: RenderPopupLike): void {
+    const groot = this.GameRoot as unknown as GameRootForGameNode;
+    const p = popup || (this.renderPopup as RenderPopupLike | undefined);
+    if (!p) return;
+
+    p.on('button_click.MainButton', (e: unknown) => {
+      stopProp(e);
+      p.trigger('popup_close');
+    });
+    p.on('button_click.ChargeButton', (e: unknown) => {
+      stopProp(e);
+      (this as GameNode & { Charge?(): void }).Charge?.();
+    });
+    p.on('button_click.CollectButton', (e: unknown) => {
+      stopProp(e);
+      (this as GameNode & { collect?(): void }).collect?.();
+    });
+
+    p.on('popup_close', (e: unknown) => {
+      stopProp(e);
+      if (p.notificationMission) {
+        const gestalt = p.notificationMission;
+        p.notificationMission = null;
+        // No optimistic raw_data write: dismissMissionBriefing emits a
+        // delta whose listener echo lands synchronously in this tick
+        // (closes #116 race window under the #120 architectural fix).
+        const remote = appModule.getApplication().remote as {
+          dismissMissionBriefing?(g: string): unknown;
+        };
+        remote.dismissMissionBriefing?.(gestalt);
+      }
+      const subclass = this as GameNode & {
+        highlightTabs?: string[];
+      };
+      if (subclass.highlightTabs) subclass.highlightTabs = [];
+      const rn = this.renderNode as RenderNodeLike | undefined;
+      if (rn?.DecoratorNew && this.gestalt) {
+        getAllByGestalt(this.gestalt).forEach((gn) => {
+          (gn.renderNode as RenderNodeLike | undefined)?.DecoratorNew?.remove();
+        });
+      }
+      if (p.callback) {
+        p.close(p.callback);
+      } else {
+        p.close();
+      }
+      delete this.renderPopup;
+    });
+
+    p.on('button_click.PowerupBuyButton', (e: unknown, bgestalt: unknown, bslot: unknown) => {
+      stopProp(e);
+      (this as GameNode & { BuyPowerup?(g: unknown, s: unknown): void }).BuyPowerup?.(
+        bgestalt,
+        bslot
+      );
+    });
+    p.on('button_click.PowerupBuySlotsButton', (e: unknown, bgestalt: unknown, bslot: unknown) => {
+      stopProp(e);
+      (this as GameNode & { BuySlots?(s: unknown, g: unknown): void }).BuySlots?.(bslot, bgestalt);
+    });
+    p.on('button_click.PowerupSellButton', (e: unknown, bgestalt: unknown, bslot: unknown) => {
+      stopProp(e);
+      (this as GameNode & { SellPowerup?(g: unknown, s: unknown): void }).SellPowerup?.(
+        bgestalt,
+        bslot
+      );
+    });
+
+    p.on('popup_token_seen', (e: unknown, gestalt: unknown) => {
+      stopProp(e);
+      if (typeof gestalt !== 'string' || !gestalt) return;
+      // No optimistic raw_data write: markTokenSeen emits a delta whose
+      // listener echo lands synchronously (closes #116 race window
+      // under the #120 architectural fix).  The handler itself short-
+      // circuits when the gestalt is already in tokens_seen, so calling
+      // it twice is a no-op delta.
+      const remote = appModule.getApplication().remote as {
+        markTokenSeen?(g: string): unknown;
+      };
+      remote.markTokenSeen?.(gestalt);
+    });
+
+    p.on('button_click.PerpBuyButton', (e: unknown, bgestalt: unknown) => {
+      stopProp(e);
+      if (typeof bgestalt !== 'string') return;
+      const gtype = groot.getTypeFromGestalt(bgestalt);
+      if (gtype === 'CityPerp') {
+        const dbPerps = getByType('DatabasePerp') as Array<
+          GameNode & { BuyCity?(g: string): void }
+        >;
+        if (!dbPerps.length) return;
+        dbPerps[0]?.BuyCity?.(bgestalt);
+      } else {
+        (this as GameNode & { BuyPerp?(g: string): void }).BuyPerp?.(bgestalt);
+      }
+    });
+
+    p.on('button_click.UpgradeButton', (e: unknown) => {
+      stopProp(e);
+      (this as GameNode & { Charge?(): void }).Charge?.();
+    });
+
+    const $ = globalThis.$ as JQueryStatic | undefined;
+    p.jdomelem?.on('click touchend', 'a.ml', function (this: unknown, e: unknown) {
+      stopProp(e);
+      preventDefault(e);
+      // FIX for FF: open link in external window to prevent socketloss.
+      const link = $?.(this as object).attr?.('href');
+      if (typeof link === 'string') window.open(link);
+    });
+    p.jdomelem?.on('click touchend', 'a.mln', function (this: unknown, e: unknown) {
+      stopProp(e);
+      preventDefault(e);
+      const link = $?.(this as object).attr?.('href');
+      if (typeof link === 'string') window.open(link);
+    });
+
+    p.on('button_click.RefreshButton', (e: unknown) => {
+      stopProp(e);
+      groot.refresh();
+    });
+  }
+
+  fetchProvided(cb?: () => void): void {
+    const dataRec = (this.data ||= {}) as {
+      providedPerps?: unknown[];
+      buyablePerps?: unknown;
+    };
+    dataRec.providedPerps = [];
+    if (this.popupTemplateData) {
+      (this.popupTemplateData as { loading?: boolean }).loading = true;
+    }
+    const remote = appModule.getApplication().remote as {
+      getProvidedPerps?(path: string): {
+        done(cb: (data: { result?: { buyable?: unknown } }) => void): {
+          fail(cb: (data: unknown) => void): unknown;
+        };
+      };
+    };
+    const fn = remote.getProvidedPerps;
+    if (!fn) {
+      cb?.();
+      return;
+    }
+    const path = (this as GameNode & { path?: string }).path || '';
+    fn(path)
+      .done((data) => {
+        if (data.result?.buyable) {
+          dataRec.buyablePerps = data.result.buyable;
+          if (this.popupTemplateData) {
+            (this.popupTemplateData as { loading?: boolean }).loading = false;
+          }
+          cb?.();
+        }
+      })
+      .fail(() => {
+        cb?.();
+      });
+  }
+
+  Error(errormsg: string, data: unknown): void {
+    const groot = this.GameRoot as unknown as GameRootForGameNode | undefined;
+    const popup = this.renderPopup as RenderPopupLike | undefined;
+    const rn = this.renderNode as RenderNodeLike | undefined;
+    if (popup?.open) {
+      popup.trigger('error');
+    } else if (rn) {
+      rn.FXError?.();
+    } else if (groot) {
+      groot.renderNode?.FXError?.();
+    }
+    if (setup.debug) {
+      console.error(errormsg, data);
+    }
+  }
+
+  NoCash(): void {
+    const popup = this.renderPopup as RenderPopupLike | undefined;
+    if (popup?.open) popup.trigger('no_cash');
+    else (this.renderNode as RenderNodeLike | undefined)?.FXNoCash?.();
+  }
+
+  NoAP(): void {
+    const popup = this.renderPopup as RenderPopupLike | undefined;
+    if (popup?.open) popup.trigger('no_AP');
+    else (this.renderNode as RenderNodeLike | undefined)?.FXNoAP?.();
+  }
+
+  // Property added by openGenericPopup / Perp.updateTemplateData.
+  popupTemplateData?: Record<string, unknown>;
+}
+
+// jQuery `Event.stopPropagation` / `preventDefault` are present at
+// runtime but the `e` argument from the popup's pub-sub is typed
+// `unknown` here.  Localized helpers narrow without per-call clutter.
+function stopProp(e: unknown): void {
+  const fn = (e as { stopPropagation?: () => void } | null | undefined)?.stopPropagation;
+  if (typeof fn === 'function') fn.call(e);
+}
+function preventDefault(e: unknown): void {
+  const fn = (e as { preventDefault?: () => void } | null | undefined)?.preventDefault;
+  if (typeof fn === 'function') fn.call(e);
 }
