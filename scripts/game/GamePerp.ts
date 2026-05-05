@@ -247,11 +247,6 @@ export class GamePerp extends GameNode {
     this.Error?.('The computer says NOOOO', data);
   }
 
-  protected static _stopProp(e: unknown): void {
-    const fn = (e as { stopPropagation?: () => void } | null | undefined)?.stopPropagation;
-    if (typeof fn === 'function') fn.call(e);
-  }
-
   override initEventHandlers(): void {
     const gnode = this;
     const groot = this.groot;

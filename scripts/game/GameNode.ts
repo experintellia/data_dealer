@@ -675,20 +675,20 @@ export class GameNode {
     if (!p) return;
 
     p.on('button_click.MainButton', (e: unknown) => {
-      stopProp(e);
+      GameNode._stopProp(e);
       p.trigger('popup_close');
     });
     p.on('button_click.ChargeButton', (e: unknown) => {
-      stopProp(e);
+      GameNode._stopProp(e);
       (this as GameNode & { Charge?(): void }).Charge?.();
     });
     p.on('button_click.CollectButton', (e: unknown) => {
-      stopProp(e);
+      GameNode._stopProp(e);
       (this as GameNode & { collect?(): void }).collect?.();
     });
 
     p.on('popup_close', (e: unknown) => {
-      stopProp(e);
+      GameNode._stopProp(e);
       if (p.notificationMission) {
         const gestalt = p.notificationMission;
         p.notificationMission = null;
@@ -719,18 +719,18 @@ export class GameNode {
     });
 
     p.on('button_click.PowerupBuyButton', (e: unknown, bgestalt: unknown, bslot: unknown) => {
-      stopProp(e);
+      GameNode._stopProp(e);
       (this as GameNode & { BuyPowerup?(g: unknown, s: unknown): void }).BuyPowerup?.(
         bgestalt,
         bslot
       );
     });
     p.on('button_click.PowerupBuySlotsButton', (e: unknown, bgestalt: unknown, bslot: unknown) => {
-      stopProp(e);
+      GameNode._stopProp(e);
       (this as GameNode & { BuySlots?(s: unknown, g: unknown): void }).BuySlots?.(bslot, bgestalt);
     });
     p.on('button_click.PowerupSellButton', (e: unknown, bgestalt: unknown, bslot: unknown) => {
-      stopProp(e);
+      GameNode._stopProp(e);
       (this as GameNode & { SellPowerup?(g: unknown, s: unknown): void }).SellPowerup?.(
         bgestalt,
         bslot
@@ -738,7 +738,7 @@ export class GameNode {
     });
 
     p.on('popup_token_seen', (e: unknown, gestalt: unknown) => {
-      stopProp(e);
+      GameNode._stopProp(e);
       if (typeof gestalt !== 'string' || !gestalt) return;
       // No optimistic raw_data write: markTokenSeen emits a delta whose
       // listener echo lands synchronously (closes #116 race window
@@ -752,7 +752,7 @@ export class GameNode {
     });
 
     p.on('button_click.PerpBuyButton', (e: unknown, bgestalt: unknown) => {
-      stopProp(e);
+      GameNode._stopProp(e);
       if (typeof bgestalt !== 'string') return;
       const gtype = groot.getTypeFromGestalt(bgestalt);
       if (gtype === 'CityPerp') {
@@ -767,27 +767,27 @@ export class GameNode {
     });
 
     p.on('button_click.UpgradeButton', (e: unknown) => {
-      stopProp(e);
+      GameNode._stopProp(e);
       (this as GameNode & { Charge?(): void }).Charge?.();
     });
 
     const $ = globalThis.$ as JQueryStatic | undefined;
     p.jdomelem?.on('click touchend', 'a.ml', function (this: unknown, e: unknown) {
-      stopProp(e);
-      preventDefault(e);
+      GameNode._stopProp(e);
+      GameNode._preventDefault(e);
       // FIX for FF: open link in external window to prevent socketloss.
       const link = $?.(this as object).attr?.('href');
       if (typeof link === 'string') window.open(link);
     });
     p.jdomelem?.on('click touchend', 'a.mln', function (this: unknown, e: unknown) {
-      stopProp(e);
-      preventDefault(e);
+      GameNode._stopProp(e);
+      GameNode._preventDefault(e);
       const link = $?.(this as object).attr?.('href');
       if (typeof link === 'string') window.open(link);
     });
 
     p.on('button_click.RefreshButton', (e: unknown) => {
-      stopProp(e);
+      GameNode._stopProp(e);
       groot.refresh();
     });
   }
@@ -859,16 +859,18 @@ export class GameNode {
 
   // Property added by openGenericPopup / Perp.updateTemplateData.
   popupTemplateData?: Record<string, unknown>;
-}
 
-// jQuery `Event.stopPropagation` / `preventDefault` are present at
-// runtime but the `e` argument from the popup's pub-sub is typed
-// `unknown` here.  Localized helpers narrow without per-call clutter.
-function stopProp(e: unknown): void {
-  const fn = (e as { stopPropagation?: () => void } | null | undefined)?.stopPropagation;
-  if (typeof fn === 'function') fn.call(e);
-}
-function preventDefault(e: unknown): void {
-  const fn = (e as { preventDefault?: () => void } | null | undefined)?.preventDefault;
-  if (typeof fn === 'function') fn.call(e);
+  // jQuery `Event.stopPropagation` / `preventDefault` are present at
+  // runtime, but the `e` arg from the popup pub-sub / `gnode.on` event
+  // bus is typed `unknown` at the migration boundary.  Centralised
+  // helpers here so subclasses (Perp / GamePerp / Database) can call
+  // through static inheritance without re-defining the narrow.
+  protected static _stopProp(e: unknown): void {
+    const fn = (e as { stopPropagation?: () => void } | null | undefined)?.stopPropagation;
+    if (typeof fn === 'function') fn.call(e);
+  }
+  protected static _preventDefault(e: unknown): void {
+    const fn = (e as { preventDefault?: () => void } | null | undefined)?.preventDefault;
+    if (typeof fn === 'function') fn.call(e);
+  }
 }
