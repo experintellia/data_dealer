@@ -3443,6 +3443,9 @@ button {
     margin-right: 4px;
     font-size: 14px;
   }
+}
+
+@media (max-width: 520px) {
 
   .TutorialContent {
     padding: 0px 4px;
