@@ -5228,11 +5228,6 @@ var Render = function () {
   };
 
   Popup.prototype.onAddInit = function () {
-    // Pin the body height once so the close-animation has a stable target
-    // (the keyframe scales `.PopupBody` to (2,0); without a fixed height
-    // the from-state would be `auto` and the transition wouldn't fire).
-    var pbody = this.jdomelem.find('.PopupBody');
-    pbody.css({ height: pbody.height() });
     if (this.placeBottom) {
       this.jdomelem.addClass('placeBottom');
     }
