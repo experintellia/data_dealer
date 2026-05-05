@@ -146,19 +146,34 @@
     margin: 4px 0 4px 28px;
   }
   .mm-tabs {
-    padding: 2px 6px;
+    padding: 0 6px 4px 6px;
     height: auto;
     display: flex;
     flex-direction: row;
-    justify-content: center;
+    justify-content: stretch;
     align-items: stretch;
     gap: 4px;
     box-sizing: border-box;
     width: 100%;
+    border-bottom: none;
   }
+  /* Tabs grow to fill the row equally — text auto-sizes via the
+   * cascaded font-size media queries below.  Reset the desktop
+   * `top: 13/9` offsets and asymmetric padding so there's no fat
+   * empty band beneath the label. */
   .mm-tabs .mm-tab {
-    flex: 0 1 auto;
-    margin-right: 0;
+    flex: 1 1 0;
+    margin: 0;
+    top: 0;
+    min-height: 44px;
+    padding: 4px 8px;
+    line-height: 26px;
+    font-size: 16px;
+    box-sizing: border-box;
+    text-align: center;
+  }
+  .mm-tabs .mm-tab.active {
+    top: 0;
   }
   .mm-user-btn {
     padding: 3px 8px;
@@ -208,13 +223,13 @@
   }
 }
 
-/* ── Tap-target / mobile sizing for tabs.
+/* ── Per-breakpoint font-size tightening for tabs.
  *
- * Goal: text as large as fits on one line (no ellipsis, no wrap) and
- * balanced top/bottom padding so there's no fat empty band below the
- * text.  44 px tap target is preserved via `min-height`.  The `top:`
- * offset between active/inactive remains, just smaller — the desktop
- * "press down" cue still reads on touch.
+ * The base mobile rules (≤ 926 px) above set layout, padding, and a
+ * 16 px font-size that fits four labels at ~600 px viewport.  Tighten
+ * the font further at 600 / 480 / 380 px so labels keep fitting on
+ * one line without ellipsis at narrower widths.  Also drop the
+ * box-shadow to a smaller offset so it doesn't dominate the tab.
  */
 @media (max-width: 768px) {
   .mm-user-btn {
@@ -222,51 +237,31 @@
     font-size: 15px;
     margin-left: 6px;
   }
-
-  .mm-tab {
-    min-height: 44px;
-    padding: 7px 12px;
-    line-height: 24px;
-    font-size: 16px;
-    box-sizing: border-box;
-    top: 4px;
-  }
-  .mm-tab.active {
-    top: 0;
-  }
-  .mm-tab + .mm-tab {
-    margin-left: 4px;
-  }
 }
 
 @media (max-width: 600px) {
-  .mm-tab {
-    padding: 8px 8px;
+  .mm-tabs .mm-tab {
     font-size: 15px;
-    line-height: 22px;
+    line-height: 24px;
     box-shadow: 2px 2px 0 #009fd9;
   }
 }
 
 @media (max-width: 480px) {
-  .mm-tab {
-    padding: 6px 6px;
-    font-size: 11px;
-    line-height: 18px;
+  .mm-tabs .mm-tab {
+    font-size: 13px;
+    line-height: 22px;
+    padding: 4px 4px;
     border-width: 2px;
     border-radius: 6px;
     box-shadow: 1px 1px 0 #009fd9;
   }
-  .mm-tab + .mm-tab {
-    margin-left: 2px;
-  }
 }
 
 @media (max-width: 380px) {
-  .mm-tab {
-    padding: 6px 4px;
-    font-size: 10px;
-    line-height: 16px;
-    margin-right: 1px;
+  .mm-tabs .mm-tab {
+    font-size: 11px;
+    line-height: 20px;
+    padding: 4px 2px;
   }
 }
