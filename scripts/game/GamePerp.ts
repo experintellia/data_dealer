@@ -11,12 +11,7 @@
 import { getRender } from '../Render.js';
 import appModule from '../app.js';
 import i18n from '../i18n.js';
-import {
-  GameNode,
-  getAllByGestalt,
-  getByFirstId,
-  getFirstId,
-} from './GameNode.js';
+import { GameNode, getAllByGestalt, getByFirstId, getFirstId } from './GameNode.js';
 import { mergeData } from './mergeData.js';
 import { lookupPerpClass } from './perpRegistry.js';
 
@@ -599,4 +594,3 @@ export class GamePerp extends GameNode {
     dataRec.providedPerps = unlocked.concat(locked);
   }
 }
-
