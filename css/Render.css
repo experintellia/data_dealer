@@ -1193,7 +1193,7 @@
   left: 0px;
   top: 95px;
   height: 26px;
-  width: 540px;
+  width: 100%;
   font-size: 18px;
   text-align: center;
   font-family: Bowlby;
@@ -1925,7 +1925,7 @@
 }
 .PopupMenu {
   position:absolute;
-  top: 152px;
+  top: 146px;
   left:180px;
   left: 50px;
   width: 600px;
@@ -3483,6 +3483,18 @@ button {
   .MissionContent .NotificationBubble .PopupButtons {
     bottom: 4px;
   }
+
+  .PopupBody.Status .PopupButtons,
+  .PopupBody.TokenPerp .PopupButtons {
+    bottom: unset;
+    margin: 10px;
+    height: unset;
+    position: unset;
+  }
+
+  .Popup .PopupTab .standalone .SubpopHeader {
+    top: -9px;
+  }
 }
 
 /* ── Tap targets (≥ 44 px), legibility (≥ 16 px body), :active feedback. */
@@ -3947,7 +3959,6 @@ button {
   .PopupPage.PerpPage,
   .PopupPage.PowerupPage {
     width: 100%;
-    height: auto;
     float: none;
     text-align: center;
     box-sizing: border-box;
@@ -3986,8 +3997,8 @@ button {
 
   /* Tab row: full-width flex, equal-share buttons, extra space above so
      the row doesn't crowd the title text. */
-  .PopupMenu {
-    top: 168px;
+  .PopupMenu {       
+    top: 189px;
     left: 6px;
     right: 6px;
     width: auto;
