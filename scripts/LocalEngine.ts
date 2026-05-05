@@ -16,6 +16,7 @@ import i18nDe from '../i18n/de_AT.json' with { type: 'json' };
 import i18nEn from '../i18n/en_US.json' with { type: 'json' };
 import { getState, setState } from './boot.js';
 import { now as clockNow } from './clock.js';
+import type { UpgradeValuesShape } from './game/ProfileSet.js';
 import { materialize } from './materializer.js';
 import { applyDelta } from './state.js';
 import type { Delta, GameNode, GameValues, LocalState, MissionGoal } from './state.js';
@@ -1639,6 +1640,19 @@ function _seedMissionGoals(state: LocalState): LocalState {
   return Object.assign({}, state, { mission_goals: repairedGoals });
 }
 
+// gestalt → instance_data.amount for every TokenPerp node, mirroring
+// the GameRoot.DBTokens map the UI keys upgrade math against.
+function _buildTokenMap(nodes: GameNode[] | undefined): Record<string, number> {
+  var out: Record<string, number> = {};
+  (nodes || []).forEach(function (n) {
+    if (n.game_type === 'TokenPerp' && n.gestalt && n.instance_data) {
+      var amt = (n.instance_data as NodeInstanceData).amount;
+      out[n.gestalt] = typeof amt === 'number' ? amt : 0;
+    }
+  });
+  return out;
+}
+
 // current_amount math mirrors TokenPerp.setAmount → DBTokensAbsolute
 // (Game.js:5439) so the LocalEngine and UI agree on completion.
 function _advanceIntegrateProfilesMissions(
@@ -1652,14 +1666,7 @@ function _advanceIntegrateProfilesMissions(
     return { missions: null, mission_goals: goals, active_missions: activeMissions };
   }
 
-  var amountByGestalt: Record<string, number> = {};
-  (nodes || []).forEach(function (n) {
-    if (n.game_type === 'TokenPerp' && n.gestalt && n.instance_data) {
-      var idata: NodeInstanceData = n.instance_data || {};
-      var amt = idata.amount;
-      amountByGestalt[n.gestalt] = typeof amt === 'number' ? amt : 0;
-    }
-  });
+  var amountByGestalt = _buildTokenMap(nodes);
 
   var changed = false;
   var updatedGoals = goals.map(function (goal) {
@@ -2063,29 +2070,18 @@ export function chargePerp(
         : typeof typeData.income_base === 'number'
           ? typeData.income_base
           : 0;
-  // Snapshot { profiles_value, token_map } at charge-init so the
-  // SuperTokenPerp upgrade popup can compute "Data not yet analyzed" vs
-  // "Data already analyzed" against the state at the last compute.
-  // Mirrors dd_app views.py:776, which $sets instance_data.last_upgrade_values
-  // on chargePerp; the value is also surfaced in the node_ready payload so
-  // Game.js's in-memory copy stays in sync without a reload.
-  var tokenMap: Record<string, number> = {};
-  for (var ti = 0; ti < nodes.length; ti++) {
-    var tn = nodes[ti];
-    if (tn && tn.game_type === 'TokenPerp' && tn.gestalt && tn.instance_data) {
-      var tnAmt = tn.instance_data.amount;
-      tokenMap[tn.gestalt] = typeof tnAmt === 'number' ? tnAmt : 0;
-    }
-  }
-  var lastUpgradeData = {
-    profiles_value: gv.profiles_value || 0,
-    token_map: tokenMap,
-  };
+  // SuperTokenPerp upgrade popup compares current DB state to the snapshot
+  // taken at the last compute to render "not yet analyzed" vs "already
+  // analyzed". Other perp types never read this, so skip the work.
+  var lastUpgradeData: UpgradeValuesShape | undefined =
+    node.game_type === 'TokenPerp'
+      ? { profiles_value: gv.profiles_value || 0, token_map: _buildTokenMap(nodes) }
+      : undefined;
 
-  var chargeResult = {
+  var chargeResult: { amount: number; last_upgrade_data?: UpgradeValuesShape } = {
     amount: _getVariatedAmount(baseAmount, now, path),
-    last_upgrade_data: lastUpgradeData,
   };
+  if (lastUpgradeData) chargeResult.last_upgrade_data = lastUpgradeData;
 
   var durationMs = typeData.charge_time;
   var chargeEntry = {
@@ -2103,12 +2099,11 @@ export function chargePerp(
   // $addToSet nodes_charging, $inc cash_value/cash_spent/xp_value, $dec ap_snapshot
   var newNodes = nodes.map(function (n, idx) {
     if (idx !== nodeIdx) return n;
-    return Object.assign({}, n, {
-      instance_data: Object.assign({}, n.instance_data, {
-        charge_start: now,
-        last_upgrade_values: lastUpgradeData,
-      }),
+    var inst: Record<string, unknown> = Object.assign({}, n.instance_data, {
+      charge_start: now,
     });
+    if (lastUpgradeData) inst.last_upgrade_values = lastUpgradeData;
+    return Object.assign({}, n, { instance_data: inst });
   });
 
   var newGv: GameValues = Object.assign({}, gv, {

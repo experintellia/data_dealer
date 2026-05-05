@@ -143,29 +143,38 @@ describe('chargePerp — happy path', () => {
     expect(node.instance_data.charge_start).toBe(FIXED_NOW);
   });
 
-  it('snapshots last_upgrade_values on instance_data and chargeResult', async () => {
-    // Seed two existing TokenPerps so the snapshot has a non-empty token_map.
+  it('omits last_upgrade_values for non-TokenPerp charges', async () => {
+    await chargePerp(NODE_PATH); // contact035 = ContactPerp
+    expect(getState().nodes_charging[0].result.last_upgrade_data).toBeUndefined();
+    expect(getState().nodes[0].instance_data.last_upgrade_values).toBeUndefined();
+  });
+
+  it('snapshots last_upgrade_values for TokenPerp charges', async () => {
+    // supertoken002 is the canonical SuperTokenPerp in the ruleset (charge_time set,
+    // contained_tokens non-empty). Seed two sibling TokenPerps so the snapshot map
+    // is non-trivial.
+    const TP_PATH = 'Database.supertoken002';
     setState(
       _mkBaseState({
         nodes: [
-          _mkNode('ContactPerp', NODE_PATH),
-          _mkNode('TokenPerp', 'Database.first_name_nora', { amount: 30 }),
-          _mkNode('TokenPerp', 'Database.first_name_sara', { amount: 70 }),
+          _mkNode('TokenPerp', TP_PATH),
+          _mkNode('TokenPerp', 'Database.token018', { amount: 30 }),
+          _mkNode('TokenPerp', 'Database.token125', { amount: 70 }),
         ],
         game_values: Object.assign({}, BASE_GV, { profiles_value: 12345 }),
       })
     );
 
-    await chargePerp(NODE_PATH);
+    await chargePerp(TP_PATH);
 
-    const node = getState().nodes.find((n) => n.full_path === NODE_PATH);
+    const node = getState().nodes.find((n) => n.full_path === TP_PATH);
     expect(node.instance_data.last_upgrade_values).toEqual({
       profiles_value: 12345,
-      token_map: { first_name_nora: 30, first_name_sara: 70 },
+      token_map: { supertoken002: 0, token018: 30, token125: 70 },
     });
-
-    const chargeEntry = getState().nodes_charging[0];
-    expect(chargeEntry.result.last_upgrade_data).toEqual(node.instance_data.last_upgrade_values);
+    expect(getState().nodes_charging[0].result.last_upgrade_data).toEqual(
+      node.instance_data.last_upgrade_values
+    );
   });
 
   it('is deterministic: same ts+path produces same amount on repeated calls', async () => {
