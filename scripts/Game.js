@@ -46,7 +46,7 @@ import { TokenPerp } from './game/TokenPerp.js';
 import { Topscore } from './game/Topscore.js';
 import { Topscores } from './game/Topscores.js';
 import { mergeData } from './game/mergeData.js';
-import { setPerpClasses } from './game/perpRegistry.js';
+import './game/perpCtors.js';
 import i18n from './i18n.js';
 import setup from './setup.js';
 import { getTypeSettings } from './type_settings.js';
@@ -1854,11 +1854,10 @@ var Game = function () {
   //
   // Extracted to scripts/game/Database.ts in PR 10 of issue #147.  The
   // class is imported above; the API publisher at the bottom of this
-  // IIFE re-exposes it as Game.Database.  Database's dynamic
-  // `Game[node.game_type]` and `Game.TokenPerp` lookups are routed
-  // through scripts/game/perpRegistry.ts; setPerpClasses(Game) is
-  // called at the bottom of this IIFE so the registry is populated
-  // before any Database method runs.
+  // IIFE re-exposes it as Game.Database.  Database resolves the
+  // `Game[node.game_type]` lookup via `perpCtors[name]` (typed direct
+  // map) and the known-name `Game.TokenPerp` reference via a direct
+  // import — both wired up in PR 17 of issue #147.
 
   // updateGears was scoped to the Database section in legacy
   // (`// TODO: Move this to GameRoot`) but is a GameRoot prototype mixin.
@@ -1878,9 +1877,11 @@ var Game = function () {
   // class is imported above; the API publisher at the bottom of this
   // IIFE re-exposes it as Game.GamePerp.  The dynamic
   // `Game[node.game_type]` lookup in BuyPerp is routed through
-  // scripts/game/perpRegistry.ts (registered via setPerpClasses(Game)
-  // at the IIFE's tail).  AniTicker is injected via setAniTicker(AniTicker)
-  // at the same spot so GamePerp can subscribe to charge-running animations.
+  // scripts/game/perpRegistry.ts (seeded as a side effect of
+  // perpCtors.ts; the import on line 49 of this file kicks the
+  // registration before any BuyPerp flow runs).  AniTicker is injected
+  // via setAniTicker(AniTicker) at the IIFE's tail so GamePerp can
+  // subscribe to charge-running animations.
 
   GameNode.prototype.initPopupEvents = function (popup) {
     var gnode = this;
@@ -2178,16 +2179,10 @@ var Game = function () {
     SupertokenPerp: SupertokenPerp,
   };
 
-  // Register every published class with the perpRegistry so
-  // scripts/game/Database.ts (and future-extracted subclasses) can
-  // resolve dynamic `Game[node.game_type]` lookups + direct
-  // `Game.TokenPerp` references without an IIFE-closure roundtrip.
-  // Disposable seam — retired with the IIFE in the final PR (#147).
-  setPerpClasses(Game);
   // Inject AniTicker into GamePerp so its initEventHandlers can register
   // listeners on the legacy ticker singleton (which still lives in this
-  // IIFE). Disposable seam alongside setPerpClasses; retires when AniTicker
-  // is itself extracted from Game.js.
+  // IIFE). Disposable seam; retires when AniTicker is itself extracted
+  // from Game.js.
   setAniTicker(AniTicker);
 
   return Game;

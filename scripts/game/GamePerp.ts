@@ -3,10 +3,12 @@
 // ProjectPerp, TokenPerp, SupertokenPerp).  Extracted from
 // scripts/Game.js's IIFE in PR 11 of issue #147.
 //
-// The dynamic `Game[node.game_type]` lookup in BuyPerp is routed through
-// scripts/game/perpRegistry.ts so GamePerp can land before the individual
-// perp subclasses; PR 12+ extracts each subclass and migrates the
-// registry consumers to direct imports.
+// The dynamic `Game[node.game_type]` lookup in BuyPerp is routed
+// through scripts/game/perpRegistry.ts because GamePerp.ts can't
+// import its own subclasses directly without a load-time cycle (each
+// subclass extends GamePerp).  Database / DatabasePerp resolved
+// their own dynamic lookups against `perpCtors[name]` directly in
+// PR 17 of issue #147; this seam stays only for GamePerp's case.
 
 import { getRender } from '../Render.js';
 import appModule from '../app.js';
@@ -127,9 +129,8 @@ export interface ProvidedPerpRow {
 }
 
 // AniTicker is captured at GamePerp-class scope and injected by Game.js
-// via `setAniTicker` (called once at IIFE-end, alongside setPerpClasses).
-// Keeps GamePerp.ts free of the legacy AniTicker singleton's Game.js-side
-// implementation.
+// via `setAniTicker` (called once at IIFE-end).  Keeps GamePerp.ts free
+// of the legacy AniTicker singleton's Game.js-side implementation.
 let _aniTicker: AniTickerLike | null = null;
 export function setAniTicker(ticker: AniTickerLike): void {
   _aniTicker = ticker;
