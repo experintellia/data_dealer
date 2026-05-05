@@ -3459,7 +3459,11 @@ button {
     width: 100%;
   }
 
-  .TutorialContent .NotificationBubble .NotificationText {
+  .MissionDecorator {
+    width: 100%;
+  }
+
+  .NotificationText {
     width: unset;
     margin-right: 6px;
   }
@@ -3470,6 +3474,14 @@ button {
 
   .Popup.Tutorial.placeBottom{
     max-width: calc(100vw - 10px);
+  }
+
+  .NotificationBubble {
+    left: 14px;
+  }
+
+  .MissionContent .NotificationBubble .PopupButtons {
+    bottom: 4px;
   }
 }
 
