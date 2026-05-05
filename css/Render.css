@@ -3995,3 +3995,68 @@ button {
     white-space: nowrap;
   }
 }
+
+/* --- Fix: re-anchor inner popup elements to .PopupContent ----------------
+ * Changing .PopupHeader from `height` to `min-height` (PR #181) lets long
+ * descriptions show in full, but broke three absolutely-positioned children
+ * that assumed the header was always exactly its minimum height:
+ *
+ *   .PopupSummary   top:192px  from .PopupBody  (= content-start 167 + 25)
+ *   .SubpopContainer top:173px from .PopupBody  (= content-start 167 +  6)
+ *   .PopupButtons   bottom:-10px from .PopupBody
+ *
+ * Fix: promote .PopupContent to a positioning context so these children
+ * anchor to the content area regardless of how tall the header grows.
+ * ---------------------------------------------------------------------- */
+.PopupContent {
+  position: relative;
+}
+
+/* Summary badges: 25 px from the top of .PopupContent (was 192 from body). */
+.PopupSummary {
+  top: 25px;
+}
+.PopupSummary.half {
+  top: 24px;
+}
+
+/* SubpopContainer overlay: flush with the top of .PopupContent (was 173 from
+ * body = 6 px inside the content).  left:0 aligns with the content edge
+ * (body padding is already outside .PopupContent). */
+.SubpopContainer {
+  top: 6px;
+  left: 0;
+}
+.SubpopContainer.half {
+  top: 75px;
+}
+
+/* Popup action button: body had 6 px bottom-padding between content-end and
+ * body-end, so subtract that from the old -10 px to keep the same visual
+ * offset below the content area. */
+.PopupButtons {
+  bottom: -16px;
+}
+
+/* Undo the box-sizing: border-box on .Subpop that PR #181 applied globally.
+ * .Subpop is pixel-designed at exactly 540 px total outer width; border-box
+ * was shrinking the content area by 12 px (2×6 px border), which compressed
+ * inner text and caused the SubpopButtons BUY/CLOSE label to overflow. */
+.Subpop {
+  box-sizing: content-box;
+}
+
+/* --- Mobile: keep action button after all visible content ----------------
+ * On narrow viewports the mobile layout reveals every pagination page at
+ * once, making .PopupContent grow taller than its designed height.  The
+ * absolutely-positioned .PopupButtons then appears in the middle of the
+ * expanded content (e.g. Sweepstakes Upgrades showing 5 items).
+ * Re-join the normal flow so the button always trails all items. */
+@media (max-width: 768px) {
+  .PopupContent > .PopupTab > .PopupButtons {
+    position: static;
+    margin: 8px auto;
+    height: auto;
+    width: auto;
+  }
+}
