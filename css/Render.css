@@ -3803,71 +3803,52 @@ button {
   }
 }
 
-/* --- Popup / dialog: shrink-to-fit on narrow viewports ------------------
- * Desktop popups are pixel-designed at 600 px wide with a lot of inner
- * absolute positioning (PopupLogo, PopupSummary, PopupButtons, etc.).
- * Rewriting every inner offset to be fluid would invariably drift the
- * carefully tuned design.  Instead, swap the JS-driven absolute centring
- * for CSS flex-centring on the lockOn container, and `transform: scale()`
- * the entire Popup proportionally so it always fits the viewport.
+/* --- Popup / dialog centring + shrink-to-fit ----------------------------
+ * Popups are pixel-designed at 600 px wide with a lot of inner absolute
+ * positioning (PopupLogo, PopupSummary, PopupButtons, etc.).  Rewriting
+ * every inner offset to be fluid would drift the carefully tuned design,
+ * so we keep the inner pixel layout intact and just:
  *
- *   --popup-s = clamp(min, viewport / native-width, 1)
+ *   1. Centre the Popup inside `.PopupContainer.lockOn` via flex —
+ *      replacing the previous JS `setPosition` (translate3d) dance.
+ *   2. Shrink-to-fit on narrow viewports via `transform: scale()` with
+ *      a viewport-derived CSS variable.
  *
- * The clamp caps the scale at 1 so we never up-scale on a wide phone,
- * and at 0.5 so the content stays readable on the smallest devices.
+ *   --popup-s  =  clamp(min, viewport-budget / native-width, 1)
+ *
+ * 94vw budget leaves ~3vw breathing room on each side; clamped to 1 so
+ * we never up-scale, and to 0.5 so content stays legible on the smallest
+ * phones.
  * ----------------------------------------------------------------------- */
-@media (max-width: 768px) {
-  /* Centre via flex; the JS-applied translate3d on .Popup is then a no-op
-     because we override its transform below.  `lockOn` is the open state,
-     so closed popups remain hidden via their existing `visibility` rule. */
-  .PopupContainer.lockOn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    /* PopupContainer is `position: absolute; width/height: 100%` of the
-       Stage; flex centring inside it puts the popup at the Stage centre. */
-  }
+.PopupContainer.lockOn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-  .Popup {
-    /* 612 = 600 design width + 2×6 px outer border.  8 px viewport gutter
-       guarantees a small safe-area margin on edge-to-edge phones. */
-    --popup-s: clamp(0.5, calc((100vw - 8px) / 612), 1);
-    /* !important overrides the JS-set inline -webkit-/-moz-transform
-       (translate3d for absolute centring) which we've replaced with
-       flex centring above. */
-    transform: scale(var(--popup-s)) !important;
-    -webkit-transform: scale(var(--popup-s)) !important;
-    -moz-transform: scale(var(--popup-s)) !important;
-    transform-origin: center center !important;
-    -webkit-transform-origin: center center !important;
-    /* Drop the JS-set absolute placement so flex centring takes over. */
-    position: relative !important;
-    top: auto !important;
-    left: auto !important;
-    /* Belt-and-braces: even before scale applies (first paint), cap the
-       layout box so it never reports wider than the viewport. */
-    max-width: 100vw;
-  }
+.Popup {
+  /* 612 = 600 design width + 2×6 px outer border. */
+  --popup-s: clamp(0.5, calc(94vw / 612), 1);
+  transform: scale(var(--popup-s));
+  transform-origin: center center;
+}
 
-  /* Inner panes inherit the parent's hardcoded widths in pixels; once
-     the parent is scaled they fit by construction.  Add box-sizing so
-     any future percentage tweaks don't blow out the border. */
-  .PopupBody,
-  .PopupHeader,
-  .PopupContent,
-  .SubpopContainer,
-  .Subpop,
-  .PopupSelector {
-    box-sizing: border-box;
-    max-width: 100%;
-  }
+/* Tutorial / levelup popups pin to the Stage's bottom edge instead of
+ * its centre.  JS toggles `.placeBottom` on these. */
+.PopupContainer.lockOn .Popup.placeBottom {
+  align-self: flex-end;
+  margin-bottom: 32px;
+}
 
-  /* Notification toasts and other top-stacked popups use the same
-     container; the Top variant sits above the Stage so flex centring
-     against its 100%×100% box works the same way. */
-  .PopupContainer.Top.lockOn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+/* Inner panes inherit the parent's hardcoded widths in pixels; once the
+ * parent is scaled they fit by construction.  Add box-sizing so any
+ * future percentage tweaks don't blow out the border. */
+.PopupBody,
+.PopupHeader,
+.PopupContent,
+.SubpopContainer,
+.Subpop,
+.PopupSelector {
+  box-sizing: border-box;
+  max-width: 100%;
 }
