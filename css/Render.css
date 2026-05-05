@@ -3443,6 +3443,31 @@ button {
     margin-right: 4px;
     font-size: 14px;
   }
+
+  .TutorialContent {
+    padding: 0px 4px;
+  }
+
+  .TutorialContent .NotificationBubble {
+    height: 160px;
+    position: unset;
+    left: unset; 
+    bottom: unset;
+    width: 100%;
+  }
+
+  .TutorialContent .NotificationBubble .NotificationText {
+    width: unset;
+    margin-right: 6px;
+  }
+
+  .TutorialTapHint {
+    margin-top: 2px;
+  }
+
+  .Popup.Tutorial.placeBottom{
+    max-width: calc(100vw - 10px);
+  }
 }
 
 /* ── Tap targets (≥ 44 px), legibility (≥ 16 px body), :active feedback. */
