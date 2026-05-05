@@ -354,7 +354,7 @@ var typeSettings = function () {
         height: 1600,
         x: -544,
         y: -500,
-        zoom_scale: 1,
+        zoom_scale: 0.75,
       },
     },
     UpgradePowerup: {
@@ -482,7 +482,7 @@ var typeSettings = function () {
         height: 1600,
         x: -544,
         y: -500,
-        zoom_scale: 1,
+        zoom_scale: 0.75,
       },
     },
     AgentPerp: {
