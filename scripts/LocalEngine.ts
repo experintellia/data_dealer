@@ -2063,7 +2063,29 @@ export function chargePerp(
         : typeof typeData.income_base === 'number'
           ? typeData.income_base
           : 0;
-  var chargeResult = { amount: _getVariatedAmount(baseAmount, now, path) };
+  // Snapshot { profiles_value, token_map } at charge-init so the
+  // SuperTokenPerp upgrade popup can compute "Data not yet analyzed" vs
+  // "Data already analyzed" against the state at the last compute.
+  // Mirrors dd_app views.py:776, which $sets instance_data.last_upgrade_values
+  // on chargePerp; the value is also surfaced in the node_ready payload so
+  // Game.js's in-memory copy stays in sync without a reload.
+  var tokenMap: Record<string, number> = {};
+  for (var ti = 0; ti < nodes.length; ti++) {
+    var tn = nodes[ti];
+    if (tn && tn.game_type === 'TokenPerp' && tn.gestalt && tn.instance_data) {
+      var tnAmt = tn.instance_data.amount;
+      tokenMap[tn.gestalt] = typeof tnAmt === 'number' ? tnAmt : 0;
+    }
+  }
+  var lastUpgradeData = {
+    profiles_value: gv.profiles_value || 0,
+    token_map: tokenMap,
+  };
+
+  var chargeResult = {
+    amount: _getVariatedAmount(baseAmount, now, path),
+    last_upgrade_data: lastUpgradeData,
+  };
 
   var durationMs = typeData.charge_time;
   var chargeEntry = {
@@ -2077,12 +2099,15 @@ export function chargePerp(
 
   var xpInc = typeof typeData.xp_inc === 'number' ? typeData.xp_inc : 0;
 
-  // mirrors dd_app views.py:776: $set charge_start, $addToSet nodes_charging,
-  // $inc cash_value/cash_spent/xp_value, $dec ap_snapshot
+  // mirrors dd_app views.py:776: $set charge_start + last_upgrade_values,
+  // $addToSet nodes_charging, $inc cash_value/cash_spent/xp_value, $dec ap_snapshot
   var newNodes = nodes.map(function (n, idx) {
     if (idx !== nodeIdx) return n;
     return Object.assign({}, n, {
-      instance_data: Object.assign({}, n.instance_data, { charge_start: now }),
+      instance_data: Object.assign({}, n.instance_data, {
+        charge_start: now,
+        last_upgrade_values: lastUpgradeData,
+      }),
     });
   });
 
