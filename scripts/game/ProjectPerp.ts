@@ -16,6 +16,7 @@ import appModule from '../app.js';
 import i18n from '../i18n.js';
 import { type GameNodeConfig } from './GameNode.js';
 import {
+  type ChargeResult,
   type DoneFailChain,
   GamePerp,
   type GameRootForPerp,
@@ -66,14 +67,6 @@ interface ProjectRenderPopupLike extends RenderPopupLike {
   jdomelem?: JQueryElemLike;
   renderDataTab?(): void;
   renderPowerupSelectors?(pcat: string): void;
-}
-
-interface ChargeResult {
-  error?: number;
-  game_values?: Record<string, unknown>;
-  levelup?: boolean;
-  missions?: unknown;
-  duration?: number;
 }
 
 interface CollectResult {
@@ -226,25 +219,27 @@ export class ProjectPerp extends GamePerp {
       });
     }
 
+    const typeConfig = {
+      UpgradePowerup: { slotsField: 'upgrade_slots', providedField: 'provided_upgrades' },
+      AdPowerup: { slotsField: 'ad_slots', providedField: 'provided_ads' },
+      TeamMemberPowerup: {
+        slotsField: 'teammember_slots',
+        providedField: 'provided_teammembers',
+      },
+    } as const;
+
     const powerups: Record<string, PowerupSlotsBucket> = {};
-    (['UpgradePowerup', 'AdPowerup', 'TeamMemberPowerup'] as const).forEach((game_type) => {
+    (Object.keys(typeConfig) as (keyof typeof typeConfig)[]).forEach((game_type) => {
       const pcat = convertPowerupType(game_type);
       if (!pcat) return;
+      const cfg = typeConfig[game_type];
       const slots_left =
         ((dataRec[`max_${pcat}_slots`] as number) ?? 0) -
         ((dataRec[`${pcat}_slots`] as number) ?? 0);
-      let slotslen = 0;
-      let provided: PowerupRow[] = [];
-      if (game_type === 'UpgradePowerup') {
-        slotslen = dataRec.upgrade_slots ?? 0;
-        provided = (dataRec.provided_upgrades ?? []).filter((p) => p.bought !== true);
-      } else if (game_type === 'AdPowerup') {
-        slotslen = dataRec.ad_slots ?? 0;
-        provided = (dataRec.provided_ads ?? []).filter((p) => p.bought !== true);
-      } else {
-        slotslen = dataRec.teammember_slots ?? 0;
-        provided = (dataRec.provided_teammembers ?? []).filter((p) => p.bought !== true);
-      }
+      const slotslen = (dataRec[cfg.slotsField] as number) ?? 0;
+      const provided = ((dataRec[cfg.providedField] as PowerupRow[]) ?? []).filter(
+        (p) => p.bought !== true
+      );
       const slots: (string | PowerupRow)[] = [];
       for (let i = 0; i < slotslen; i++) slots.push('free');
       // TODO: only add locked if slots < max_length of slots
@@ -309,7 +304,7 @@ export class ProjectPerp extends GamePerp {
     call
       .done(function (data) {
         if (!data.result) {
-          gnode.Error?.('The computer says NOOOO', data);
+          gnode._serverError(data);
           return;
         }
         const r = data.result;
@@ -332,7 +327,7 @@ export class ProjectPerp extends GamePerp {
             data
           );
           if (r.error === 3) gnode.NoCash?.();
-          else gnode.Error?.('The computer says NOOOO', data);
+          else gnode._serverError(data);
           return;
         }
         groot.updateGameValues(r.game_values || {}, r.levelup === true, r.missions);
@@ -366,12 +361,12 @@ export class ProjectPerp extends GamePerp {
     call
       .done(function (data) {
         if (!data.result) {
-          gnode.Error?.('The computer says NOOOO', data);
+          gnode._serverError(data);
           return;
         }
         const r = data.result;
         if (r.error !== undefined) {
-          gnode.Error?.('The computer says NOOOO', data);
+          gnode._serverError(data);
           return;
         }
         groot.updateGameValues(r.game_values || {}, r.levelup === true, r.missions);
@@ -413,7 +408,7 @@ export class ProjectPerp extends GamePerp {
     call
       .done(function (data) {
         if (!data.result) {
-          gnode.Error?.('The computer says NOOOO', data);
+          gnode._serverError(data);
           return;
         }
         const r = data.result;
@@ -554,7 +549,7 @@ export class ProjectPerp extends GamePerp {
     call
       .done(function (data) {
         if (!data.result) {
-          gnode.Error?.('The computer says NOOOO', data);
+          gnode._serverError(data);
           return;
         }
         const r = data.result;
@@ -564,22 +559,21 @@ export class ProjectPerp extends GamePerp {
             2: 'already charging',
             3: 'insufficient cash',
           };
-          let chargeDetail = '';
-          if (r.error === 1) chargeDetail = ` (AP: ${groot.ap_value})`;
-          else if (r.error === 3) {
-            chargeDetail = ` (cash: ${groot.cash_value}, need: ${dataRec.charge_cost})`;
-          }
+          const chargeDetail =
+            r.error === 1
+              ? ` (AP: ${groot.ap_value})`
+              : r.error === 3
+                ? ` (cash: ${groot.cash_value}, need: ${dataRec.charge_cost})`
+                : '';
           console.log(
             '[Charge] failed:',
             (chargeErrors[r.error] || `unknown error ${r.error}`) + chargeDetail,
             data
           );
+          const popup = gnode.renderPopup as RenderPopupLike | undefined;
           if (r.error === 3) {
-            if (gnode.renderPopup && (gnode.renderPopup as RenderPopupLike).open) {
-              (gnode.renderPopup as RenderPopupLike).trigger('no_cash');
-            } else {
-              rn?.FXNoCash?.();
-            }
+            if (popup?.open) popup.trigger('no_cash');
+            else rn?.FXNoCash?.();
           } else if (r.error === 1) {
             gnode.NoAP?.();
           }
@@ -597,7 +591,7 @@ export class ProjectPerp extends GamePerp {
         });
       })
       .fail(function (data) {
-        gnode.Error?.('The computer says NOOOO', data);
+        gnode._serverError(data);
       });
   }
 
@@ -653,7 +647,7 @@ export class ProjectPerp extends GamePerp {
           deco.setClickable(true);
           deco.setFrame('normal');
         } else {
-          gperp.Error?.('The computer says NOOOO', data);
+          gperp._serverError(data);
         }
       })
       .fail(function () {

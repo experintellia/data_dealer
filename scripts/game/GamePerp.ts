@@ -88,6 +88,16 @@ export interface BuyPerpResult {
   error?: number;
 }
 
+/** Shared shape returned by `app.remote.chargePerp` for any
+ *  lifecycle-style perp (ContactPerp / ClientPerp / ProjectPerp). */
+export interface ChargeResult {
+  error?: number;
+  game_values?: Record<string, unknown>;
+  levelup?: boolean;
+  missions?: unknown;
+  duration?: number;
+}
+
 export interface DoneFailChain<T> {
   done(cb: (data: { result?: T }) => void): DoneFailChain<T>;
   fail(cb: (data: unknown) => void): DoneFailChain<T>;
@@ -228,6 +238,13 @@ export class GamePerp extends GameNode {
     return true;
   }
 
+  /** Shared boilerplate for the `gnode.Error?.('The computer says NOOOO',
+   *  data)` branch that every perp's Deferred chain falls through to
+   *  on a missing or malformed `data.result`. */
+  protected _serverError(data: unknown): void {
+    this.Error?.('The computer says NOOOO', data);
+  }
+
   protected static _stopProp(e: unknown): void {
     const fn = (e as { stopPropagation?: () => void } | null | undefined)?.stopPropagation;
     if (typeof fn === 'function') fn.call(e);
@@ -349,7 +366,7 @@ export class GamePerp extends GameNode {
     call.done(function (data) {
       if (!data.result) {
         // Server Error
-        gnode.Error?.('The computer says NOOOO', data);
+        gnode._serverError(data);
         return;
       }
       const r = data.result;
