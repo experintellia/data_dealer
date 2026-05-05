@@ -137,7 +137,11 @@
     display: flex;
     flex-direction: column;
     height: auto;
-    overflow: visible;
+    /* `overflow: hidden` clips the tab's bottom edge against the menu's
+     * bottom — same trick the desktop layout uses to hide the tab's
+     * rounded bottom corners and box-shadow tail.  Without this, the
+     * tabs' rounded bottoms read as a rounded bottom on the menu. */
+    overflow: hidden;
     border-radius: 8px 8px 0 0;
   }
   .mm-xp {
@@ -146,7 +150,9 @@
     margin: 4px 0 4px 28px;
   }
   .mm-tabs {
-    padding: 0 6px 4px 6px;
+    /* No padding-bottom — tabs flush against the menu's bottom edge
+     * (and beyond, getting clipped by .MainMenu's `overflow: hidden`). */
+    padding: 0 6px;
     height: auto;
     display: flex;
     flex-direction: row;
@@ -158,16 +164,18 @@
     border-bottom: none;
   }
   /* Tabs grow to fill the row equally — text auto-sizes via the
-   * cascaded font-size media queries below.  Reset the desktop
-   * `top: 13/9` offsets and asymmetric padding so there's no fat
-   * empty band beneath the label. */
+   * cascaded font-size media queries below.  `top: 4` shifts each tab
+   * 4 px past the menu's bottom edge so the tab's rounded corners and
+   * box-shadow get clipped, matching the desktop "tabs tucked into the
+   * menu" look.  Active tab sits flush so it reads as recessed. */
   .mm-tabs .mm-tab {
     flex: 1 1 0;
     margin: 0;
-    top: 0;
+    top: 4px;
+    height: 44px;
     min-height: 44px;
-    padding: 4px 8px;
-    line-height: 26px;
+    padding: 2px 8px 4px 8px;
+    line-height: 28px;
     font-size: 16px;
     box-sizing: border-box;
     text-align: center;
