@@ -3858,3 +3858,115 @@ button {
   box-sizing: border-box;
   max-width: 100%;
 }
+
+/* --- Popup mobile layout (≤ 768 px) ------------------------------------
+ * Three coordinated changes for narrow viewports:
+ *
+ *   1. Drop pagination — show every perp / powerup at once and let the
+ *      whole popup scroll vertically.  Native scroll beats arrow taps
+ *      on a touchscreen, and saves us a `.hidden` page swap on every
+ *      pagination tick.
+ *   2. Tab row spans the full popup width with equal-flex tabs and a
+ *      bit of breathing room above.  Desktop keeps its `left: 50px`
+ *      offset (so the row starts after the logo), so we don't override
+ *      that there.
+ *   3. Allow `.PopupContent` to grow as tall as the un-paginated grid
+ *      needs, and let `.PopupContainer` scroll if the popup outgrows
+ *      the viewport.
+ * ----------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  /* Container scrolls when popup content > viewport height.  `safe center`
+     keeps the popup vertically centred when it fits, but falls back to
+     flex-start when it overflows so the top isn't clipped behind the
+     scroll origin. */
+  .PopupContainer.lockOn {
+    overflow-y: auto;
+    overflow-x: hidden;
+    align-items: safe center;
+    padding: 16px 0;
+  }
+  .PopupContainer.lockOn .Popup.placeBottom {
+    align-self: safe flex-end;
+    margin-bottom: 32px;
+  }
+  /* Scale-from-top so the rendered top edge sits at the layout top edge —
+     otherwise center-origin scaling leaves an empty band above the popup
+     before the scroll container's first paint. */
+  .Popup {
+    transform-origin: top center;
+  }
+
+  /* Show every page at once.  Override the slider transitions and the
+     `hidden` opacity/scale effect that pagination relies on. */
+  .PopupPageWrap {
+    width: 100%;
+    left: 0 !important;
+    transition: none;
+  }
+  .PopupPage,
+  .PopupPage.PerpPage,
+  .PopupPage.PowerupPage {
+    width: 100%;
+    height: auto;
+    float: none;
+    text-align: center;
+    box-sizing: border-box;
+  }
+  .PopupPage.hidden,
+  .PopupPage.PerpPage.hidden,
+  .PopupPage.PowerupPage.hidden {
+    display: block;
+    opacity: 1;
+    transform: none;
+    -webkit-transform: none;
+  }
+  .PopupPageArrowR,
+  .PopupPageArrowL,
+  .Selector .PopupPageArrowR,
+  .Selector .PopupPageArrowL,
+  .Selector .PopupPageArrowR.standalone,
+  .Selector .PopupPageArrowL.standalone {
+    display: none !important;
+  }
+
+  /* Selector grows with its content; remove the fixed slot box. */
+  .PopupSelector,
+  .standalone .PopupSelector {
+    width: auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    position: relative;
+    top: auto;
+    left: auto;
+  }
+  .PopupContent {
+    height: auto;
+  }
+
+  /* Tab row: full-width flex, equal-share buttons, extra space above so
+     the row doesn't crowd the title text. */
+  .PopupMenu {
+    top: 168px;
+    left: 6px;
+    right: 6px;
+    width: auto;
+    display: flex;
+    gap: 4px;
+  }
+  .PopupHeader {
+    /* Tabs sit at top:168 inside the header, so make sure the header is
+       tall enough to contain them (otherwise they'd overlap the
+       PopupContent border below). */
+    min-height: 196px;
+  }
+  .PopupMenuButton {
+    flex: 1;
+    margin-right: 0;
+    text-align: center;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
