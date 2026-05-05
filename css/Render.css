@@ -4025,11 +4025,16 @@ button {
 /* --- Fix: re-anchor inner popup elements to .PopupContent ----------------
  * Changing .PopupHeader from `height` to `min-height` (PR #181) lets long
  * descriptions show in full, but broke three absolutely-positioned children
- * that assumed the header was always exactly its minimum height:
+ * that assumed the header was always exactly its minimum height.
  *
- *   .PopupSummary   top:192px  from .PopupBody  (= content-start 167 + 25)
- *   .SubpopContainer top:173px from .PopupBody  (= content-start 167 +  6)
- *   .PopupButtons   bottom:-10px from .PopupBody
+ * Original positions from .PopupBody (no border, padding:6px):
+ *   .PopupSummary    top:192px  = PopupContent padding-edge(173) + 19
+ *   .SubpopContainer top:173px  = PopupContent padding-edge(173) + 0
+ *   .SubpopContainer.half top:242px = SuperToken PopupContent padding-edge(242) + 0
+ *   .PopupButtons    bottom:-10px → 10px below PopupBody padding-edge-bottom
+ *
+ * PopupContent padding-edge = body-pad(6) + header-border-box + content-margin(6) + content-border(6).
+ * Standard header (155px) → 173px.  SuperToken header (224px) → 242px.
  *
  * Fix: promote .PopupContent to a positioning context so these children
  * anchor to the content area regardless of how tall the header grows.
@@ -4038,30 +4043,32 @@ button {
   position: relative;
 }
 
-/* Summary badges: 25 px from the top of .PopupContent (was 192 from body). */
+/* Summary badges: 19 px below PopupContent's padding edge (was 192 from body). */
 .PopupSummary {
-  top: 25px;
+  top: 19px;
 }
+/* SuperToken variant: PopupContent padding-edge=242, original top=260 → 18px. */
 .PopupSummary.half {
-  top: 24px;
+  top: 18px;
 }
 
-/* SubpopContainer overlay: flush with the top of .PopupContent (was 173 from
- * body = 6 px inside the content).  left:0 aligns with the content edge
- * (body padding is already outside .PopupContent). */
+/* SubpopContainer: flush with PopupContent's padding edge (top:173 from body → 0).
+ * left:0 aligns with the padding edge; body's 6px padding is outside PopupContent. */
 .SubpopContainer {
-  top: 6px;
+  top: 0;
   left: 0;
 }
+/* SuperToken half variant: original top:242 from body = padding-edge of its
+ * PopupContent (242px) → 0 from PopupContent. */
 .SubpopContainer.half {
-  top: 75px;
+  top: 0;
 }
 
-/* Popup action button: body had 6 px bottom-padding between content-end and
- * body-end, so subtract that from the old -10 px to keep the same visual
- * offset below the content area. */
+/* Popup action button: PopupBody padding-edge-bottom(489) + 10 = 499px from body outer.
+ * PopupContent padding-edge-bottom = PopupContent-outer-bottom(489) - border(6) = 483.
+ * To land at 499: 483 + 22 = 499 → bottom: -22px. */
 .PopupButtons {
-  bottom: -16px;
+  bottom: -22px;
 }
 
 /* Undo the box-sizing: border-box on .Subpop that PR #181 applied globally.
@@ -4084,5 +4091,12 @@ button {
     margin: 8px auto;
     height: auto;
     width: auto;
+  }
+
+  /* On mobile all pagination pages are revealed at once, so the fixed-height
+   * token grid in SuperToken popups clips the second row.  Let it grow. */
+  .Pagination.half .PopupTokens {
+    height: auto;
+    overflow: visible;
   }
 }
