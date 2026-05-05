@@ -1,0 +1,186 @@
+/* ============================================================
+ * Main tab switcher — desktop + mobile variants
+ * ============================================================
+ * Shared by .MainMenuButton (game-level tabs) and
+ * .ViewTabMenuButton (view-level tab switcher).  These pair in
+ * every rule because they render identically.
+ *
+ * Layout cascade:
+ *   desktop      inline-block row, decorative offsets
+ *   ≤ 980 px     logo hidden → tabs reclaim its space
+ *   ≤ 926 px     two-row header → tabs become equal-flex
+ *   ≤ 768 px     touch-friendly minimum hit size
+ *   ≤ 600 px     tighter padding, smaller font
+ *   ≤ 480 px     compact phone layout
+ *   ≤ 380 px     tightest layout for the smallest screens
+ *
+ * Note: `touch-action: manipulation` (300 ms iOS tap-delay fix) is
+ * shared with many non-tab selectors and stays in Render.css.
+ * ============================================================ */
+
+/* ── Tab-row container ──────────────────────────────────────── */
+.MainMenuButtons {
+  height: 39px;
+  padding-top: 6px;
+  padding-left: 240px;
+  border-bottom: 3px solid #16A3D7;
+}
+
+/* ── Tab base ───────────────────────────────────────────────── */
+.ViewTabMenuButton,
+.MainMenuButton {
+  display: inline-block;
+  position: relative;
+  top: 13px;
+  font-family: Bowlby;
+  color: #009FD9;
+  font-size: 16px;
+  background: #B7DDED;
+  line-height: 24px;
+  border: 3px solid #009FD9;
+  border-radius: 8px;
+  padding: 2px 16px 8px 16px;
+  margin-right: 8px;
+  box-shadow: 3px 3px 0px #009FD9;
+  text-shadow: 0px 0px 0px white, 1px 1px 0px white, 2px 2px 0px white, 3px 3px 0px white;
+  -webkit-transition: top 0.2s linear;
+  -moz-transition: top 0.2s linear;
+  transition: top 0.2s linear;
+}
+
+/* View-level tab strip's own container (sibling to MainMenuButtons). */
+.ViewTabMenu {
+  width: 680px;
+  margin: 0 auto;
+  text-align: center;
+  height: 30px;
+}
+
+/* ── States ─────────────────────────────────────────────────── */
+.ViewTabMenuButton.active,
+.MainMenuButton.active {
+  background: #ECF8FC;
+  color: #E48931;
+  top: 9px;
+  -webkit-transition: top 0 linear;
+  -moz-transition: top 0 linear;
+  transition: top 0 linear;
+}
+
+.ViewTabMenuButton:hover,
+.MainMenuButton:hover {
+  background: #ECF8FC;
+}
+
+.MainMenuButton:not(.disabled):active,
+.ViewTabMenuButton:not(.disabled):active {
+  background: #ECF8FC;
+  transform: scale(0.97);
+}
+
+.MainMenuButton.disabled,
+.MainMenuButton.disabled:hover {
+  -webkit-transform: inherit;
+  -moz-transform: inherit;
+  transform: inherit;
+  opacity: 0.5;
+}
+.MainMenuButton.disabled:hover {
+  background: #B7DDED;
+}
+.MainMenuButton.active.disabled:hover {
+  background: #ECF8FC;
+}
+
+/* ── ≤ 980 px: tabs reclaim the hidden logo's 228 px left pad ── */
+@media (max-width: 980px) {
+  .MainMenuButtons {
+    padding-left: 0;
+  }
+}
+
+/* ── ≤ 926 px: two-row header → equal-flex tab buttons ─────── */
+@media (max-width: 926px) {
+  .MainMenuButtons {
+    width: 100%;
+    height: auto;
+    min-height: 32px;
+    padding: 2px 6px;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: stretch;
+    gap: 4px;
+    box-sizing: border-box;
+  }
+  .MainMenuButtons .MainMenuButton {
+    flex: 1 1 0;
+    min-width: 0;
+    margin-right: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* ── ≤ 768 px: touch-friendly minimum hit size ─────────────── */
+@media (max-width: 768px) {
+  .ViewTabMenuButton,
+  .MainMenuButton {
+    min-height: 44px;
+    line-height: 28px;
+    padding: 4px 14px 8px 14px;
+  }
+  .ViewTabMenuButton + .ViewTabMenuButton,
+  .MainMenuButton + .MainMenuButton {
+    margin-left: 4px;
+  }
+}
+
+/* ── ≤ 600 px: tighter padding, smaller font ───────────────── */
+@media (max-width: 600px) {
+  .ViewTabMenuButton,
+  .MainMenuButton {
+    padding: 3px 6px 6px 6px;
+    font-size: 15px;
+    line-height: 22px;
+    box-shadow: 2px 2px 0px #009FD9;
+  }
+}
+
+/* ── ≤ 480 px: compact phone layout ────────────────────────── */
+@media (max-width: 480px) {
+  .ViewTabMenuButton,
+  .MainMenuButton {
+    padding: 1px 2px;
+    font-size: 17px;
+    line-height: 18px;
+    border-width: 2px;
+    border-radius: 6px;
+    box-shadow: 1px 1px 0px #009FD9;
+    top: 7px;
+  }
+  .ViewTabMenuButton.active,
+  .MainMenuButton.active {
+    top: 5px;
+  }
+  .ViewTabMenuButton + .ViewTabMenuButton,
+  .MainMenuButton + .MainMenuButton {
+    margin-left: 1px;
+  }
+  .MainMenuButtons {
+    min-height: 30px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+}
+
+/* ── ≤ 380 px: tightest layout for the smallest screens ────── */
+@media (max-width: 380px) {
+  .ViewTabMenuButton,
+  .MainMenuButton {
+    padding: 1px 3px 2px 3px;
+    font-size: 13px;
+    margin-right: 1px;
+  }
+}
