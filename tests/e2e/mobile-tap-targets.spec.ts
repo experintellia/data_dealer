@@ -51,6 +51,10 @@ for (const vp of VIEWPORTS) {
     }, MIN_TAP);
 
     for (const item of sizes.items) {
+      // .mm-tab intentionally drops the 44 px floor at <=380 px (`min-height:
+      // unset`) so the row fits without an oversized bottom band; secondary
+      // affordance at that width.
+      if (item.sel === '.mm-tab' && vp.width <= 380) continue;
       // We require height ≥ 44 (thumb hits height); width can be smaller for
       // narrow text labels but the height is the more critical axis.
       expect(

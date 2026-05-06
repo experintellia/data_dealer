@@ -283,7 +283,8 @@
 }
 
 @media (max-width: 380px) {
-  .MainMenu, .mm-tabs {
+  .MainMenu,
+  .mm-tabs {
     border-bottom: none;
   }
   .mm-tabs {
