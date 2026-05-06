@@ -341,11 +341,13 @@
  * 142 + 140 + 144 + 130 = 556 px.
  *
  * ≤ 580 px: single-row scaling collapses each item below its legible
- * minimum, so switch to a 2-column × 2-row grid (Profiles | Cash on
- * row 1, AP | Karma on row 2).  Items keep their natural sizes — the
- * grid's two columns each shrink to the wider item's `max-content`
- * (144 + 140 + 12 px gap = 296 px), which fits even a 320 px viewport
- * with comfortable side padding. */
+ * minimum, so switch to a 2-column × 2-row grid.  DOM order is
+ * Profiles, Cash, AP, Karma; `order` reshuffles them so the rows pair
+ * Profiles | Karma (long bars on top) and Cash | AP (short bars
+ * below).  Items keep their natural sizes — the grid's two columns
+ * each shrink to the wider item's `max-content` (142 + 144 + 12 px
+ * gap = 298 px), which fits even a 320 px viewport with comfortable
+ * side padding. */
 
 @media (max-width: 926px) {
   .Statusbar .StatusItem.Profiles,
@@ -381,4 +383,9 @@
   .Statusbar .StatusItem {
     zoom: 1;
   }
+
+  .Statusbar .StatusItem.Profiles { order: 1; }
+  .Statusbar .StatusItem.Karma    { order: 2; }
+  .Statusbar .StatusItem.Cash     { order: 3; }
+  .Statusbar .StatusItem.AP       { order: 4; }
 }

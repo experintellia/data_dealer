@@ -6,7 +6,7 @@
  *     on mobile, so the menu copy is the only entry point)
  *   - the username label sits above the XP bar
  *   - statusbar items (Profiles/Cash/AP/Karma) sit in a 2×2 grid
- *     (Profiles | Cash on row 1, AP | Karma on row 2) within the
+ *     (Profiles | Karma on row 1, Cash | AP on row 2) within the
  *     viewport, no horizontal clipping
  */
 
@@ -99,9 +99,14 @@ test('iter2: 4 statusbar items form a 2×2 grid inside the viewport', async ({ p
   });
 
   const layout = await page.evaluate(() => {
-    const items = Array.from(
-      document.querySelectorAll<HTMLElement>('.Statusbar .StatusItem:not([data-status-id="XP"])')
-    );
+    const sel = (id: string) =>
+      document.querySelector<HTMLElement>(`.Statusbar .StatusItem[data-status-id="${id}"]`);
+    const profiles = sel('Profiles');
+    const cash = sel('Cash');
+    const ap = sel('AP');
+    const karma = sel('karma');
+    if (!profiles || !cash || !ap || !karma) return null;
+    const rect = (el: HTMLElement) => el.getBoundingClientRect();
     // Bucket tops/lefts into 4-px bands so sub-pixel rounding doesn't
     // split a row/column into two.
     const bucket = (xs: number[]) => {
@@ -111,9 +116,10 @@ test('iter2: 4 statusbar items form a 2×2 grid inside the viewport', async ({ p
       }
       return bands.length;
     };
-    const tops = items.map((e) => e.getBoundingClientRect().top);
-    const lefts = items.map((e) => e.getBoundingClientRect().left);
-    const rights = items.map((e) => e.getBoundingClientRect().right);
+    const items = [profiles, cash, ap, karma];
+    const tops = items.map((e) => rect(e).top);
+    const lefts = items.map((e) => rect(e).left);
+    const rights = items.map((e) => rect(e).right);
     return {
       uniqueRows: bucket(tops),
       uniqueCols: bucket(lefts),
@@ -121,11 +127,33 @@ test('iter2: 4 statusbar items form a 2×2 grid inside the viewport', async ({ p
       maxRight: Math.max(...rights),
       minLeft: Math.min(...lefts),
       vw: window.innerWidth,
+      profilesTop: rect(profiles).top,
+      karmaTop: rect(karma).top,
+      cashTop: rect(cash).top,
+      apTop: rect(ap).top,
+      profilesLeft: rect(profiles).left,
+      karmaLeft: rect(karma).left,
+      cashLeft: rect(cash).left,
+      apLeft: rect(ap).left,
     };
   });
+  expect(layout).not.toBeNull();
+  if (!layout) return;
   expect(layout.itemCount).toBe(4);
   expect(layout.uniqueRows, 'status items span 2 rows').toBe(2);
   expect(layout.uniqueCols, 'status items span 2 columns').toBe(2);
   expect(layout.maxRight).toBeLessThanOrEqual(layout.vw + 1);
   expect(layout.minLeft).toBeGreaterThanOrEqual(-1);
+
+  // Row 1: Profiles + Karma share a top edge (within 4 px); Row 2:
+  // Cash + AP share a top edge below row 1.
+  expect(Math.abs(layout.profilesTop - layout.karmaTop)).toBeLessThanOrEqual(4);
+  expect(Math.abs(layout.cashTop - layout.apTop)).toBeLessThanOrEqual(4);
+  expect(layout.cashTop).toBeGreaterThan(layout.profilesTop + 4);
+
+  // Col 1: Profiles + Cash share a left edge; Col 2: Karma + AP share
+  // a left edge to the right of col 1.
+  expect(Math.abs(layout.profilesLeft - layout.cashLeft)).toBeLessThanOrEqual(4);
+  expect(Math.abs(layout.karmaLeft - layout.apLeft)).toBeLessThanOrEqual(4);
+  expect(layout.karmaLeft).toBeGreaterThan(layout.profilesLeft + 4);
 });
