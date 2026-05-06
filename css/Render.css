@@ -1056,9 +1056,11 @@
 .MissionGoal.small .MissionGoalProgress {
   font-size: 15px;
   line-height: 15px;
-  padding: 6px 6px 0px 0px;
+  padding: 6px 28px 0px 0px;
   overflow: hidden;
   height: 34px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .MissionGoal.small .MissionGoalSprite {
@@ -3397,6 +3399,21 @@ button {
     max-width: 92vw;
     margin: 0 auto;
     box-sizing: border-box;
+  }
+
+  .MissionInline {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+  .MissionInline .MissionLabel {
+    flex-basis: 100%;
+  }
+  .MissionGoal.small {
+    width: calc(50% - 6px);
+    box-sizing: border-box;
+    margin: 0;
   }
 
   .TopscoreDiv,
