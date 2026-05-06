@@ -114,6 +114,62 @@ interface AniTickerLike {
 interface APTickerLike {
   interval: number;
   reset(): void;
+  start(offset?: number): void;
+  addListener(node: GameNode): void;
+}
+
+/** Status-bar slot — one per game-value.  `val`/`max` drive the
+ *  numeric label; `barsize` drives the pixel width of the visual
+ *  bar (clipped to design-time max widths). */
+interface StatusBarSlot {
+  val?: number;
+  max?: number;
+  barsize?: number;
+  level?: number;
+  crosssum?: number;
+  tokenslength?: number;
+  tokenslengthmax?: number;
+}
+
+interface StatusBarData extends Record<string, unknown> {
+  gameNode?: GameNode;
+  AP: StatusBarSlot;
+  cash: StatusBarSlot;
+  profiles: StatusBarSlot;
+  karma: StatusBarSlot;
+  XP: StatusBarSlot;
+}
+
+/** Statusbar render-node surface for the FXUpdate* fan-out. */
+interface RenderStatusbarLike extends RenderRootLike {
+  FXUpdateAP?(silent?: boolean): void;
+  FXUpdateCash?(silent?: boolean): void;
+  FXUpdateProfiles?(silent?: boolean): void;
+  FXUpdateKarma?(silent?: boolean): void;
+  FXUpdateXP?(silent?: boolean): void;
+}
+
+/** Server-side game_values payload — every field is independently
+ *  optional (the engine emits partial deltas). */
+interface GameValuesPayload {
+  ap_initial?: number;
+  ap_offset?: number;
+  ap_increment?: number;
+  ap_snapshot?: number;
+  profiles_value?: number;
+  profiles_max?: number;
+  cash_value?: number;
+  cash_max?: number;
+  karma_value?: number;
+  xp_value?: number;
+  xp_level?: number;
+  [key: string]: unknown;
+}
+
+/** Missions singleton API used by `updateGameValues` (the only
+ *  caller).  Forward-ref; collapses when Missions itself extracts. */
+interface MissionsLike {
+  updateMissions(missions: unknown, gv: GameValuesPayload): void;
 }
 
 let _aniTicker: AniTickerLike | null = null;
@@ -168,9 +224,13 @@ export class GameRoot extends GameNode {
   // here so subclass call sites that read them through the typed
   // GameRoot reference don't need per-call casts.
   profiles_value = 0;
+  profiles_max = 0;
   cash_value = 0;
+  cash_max = 0;
   ap_value = 0;
+  ap_offset = 0;
   karma_value = 0;
+  karma_max = 100;
   xp_value = 0;
   xp_level: Level = {
     number: 0,
@@ -180,13 +240,16 @@ export class GameRoot extends GameNode {
     ap_inc_value: 0,
     ap_inc_interval: 0,
   };
+  /** Set by `loadGame` (still in Game.js) once the Missions singleton
+   *  is constructed.  Forward-ref optional until Missions extracts. */
+  Missions?: MissionsLike;
   data: {
     status_icons?: unknown;
-    status_bar?: { gameNode?: GameNode; [key: string]: unknown };
+    status_bar?: StatusBarData;
     width?: number;
     height?: number;
     levels?: Level[];
-    game_values?: { xp_level?: number; [key: string]: unknown };
+    game_values?: GameValuesPayload;
     [key: string]: unknown;
   } = {};
   override renderNode?: NonNullable<GameNode['renderNode']> & RenderRootLike;
@@ -196,7 +259,7 @@ export class GameRoot extends GameNode {
     RenderRootLike & {
       addButton?(label: string, id: string, states: unknown): void;
     };
-  override renderStatusbar?: NonNullable<GameNode['renderStatusbar']> & RenderRootLike;
+  override renderStatusbar?: NonNullable<GameNode['renderStatusbar']> & RenderStatusbarLike;
   /** Active ViewMap (Imperium or Database).  Set by switch_view; read
    *  by the camera/zoom helpers and by `fitToWindow` / `setSize`. */
   activeView?: ViewLike;
@@ -208,16 +271,16 @@ export class GameRoot extends GameNode {
   // PR).  Declared as optional methods so the camera/zoom helpers can
   // call them through the typed GameRoot reference.
   getImperium?(): ViewLike | undefined;
-  getDatabase?(): GameNode & { renderDBQueue?: { render?(): void } };
+  getDatabase?(): GameNode & {
+    renderDBQueue?: { render?(): void };
+    checkNotifications?(): void;
+  };
 
-  // Game-values setters still live in Game.js.  Declared optional so
-  // `setLevel` / `updateStatusBarValues` can call them through the
-  // typed GameRoot reference (the next PR in this wave migrates them).
-  setAP?(num?: number, silent?: boolean): void;
-  setCash?(num?: number, silent?: boolean): void;
-  setProfiles?(num?: number, silent?: boolean): void;
-  setKarma?(num?: number, silent?: boolean): void;
-  setXP?(num?: number, silent?: boolean): void;
+  // Notification mixins still live in Game.js (migrate in a follow-up
+  // PR).  Declared optional so `updateGameValues` can dispatch through
+  // the typed reference.
+  makeNotifications?(data: Record<string, unknown>): void;
+
   notificationPopup?: NonNullable<GameNode['renderPopup']> & {
     render?(): void;
     notificationMission?: string | null;
@@ -618,8 +681,8 @@ export class GameRoot extends GameNode {
       _apTicker.interval = lvl.ap_inc_interval;
       if (!nolevelup) _apTicker.reset();
     }
-    this.setAP?.();
-    this.setXP?.();
+    this.setAP();
+    this.setXP();
     return this.xp_level;
   }
 
@@ -665,7 +728,7 @@ export class GameRoot extends GameNode {
   override APTick(): void {
     if (this.xp_level.ap_max > this.ap_value) {
       this.ap_value += this.xp_level.ap_inc_value;
-      this.setAP?.();
+      this.setAP();
       // Remove No-AP decorators
       const popups = this.renderNode?.jdomelem?.find?.('.Popup .no_AP');
       popups?.removeClass?.('no_AP disabled active');
@@ -676,11 +739,191 @@ export class GameRoot extends GameNode {
    *  without rendering — the per-setter methods own the render
    *  trigger.  All five setters still live in Game.js (next PR). */
   updateStatusBarValues(): void {
-    this.setProfiles?.();
-    this.setCash?.();
-    this.setAP?.();
-    this.setKarma?.();
-    this.setXP?.();
+    this.setProfiles();
+    this.setCash();
+    this.setAP();
+    this.setKarma();
+    this.setXP();
+  }
+
+  // -------------------------------------------------------------------
+  // Game values (extracted in PR 22 of issue #147)
+  // -------------------------------------------------------------------
+
+  /** Hydrates the GameRoot's value-state from the bootstrap
+   *  `data.game_values` payload, anchors the first level, and starts
+   *  APTicker.  Called once per game-load by `loadGame` (still in
+   *  Game.js). */
+  initGameValues(): void {
+    const gv = this.data.game_values ?? {};
+    this.ap_value = gv.ap_initial ?? 0;
+    this.ap_offset = gv.ap_offset ?? 0;
+    this.profiles_value = gv.profiles_value ?? 0;
+    this.profiles_max = gv.profiles_max ?? 0;
+    this.cash_value = gv.cash_value ?? 0;
+    // cash_max was never initialised in the legacy code, so the
+    // cash-bar barsize divided by undefined → NaN.  Pin to a sane
+    // large default so the bar fills meaningfully without overflowing
+    // once the player accumulates cash from client collections.  Use
+    // `||` (not `??`) to match legacy behaviour: `cash_max === 0`
+    // also falls through to the default, since 0 would NaN-cascade
+    // through the barsize division.
+    this.cash_max = gv.cash_max || 10000;
+    this.karma_value = gv.karma_value ?? 0;
+    this.karma_max = 100;
+    this.xp_value = gv.xp_value ?? 0;
+    this.setLevel(gv.xp_level, true);
+    if (_apTicker) {
+      _apTicker.addListener(this);
+      _apTicker.start(this.ap_offset);
+    }
+  }
+
+  updateGameValues(
+    game_values: GameValuesPayload,
+    levelup?: boolean,
+    missions?: unknown,
+    silent?: boolean
+  ): void {
+    const gv = game_values;
+    if (missions) {
+      this.Missions?.updateMissions(missions, game_values);
+      // FIXME: TESTING when mission completed, do not yet update
+      // game_values
+    }
+    if (gv.profiles_max !== undefined) {
+      this.profiles_max = gv.profiles_max;
+    }
+    if (gv.profiles_value !== undefined && gv.profiles_value !== this.profiles_value) {
+      this.setProfiles(gv.profiles_value, silent);
+    }
+    if (gv.cash_value !== undefined && gv.cash_value !== this.cash_value) {
+      this.setCash(gv.cash_value, silent);
+    }
+    if (gv.ap_increment) {
+      this.useAP(gv.ap_increment);
+    }
+    if (gv.karma_value !== undefined && gv.karma_value !== this.karma_value) {
+      this.setKarma(gv.karma_value, silent);
+    }
+    if (gv.xp_value !== undefined) {
+      this.setXP(gv.xp_value, silent);
+    }
+    // ap_snapshot is the authoritative engine AP — sync the visible
+    // ap_value whenever it differs, not only on levelup.  Without this,
+    // the statusbar AP bar shows stale text after every chargePerp /
+    // integrateCollected (handlers decrement ap_snapshot but Game.js
+    // never reapplied it pre-#120 follow-up).
+    if (gv.ap_snapshot !== undefined && gv.ap_snapshot !== this.ap_value) {
+      this.setAP(gv.ap_snapshot, silent);
+    }
+    // levelup-only side effects.
+    if (gv.ap_snapshot !== undefined && levelup === true && !silent) {
+      this.getDatabase?.().checkNotifications?.();
+      this.makeNotifications?.({ levelup: this.xp_level.number });
+    }
+  }
+
+  /** Additive AP delta wrapper.  Note: legacy `updateGameValues`
+   *  passed a `silent` arg here that was silently dropped (the
+   *  legacy signature accepted one param).  Preserved as-is to keep
+   *  this PR a pure migration; the latent flicker bug is tracked in
+   *  issue #207. */
+  useAP(inc: number): void {
+    this.setAP(this.ap_value + inc);
+  }
+
+  setAP(num?: number, silent?: boolean): void {
+    if (num !== undefined) this.ap_value = num;
+    if (this.ap_value > this.xp_level.ap_max) {
+      this.ap_value = this.xp_level.ap_max;
+    }
+    const sb = this.data.status_bar;
+    if (!sb) return;
+    // Only clip AP display: internally it can be -1 since that's the
+    // server's bonus.
+    const clipped = this.ap_value < 0 ? 0 : this.ap_value;
+    sb.AP.val = clipped;
+    sb.AP.max = this.xp_level.ap_max;
+    sb.AP.barsize = Math.min(120, Math.max(0, Math.round((clipped / this.xp_level.ap_max) * 120)));
+    // Always invoke FXUpdate*: the Statusbar template binds the flat
+    // AP_val prop, which only refreshes inside FXUpdateAP.  Skipping
+    // it on silent paths leaves the rendered DOM stale (issue #153).
+    this.renderStatusbar?.FXUpdateAP?.(silent);
+  }
+
+  setCash(num?: number, silent?: boolean): void {
+    if (num !== undefined) this.cash_value = num;
+    const sb = this.data.status_bar;
+    if (!sb) return;
+    sb.cash.val = this.cash_value;
+    sb.cash.barsize = Math.min(
+      120,
+      Math.max(0, Math.round((this.cash_value / this.cash_max) * 120))
+    );
+    this.renderStatusbar?.FXUpdateCash?.(silent);
+  }
+
+  setProfiles(num?: number, silent?: boolean): void {
+    if (num !== undefined) this.profiles_value = num;
+    if (this.profiles_value > this.profiles_max) {
+      this.profiles_value = this.profiles_max;
+    }
+    const sb = this.data.status_bar;
+    if (!sb) return;
+    sb.profiles.val = this.profiles_value;
+    sb.profiles.max = this.profiles_max;
+    sb.profiles.barsize = Math.min(
+      120,
+      Math.max(0, Math.round((this.profiles_value / this.profiles_max) * 120))
+    );
+    sb.profiles.crosssum = this.getDBTokensCrossSum();
+    this.getDBTokensLength();
+    sb.profiles.tokenslength = this.DBTokensLength;
+    sb.profiles.tokenslengthmax = this.DBTokensLengthMax;
+    this.renderStatusbar?.FXUpdateProfiles?.(silent);
+  }
+
+  setKarma(num?: number, silent?: boolean): void {
+    if (num !== undefined) this.karma_value = num;
+    if (this.karma_value > this.karma_max) {
+      this.karma_value = this.karma_max;
+    }
+    if (this.karma_value < -this.karma_max) {
+      this.karma_value = -this.karma_max;
+    }
+    const sb = this.data.status_bar;
+    if (!sb) return;
+    sb.karma.val = this.karma_value;
+    sb.karma.max = this.karma_max || 100;
+    // FIXME: set to correct level not 50.
+    sb.karma.barsize = Math.min(
+      59,
+      Math.max(-59, Math.round((this.karma_value / this.karma_max) * 59))
+    );
+    this.renderStatusbar?.FXUpdateKarma?.(silent);
+  }
+
+  setXP(num?: number, silent?: boolean): void {
+    if (num !== undefined && num > this.xp_value) {
+      this.xp_value = num;
+    }
+    if (this.xp_value > this.xp_level.xp_max) {
+      this.setLevel(this.getLevelByXP(this.xp_value).number);
+    }
+    if (this.xp_value < this.xp_level.xp_min) {
+      this.setLevel(this.getLevelByXP(this.xp_value).number);
+    }
+    const sb = this.data.status_bar;
+    if (!sb) return;
+    sb.XP.val = this.xp_value;
+    sb.XP.level = this.xp_level.number;
+    const span = this.xp_level.xp_max - this.xp_level.xp_min;
+    sb.XP.barsize = Math.min(
+      96,
+      Math.max(0, Math.round(((this.xp_value - this.xp_level.xp_min) / span) * 96))
+    );
+    this.renderStatusbar?.FXUpdateXP?.(silent);
   }
 
   // -------------------------------------------------------------------
