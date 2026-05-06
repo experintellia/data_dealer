@@ -1003,17 +1003,17 @@
 
 .MissionGoal.small {
   height:38px;
-  width:234px;
   display:inline-block;
   padding-left: 40px;
+  padding-right: 32px;
 }
 
 .MissionGoal.small .MissionGoalProgress {
   font-size: 15px;
   line-height: 15px;
-  padding: 6px 6px 0px 0px;
-  overflow: hidden;
+  padding: 6px 0px 0px 0px;
   height: 34px;
+  white-space: nowrap;
 }
 
 .MissionGoal.small .MissionGoalSprite {
@@ -3244,6 +3244,7 @@ button {
     box-sizing: border-box;
   }
 
+
   .TopscoreDiv,
   .TopscorePerp,
   .MissionPerp {
@@ -3273,7 +3274,6 @@ button {
      share the parent card row evenly with a 4 px gutter; `max-width:
      234px` so they never grow past the desktop size on a wide phone. */
   .MissionGoal.small {
-    width: calc(50% - 16px);
     max-width: 234px;
     display: inline-block;
     margin: 0 4px 6px 0;
