@@ -3003,7 +3003,8 @@ button {
 
   .ViewTabMenuButton {
     min-height: 44px;
-    line-height: 28px;
+    font-size: 16px;
+    line-height: 25px;
     padding: 4px 14px 8px 14px;
   }
 
@@ -3045,8 +3046,6 @@ button {
 @media (max-width: 600px) {
   .ViewTabMenuButton {
     padding: 3px 6px 6px 6px;
-    font-size: 15px;
-    line-height: 22px;
     box-shadow: 2px 2px 0px #009FD9;
   }
 }
@@ -3054,16 +3053,12 @@ button {
 @media (max-width: 530px) {
   .ViewTabMenuButton {
     padding: 2px 5px 5px 5px;
-    font-size: 15px;
-    line-height: 22px;
   }
 }
 
 @media (max-width: 480px) {
   .ViewTabMenuButton {
     padding: 2px 4px 5px 4px;
-    font-size: 11px;
-    line-height: 18px;
     border-width: 2px;
     border-radius: 6px;
     box-shadow: 1px 1px 0px #009FD9;
@@ -3082,8 +3077,6 @@ button {
 @media (max-width: 380px) {
   .ViewTabMenuButton {
     padding: 2px 2px 4px 2px;
-    font-size: 10px;
-    line-height: 16px;
     margin-right: 1px;
   }
 }

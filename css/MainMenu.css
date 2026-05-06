@@ -273,8 +273,12 @@
     border-width: 2px;
     border-radius: 6px 6px 0px 0px;
     box-shadow: 1px 1px 0 #009fd9;
-    height: unset;
-    min-height: unset;
+    /* Allow the tab to grow with line-height + padding rather than being
+     * pinned at the desktop 44.  Keep `min-height: 44` to satisfy the
+     * accessibility tap-target floor; without it the tab collapses to
+     * ~34 px and the mobile-tap-targets spec fails at 360/390/414. */
+    height: auto;
+    min-height: 44px;
   }
 }
 
