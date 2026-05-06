@@ -33,6 +33,7 @@ import {
   remove,
 } from './game/GameNode.js';
 import { GamePerp, setAniTicker } from './game/GamePerp.js';
+import { GameRoot, setAniTickerForGameRoot } from './game/GameRoot.js';
 import { Imperium } from './game/Imperium.js';
 import { Mission } from './game/Mission.js';
 import { Missions } from './game/Missions.js';
@@ -257,201 +258,6 @@ var Game = function () {
   // GameRoot (app.game) can be accessed in debug mode from the console
   // TODO: better way to publish only those parts of the api that need to be global
   ///////////////////////////////////
-
-  var GameRoot = function (config) {
-    // Initialize the typeRegistry
-    this.typeRegistry = {};
-    this.DBTokensLength = 0;
-    this.DBTokensLengthMax = 0;
-    this.DBTokens = {};
-    this.DBOriginTokens = {};
-    this.DBTokensAbsolute = {};
-    this.DBTokensCrossSum = 0;
-    this.IPerps = {};
-    this.NotificationQueue = [];
-    return this;
-  };
-  extend(GameRoot, GameNode);
-
-  GameRoot.prototype.renderType = 'Stage';
-
-  GameRoot.prototype.get = get;
-
-  GameRoot.prototype.setup = setup;
-
-  GameRoot.prototype.ids = _ids;
-  GameRoot.prototype.getById = getById;
-
-  GameRoot.prototype.addType = function (gestalt, data) {
-    // Add a type to the typeRegistry data should have data.type_data
-    // If the game_type is also defined in typeSettings it will be merged and overwritten with data
-    if (data.game_type && data.type_data) {
-      if (typeSettings.hasOwnProperty(data.game_type)) {
-        data.type_data = mergeData(typeSettings[data.game_type].type_data, data.type_data);
-      }
-    }
-    this.typeRegistry[gestalt] = data;
-    this.typeRegistry[gestalt].gestalt = gestalt;
-    this.typeRegistry[gestalt].game_type = data.game_type;
-    // FIXME: is_supertoken fix for export fail.
-    if (gestalt.substring(0, 5) === 'token') {
-      this.typeRegistry[gestalt].type_data.is_supertoken = false;
-    }
-
-    return this.typeRegistry[gestalt];
-  };
-
-  GameRoot.prototype.addSubType = function (parent_gestalt, gestalt, data) {
-    // Add a subtype to the typeRegistry data should have data.type_data
-    // If the game_type is also defined in typeSettings it will be merged and overwritten with data
-    var groot = this;
-    var parentType = groot.getType(parent_gestalt);
-    if (parentType) {
-      if (data.game_type && data.type_data) {
-        if (typeSettings.hasOwnProperty(data.game_type)) {
-          data.type_data = mergeData(typeSettings[data.game_type].type_data, data.type_data);
-          // expand powerup tokens with their type data
-          if (data.type_data.tokens && data.type_data.tokens.length) {
-            _.each(data.type_data.tokens, function (v, k) {
-              v.type_data = groot.getTypeData(v.gestalt);
-            });
-          }
-        }
-        return (parentType[gestalt] = data);
-      }
-    }
-  };
-
-  GameRoot.prototype.removeType = function (gestalt) {
-    // Remove a type from the typeRegistry
-    delete this.typeRegistry[gestalt];
-  };
-  GameRoot.prototype.getType = function (gestalt) {
-    // Get type from the registry, Note on the structure: data.type_data
-    return this.typeRegistry[gestalt];
-  };
-  GameRoot.prototype.getTypeData = function (gestalt) {
-    // Get type_data from the registry, Note on the structure: data.type_data
-    var type = this.getType(gestalt);
-    if (type) {
-      return type.type_data;
-    } else {
-      return undefined;
-    }
-  };
-  GameRoot.prototype.getTypes = function (game_type) {
-    // Get all types with game_type from the registry
-    //return this.typeRegistry[gestalt];
-    return _.where(this.typeRegistry, { game_type: game_type });
-  };
-  GameRoot.prototype.getTypeFromGestalt = function (gestalt) {
-    // Get all types with game_type from the registry
-    if (gestalt) {
-      return this.typeRegistry[gestalt].game_type;
-    } else {
-      return {};
-    }
-  };
-
-  GameRoot.prototype.getDBTokenAmount = function (gestalt) {
-    if (this.DBTokens && this.DBTokens.hasOwnProperty(gestalt)) {
-      return this.DBTokens[gestalt];
-    } else {
-      return 0;
-    }
-  };
-
-  GameRoot.prototype.getDBTokensLength = function () {
-    // without origin tokens
-    return (this.DBTokensLength = _.filter(_.keys(this.DBTokens), function (t) {
-      return t.substring(0, 6) !== 'origin';
-    }).length);
-  };
-
-  GameRoot.prototype.getDBTokensLengthMax = function () {
-    // without origin tokens
-    return (this.DBTokensLengthMax = _.filter(
-      _.where(this.typeRegistry, { game_type: 'TokenPerp' }),
-      function (t) {
-        return t.gestalt.substring(0, 6) !== 'origin';
-      }
-    ).length);
-  };
-
-  GameRoot.prototype.getDBTokensCrossSum = function (gestalt) {
-    var DBTokens = this.DBTokens;
-    var sum = 0;
-    var count = 1;
-    _.each(DBTokens, function (t, k) {
-      sum += t;
-      count += 1;
-    });
-    return sum / count;
-  };
-
-  GameRoot.prototype.compileOriginTokens = function (nodes) {
-    var groot = this;
-    var origintokens = _.filter(nodes, function (n) {
-      if (n.gestalt) {
-        return n.gestalt.substring(0, 6) === 'origin';
-      } else {
-        return false;
-      }
-    });
-    _.each(origintokens, function (t, k) {
-      var ot = (groot.DBOriginTokens[t.gestalt] = {});
-      ot.gestalt = t.gestalt;
-      ot.data = groot.getTypeData(t.gestalt);
-      ot.amount = ot.data.amount = t.instance_data.amount;
-      ot.absoluteAmount = (groot.profiles_value * ot.amount) / 100;
-      ot.originGameNode = getByGestalt(ot.data.origin_gestalt);
-      ot.originGameType = ot.originGameNode.gameType;
-      if (ot.originGameType === 'CityPerp') {
-        var citymax = ot.originGameNode.data.profiles_max;
-        ot.cityMaxAmount = ((ot.amount / 100) * groot.profiles_value) / citymax;
-        //((float(amounts.get(origin_gestalt, 0))/100) * self.game_values.get('profiles_value')) / origin_data.get('type_data').get('profiles_max')
-      }
-    });
-  };
-
-  GameRoot.prototype.getOriginGestaltFromOriginTokenGestalt = function (origintokengestalt) {
-    var origin =
-      _.find(this.DBOriginTokens, function (ot) {
-        return ot.originGameNode.gestalt === 'city002';
-      }) || {};
-    return origin.gestalt;
-  };
-
-  GameRoot.prototype.kill = function () {
-    console.warn('Killing Game');
-    clear();
-    delete app.game;
-  };
-
-  GameRoot.prototype.lock = function () {
-    // Lock the whole stage and turn off triggering of render Events
-    // TODO make stage spinner in Render and use proper method to unbind events
-    // Unlock currently wouldn't work since all events are destroyed
-    if (this.renderNode) {
-      this.renderNode.lock();
-      this.renderMenu.lock();
-      AniTicker.stop();
-    }
-    // FIXME for Popups
-    //this.renderNode.jdomelem.find('*').off();
-  };
-  GameRoot.prototype.unlock = function () {
-    if (this.NotificationQueue && this.NotificationQueue.length < 2) {
-      this.renderNode.unlock();
-      this.renderMenu.unlock();
-      AniTicker.start();
-    } else if (!this.NotificationQueue) {
-      this.renderNode.unlock();
-      this.renderMenu.unlock();
-      AniTicker.start();
-    }
-    //this.renderNode.jdomelem.find('*').off();
-  };
 
   GameRoot.prototype.refresh = function () {
     // Reload the game data and reinit the whole Game (like a page reload).
@@ -691,42 +497,6 @@ var Game = function () {
       e.stopPropagation();
       gnode.makeNotifications(data);
     });
-  };
-
-  GameRoot.prototype.getParentTypes = function (gestalt) {
-    // returns the type_data of all perps where gestalt is provided
-    var types = _.filter(this.typeRegistry, function (t) {
-      return _.contains(t.type_data.provided_perps, gestalt);
-    });
-    if (types) {
-      return types;
-    } else {
-      return {};
-    }
-  };
-
-  GameRoot.prototype.getParentTypeData = function (gestalt) {
-    // returns the type_data of a perp where gestalt is provided
-    var type = _.find(this.typeRegistry, function (t) {
-      return _.contains(t.type_data.provided_perps, gestalt);
-    });
-    if (type) {
-      return type.type_data;
-    } else {
-      return {};
-    }
-  };
-
-  GameRoot.prototype.getParentType = function (gestalt) {
-    // returns the type_data of a perp where gestalt is provided
-    var type = _.find(this.typeRegistry, function (t) {
-      return _.contains(t.type_data.provided_perps, gestalt);
-    });
-    if (type) {
-      return type;
-    } else {
-      return {};
-    }
   };
 
   GameRoot.prototype.notification_level = 2;
@@ -1824,16 +1594,6 @@ var Game = function () {
   // map) and the known-name `Game.TokenPerp` reference via a direct
   // import — both wired up in PR 17 of issue #147.
 
-  // updateGears was scoped to the Database section in legacy
-  // (`// TODO: Move this to GameRoot`) but is a GameRoot prototype mixin.
-  // Kept here at GameRoot scope so all the GameRoot.prototype.X
-  // assignments stay together.
-  GameRoot.prototype.updateGears = function () {
-    _.each(getByType('TokenPerp'), function (t) {
-      t.updateGear();
-    });
-  };
-
   ///////////////////////////////////
   // The GamePerp Base Class
   ///////////////////////////////////
@@ -1872,60 +1632,6 @@ var Game = function () {
   // DatabasePerp + CityPerp similarly extracted to scripts/game/
   // DatabasePerp.ts / CityPerp.ts in PR 12 of issue #147.
 
-  GameRoot.prototype.getCityOriginAmounts = function () {
-    var cities = _.where(this.DBOriginTokens, { originGameType: 'CityPerp' });
-    var city_amounts = {};
-    _.each(cities, function (c) {
-      city_amounts[c.gestalt] = c.cityMaxAmount;
-    });
-    return city_amounts;
-  };
-
-  GameRoot.prototype.getDBFactorNormalized = function () {
-    var cityamounts = this.getCityOriginAmounts();
-    return _.reduce(
-      _.values(cityamounts),
-      function (memo, num) {
-        return memo + num;
-      },
-      0
-    );
-  };
-
-  GameRoot.prototype.fetchProjectPowerupData = function (project_gestalt, cb) {
-    var groot = this;
-    var gnode = getByGestalt(project_gestalt);
-    // Register Powerups in typeRegistry
-    if (gnode && !gnode.data.powerupsCached) {
-      app.remote.getPowerups(project_gestalt, app.version).done(function (data) {
-        _.each(data.result, function (v, k) {
-          groot.addSubType(project_gestalt, v.game_gestalt, v);
-        });
-        if (gnode.renderPopup) {
-          gnode.renderPopup.templateData.cached = true;
-        }
-        gnode.data.powerupsCached = true;
-        if (cb) {
-          cb();
-        }
-      });
-    } else if (gnode && gnode.renderPopup && gnode.renderPopup.templateData) {
-      gnode.renderPopup.templateData.cached = true;
-      if (cb) {
-        cb();
-      }
-    } else {
-      app.remote.getPowerups(project_gestalt, app.version).done(function (data) {
-        _.each(data.result, function (v, k) {
-          groot.addSubType(project_gestalt, v.game_gestalt, v);
-        });
-        if (cb) {
-          cb();
-        }
-      });
-    }
-  };
-
   ////////////////////////////////////////////
   // The API Publisher
   ////////////////////////////////////////////
@@ -1961,11 +1667,12 @@ var Game = function () {
     SupertokenPerp: SupertokenPerp,
   };
 
-  // Inject AniTicker into GamePerp so its initEventHandlers can register
-  // listeners on the legacy ticker singleton (which still lives in this
-  // IIFE). Disposable seam; retires when AniTicker is itself extracted
-  // from Game.js.
+  // Inject AniTicker into GamePerp / GameRoot so their lock/unlock and
+  // initEventHandlers can register listeners on the legacy ticker
+  // singleton (which still lives in this IIFE). Disposable seam;
+  // retires when AniTicker is itself extracted from Game.js.
   setAniTicker(AniTicker);
+  setAniTickerForGameRoot(AniTicker);
 
   return Game;
 };
