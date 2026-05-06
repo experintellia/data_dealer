@@ -1,4 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Look at the host messenger's selfName and report whether it differs from the
 // stored display_name. Display name is owned by the messenger — the game has
 // no UI to rename — so this runs once per boot and only fires the dispatch
@@ -8,16 +7,19 @@
 // they already match (or no user). Does NOT mutate the passed-in user object;
 // callers must route the new name through the proper delta dispatch (e.g.
 // setDisplayName) so the change flows through state and observers cleanly.
+//
+// File converted from webxdc-identity.js to webxdc-identity.ts in PR 26 of
+// issue #147; `@ts-nocheck` quarantine dropped.
 
-export function getMessengerDisplayNameChange(user) {
-  if (!user) {
-    return null;
-  }
-  var selfName = globalThis.webxdc.selfName;
-  if (user.display_name === selfName) {
-    return null;
-  }
-  return selfName;
+interface UserLike {
+  display_name?: string;
+}
+
+export function getMessengerDisplayNameChange(user?: UserLike | null): string | null {
+  if (!user) return null;
+  const selfName = globalThis.webxdc?.selfName;
+  if (user.display_name === selfName) return null;
+  return selfName ?? null;
 }
 
 // Default export is the namespace object consumed by AMD callers via the bridge.

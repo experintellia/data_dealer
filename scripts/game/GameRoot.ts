@@ -22,7 +22,6 @@ import appModule from '../app.js';
 import i18n from '../i18n.js';
 import setup from '../setup.js';
 import { getTypeSettings } from '../type_settings.js';
-import utilDefault from '../util.js';
 import webxdcIdentity from '../webxdc-identity.js';
 import { Database } from './Database.js';
 import {
