@@ -62,7 +62,10 @@ interface RenderRootLike {
   width?: number;
   height?: number;
   jdomelem?: {
-    find?(sel: string): { off(ev?: string): void };
+    find?(sel: string): {
+      off?(ev?: string): void;
+      removeClass?(cls: string): void;
+    };
     outerHeight?(): number;
   };
   setSize?(opts: { width?: number; height?: number }): void;
@@ -88,9 +91,29 @@ interface ViewLike {
   renderNode?: ViewMapRenderLike;
 }
 
+/** Per-level config from `data.levels`.  AP regeneration interval +
+ *  cap, XP range, and the level number (1-indexed). */
+interface Level {
+  number: number;
+  xp_min: number;
+  xp_max: number;
+  ap_max: number;
+  ap_inc_value: number;
+  ap_inc_interval: number;
+  [key: string]: unknown;
+}
+
 interface AniTickerLike {
   start(): void;
   stop(): void;
+}
+
+/** APTicker singleton interface — increments AP at level-derived
+ *  intervals.  Game.js owns the implementation; injected via
+ *  `setAPTickerForGameRoot`. */
+interface APTickerLike {
+  interval: number;
+  reset(): void;
 }
 
 let _aniTicker: AniTickerLike | null = null;
@@ -99,6 +122,14 @@ let _aniTicker: AniTickerLike | null = null;
  *  when AniTicker itself extracts. */
 export function setAniTickerForGameRoot(ticker: AniTickerLike): void {
   _aniTicker = ticker;
+}
+
+let _apTicker: APTickerLike | null = null;
+/** Game.js injects the APTicker singleton at IIFE-end (parallel to
+ *  `setAniTickerForGameRoot`).  Used by `setLevel` / `APTick`.
+ *  Disposable seam — retires when APTicker itself extracts. */
+export function setAPTickerForGameRoot(ticker: APTickerLike): void {
+  _apTicker = ticker;
 }
 
 // ---------------------------------------------------------------------------
@@ -140,12 +171,22 @@ export class GameRoot extends GameNode {
   cash_value = 0;
   ap_value = 0;
   karma_value = 0;
-  xp_level: { number: number; [key: string]: unknown } = { number: 0 };
+  xp_value = 0;
+  xp_level: Level = {
+    number: 0,
+    xp_min: 0,
+    xp_max: 0,
+    ap_max: 0,
+    ap_inc_value: 0,
+    ap_inc_interval: 0,
+  };
   data: {
     status_icons?: unknown;
     status_bar?: { gameNode?: GameNode; [key: string]: unknown };
     width?: number;
     height?: number;
+    levels?: Level[];
+    game_values?: { xp_level?: number; [key: string]: unknown };
     [key: string]: unknown;
   } = {};
   override renderNode?: NonNullable<GameNode['renderNode']> & RenderRootLike;
@@ -168,6 +209,15 @@ export class GameRoot extends GameNode {
   // call them through the typed GameRoot reference.
   getImperium?(): ViewLike | undefined;
   getDatabase?(): GameNode & { renderDBQueue?: { render?(): void } };
+
+  // Game-values setters still live in Game.js.  Declared optional so
+  // `setLevel` / `updateStatusBarValues` can call them through the
+  // typed GameRoot reference (the next PR in this wave migrates them).
+  setAP?(num?: number, silent?: boolean): void;
+  setCash?(num?: number, silent?: boolean): void;
+  setProfiles?(num?: number, silent?: boolean): void;
+  setKarma?(num?: number, silent?: boolean): void;
+  setXP?(num?: number, silent?: boolean): void;
   notificationPopup?: NonNullable<GameNode['renderPopup']> & {
     render?(): void;
     notificationMission?: string | null;
@@ -547,6 +597,81 @@ export class GameRoot extends GameNode {
     const dbQueue = (this.getDatabase?.() as { renderDBQueue?: { render?(): void } } | undefined)
       ?.renderDBQueue;
     dbQueue?.render?.();
+  }
+
+  // -------------------------------------------------------------------
+  // Status bar / level / XP (extracted in PR 21 of issue #147)
+  // -------------------------------------------------------------------
+
+  initStatusBar(): void {
+    if (this.data.status_bar) this.data.status_bar.gameNode = this;
+    this.updateStatusBarValues();
+  }
+
+  setLevel(levelnum?: number, nolevelup?: boolean): Level {
+    const lvl = levelnum ? this.getLevel(levelnum) : this.getLevel();
+    if (lvl !== this.getLevelByXP(this.xp_value)) {
+      this.xp_value = lvl.xp_min;
+    }
+    this.xp_level = lvl;
+    if (_apTicker) {
+      _apTicker.interval = lvl.ap_inc_interval;
+      if (!nolevelup) _apTicker.reset();
+    }
+    this.setAP?.();
+    this.setXP?.();
+    return this.xp_level;
+  }
+
+  getLevel(level?: number): Level {
+    const levels = this.data.levels ?? [];
+    const idx = level ? level - 1 : (this.data.game_values?.xp_level ?? 1) - 1;
+    return (
+      levels[idx] ?? {
+        number: 0,
+        xp_min: 0,
+        xp_max: 0,
+        ap_max: 0,
+        ap_inc_value: 0,
+        ap_inc_interval: 0,
+      }
+    );
+  }
+
+  /** Returns the Level whose `xp_min..xp_max` window contains `xp`,
+   *  or an empty Level-shape when `xp` is falsy.  Legacy returned
+   *  `{}` for the falsy branch — flattened to a Level-shaped sentinel
+   *  to keep the strict-TS signature clean (callers pass it to
+   *  `setLevel`'s identity check, never read fields off it). */
+  getLevelByXP(xp?: number): Level {
+    if (!xp) {
+      return { number: 0, xp_min: 0, xp_max: 0, ap_max: 0, ap_inc_value: 0, ap_inc_interval: 0 };
+    }
+    const found = (this.data.levels ?? []).find((lvl) => xp >= lvl.xp_min && xp <= lvl.xp_max);
+    return (
+      found ?? { number: 0, xp_min: 0, xp_max: 0, ap_max: 0, ap_inc_value: 0, ap_inc_interval: 0 }
+    );
+  }
+
+  override APTick(): void {
+    if (this.xp_level.ap_max > this.ap_value) {
+      this.ap_value += this.xp_level.ap_inc_value;
+      this.setAP?.();
+      // Remove No-AP decorators
+      const popups = this.renderNode?.jdomelem?.find?.('.Popup .no_AP');
+      popups?.removeClass?.('no_AP disabled active');
+    }
+  }
+
+  /** Map (and eventually crunch) game_values onto status-bar values
+   *  without rendering — the per-setter methods own the render
+   *  trigger.  All five setters still live in Game.js (next PR). */
+  updateStatusBarValues(): void {
+    this.setProfiles?.();
+    this.setCash?.();
+    this.setAP?.();
+    this.setKarma?.();
+    this.setXP?.();
   }
 
   // -------------------------------------------------------------------
