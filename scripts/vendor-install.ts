@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Regenerates vendor/ from npm packages. Run after a fresh clone if the vendor/
 // directory is ever deleted, or to upgrade a pinned lib.
 //
-// Usage: node scripts/vendor-install.js
+// Usage: node scripts/vendor-install.js (or, post-build, the .ts file is run
+// through tsx or compiled by tsc — see package.json)
 //
 // Version notes (divergences from original bower.json pins):
 //   jquery        bower: 2.0.3      npm: latest (4.x) — API-compatible for boot path
@@ -25,10 +25,12 @@
 //   zynga-animate: https://raw.githubusercontent.com/zynga/scroller/7d460ea/src/Animate.js
 //   zynga-scroller:https://raw.githubusercontent.com/zynga/scroller/dadd850/src/Scroller.js
 //   sprintf:       https://raw.githubusercontent.com/alexei/sprintf.js/192bc60/src/sprintf.js
+//
+// File converted from vendor-install.js in PR 27 of issue #147; `@ts-nocheck`
+// quarantine dropped.
 
 import { execSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
-import { mkdtempSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,11 +41,11 @@ mkdirSync(vendorDir, { recursive: true });
 
 const tmp = mkdtempSync(join(tmpdir(), 'dd-vendor-'));
 
-function run(cmd) {
+function run(cmd: string): void {
   execSync(cmd, { stdio: 'inherit', cwd: tmp });
 }
 
-function cp(src, dest) {
+function cp(src: string, dest: string): void {
   const full = join(tmp, 'node_modules', src);
   if (!existsSync(full)) {
     console.warn(`  WARN: ${src} not found — skipping`);
@@ -85,4 +87,6 @@ console.log('Vendored verbatim in repo: zynga-animate.js, zynga-scroller.js');
 console.log('\nFiles in vendor/:');
 readdirSync(vendorDir)
   .sort()
-  .forEach((f) => console.log('  ' + f));
+  .forEach((f) => {
+    console.log(`  ${f}`);
+  });

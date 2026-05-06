@@ -1,8 +1,7 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Browser-only devtools surface for the injectable clock.
 //
 // Loaded only when the page URL contains ?devtools=1.
-// In production (no flag) this module is a no-op and window.__dd is never
+// In production (no flag) this module is a no-op and `window.__dd` is never
 // defined, so there is zero debug surface exposed to end users.
 //
 // Usage from a browser console or Playwright test:
@@ -11,8 +10,46 @@
 //   window.__dd.clearNowOverride();                // revert to real wall clock
 //   window.__dd.getZoom();                          // current zoom of active ViewMap
 //   window.__dd.setZoom(0.6);                       // jump zoom (no animation)
+//
+// File converted from devtools.js in PR 27 of issue #147; `@ts-nocheck`
+// quarantine dropped.
 
 import { advance, clearOverride, setOverride } from './clock.js';
+
+interface ZyngaScrollerLike {
+  __zoomLevel?: number;
+  zoomTo?(level: number, animate?: boolean): void;
+}
+
+interface ViewMapRenderNodeLike {
+  scroller?: ZyngaScrollerLike;
+}
+
+interface ViewLike {
+  renderNode?: ViewMapRenderNodeLike;
+}
+
+interface GameLike {
+  activeView?: ViewLike;
+  getImperium?(): ViewLike | undefined;
+}
+
+interface DevToolsHooks {
+  setNow: typeof setOverride;
+  advanceNow: typeof advance;
+  clearNowOverride: typeof clearOverride;
+  getZoom(): number | null;
+  setZoom(level: number): void;
+  /** Set by `app.ts` once `Application.start()` finishes — exposes the
+   *  GameRoot instance to the dev-time hooks. */
+  _app?: { game?: GameLike };
+}
+
+declare global {
+  interface Window {
+    __dd?: DevToolsHooks;
+  }
+}
 
 if (
   typeof window !== 'undefined' &&
@@ -21,27 +58,26 @@ if (
 ) {
   // app.js populates window.__dd._app once Application.start finishes, so
   // the active ViewMap may not be reachable until after the boot sequence.
-  const activeViewMap = () => {
-    const game = window.__dd._app && window.__dd._app.game;
+  const activeViewMap = (): ViewMapRenderNodeLike | null => {
+    const game = window.__dd?._app?.game;
     if (!game) return null;
-    const view = game.activeView || (game.getImperium && game.getImperium());
-    return (view && view.renderNode) || null;
+    const view = game.activeView ?? game.getImperium?.();
+    return view?.renderNode ?? null;
   };
+
   window.__dd = {
     setNow: setOverride,
     advanceNow: advance,
     clearNowOverride: clearOverride,
     // Test hooks for the zoom-controls e2e spec — read from / write to the
     // active ViewMap's scroller without exposing the whole app surface.
-    getZoom: () => {
+    getZoom: (): number | null => {
       const vm = activeViewMap();
-      return vm && vm.scroller ? vm.scroller.__zoomLevel : null;
+      return vm?.scroller?.__zoomLevel ?? null;
     },
-    setZoom: (level) => {
+    setZoom: (level: number): void => {
       const vm = activeViewMap();
-      if (vm && vm.scroller && typeof vm.scroller.zoomTo === 'function') {
-        vm.scroller.zoomTo(level, false);
-      }
+      if (vm?.scroller?.zoomTo) vm.scroller.zoomTo(level, false);
     },
   };
 }
