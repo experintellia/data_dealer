@@ -623,6 +623,15 @@ export class GameRoot extends GameNode {
     return this.xp_level;
   }
 
+  /** Looks up `data.levels[level - 1]` (legacy 1-indexed); falls back
+   *  to the current `data.game_values.xp_level`.  The zero-Level
+   *  fallback covers two cases:
+   *    - `data.levels` unset (server bootstrap not yet run);
+   *    - `level` index out of bounds.
+   *  Both are dead paths in production (loadGame populates `levels`
+   *  before any `setLevel` caller runs), but the strict-TS shape
+   *  silently no-ops rather than throwing the legacy `TypeError` on
+   *  `undefined.xp_min`. */
   getLevel(level?: number): Level {
     const levels = this.data.levels ?? [];
     const idx = level ? level - 1 : (this.data.game_values?.xp_level ?? 1) - 1;
