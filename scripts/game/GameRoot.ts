@@ -468,6 +468,9 @@ export class GameRoot extends GameNode {
     this._cancelPendingCenter();
     this._centerActiveViewTimer = setTimeout(() => {
       this._centerActiveViewTimer = null;
+      // Inlined resolution (rather than `_resolveActiveViewMap()`)
+      // because the Imperium home-point branch below needs the
+      // `view` reference for `view === this.getImperium()` identity.
       const view = this.activeView ?? this.getImperium?.();
       const vm = view?.renderNode;
       if (!vm?.scroller || !vm.parentNode) return;
