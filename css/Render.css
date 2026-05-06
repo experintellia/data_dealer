@@ -3429,7 +3429,6 @@ button {
      share the parent card row evenly with a 4 px gutter; `max-width:
      234px` so they never grow past the desktop size on a wide phone. */
   .MissionGoal.small {
-    width: calc(50% - 16px);
     max-width: 234px;
     display: inline-block;
     margin: 0 4px 6px 0;
