@@ -201,7 +201,11 @@ export class GameRoot extends GameNode {
   /** Returns `''` when called with a falsy gestalt — legacy returned
    *  `{}` here, but every caller treats the result as a string game-
    *  type name.  The `{}` was a mis-typed sentinel; flatten to `''` so
-   *  the strict TS signature stays clean. */
+   *  the strict TS signature stays clean.  Audited 2026-05-06: both
+   *  call sites (Game.js:866 GameRoot.BuyPerp and GameNode.ts:757
+   *  initPopupEvents PerpBuyButton handler) compare the result with
+   *  `=== 'CityPerp'` — the legacy `{}` would have failed that check
+   *  identically to `''`.  No truthy-empty-object dependency exists. */
   getTypeFromGestalt(gestalt?: string): string {
     if (!gestalt) return '';
     return this.typeRegistry[gestalt]?.game_type ?? '';
@@ -310,7 +314,7 @@ export class GameRoot extends GameNode {
 
   /** Hardcoded `'city002'` lookup is preserved from legacy.  Suspected
    *  copy-paste latent bug — should probably read `origintokengestalt`'s
-   *  origin link.  Filed for follow-up. */
+   *  origin link.  Tracked in issue #203. */
   getOriginGestaltFromOriginTokenGestalt(_origintokengestalt: string): string | undefined {
     const origin = Object.values(this.DBOriginTokens).find(
       (ot) => ot.originGameNode?.gestalt === 'city002'
