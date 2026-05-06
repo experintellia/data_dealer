@@ -53,12 +53,39 @@ interface OriginToken {
   cityMaxAmount: number | undefined;
 }
 
-/** Minimal Render surface needed by the lifecycle methods extracted in
- *  this PR.  Collapses when Render.js is typed (later in #147). */
+/** Minimal Render surface used by GameRoot's lifecycle, camera/zoom,
+ *  and `setSize` methods.  Collapses when Render.js is typed (later
+ *  in #147). */
 interface RenderRootLike {
   lock?(): void;
   unlock?(): void;
-  jdomelem?: { find(sel: string): { off(ev?: string): void } };
+  width?: number;
+  height?: number;
+  jdomelem?: {
+    find?(sel: string): { off(ev?: string): void };
+    outerHeight?(): number;
+  };
+  setSize?(opts: { width?: number; height?: number }): void;
+  render?(): void;
+}
+
+/** ViewMap render-node surface needed by `_centerActiveView` /
+ *  `resetZoom` / `fitToWindow`.  Each ViewMap (Imperium, Database)
+ *  owns a `scroller` and a `parentNode` (the viewport wrapper). */
+interface ViewMapRenderLike extends RenderRootLike {
+  scroller?: {
+    scrollTo(x: number, y: number, animate?: boolean | unknown, zoom?: number): void;
+  };
+  updateScroller?(): void;
+  parentNode?: { width?: number; height?: number };
+  getPosition?(): { x: number; y: number };
+}
+
+/** A "View" GameNode (Imperium / Database) — owns a ViewMap-shaped
+ *  render node.  Forward-ref shape; collapses when the View
+ *  hierarchy is typed. */
+interface ViewLike {
+  renderNode?: ViewMapRenderLike;
 }
 
 interface AniTickerLike {
@@ -114,7 +141,13 @@ export class GameRoot extends GameNode {
   ap_value = 0;
   karma_value = 0;
   xp_level: { number: number; [key: string]: unknown } = { number: 0 };
-  data: { status_icons?: unknown; [key: string]: unknown } = {};
+  data: {
+    status_icons?: unknown;
+    status_bar?: { gameNode?: GameNode; [key: string]: unknown };
+    width?: number;
+    height?: number;
+    [key: string]: unknown;
+  } = {};
   override renderNode?: NonNullable<GameNode['renderNode']> & RenderRootLike;
   // `renderMenu` widens GameNode's typed declaration to also expose the
   // RenderRoot lock/unlock surface the lifecycle methods touch.
@@ -122,6 +155,19 @@ export class GameRoot extends GameNode {
     RenderRootLike & {
       addButton?(label: string, id: string, states: unknown): void;
     };
+  override renderStatusbar?: NonNullable<GameNode['renderStatusbar']> & RenderRootLike;
+  /** Active ViewMap (Imperium or Database).  Set by switch_view; read
+   *  by the camera/zoom helpers and by `fitToWindow` / `setSize`. */
+  activeView?: ViewLike;
+  /** Debounce handle for `_centerActiveView` (50ms).  `_cancelPending-
+   *  Center` clears it so explicit camera moves aren't clobbered. */
+  _centerActiveViewTimer?: ReturnType<typeof setTimeout> | null;
+
+  // View-getter mixins still live in Game.js (migrate in a follow-up
+  // PR).  Declared as optional methods so the camera/zoom helpers can
+  // call them through the typed GameRoot reference.
+  getImperium?(): ViewLike | undefined;
+  getDatabase?(): GameNode & { renderDBQueue?: { render?(): void } };
   notificationPopup?: NonNullable<GameNode['renderPopup']> & {
     render?(): void;
     notificationMission?: string | null;
@@ -372,6 +418,132 @@ export class GameRoot extends GameNode {
       this.renderMenu?.unlock?.();
       _aniTicker?.start();
     }
+  }
+
+  // -------------------------------------------------------------------
+  // Camera / zoom (extracted in PR 20 of issue #147)
+  // -------------------------------------------------------------------
+
+  /** The active ViewMap for camera math — `activeView` if set,
+   *  otherwise Imperium.  `getImperium` lives on the not-yet-extracted
+   *  Game.js side; the optional-chain handles the load-order window
+   *  before `loadGame` runs.  Returns `undefined` when no view is
+   *  available. */
+  private _resolveActiveViewMap(): ViewMapRenderLike | undefined {
+    const view = this.activeView ?? this.getImperium?.();
+    return view?.renderNode;
+  }
+
+  /** Cancel any debounced `_centerActiveView` so an explicit camera
+   *  move (reset-zoom, tutorial scrollTo) isn't clobbered ~50ms
+   *  later. */
+  _cancelPendingCenter(): void {
+    if (this._centerActiveViewTimer) clearTimeout(this._centerActiveViewTimer);
+    this._centerActiveViewTimer = null;
+  }
+
+  /** The fullscreen button resets zoom AND re-centers on the ViewMap's
+   *  design home point — for Imperium that's where the seed places
+   *  the Database (≈1024,800).  No-op if no ViewMap is active. */
+  resetZoom(): void {
+    const vm = this._resolveActiveViewMap();
+    if (!vm?.scroller || typeof vm.scroller.scrollTo !== 'function') return;
+    vm.updateScroller?.();
+    const vp = vm.parentNode;
+    if (!vp) return;
+    this._cancelPendingCenter();
+    // Combined zoom+scroll in one __publish so the tween goes
+    // (current zoom, current scroll) → (1.0, centered) instead of
+    // two animations fighting each other.
+    const sx = Math.max(0, (vm.width ?? 0) / 2 - (vp.width ?? 0) / 2);
+    const sy = Math.max(0, (vm.height ?? 0) / 2 - (vp.height ?? 0) / 2);
+    vm.scroller.scrollTo(sx, sy, true, 1);
+  }
+
+  /** Re-centers the active ViewMap on its design home point.
+   *  Debounced so rapid callers during initial mount (`fitToWindow`
+   *  → `after_render` → tutorial `switch_view`) collapse into one
+   *  scroll. */
+  _centerActiveView(animate: boolean): void {
+    this._cancelPendingCenter();
+    this._centerActiveViewTimer = setTimeout(() => {
+      this._centerActiveViewTimer = null;
+      const view = this.activeView ?? this.getImperium?.();
+      const vm = view?.renderNode;
+      if (!vm?.scroller || !vm.parentNode) return;
+      const vw = vm.parentNode.width ?? 0;
+      const vh = vm.parentNode.height ?? 0;
+      const maxX = Math.max(0, (vm.width ?? 0) - vw);
+      const maxY = Math.max(0, (vm.height ?? 0) - vh);
+
+      // Imperium centres on the DatabasePerp (visual focal point);
+      // its rendered position is offset from vm.width/2 once the
+      // type_data anchor is applied, enough to be visibly off-centre
+      // on a phone viewport.  Other views fall back to geometric
+      // centre.
+      let homeX = (vm.width ?? 0) / 2;
+      let homeY = (vm.height ?? 0) / 2;
+      if (this.getImperium && view === this.getImperium()) {
+        const db = getByType('DatabasePerp')[0];
+        const dbPos = (db?.renderNode as ViewMapRenderLike | undefined)?.getPosition?.();
+        if (dbPos) {
+          homeX = dbPos.x;
+          homeY = dbPos.y;
+        }
+      }
+
+      const sx = Math.max(0, Math.min(maxX, homeX - vw / 2));
+      const sy = Math.max(0, Math.min(maxY, homeY - vh / 2));
+      vm.scroller.scrollTo(sx, sy, animate);
+    }, 50);
+  }
+
+  /** Size the renderable area to the current viewport.  Called on
+   *  initial load and on window resize so the game fills the available
+   *  space by default rather than sitting in a 960×600 letterbox. */
+  fitToWindow(): void {
+    // The MainMenu is a sibling of the Stage in #GameContainer (not
+    // a child), so its height eats into the available viewport —
+    // without subtracting it the Stage pushes the page past the
+    // bottom edge.
+    const menuH = this.renderMenu?.jdomelem?.outerHeight?.() ?? 0;
+    const $ = globalThis.$;
+    if (!$) return;
+    const win = $(window);
+    this.setSize(
+      (win as unknown as { width(): number }).width(),
+      (win as unknown as { height(): number }).height() - menuH
+    );
+    // Refresh the scroller's viewport dimensions so the new stage
+    // size is reflected in clamping/zoom math.  Without this,
+    // scrollTo and the +/- zoom buttons clamp against the previous
+    // viewport.
+    const vm = this._resolveActiveViewMap();
+    vm?.updateScroller?.();
+    this._centerActiveView(false);
+  }
+
+  setSize(width: number, height: number): void {
+    const rn = this.renderNode;
+    if (!rn) return;
+    const imperium = this.getImperium?.();
+    const imperiumRn = imperium?.renderNode as ViewMapRenderLike | undefined;
+    const maxwidth = imperiumRn?.width ?? width;
+    const maxheight = imperiumRn?.height ?? height;
+    const minwidth = this.data.width ?? 0;
+    const minheight = this.data.height ?? 0;
+
+    let w = width || rn.width || 0;
+    let h = height || rn.height || 0;
+    w = Math.min(maxwidth, Math.max(minwidth, w));
+    h = Math.min(maxheight, Math.max(minheight, h));
+
+    rn.setSize?.({ width: w, height: h });
+    this.renderMenu?.setSize?.({ width: w });
+    this.renderStatusbar?.render?.();
+    const dbQueue = (this.getDatabase?.() as { renderDBQueue?: { render?(): void } } | undefined)
+      ?.renderDBQueue;
+    dbQueue?.render?.();
   }
 
   // -------------------------------------------------------------------
