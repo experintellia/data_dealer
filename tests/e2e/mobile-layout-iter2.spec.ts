@@ -5,8 +5,9 @@
  *     tapped (the original star bar in the in-stage Statusbar is hidden
  *     on mobile, so the menu copy is the only entry point)
  *   - the username label sits above the XP bar
- *   - statusbar items (Profiles/Cash/AP/Karma) sit on a single row
- *     within the viewport, no horizontal clipping
+ *   - statusbar items (Profiles/Cash/AP/Karma) sit in a 2×2 grid
+ *     (Profiles | Cash on row 1, AP | Karma on row 2) within the
+ *     viewport, no horizontal clipping
  */
 
 import { expect, test } from '@playwright/test';
@@ -91,7 +92,7 @@ test('iter2: username label sits above the cloned XP bar', async ({ page }) => {
   expect(layout.nameFont).toBeLessThanOrEqual(14);
 });
 
-test('iter2: 4 statusbar items fit on a single row inside the viewport', async ({ page }) => {
+test('iter2: 4 statusbar items form a 2×2 grid inside the viewport', async ({ page }) => {
   await page.goto('/?devtools=1');
   await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
     timeout: 50_000,
@@ -101,11 +102,21 @@ test('iter2: 4 statusbar items fit on a single row inside the viewport', async (
     const items = Array.from(
       document.querySelectorAll<HTMLElement>('.Statusbar .StatusItem:not([data-status-id="XP"])')
     );
-    const tops = items.map((e) => Math.round(e.getBoundingClientRect().top));
-    const rights = items.map((e) => e.getBoundingClientRect().right);
+    // Bucket tops/lefts into 4-px bands so sub-pixel rounding doesn't
+    // split a row/column into two.
+    const bucket = (xs: number[]) => {
+      const bands: number[] = [];
+      for (const x of xs) {
+        if (!bands.some((b) => Math.abs(b - x) <= 4)) bands.push(x);
+      }
+      return bands.length;
+    };
+    const tops = items.map((e) => e.getBoundingClientRect().top);
     const lefts = items.map((e) => e.getBoundingClientRect().left);
+    const rights = items.map((e) => e.getBoundingClientRect().right);
     return {
-      uniqueRows: Array.from(new Set(tops)).length,
+      uniqueRows: bucket(tops),
+      uniqueCols: bucket(lefts),
       itemCount: items.length,
       maxRight: Math.max(...rights),
       minLeft: Math.min(...lefts),
@@ -113,7 +124,8 @@ test('iter2: 4 statusbar items fit on a single row inside the viewport', async (
     };
   });
   expect(layout.itemCount).toBe(4);
-  expect(layout.uniqueRows, 'status items wrap to 2 rows').toBe(1);
+  expect(layout.uniqueRows, 'status items span 2 rows').toBe(2);
+  expect(layout.uniqueCols, 'status items span 2 columns').toBe(2);
   expect(layout.maxRight).toBeLessThanOrEqual(layout.vw + 1);
   expect(layout.minLeft).toBeGreaterThanOrEqual(-1);
 });
