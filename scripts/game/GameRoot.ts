@@ -1069,6 +1069,10 @@ export class GameRoot extends GameNode {
     this.data.providedKarma = [];
     this.getTypes('Karmalauter').forEach((v) => {
       const td = (v.type_data ?? {}) as ProvidedKarmaRow['data'];
+      // Mutates the shared typeRegistry entry through `v.type_data`'s
+      // reference — idempotent (same value every call); legacy
+      // preserved the side effect.  See the popup_karma.html template
+      // which reads `slot_background` off each row's `data`.
       td.slot_background = this.data.slot_background;
       const row: ProvidedKarmaRow = {
         gestalt: v.gestalt ?? '',
