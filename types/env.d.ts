@@ -37,6 +37,7 @@ export interface UnderscoreStatic {
   template(text: string, data: unknown, settings: { variable: string }): (data?: unknown) => string;
   mixin(mixins: Record<string, unknown>): void;
   sprintf(template: string, ...subs: unknown[]): string;
+  span(text: string, cls?: string): string;
   toKSNum(n: number): string;
   numeral(n: number): { format(fmt: string): string };
   pad0(n: number, length: number): string;
