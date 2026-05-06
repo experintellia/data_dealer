@@ -1060,7 +1060,6 @@
   overflow: hidden;
   height: 34px;
   white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .MissionGoal.small .MissionGoalSprite {
@@ -3411,7 +3410,7 @@ button {
     flex-basis: 100%;
   }
   .MissionGoal.small {
-    width: calc(50% - 6px);
+    width: 100%;
     box-sizing: border-box;
     margin: 0;
   }
