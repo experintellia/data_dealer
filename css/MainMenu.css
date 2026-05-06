@@ -283,9 +283,17 @@
 }
 
 @media (max-width: 380px) {
+  .MainMenu, .mm-tabs {
+    border-bottom: none;
+  }
+  .mm-tabs {
+    margin-top: 4px;
+    padding: 0 4px;
+  }
   .mm-tabs .mm-tab {
     font-size: 13px;
     line-height: 20px;
     padding: 4px 2px;
+    min-height: unset;
   }
 }
