@@ -211,27 +211,27 @@ export class GameRoot extends GameNode {
     return this.typeRegistry[gestalt]?.game_type ?? '';
   }
 
+  /** Predicate shared by `getParentType` / `getParentTypeData` /
+   *  `getParentTypes`: a typeRegistry entry whose `provided_perps` list
+   *  contains `gestalt`. */
+  private _providesGestalt(t: TypeEntry, gestalt: string): boolean {
+    const provided = (t.type_data as { provided_perps?: string[] } | undefined)?.provided_perps;
+    return !!provided?.includes(gestalt);
+  }
+
   getParentTypes(gestalt: string): TypeEntry[] {
-    return Object.values(this.typeRegistry).filter((t) => {
-      const provided = (t.type_data as { provided_perps?: string[] } | undefined)?.provided_perps;
-      return provided?.includes(gestalt);
-    });
+    return Object.values(this.typeRegistry).filter((t) => this._providesGestalt(t, gestalt));
   }
 
   getParentTypeData(gestalt: string): Record<string, unknown> {
-    const type = Object.values(this.typeRegistry).find((t) => {
-      const provided = (t.type_data as { provided_perps?: string[] } | undefined)?.provided_perps;
-      return provided?.includes(gestalt);
-    });
-    return type?.type_data ?? {};
+    return (
+      Object.values(this.typeRegistry).find((t) => this._providesGestalt(t, gestalt))?.type_data ??
+      {}
+    );
   }
 
   getParentType(gestalt: string): TypeEntry {
-    const type = Object.values(this.typeRegistry).find((t) => {
-      const provided = (t.type_data as { provided_perps?: string[] } | undefined)?.provided_perps;
-      return provided?.includes(gestalt);
-    });
-    return type ?? {};
+    return Object.values(this.typeRegistry).find((t) => this._providesGestalt(t, gestalt)) ?? {};
   }
 
   // -------------------------------------------------------------------
@@ -268,15 +268,9 @@ export class GameRoot extends GameNode {
    *  textbook average).  `gestalt` is unused — preserved as a parameter
    *  for callsite compat. */
   getDBTokensCrossSum(_gestalt?: string): number {
-    let sum = 0;
-    let count = 1;
-    for (const k in this.DBTokens) {
-      if (Object.prototype.hasOwnProperty.call(this.DBTokens, k)) {
-        sum += this.DBTokens[k] ?? 0;
-        count += 1;
-      }
-    }
-    return sum / count;
+    const values = Object.values(this.DBTokens);
+    const sum = values.reduce((memo, v) => memo + (v ?? 0), 0);
+    return sum / (values.length + 1);
   }
 
   compileOriginTokens(
@@ -384,6 +378,19 @@ export class GameRoot extends GameNode {
   // ProjectPerp powerup fetch (used by ProjectPerp.fetchPowerups)
   // -------------------------------------------------------------------
 
+  /** Register every entry in `data.result` as a subtype under
+   *  `project_gestalt`.  Shared by the two `getPowerups` `.done`
+   *  branches in `fetchProjectPowerupData`. */
+  private _registerPowerups(
+    data: { result?: Record<string, TypeEntry> },
+    project_gestalt: string
+  ): void {
+    Object.values(data.result ?? {}).forEach((v) => {
+      const sub = v.game_gestalt as string | undefined;
+      if (sub) this.addSubType(project_gestalt, sub, v);
+    });
+  }
+
   fetchProjectPowerupData(project_gestalt: string, cb?: () => void): void {
     const gnode = getByGestalt(project_gestalt);
     const remote = appModule.getApplication().remote as {
@@ -405,10 +412,7 @@ export class GameRoot extends GameNode {
 
     if (gnode && !dataNode?.powerupsCached) {
       fn(project_gestalt, app.version).done((data) => {
-        Object.values(data.result ?? {}).forEach((v) => {
-          const sub = v.game_gestalt as string | undefined;
-          if (sub) this.addSubType(project_gestalt, sub, v);
-        });
+        this._registerPowerups(data, project_gestalt);
         if (popup?.templateData) popup.templateData.cached = true;
         if (dataNode) dataNode.powerupsCached = true;
         cb?.();
@@ -418,10 +422,7 @@ export class GameRoot extends GameNode {
       cb?.();
     } else {
       fn(project_gestalt, app.version).done((data) => {
-        Object.values(data.result ?? {}).forEach((v) => {
-          const sub = v.game_gestalt as string | undefined;
-          if (sub) this.addSubType(project_gestalt, sub, v);
-        });
+        this._registerPowerups(data, project_gestalt);
         cb?.();
       });
     }
