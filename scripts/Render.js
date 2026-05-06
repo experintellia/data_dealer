@@ -2037,6 +2037,10 @@ var Render = function () {
     config = config || {};
     var node = this.gameNode.GameRoot.renderNode;
     var nodePos = this.gameNode.GameRoot.renderStatusbar.getTopLeftPosition();
+    // Statusbar.css pins the bar to left:0/width:100%, but
+    // getTopLeftPosition() still returns stage.width/2 - 360 from the
+    // 720 px design — negative on narrower viewports.
+    nodePos.x = Math.max(8, nodePos.x);
     config.wait = config.wait || 0;
     if (!node.renderBlings) {
       node.renderBlings = {};
