@@ -1,12 +1,23 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Some fixtures that are currently not handled or provided by dd_cms.
-// Underscore is read from globalThis (set by vendor/underscore.js) at
-// call time; getTypeSettings() is invoked after app.start() has run
-// _.mixin({_: i18n.gettext}), so `_._('msgid')` resolves correctly.
+// File converted from type_settings.js in PR 28 of issue #147; the
+// `@ts-nocheck` quarantine is dropped and the legacy `_._('msgid')`
+// underscore-mixin lookup is replaced with direct `i18n.gettext`
+// calls (the mixin was already pointed at `i18n.gettext` by app.ts).
 
-var typeSettings = function () {
-  var _ = globalThis._;
-  var type_settings = {
+import i18n from './i18n.js';
+
+/** Per-game-type fixture entry.  Loose `Record<string, unknown>`
+ *  shape — every value is consumed by the legacy Render / Game
+ *  layer through dynamic field reads, so a tighter shape would
+ *  add casts everywhere without buying anything. */
+interface TypeSettingsEntry {
+  type_data?: Record<string, unknown>;
+  game_type?: string;
+  [key: string]: unknown;
+}
+
+const typeSettings = (): Record<string, TypeSettingsEntry> => {
+  const type_settings: Record<string, TypeSettingsEntry> = {
     GameRoot: {
       type_data: {
         id: 'Game',
@@ -261,13 +272,13 @@ var typeSettings = function () {
     Mission: {
       type_data: {
         goals_texts: {
-          buy_perp: _._('goal Buy Perp %s'),
-          buy_powerup: _._('goal Buy %s in Project %s'),
-          charge_perp: _._('goal Charge Perp %s'),
-          collect_cash: _._('goal Collect $%s from %s'),
-          collect_profiles: _._('goal Collect %s Profiles from %s'),
-          integrate_profiles: _._('goal Integrate %s x %s'),
-          upgrade_token: _._('goal Upgrade %s'),
+          buy_perp: i18n.gettext('goal Buy Perp %s'),
+          buy_powerup: i18n.gettext('goal Buy %s in Project %s'),
+          charge_perp: i18n.gettext('goal Charge Perp %s'),
+          collect_cash: i18n.gettext('goal Collect $%s from %s'),
+          collect_profiles: i18n.gettext('goal Collect %s Profiles from %s'),
+          integrate_profiles: i18n.gettext('goal Integrate %s x %s'),
+          upgrade_token: i18n.gettext('goal Upgrade %s'),
         },
         popup_sprite: {
           frameSrc: 'MainSprites.png',
@@ -281,10 +292,10 @@ var typeSettings = function () {
     Topscore: {
       type_data: {
         type_headlines: {
-          cash: _._('topscore cash headline'),
-          profiles: _._('topscore profiles headline'),
-          xp: _._('topscore xp headline'),
-          spent: _._('topscore spent headline'),
+          cash: i18n.gettext('topscore cash headline'),
+          profiles: i18n.gettext('topscore profiles headline'),
+          xp: i18n.gettext('topscore xp headline'),
+          spent: i18n.gettext('topscore spent headline'),
         },
       },
     },
@@ -292,22 +303,22 @@ var typeSettings = function () {
       type_data: {
         RenderTemplate: 'topscores.html',
         type_titles: {
-          cash: _._('topscore Cash'),
-          profiles: _._('topscore Profiles'),
-          xp: _._('topscore XP'),
-          spent: _._('topscore Investor'),
+          cash: i18n.gettext('topscore Cash'),
+          profiles: i18n.gettext('topscore Profiles'),
+          xp: i18n.gettext('topscore XP'),
+          spent: i18n.gettext('topscore Investor'),
         },
       },
     },
 
     Karmalauter: {
       type_data: {
-        buy_button_text: _._('karma_buy Do it!'),
+        buy_button_text: i18n.gettext('karma_buy Do it!'),
       },
     },
     DatabasePerp: {
       type_data: {
-        label: _._('Database'),
+        label: i18n.gettext('Database'),
         perp_background: {
           frameMap: {
             active: {
@@ -359,9 +370,9 @@ var typeSettings = function () {
     },
     UpgradePowerup: {
       type_data: {
-        mgoal_text: _._('goal_upgrade %s in project %s'),
-        ntitle: _._('New Upgrade!'),
-        ntext: _._('ntext_upgrade Upgrade is now available in projects: %s'),
+        mgoal_text: i18n.gettext('goal_upgrade %s in project %s'),
+        ntitle: i18n.gettext('New Upgrade!'),
+        ntext: i18n.gettext('ntext_upgrade Upgrade is now available in projects: %s'),
         slot_background: {
           frameMap: {
             free: {
@@ -403,10 +414,10 @@ var typeSettings = function () {
     },
     AdPowerup: {
       type_data: {
-        mgoal_text: _._('goal_ad %s in project %s'),
-        ntitle: _._('New Ad!'),
-        ntext: _._('ntext_ad Ad is now available in projects: %s'),
-        ntext_server: _._('ntext_server Ad is now available in projects: %s'),
+        mgoal_text: i18n.gettext('goal_ad %s in project %s'),
+        ntitle: i18n.gettext('New Ad!'),
+        ntext: i18n.gettext('ntext_ad Ad is now available in projects: %s'),
+        ntext_server: i18n.gettext('ntext_server Ad is now available in projects: %s'),
         slot_background: {
           frameMap: {
             free: {
@@ -440,9 +451,9 @@ var typeSettings = function () {
     },
     TeamMemberPowerup: {
       type_data: {
-        mgoal_text: _._('goal_teammember %s in project %s'),
-        ntitle: _._('New Teammember!'),
-        ntext: _._('ntext_teammember teammember is now available in projects: %s'),
+        mgoal_text: i18n.gettext('goal_teammember %s in project %s'),
+        ntitle: i18n.gettext('New Teammember!'),
+        ntext: i18n.gettext('ntext_teammember teammember is now available in projects: %s'),
         slot_background: {
           frameMap: {
             free: {
@@ -487,12 +498,12 @@ var typeSettings = function () {
     },
     AgentPerp: {
       type_data: {
-        mgoal_text: _._('goal_agent %s'),
-        ntitle: _._('New Agent!'),
-        ntext: _._('ntext_agent click on %s'),
-        buy_button_text: _._('agent buy_button'),
-        provided_perps_text: _._('contact_buy Knows %s contacts'),
-        provided_perps_button_text: _._('pusher buy_contact_button'),
+        mgoal_text: i18n.gettext('goal_agent %s'),
+        ntitle: i18n.gettext('New Agent!'),
+        ntext: i18n.gettext('ntext_agent click on %s'),
+        buy_button_text: i18n.gettext('agent buy_button'),
+        provided_perps_text: i18n.gettext('contact_buy Knows %s contacts'),
+        provided_perps_button_text: i18n.gettext('pusher buy_contact_button'),
         perp_background: {
           frameMap: {
             active: {
@@ -534,12 +545,12 @@ var typeSettings = function () {
     },
     ContactPerp: {
       type_data: {
-        mgoal_text: _._('goal_contact %s'),
-        mgoal_text_charge_perp: _._('goal_contact Charge %s'),
-        ntitle: _._('New Contact!'),
-        ntext: _._('ntext_contact click on %s'),
-        button_text: _._('contact Make a Deal'),
-        buy_button_text: _._('contact buy_button'),
+        mgoal_text: i18n.gettext('goal_contact %s'),
+        mgoal_text_charge_perp: i18n.gettext('goal_contact Charge %s'),
+        ntitle: i18n.gettext('New Contact!'),
+        ntext: i18n.gettext('ntext_contact click on %s'),
+        button_text: i18n.gettext('contact Make a Deal'),
+        buy_button_text: i18n.gettext('contact buy_button'),
         perp_background: {
           frameMap: {
             active: {
@@ -581,11 +592,11 @@ var typeSettings = function () {
     },
     PusherPerp: {
       type_data: {
-        mgoal_text: _._('goal_pusher %s'),
-        ntitle: _._('New Pusher!'),
-        ntext: _._('ntext_pusher click on %s'),
-        provided_perps_text: _._('pusher_buy Knows %s clients'),
-        buy_button_text: _._('pusher buy_button'),
+        mgoal_text: i18n.gettext('goal_pusher %s'),
+        ntitle: i18n.gettext('New Pusher!'),
+        ntext: i18n.gettext('ntext_pusher click on %s'),
+        provided_perps_text: i18n.gettext('pusher_buy Knows %s clients'),
+        buy_button_text: i18n.gettext('pusher buy_button'),
         perp_background: {
           frameMap: {
             active: {
@@ -627,12 +638,12 @@ var typeSettings = function () {
     },
     ClientPerp: {
       type_data: {
-        mgoal_text: _._('goal_client %s'),
-        mgoal_text_charge_perp: _._('goal_client Charge %s'),
-        ntitle: _._('New Client!'),
-        ntext: _._('ntext_client click on %s'),
-        button_text: _._('client Make a Deal'),
-        buy_button_text: _._('client buy_button'),
+        mgoal_text: i18n.gettext('goal_client %s'),
+        mgoal_text_charge_perp: i18n.gettext('goal_client Charge %s'),
+        ntitle: i18n.gettext('New Client!'),
+        ntext: i18n.gettext('ntext_client click on %s'),
+        button_text: i18n.gettext('client Make a Deal'),
+        buy_button_text: i18n.gettext('client buy_button'),
         perp_background: {
           frameMap: {
             active: {
@@ -674,10 +685,10 @@ var typeSettings = function () {
     },
     ProxyPerp: {
       type_data: {
-        mgoal_text: _._('goal_proxy'),
-        ntitle: _._('New Proxy!'),
-        ntext: _._('ntext_proxy click on %s'),
-        buy_button_text: _._('proxy buy_button'),
+        mgoal_text: i18n.gettext('goal_proxy'),
+        ntitle: i18n.gettext('New Proxy!'),
+        ntext: i18n.gettext('ntext_proxy click on %s'),
+        buy_button_text: i18n.gettext('proxy buy_button'),
         perp_background: {
           frameMap: {
             active: {
@@ -719,10 +730,10 @@ var typeSettings = function () {
     },
     CityPerp: {
       type_data: {
-        mgoal_text: _._('goal_city %s'),
-        ntitle: _._('New City!'),
-        ntext: _._('ntext_city click on'),
-        buy_button_text: _._('city buy_button'),
+        mgoal_text: i18n.gettext('goal_city %s'),
+        ntitle: i18n.gettext('New City!'),
+        ntext: i18n.gettext('ntext_city click on'),
+        buy_button_text: i18n.gettext('city buy_button'),
         perp_background: {
           frameMap: {
             active: {
@@ -764,12 +775,12 @@ var typeSettings = function () {
     },
     TokenPerp: {
       type_data: {
-        mgoal_text: _._('goal_token %s'),
-        mgoal_text_charge_perp: _._('goal_token Charge %s'),
-        mgoal_text_collect_perp: _._('goal_token Integrate %s'),
-        ntitle: _._('New Token!'),
-        ntext: _._('ntext_token click on upgrade in the database to get %s'),
-        buy_button_text: _._('token buy_button'),
+        mgoal_text: i18n.gettext('goal_token %s'),
+        mgoal_text_charge_perp: i18n.gettext('goal_token Charge %s'),
+        mgoal_text_collect_perp: i18n.gettext('goal_token Integrate %s'),
+        ntitle: i18n.gettext('New Token!'),
+        ntext: i18n.gettext('ntext_token click on upgrade in the database to get %s'),
+        buy_button_text: i18n.gettext('token buy_button'),
         perp_background: {
           frameMap: {
             active: {
@@ -856,52 +867,52 @@ var typeSettings = function () {
     },
     ProjectPerp: {
       type_data: {
-        mgoal_text: _._('goal_project %s'),
-        mgoal_text_charge_perp: _._('goal_project Charge %s'),
-        ntitle: _._('New Project!'),
-        ntext: _._('ntext_project click on %s'),
-        button_text: _._('project Invest'),
-        buy_button_text: _._('project buy_button'),
-        upgrade_tab_text: _._('upgrade_tab text'),
-        ad_tab_text: _._('ad_tab text'),
-        server_tab_text: _._('server_tab text'),
-        teammember_tab_text: _._('teammember_tab text'),
+        mgoal_text: i18n.gettext('goal_project %s'),
+        mgoal_text_charge_perp: i18n.gettext('goal_project Charge %s'),
+        ntitle: i18n.gettext('New Project!'),
+        ntext: i18n.gettext('ntext_project click on %s'),
+        button_text: i18n.gettext('project Invest'),
+        buy_button_text: i18n.gettext('project buy_button'),
+        upgrade_tab_text: i18n.gettext('upgrade_tab text'),
+        ad_tab_text: i18n.gettext('ad_tab text'),
+        server_tab_text: i18n.gettext('server_tab text'),
+        teammember_tab_text: i18n.gettext('teammember_tab text'),
         powerup_slot_texts: {
           upgrade: {
-            button_text: _._('upgrade buy_button'),
-            empty_slot_label: _._('upgrade empty_slot'),
-            add_slots_label: _._('upgrade add_slots label'),
-            title: _._('upgrade_slotbuy title'),
-            subtitle: _._('upgrade_slotbuy subtitle'),
-            description: _._('upgrade_slotbuy description'),
-            slot_button_text: _._('upgrade_slotbuy buttontext'),
+            button_text: i18n.gettext('upgrade buy_button'),
+            empty_slot_label: i18n.gettext('upgrade empty_slot'),
+            add_slots_label: i18n.gettext('upgrade add_slots label'),
+            title: i18n.gettext('upgrade_slotbuy title'),
+            subtitle: i18n.gettext('upgrade_slotbuy subtitle'),
+            description: i18n.gettext('upgrade_slotbuy description'),
+            slot_button_text: i18n.gettext('upgrade_slotbuy buttontext'),
           },
           ad: {
-            button_text: _._('ad buy_button'),
-            empty_slot_label: _._('ad empty_slot'),
-            add_slots_label: _._('ad add_slots label'),
-            title: _._('ad_slotbuy title'),
-            subtitle: _._('ad_slotbuy subtitle'),
-            description: _._('ad_slotbuy description'),
-            slot_button_text: _._('ad_slotbuy buttontext'),
+            button_text: i18n.gettext('ad buy_button'),
+            empty_slot_label: i18n.gettext('ad empty_slot'),
+            add_slots_label: i18n.gettext('ad add_slots label'),
+            title: i18n.gettext('ad_slotbuy title'),
+            subtitle: i18n.gettext('ad_slotbuy subtitle'),
+            description: i18n.gettext('ad_slotbuy description'),
+            slot_button_text: i18n.gettext('ad_slotbuy buttontext'),
           },
           server: {
-            button_text: _._('server buy_button'),
-            empty_slot_label: _._('server empty_slot'),
-            add_slots_label: _._('server add_slots label'),
-            title: _._('server_slotbuy title'),
-            subtitle: _._('server_slotbuy subtitle'),
-            description: _._('server_slotbuy description'),
-            slot_button_text: _._('server_slotbuy buttontext'),
+            button_text: i18n.gettext('server buy_button'),
+            empty_slot_label: i18n.gettext('server empty_slot'),
+            add_slots_label: i18n.gettext('server add_slots label'),
+            title: i18n.gettext('server_slotbuy title'),
+            subtitle: i18n.gettext('server_slotbuy subtitle'),
+            description: i18n.gettext('server_slotbuy description'),
+            slot_button_text: i18n.gettext('server_slotbuy buttontext'),
           },
           teammember: {
-            button_text: _._('teammember buy_button'),
-            empty_slot_label: _._('teammember empty_slot'),
-            add_slots_label: _._('teammember add_slots label'),
-            title: _._('teammember_slotbuy title'),
-            subtitle: _._('teammember_slotbuy subtitle'),
-            description: _._('teammember_slotbuy description'),
-            slot_button_text: _._('teammember_slotbuy buttontext'),
+            button_text: i18n.gettext('teammember buy_button'),
+            empty_slot_label: i18n.gettext('teammember empty_slot'),
+            add_slots_label: i18n.gettext('teammember add_slots label'),
+            title: i18n.gettext('teammember_slotbuy title'),
+            subtitle: i18n.gettext('teammember_slotbuy subtitle'),
+            description: i18n.gettext('teammember_slotbuy description'),
+            slot_button_text: i18n.gettext('teammember_slotbuy buttontext'),
           },
         },
         perp_background: {
@@ -985,7 +996,7 @@ var typeSettings = function () {
   return type_settings;
 };
 
-export function getTypeSettings() {
+export function getTypeSettings(): Record<string, TypeSettingsEntry> {
   return typeSettings();
 }
 
