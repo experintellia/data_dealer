@@ -339,3 +339,29 @@
     order: 4;
   }
 }
+
+/* Mobile per-tab Statusbar trimming (≤ 926 px — same band that splits
+ * the header into two rows and moves the XP/level into `.mm-xp`).
+ *
+ * - Topscores / Missions: hide the entire in-stage Statusbar and reclaim
+ *   the 50 px top reservation `.ViewTab` carves out for it (otherwise
+ *   the tab content opens with an empty band).  Level stays visible via
+ *   the cloned `.mm-xp` bar in the menu header.
+ * - Database (a ViewMap, not a ViewTab — no padding to reclaim): hide
+ *   Cash and Karma only; Profiles and AP remain. */
+@media (max-width: 926px) {
+  .Stage.ActiveTopscores .Statusbar,
+  .Stage.ActiveMissions .Statusbar {
+    display: none !important;
+  }
+
+  .Stage.ActiveTopscores .ViewTab,
+  .Stage.ActiveMissions .ViewTab {
+    padding-top: 0;
+  }
+
+  .Stage.ActiveDatabase .Statusbar .StatusItem.Cash,
+  .Stage.ActiveDatabase .Statusbar .StatusItem.Karma {
+    display: none;
+  }
+}
