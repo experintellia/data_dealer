@@ -380,12 +380,7 @@
     row-gap: 14px;
   }
 
-  .Statusbar .StatusItem {
-    zoom: 1;
-  }
-
-  .Statusbar .StatusItem.Profiles { order: 1; }
-  .Statusbar .StatusItem.Karma    { order: 2; }
-  .Statusbar .StatusItem.Cash     { order: 3; }
-  .Statusbar .StatusItem.AP       { order: 4; }
+  .Statusbar .StatusItem.Karma { order: 2; }
+  .Statusbar .StatusItem.Cash  { order: 3; }
+  .Statusbar .StatusItem.AP    { order: 4; }
 }
