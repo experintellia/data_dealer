@@ -22,6 +22,9 @@ import appModule from '../app.js';
 import i18n from '../i18n.js';
 import setup from '../setup.js';
 import { getTypeSettings } from '../type_settings.js';
+import utilDefault from '../util.js';
+import webxdcIdentity from '../webxdc-identity.js';
+import { Database } from './Database.js';
 import {
   GameNode,
   type GameNodeConfig,
@@ -30,11 +33,22 @@ import {
   eachByGestalt,
   get,
   getAllByGestalt,
+  getByFirstId,
   getByGestalt,
   getById,
+  getByLastId,
   getByType,
+  getFirstId,
+  getGestalt,
+  getParentFromPath,
 } from './GameNode.js';
+import { Imperium } from './Imperium.js';
+import { Mission } from './Mission.js';
+import { Missions } from './Missions.js';
+import { Topscore } from './Topscore.js';
+import { Topscores } from './Topscores.js';
 import { mergeData } from './mergeData.js';
+import { perpCtors } from './perpCtors.js';
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -129,6 +143,58 @@ interface RenderPopupLike {
   on(ev: string, handler: (...args: unknown[]) => void): void;
 }
 
+/** Render MainMenu instance — created in `extendRender`. */
+interface MainMenuLike extends RenderRootLike {
+  data?: { buttons?: Array<{ id: string }>; [key: string]: unknown };
+  domelem?: unknown;
+  initUI?(): void;
+  remove(): void;
+}
+
+/** Server-side bootstrap payload to `loadGame`.  Loose-shape — every
+ *  field is independently optional and the engine populates each
+ *  conditionally. */
+interface LoadGameData {
+  _id?: string;
+  user?: unknown;
+  type_registry?: Record<string, TypeEntry>;
+  type_data?: Record<string, unknown>;
+  nodes?: ServerNode[];
+  nodes_charging?: Array<{ path: string; charge_start: number }>;
+  nodes_collect?: Array<{ path: string }>;
+  Imperium?: {
+    game_id?: string;
+    full_path?: string;
+    type_data?: Record<string, unknown>;
+    instance_data?: Record<string, unknown>;
+  };
+  Database?: {
+    game_id?: string;
+    full_path?: string;
+    type_data?: Record<string, unknown>;
+    instance_data?: Record<string, unknown>;
+  };
+  db_queue?: Array<{ profile_set?: unknown; origin?: unknown; collect_id?: unknown }>;
+  karmalauters?: Record<string, TypeEntry>;
+  karmalizers?: Record<string, TypeEntry>;
+  is_new_game?: boolean;
+  locale_persisted?: boolean;
+  server_time?: { $date?: number };
+  version?: unknown;
+  game_values?: GameValuesPayload;
+  [key: string]: unknown;
+}
+
+interface ServerNode {
+  game_id?: string;
+  game_type?: string;
+  gestalt?: string;
+  full_path?: string;
+  full_type?: string;
+  instance_data?: Record<string, unknown> & { amount?: number };
+  type_data?: Record<string, unknown>;
+}
+
 interface AniTickerLike {
   start(): void;
   stop(): void;
@@ -192,16 +258,9 @@ interface GameValuesPayload {
   [key: string]: unknown;
 }
 
-/** Missions singleton API used by `updateGameValues` (the only
- *  caller).  Forward-ref; collapses when Missions itself extracts. */
-interface MissionsLike {
-  updateMissions(missions: unknown, gv: GameValuesPayload): void;
-  getMission(gestalt: string): {
-    data: Record<string, unknown>;
-    states: Record<string, boolean>;
-    [key: string]: unknown;
-  };
-}
+// Missions: imported as a real class above — fields/methods used by
+// `updateGameValues` (`updateMissions`), `makeNotifications`
+// (`getMission`), and `loadGame` (`initMissions`).
 
 /** Notification cue payload — what `cueNotification` queues and
  *  `openNotification` renders.  All fields are emergent from the
@@ -292,6 +351,73 @@ interface NewItemsLike {
   highlightTabs?: string[];
 }
 
+// File-local versions of the stopPropagation / preventDefault narrows
+// (the class-level protected statics on GameNode aren't reachable
+// from free functions in this module).
+function _stopPropFile(e: unknown): void {
+  const fn = (e as { stopPropagation?: () => void } | null | undefined)?.stopPropagation;
+  if (typeof fn === 'function') fn.call(e);
+}
+function _preventDefaultFile(e: unknown): void {
+  const fn = (e as { preventDefault?: () => void } | null | undefined)?.preventDefault;
+  if (typeof fn === 'function') fn.call(e);
+}
+
+/** First-boot / settings language picker overlay.  jQuery-driven DOM
+ *  injection; on locale-pick fires `app.remote.setLocale` and
+ *  reloads.  Used by `loadGame` (no-dismiss) and the `toggle_locale`
+ *  event handler (dismissable). */
+function _showLangPicker(canDismiss: boolean): void {
+  const $ = globalThis.$;
+  if (!$) return;
+  const $overlay = $(
+    '<div class="LangSelectOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;">' +
+      '<div class="LangPickerBox" style="background:#BFE7F5;border:3px solid #009FD9;border-radius:12px;padding:24px 32px;text-align:center;box-shadow:3px 3px 0px #009FD9,3px 3px 8px rgba(0,0,0,0.5);">' +
+      '<div style="font-family:Bowlby;color:#009FD9;font-size:20px;margin-bottom:16px;">Choose your language<br>Sprache wählen</div>' +
+      '<div style="display:flex;gap:16px;justify-content:center;">' +
+      '<div class="Button lang-pick" data-locale="en">🇺🇸🇬🇧🇦🇺 EN</div>' +
+      '<div class="Button lang-pick" data-locale="de">🇩🇪🇦🇹🇨🇭 DE</div>' +
+      '</div>' +
+      '</div>' +
+      '</div>'
+  ) as unknown as {
+    on(
+      ev: string,
+      sel: string | ((e: unknown) => void),
+      cb?: (this: unknown, e: unknown) => void
+    ): void;
+    find(sel: string): { addClass(c: string): void };
+    remove(): void;
+  };
+  $('body').append?.($overlay);
+  let picked = false;
+  $overlay.on('click touchend', '.lang-pick', function (this: unknown, e: unknown) {
+    _stopPropFile(e);
+    _preventDefaultFile(e);
+    if (picked) return;
+    picked = true;
+    const chosen = ($(this as object) as unknown as { data(k: string): string }).data('locale');
+    $overlay.find('.lang-pick').addClass('disabled');
+    const remote = appModule.getApplication().remote as {
+      setLocale?(locale: string): { done(cb: () => void): unknown };
+    };
+    remote.setLocale?.(chosen).done(() => location.reload());
+  });
+  if (canDismiss) {
+    $overlay.on('click touchend', (e: unknown) => {
+      const target = (e as { target?: object } | null | undefined)?.target;
+      if (!target) return;
+      const closest = (
+        $(target) as unknown as { closest(sel: string): { length: number } }
+      ).closest('.LangPickerBox');
+      if (!closest.length) {
+        _preventDefaultFile(e);
+        $overlay.remove();
+      }
+    });
+  }
+}
+
 let _aniTicker: AniTickerLike | null = null;
 /** Game.js injects the AniTicker singleton at IIFE-end via this setter
  *  (parallel to `setAniTicker` on GamePerp).  Disposable seam — retires
@@ -366,7 +492,7 @@ export class GameRoot extends GameNode {
   };
   /** Set by `loadGame` (still in Game.js) once the Missions singleton
    *  is constructed.  Forward-ref optional until Missions extracts. */
-  Missions?: MissionsLike;
+  Missions?: Missions;
   data: {
     status_icons?: unknown;
     status_bar?: StatusBarData;
@@ -393,14 +519,18 @@ export class GameRoot extends GameNode {
    *  Center` clears it so explicit camera moves aren't clobbered. */
   _centerActiveViewTimer?: ReturnType<typeof setTimeout> | null;
 
-  // View-getter mixins still live in Game.js (migrate in a follow-up
-  // PR).  Declared as optional methods so the camera/zoom helpers can
-  // call them through the typed GameRoot reference.
-  getImperium?(): ViewLike | undefined;
-  getDatabase?(): GameNode & {
-    renderDBQueue?: { render?(): void };
-    checkNotifications?(): void;
-  };
+  // View tabs — set by `loadGame`.  `getImperium` / `getDatabase`
+  // are wrapper accessors used elsewhere; declared as real methods
+  // below.
+  Imperium?: Imperium;
+  Database?: Database;
+  Topscores?: Topscores;
+  /** User profile data passed through to MainMenu render config. */
+  userdata?: unknown;
+  /** APTicker singleton handle — assigned by `loadGame` from the
+   *  Game.js-side seed (`setAPTickerForGameRoot`).  Read by Render.js
+   *  for the no_AP decorator's "more in" hint. */
+  APTicker?: APTickerLike;
 
   notificationPopup?: NonNullable<GameNode['renderPopup']> & {
     render?(): void;
@@ -664,8 +794,8 @@ export class GameRoot extends GameNode {
    *  before `loadGame` runs.  Returns `undefined` when no view is
    *  available. */
   private _resolveActiveViewMap(): ViewMapRenderLike | undefined {
-    const view = this.activeView ?? this.getImperium?.();
-    return view?.renderNode;
+    const view = this.activeView ?? this.getImperium();
+    return view?.renderNode as ViewMapRenderLike | undefined;
   }
 
   /** Cancel any debounced `_centerActiveView` so an explicit camera
@@ -705,8 +835,8 @@ export class GameRoot extends GameNode {
       // Inlined resolution (rather than `_resolveActiveViewMap()`)
       // because the Imperium home-point branch below needs the
       // `view` reference for `view === this.getImperium()` identity.
-      const view = this.activeView ?? this.getImperium?.();
-      const vm = view?.renderNode;
+      const view = this.activeView ?? this.getImperium();
+      const vm = view?.renderNode as ViewMapRenderLike | undefined;
       if (!vm?.scroller || !vm.parentNode) return;
       const vw = vm.parentNode.width ?? 0;
       const vh = vm.parentNode.height ?? 0;
@@ -763,7 +893,7 @@ export class GameRoot extends GameNode {
   setSize(width: number, height: number): void {
     const rn = this.renderNode;
     if (!rn) return;
-    const imperium = this.getImperium?.();
+    const imperium = this.getImperium();
     const imperiumRn = imperium?.renderNode as ViewMapRenderLike | undefined;
     const maxwidth = imperiumRn?.width ?? width;
     const maxheight = imperiumRn?.height ?? height;
@@ -908,7 +1038,9 @@ export class GameRoot extends GameNode {
   ): void {
     const gv = game_values;
     if (missions) {
-      this.Missions?.updateMissions(missions, game_values);
+      // Legacy passed `game_values` as the 2nd arg; the method
+      // signature only accepts one — preserved as a no-op drop.
+      this.Missions?.updateMissions(missions as Parameters<Missions['updateMissions']>[0]);
       // FIXME: TESTING when mission completed, do not yet update
       // game_values
     }
@@ -940,7 +1072,9 @@ export class GameRoot extends GameNode {
     }
     // levelup-only side effects.
     if (gv.ap_snapshot !== undefined && levelup === true && !silent) {
-      this.getDatabase?.().checkNotifications?.();
+      (
+        this.getDatabase() as (Database & { checkNotifications?(): void }) | undefined
+      )?.checkNotifications?.();
       this.makeNotifications({ levelup: this.xp_level.number });
     }
   }
@@ -1528,6 +1662,542 @@ export class GameRoot extends GameNode {
     });
     const head = this.NotificationQueue[0];
     if (head) this.openNotification(head);
+  }
+
+  // -------------------------------------------------------------------
+  // View getters, BuyPerp dispatch, render hooks, refresh, loadGame
+  // (extracted in PR 24 of issue #147 — final GameRoot migration)
+  // -------------------------------------------------------------------
+
+  /** FIXME: this is just a wrapper. */
+  getImperium(): Imperium | undefined {
+    return this.Imperium;
+  }
+
+  /** FIXME: this is just a wrapper. */
+  getDatabase(): Database | undefined {
+    return this.Database;
+  }
+
+  /** Dispatches a buy by gestalt to the appropriate handler.
+   *  CityPerp routes through DatabasePerp.BuyCity; Karmalauter goes
+   *  to BuyKarma; everything else is the unhandled-error fallback.
+   *  Note: legacy referenced an undeclared `data` var in the error
+   *  path — preserved as `undefined` here (the call would have
+   *  thrown ReferenceError at runtime, masking what was clearly a
+   *  copy-paste bug). */
+  BuyPerp(gestalt: string, placePos?: { x: number; y: number }): void {
+    const gtype = this.getTypeFromGestalt(gestalt);
+    if (gtype === 'CityPerp') {
+      const dbPerps = getByType('DatabasePerp');
+      const dbPerp = dbPerps[0] as
+        | (GameNode & { BuyCity?(g: string, p?: { x: number; y: number }): void })
+        | undefined;
+      if (!dbPerp) return;
+      dbPerp.BuyCity?.(gestalt, placePos);
+      return;
+    }
+    if (gtype === 'Karmalauter') {
+      this.BuyKarma(gestalt);
+      return;
+    }
+    // Legacy referenced an undeclared `data` var here — preserved
+    // as `undefined` (the call would have thrown ReferenceError at
+    // runtime, masking what was clearly a copy-paste bug).
+    this.Error('The computer says NOOOO', undefined);
+  }
+
+  /** Reload the game data and reinit the whole Game (like a page
+   *  reload).  On retry-failure, escalates the retry interval and
+   *  finally redirects to `/` if the cap is exceeded. */
+  refresh(): void {
+    this.retryDelay = this.retryDelay || 2000;
+    this.lock();
+
+    const app = appModule.getApplication() as {
+      remote: {
+        getSessionLocale?(): {
+          then(onResolved: (data: { result?: string }) => unknown): {
+            fail(cb: (data: unknown) => void): unknown;
+          };
+        };
+        loadGame?(): { then(cb: (data: { result?: LoadGameData }) => void): unknown };
+      };
+      version?: unknown;
+      renderView?(name: string): string;
+    };
+    const $ = globalThis.$;
+    if (!app.remote.getSessionLocale || !$) return;
+    const chain = app.remote.getSessionLocale().then((data) => {
+      const locale = data.result === 'de' ? 'de_AT' : 'en_US';
+      i18n.setLocale(locale);
+      const html = app.renderView?.('game.html') ?? '';
+      $('#dd-control').html(html);
+      return app.remote.loadGame?.().then((d) => {
+        const gameData = d.result;
+        if (!gameData) return;
+        app.version = gameData.version;
+        const Game = appModule.getApplication() as unknown as { game?: GameRoot };
+        // Re-init through the bootstrap path; Game.js's `init` factory
+        // creates a fresh GameRoot and calls `loadGame(gameData)`.
+        const init = (appModule.getApplication() as { init?: (d: LoadGameData) => unknown }).init;
+        if (init) init(gameData);
+        else if (Game.game) Game.game.loadGame(gameData);
+      });
+    });
+    (chain as unknown as { fail(cb: (data: unknown) => void): void }).fail((_data) => {
+      if (this.notificationPopup) {
+        this.notificationPopup.trigger('error');
+        window.setTimeout(() => {
+          this.notificationPopup?.render?.();
+        }, this.retryDelay);
+        this.retryDelay = (this.retryDelay ?? 0) + 1000;
+        if ((this.retryDelay ?? 0) > 6000) {
+          document.location.href = '/';
+        }
+      }
+    });
+  }
+
+  override extendRender(): void {
+    const Render = getRender() as unknown as {
+      MainMenu: new (cfg: unknown) => MainMenuLike;
+      Statusbar: new (data: unknown) => RenderStatusbarLike & { domelem?: unknown };
+    };
+    if (this.renderMenu) this.renderMenu.remove();
+    const menu = new Render.MainMenu({
+      gameNode: this,
+      data: {
+        logo: {
+          frameSrc: 'MainSprites.png',
+          frameMap: { normal: { x: 1, y: 819, width: 222, height: 40 } },
+          frame: 'normal',
+          className: 'MainMenuLogo',
+        },
+        userdata: this.userdata,
+        buttons: [],
+      },
+    });
+
+    this.initStatusBar();
+    const statusbar = new Render.Statusbar(this.data.status_bar);
+    this.renderStatusbar = statusbar as NonNullable<typeof this.renderStatusbar>;
+
+    const stage = this.renderNode as
+      | (NonNullable<GameNode['renderNode']> & {
+          gameNode?: GameNode;
+          domelem?: unknown;
+          addChild?(child: unknown): void;
+        })
+      | undefined;
+    if (!stage) return;
+    stage.gameNode = this;
+    const $ = globalThis.$;
+    if (!$) return;
+    const setupLike = setup as unknown as { debug?: boolean; renderContainer?: string };
+    if (setupLike.debug) {
+      $(setupLike.renderContainer ?? '').addClass?.('debugmode');
+    }
+    const containerSel = setupLike.renderContainer ?? '';
+    $(containerSel).append(menu.domelem);
+    menu.initUI?.();
+    $(containerSel).append(stage.domelem);
+    this.renderMenu = menu as NonNullable<typeof this.renderMenu>;
+    stage.addChild?.(statusbar);
+  }
+
+  override initEventHandlers(): void {
+    // FIXME: This event should be renamed as we are out of the test
+    // phase – or are we?
+    const remoteApi = appModule.getApplication().remote as {
+      setPerpCoordinates?(rows: Array<[string, { x: number; y: number }]>): unknown;
+    };
+    this.on('saveCoordsQueue', (_e: unknown, path: unknown, pos: unknown) => {
+      remoteApi.setPerpCoordinates?.([[path as string, pos as { x: number; y: number }]]);
+    });
+    this.on('saveCoords', (_e: unknown, path: unknown, pos: unknown) => {
+      remoteApi.setPerpCoordinates?.([[path as string, pos as { x: number; y: number }]]);
+    });
+
+    this.on('switch_view', (e: unknown, view_id: unknown) => {
+      _stopPropFile(e);
+      const id = view_id as string;
+      const buttons = (this.renderMenu?.data as { buttons?: Array<{ id: string }> } | undefined)
+        ?.buttons;
+      buttons?.forEach((button) => {
+        if (id !== button.id) {
+          getById(button.id)?.setState('active', false);
+        }
+      });
+      const next = getById(id);
+      if (!next) return;
+      this.activeView = next as ViewLike;
+      next.setState('active', true);
+      // Refresh scroller dimensions in case the stage was resized
+      // while this tab was inactive.  Tab switches preserve scroll
+      // position; the reset-zoom button is the explicit way to
+      // recentre.
+      const vm = (next as ViewLike).renderNode;
+      vm?.updateScroller?.();
+    });
+
+    this.on('toggle_locale', (e: unknown) => {
+      _stopPropFile(e);
+      _showLangPicker(true);
+    });
+
+    this.on('user_data', (e: unknown) => {
+      _stopPropFile(e);
+      this.openGenericPopup({
+        data: { title: 'About', description: 'Data Dealer &mdash; webxdc port' },
+        template: 'popup_user_data.html',
+      });
+    });
+
+    this.on('click_status.karma', () => {
+      const providedKarma = this.compileProvidedKarma();
+      this.openGenericPopup({
+        data: {
+          title: i18n.gettext('karma_popup title'),
+          description: i18n.gettext('karma_popup description'),
+          selectortitle: i18n.gettext('karma_popup selector title'),
+          mainsprites_class: 'karma',
+          providedKarma,
+        },
+        template: 'popup_karma.html',
+      });
+    });
+
+    this.on('click_status.Profiles', () => {
+      this.openGenericPopup({
+        data: {
+          title: i18n.gettext('sb_profiles title'),
+          subtitle: globalThis._.sprintf(
+            i18n.gettext('sb_profiles subtitle %s from %s profiles'),
+            globalThis._.span(globalThis._.toKSNum(this.profiles_value)),
+            globalThis._.span(globalThis._.toKSNum(this.profiles_max))
+          ),
+          description: i18n.gettext('sb_profiles description'),
+          mainsprites_class: 'Profiles',
+        },
+        template: 'popup_status.html',
+      });
+    });
+
+    this.on('click_status.Cash', () => {
+      this.openGenericPopup({
+        data: {
+          title: i18n.gettext('sb_cash title'),
+          subtitle: globalThis._.sprintf(
+            i18n.gettext('sb_cash subtitle <span class="highlight">$%s</span>'),
+            globalThis._.toKSNum(this.cash_value)
+          ),
+          description: i18n.gettext('sb_cash description'),
+          mainsprites_class: 'Cash',
+        },
+        template: 'popup_status.html',
+      });
+    });
+
+    this.on('click_status.AP', () => {
+      this.openGenericPopup({
+        data: {
+          title: i18n.gettext('sb_AP title'),
+          subtitle: globalThis._.sprintf(
+            i18n.gettext('sb_AP subtitle %s/%s'),
+            globalThis._.span(globalThis._.toKSNum(this.ap_value)),
+            globalThis._.span(globalThis._.toKSNum(this.xp_level.ap_max))
+          ),
+          description: i18n.gettext('sb_AP description'),
+          mainsprites_class: 'AP',
+        },
+        template: 'popup_status.html',
+      });
+    });
+
+    this.on('click_status.XP', () => {
+      this.openGenericPopup({
+        data: {
+          title: i18n.gettext('sb_XP title'),
+          subtitle: globalThis._.sprintf(
+            i18n.gettext('sb_XP subtitle Level %s'),
+            globalThis._.span(globalThis._.toKSNum(this.xp_level.number))
+          ),
+          description: globalThis._.sprintf(
+            i18n.gettext('sb_XP description %s XP until next level'),
+            globalThis._.span(globalThis._.toKSNum(this.xp_level.xp_max - this.xp_value + 1))
+          ),
+          mainsprites_class: 'XP',
+        },
+        template: 'popup_status.html',
+      });
+    });
+
+    this.on('new_items', (e: unknown, data: unknown) => {
+      _stopPropFile(e);
+      this.makeNotifications(data as MakeNotificationsPayload);
+    });
+  }
+
+  /** Game-load orchestration.  Hydrates the typeRegistry from the
+   *  bootstrap payload, constructs the four view tabs (Imperium,
+   *  Database, Missions, Topscores), recreates the perp tree from
+   *  `data.nodes`, kicks the AP/Ani tickers, and wires up the
+   *  ResizeObserver-driven `fitToWindow` flow. */
+  loadGame(data: LoadGameData): GameRoot {
+    // Clear if there are instances in the singleton.
+    clearRegistry();
+    if (_apTicker) this.APTicker = _apTicker;
+
+    // Register all types (applies to all game_types).
+    Object.entries(data.type_registry ?? {}).forEach(([k, v]) => {
+      this.addType(k, v as TypeEntry);
+    });
+
+    // Register dummy gestalt of GameRoot (needed for type_settings):
+    this.addType('GameRoot', { game_type: 'GameRoot', type_data: data.type_data ?? {} });
+    this.addType('ProfileSet', { game_type: 'ProfileSet', type_data: {} });
+
+    // Basic config of the GameRoot.
+    const config: GameNodeConfig = {
+      data: mergeData(
+        this.getTypeData('GameRoot'),
+        data as Parameters<typeof mergeData>[1]
+      ) as Record<string, unknown>,
+      gameType: 'GameRoot',
+    };
+    if (data._id !== undefined) config.id = data._id;
+    if (data.user !== undefined) (config as { userdata?: unknown }).userdata = data.user;
+    (config as { raw_data?: unknown }).raw_data = data;
+    this.init(config);
+
+    // Seed display_name from webxdc.selfName on first boot; persisted
+    // as a delta so the name survives reloads without prompting the
+    // user again.  The helper is non-mutating — we route the new
+    // name through setDisplayName so the reducer produces a fresh
+    // state instead of corrupting the live reference.
+    const userPayload = (
+      this.data as { user?: Parameters<typeof webxdcIdentity.getMessengerDisplayNameChange>[0] }
+    ).user;
+    const newSelfName = webxdcIdentity.getMessengerDisplayNameChange(userPayload);
+    const remote = appModule.getApplication().remote as {
+      setDisplayName?(name: string): unknown;
+    };
+    if (newSelfName) remote.setDisplayName?.(newSelfName);
+
+    this.initGameValues();
+    this.makeRenderConfig();
+
+    // Make Main Tabs.  Imperium and Database are GameNode subclasses
+    // imported above; we need the typed constructors here.
+    const viewCtors = { Imperium, Database } as const;
+    (Object.keys(viewCtors) as (keyof typeof viewCtors)[]).forEach((v) => {
+      const tab = data[v];
+      this.addType(v, {
+        game_type: v,
+        type_data: (tab?.type_data ?? {}) as Record<string, unknown>,
+      });
+      const Ctor = viewCtors[v];
+      const viewmap = new Ctor({
+        ...(tab?.game_id !== undefined ? { id: tab.game_id } : {}),
+        ...(tab?.full_path !== undefined ? { path: tab.full_path } : {}),
+        data: mergeData(
+          this.getTypeData(v),
+          tab?.instance_data as Parameters<typeof mergeData>[1]
+        ) as Record<string, unknown>,
+        renderNodeParent: this.id,
+        gameType: v,
+      } as GameNodeConfig);
+      // Dual-keyed assignment matches legacy API surface (e.g.
+      // `groot.Imperium`, `groot.Database` direct reads from
+      // various callers that predate the typed accessors).
+      (this as unknown as Record<string, unknown>)[v] = viewmap;
+      this.addChild(viewmap);
+    });
+
+    // Make Missions Tab.
+    this.addType('Missions', { game_type: 'Missions', type_data: {} });
+    const missionsView = new Missions({
+      id: 'Missions',
+      data: this.getTypeData('Missions') ?? {},
+      renderNodeParent: this.id,
+      gameType: 'Missions',
+    });
+    this.Missions = missionsView;
+    this.addChild(missionsView);
+
+    // Make Topscores Tab.
+    this.addType('Topscores', { game_type: 'Topscores', type_data: {} });
+    this.addType('Topscore', { game_type: 'Topscore', type_data: {} });
+
+    const topscoresView = new Topscores({
+      id: 'Topscores',
+      data: this.getTypeData('Topscores') ?? {},
+      renderNodeParent: this.id,
+      gameType: 'Topscores',
+    }) as Topscores & {
+      data: { type_titles?: Record<string, unknown> };
+      initTopscore?(type: string): void;
+    };
+    this.Topscores = topscoresView;
+    this.addChild(topscoresView);
+    Object.keys(topscoresView.data?.type_titles ?? {}).forEach((type) => {
+      topscoresView.initTopscore?.(type);
+    });
+
+    // Fill DBTokens lookup table.
+    (data.nodes ?? [])
+      .filter((t) => t.game_type === 'TokenPerp')
+      .forEach((t) => {
+        if (t.gestalt && t.instance_data?.amount !== undefined) {
+          this.DBTokens[t.gestalt] = t.instance_data.amount;
+        }
+      });
+
+    this.getDBTokensLength();
+    this.getDBTokensLengthMax();
+
+    // Create Imperium and Database GameNode tree structure without
+    // recursion: walk a path-sorted snapshot, attach each node to its
+    // parent (which the path-sort guarantees has been built first).
+    const sortnodes = (data.nodes ?? [])
+      .slice()
+      .filter((n) => !n.gestalt || n.gestalt.substring(0, 6) !== 'origin')
+      .sort((a, b) => (a.full_path ?? '').localeCompare(b.full_path ?? ''));
+
+    sortnodes.forEach((datanode) => {
+      const parentGameNode = getParentFromPath(datanode.full_path ?? '');
+      if (!parentGameNode) return;
+      // get gestalt from full_type if not available:
+      if (!datanode.gestalt && datanode.full_type) {
+        const g = getGestalt(datanode.full_type);
+        if (g) datanode.gestalt = g;
+      }
+      // register dummy type when node not in typeRegistry:
+      if (!this.getType(datanode.gestalt)) {
+        const entry: TypeEntry = {};
+        if (datanode.game_type !== undefined) entry.game_type = datanode.game_type;
+        if (datanode.type_data !== undefined) entry.type_data = datanode.type_data;
+        this.addType(datanode.gestalt ?? '', entry);
+      }
+      const type_data = this.getTypeData(datanode.gestalt);
+      const node_data = mergeData(
+        type_data,
+        datanode.instance_data as Parameters<typeof mergeData>[1]
+      ) as Record<string, unknown>;
+      const Ctor = perpCtors[datanode.game_type ?? ''];
+      if (!Ctor) return;
+      const perp = new Ctor({
+        id: datanode.game_id,
+        gestalt: getGestalt(datanode.full_type ?? ''),
+        path: datanode.full_path,
+        data: node_data,
+        // Render perps to first item in path (Imperium or Database)
+        renderNodeParent: getFirstId(datanode.full_path ?? ''),
+        ViewMap: getByFirstId(datanode.full_path ?? ''),
+        parentNode: parentGameNode,
+        gameType: datanode.game_type,
+      } as unknown as GameNodeConfig);
+      parentGameNode.addChild(perp);
+    });
+
+    (data.nodes_charging ?? []).forEach((v) => {
+      const gnode = getByLastId(v.path) as
+        | (GameNode & {
+            data?: { charge_time?: number };
+            setAttrs?(attrs: Record<string, unknown>): void;
+          })
+        | undefined;
+      if (!gnode) return;
+      const timerconf = {
+        serverTime: data.server_time?.$date,
+        duration: gnode.data?.charge_time,
+        // chargeEntry.charge_start is a plain epoch-ms number — no
+        // $date wrapper.
+        serverStart: v.charge_start,
+      };
+      gnode.setAttrs?.({ _loadTimer: timerconf });
+    });
+
+    (data.nodes_collect ?? []).forEach((v) => {
+      const gnode = getByLastId(v.path) as
+        | (GameNode & { setAttrs?(attrs: Record<string, unknown>): void })
+        | undefined;
+      gnode?.setAttrs?.({ _loadReady: true });
+    });
+
+    // register Missions...
+    (
+      this.Missions as (Missions & { initMissions?(d: LoadGameData): void }) | undefined
+    )?.initMissions?.(data);
+
+    (data.db_queue ?? []).forEach((v) => {
+      const db = this.getDatabase() as
+        | (Database & { cue?(ps: unknown, origin: unknown, collect_id: unknown): void })
+        | undefined;
+      db?.cue?.(v.profile_set, v.origin, v.collect_id);
+    });
+
+    // register Karmalizers and Karmalauters...
+    Object.values(data.karmalauters ?? {}).forEach((p) => {
+      const g = (p?.type_data as { gestalt?: string } | undefined)?.gestalt;
+      if (g) this.addType(g, p);
+    });
+    Object.values(data.karmalizers ?? {}).forEach((p) => {
+      const g = (p?.type_data as { gestalt?: string } | undefined)?.gestalt;
+      if (g) this.addType(g, p);
+    });
+
+    // compile origin tokens for Database
+    this.compileOriginTokens(data.nodes ?? []);
+
+    this.on('after_render', () => {
+      (this.renderNode as { show?(): void } | undefined)?.show?.();
+      _aniTicker?.start();
+    });
+    this.on('before_render', () => {
+      (this.renderNode as { hide?(): void } | undefined)?.hide?.();
+    });
+
+    this.render();
+    // On first game start with no explicit locale choice, ask the
+    // player.
+    if (data.is_new_game && !data.locale_persisted) {
+      _showLangPicker(false);
+    }
+
+    // fitToWindow handles centring; the legacy `is_new_game`
+    // `scrollTo` would be immediately overwritten so we no longer
+    // set it here.
+    this.fitToWindow();
+    const $ = globalThis.$;
+    if ($) {
+      $(window).off?.('resize.gameFit');
+      $(window).on?.(
+        'resize.gameFit',
+        (globalThis._.debounce as (fn: () => void, ms: number) => () => void)(() => {
+          this.fitToWindow();
+        }, 100)
+      );
+    }
+    // The mobile MainMenu grows after the XP bar gets cloned in and
+    // on CSS-driven reflows (orientation, font load); refit the
+    // Stage whenever the header's measured height changes so we
+    // don't push the playfield past the bottom of the viewport.
+    const menuDom = (this.renderMenu as { domelem?: unknown } | undefined)?.domelem;
+    const RO = (
+      globalThis as unknown as {
+        ResizeObserver?: new (cb: () => void) => { observe(t: unknown): void };
+      }
+    ).ResizeObserver;
+    if (menuDom && typeof RO === 'function') {
+      const refit = (globalThis._.debounce as (fn: () => void, ms: number) => () => void)(() => {
+        this.fitToWindow();
+      }, 50);
+      new RO(refit).observe(menuDom);
+    }
+
+    return this;
   }
 
   // -------------------------------------------------------------------
