@@ -764,8 +764,11 @@ export class GameRoot extends GameNode {
     // cash_max was never initialised in the legacy code, so the
     // cash-bar barsize divided by undefined → NaN.  Pin to a sane
     // large default so the bar fills meaningfully without overflowing
-    // once the player accumulates cash from client collections.
-    this.cash_max = gv.cash_max ?? 10000;
+    // once the player accumulates cash from client collections.  Use
+    // `||` (not `??`) to match legacy behaviour: `cash_max === 0`
+    // also falls through to the default, since 0 would NaN-cascade
+    // through the barsize division.
+    this.cash_max = gv.cash_max || 10000;
     this.karma_value = gv.karma_value ?? 0;
     this.karma_max = 100;
     this.xp_value = gv.xp_value ?? 0;
@@ -821,6 +824,11 @@ export class GameRoot extends GameNode {
     }
   }
 
+  /** Additive AP delta wrapper.  Note: legacy `updateGameValues`
+   *  passed a `silent` arg here that was silently dropped (the
+   *  legacy signature accepted one param).  Preserved as-is to keep
+   *  this PR a pure migration; the latent flicker bug is tracked in
+   *  issue #207. */
   useAP(inc: number): void {
     this.setAP(this.ap_value + inc);
   }
