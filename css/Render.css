@@ -1048,16 +1048,15 @@
 
 .MissionGoal.small {
   height:38px;
-  width:234px;
   display:inline-block;
   padding-left: 40px;
+  padding-right: 32px;
 }
 
 .MissionGoal.small .MissionGoalProgress {
   font-size: 15px;
   line-height: 15px;
-  padding: 6px 28px 0px 0px;
-  overflow: hidden;
+  padding: 6px 0px 0px 0px;
   height: 34px;
   white-space: nowrap;
 }
@@ -3400,20 +3399,6 @@ button {
     box-sizing: border-box;
   }
 
-  .MissionInline {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 6px;
-  }
-  .MissionInline .MissionLabel {
-    flex-basis: 100%;
-  }
-  .MissionGoal.small {
-    width: 100%;
-    box-sizing: border-box;
-    margin: 0;
-  }
 
   .TopscoreDiv,
   .TopscorePerp,
