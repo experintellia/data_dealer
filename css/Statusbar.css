@@ -339,3 +339,21 @@
     order: 4;
   }
 }
+
+/* Mobile per-tab Statusbar trimming (≤ 926 px — same band that splits
+ * the header into two rows and moves the XP/level into `.mm-xp`).
+ *
+ * - Topscores / Missions: hide all in-stage stat items; level stays
+ *   visible via the cloned `.mm-xp` bar in the menu header.
+ * - Database: hide Cash and Karma only — Profiles and AP remain. */
+@media (max-width: 926px) {
+  .Stage.ActiveTopscores .Statusbar .StatusItem,
+  .Stage.ActiveMissions .Statusbar .StatusItem {
+    display: none;
+  }
+
+  .Stage.ActiveDatabase .Statusbar .StatusItem.Cash,
+  .Stage.ActiveDatabase .Statusbar .StatusItem.Karma {
+    display: none;
+  }
+}
