@@ -3654,9 +3654,9 @@ var Render = function () {
       if (value) {
         node.FXShow();
         node.parentNode.jdomelem.addClass('Active' + node.jdomelem.attr('id'));
-        node.gameNode.GameRoot.renderMenu.jdomelem.find('.MainMenuButton').removeClass('active');
+        node.gameNode.GameRoot.renderMenu.jdomelem.find('.mm-tab').removeClass('active');
         node.gameNode.GameRoot.renderMenu.jdomelem
-          .find('.MainMenuButton[data-button-id=' + node.id + ']')
+          .find('.mm-tab[data-button-id=' + node.id + ']')
           .addClass('active');
         node.trigger('viewtab_selected');
       } else {
@@ -3796,9 +3796,9 @@ var Render = function () {
       if (value) {
         node.FXShow();
         node.parentNode.jdomelem.addClass('Active' + node.jdomelem.attr('id'));
-        node.gameNode.GameRoot.renderMenu.jdomelem.find('.MainMenuButton').removeClass('active');
+        node.gameNode.GameRoot.renderMenu.jdomelem.find('.mm-tab').removeClass('active');
         node.gameNode.GameRoot.renderMenu.jdomelem
-          .find('.MainMenuButton[data-button-id=' + node.id + ']')
+          .find('.mm-tab[data-button-id=' + node.id + ']')
           .addClass('active');
       } else {
         node.parentNode.jdomelem.removeClass('Active' + node.jdomelem.attr('id'));
@@ -4345,16 +4345,16 @@ var Render = function () {
       e.preventDefault();
       GameRoot.trigger('user_data');
     });
-    this.jdomelem.on('click touchend', '.MainMenuButton:not(.disabled)', function (e) {
+    this.jdomelem.on('click touchend', '.mm-tab:not(.disabled)', function (e) {
       e.stopPropagation();
       e.preventDefault();
       GameRoot.trigger('switch_view', [$(this).attr('data-button-id')]);
     });
 
-    // Forward MainMenuXP taps to the same `click_status.XP` event the
+    // Forward .mm-xp taps to the same `click_status.XP` event the
     // in-stage Statusbar emits — the cloned bar lives outside the
     // Statusbar's DOM so its delegated handler doesn't reach.
-    this.jdomelem.on('click touchend', '.MainMenuXP .StatusItem', function (e) {
+    this.jdomelem.on('click touchend', '.mm-xp .StatusItem', function (e) {
       e.stopPropagation();
       e.preventDefault();
       var statusid = $(this).attr('data-status-id');
@@ -4366,13 +4366,32 @@ var Render = function () {
 
   extend(MainMenu, Stage);
 
+  // Don't pin height/display inline — let CSS drive them.  Desktop
+  // sets a fixed 48 px height with `display: block`; the mobile
+  // breakpoints switch to a flex column that grows to fit the
+  // two-row content.  Width still goes inline because the desktop
+  // layout uses a 960 px design width that JS scales for narrower
+  // viewports.
+  MainMenu.prototype.setSize = function (size) {
+    this.setAttrs(size);
+    this.css({ width: this.width + 'px' });
+  };
+  MainMenu.prototype.updateRenderProp = function () {
+    this.css({
+      'z-index': this.z,
+      position: this.position,
+      top: 0,
+      left: 0,
+    });
+  };
+
   MainMenu.prototype.template = 'mainmenu.html';
 
   MainMenu.prototype.render = function () {
     var html = app.renderView(this.template, this.data);
     this.jdomelem.html(html);
     // Invalidate the in-place XP cache so the next renderXP repopulates
-    // the freshly-emptied .MainMenuXPBar slot instead of memo-skipping.
+    // the freshly-emptied .mm-xp-bar slot instead of memo-skipping.
     this._xpSlot = null;
     this._xpLast = null;
   };
@@ -4402,7 +4421,7 @@ var Render = function () {
       level: sb.XP_level,
     };
     if (!this._xpSlot) {
-      this._xpSlot = this.jdomelem.find('.MainMenuXPBar')[0];
+      this._xpSlot = this.jdomelem.find('.mm-xp-bar')[0];
       if (!this._xpSlot) return;
     }
     var item = this._xpSlot.querySelector('.StatusItem.XP');
@@ -4430,12 +4449,12 @@ var Render = function () {
 
   MainMenu.prototype.lock = function () {
     this.jdomelem.addClass('locked');
-    this.jdomelem.find('.UserButton, .MainMenuButton').addClass('disabled');
+    this.jdomelem.find('.mm-user-btn, .mm-tab').addClass('disabled');
   };
 
   MainMenu.prototype.unlock = function () {
     this.jdomelem.removeClass('locked');
-    this.jdomelem.find('.UserButton, .MainMenuButton').removeClass('disabled');
+    this.jdomelem.find('.mm-user-btn, .mm-tab').removeClass('disabled');
   };
 
   MainMenu.prototype.addButton = function (text, id, states) {

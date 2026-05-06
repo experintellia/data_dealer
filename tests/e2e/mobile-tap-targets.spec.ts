@@ -31,14 +31,14 @@ for (const vp of VIEWPORTS) {
     });
 
     // Wait until tab buttons are laid out.
-    await expect(page.locator('.MainMenuButton').first()).toBeVisible();
+    await expect(page.locator('.mm-tab').first()).toBeVisible();
 
-    // Measure the primary tabs.  The orange UserButtons (About / locale
-    // toggle) are intentionally smaller (32 px tall, per iter-2 user
-    // feedback) — they are secondary affordances, not the primary
+    // Measure the primary tabs.  The orange .mm-user-btn (About / locale
+    // toggle) buttons are intentionally smaller (32 px tall, per iter-2
+    // user feedback) — they are secondary affordances, not the primary
     // tap-target the 44 px guideline is for.
     const sizes = await page.evaluate((minTap) => {
-      const sels = ['.MainMenuButton', '.ViewTabMenuButton'];
+      const sels = ['.mm-tab', '.ViewTabMenuButton'];
       const out: { sel: string; w: number; h: number; visible: boolean }[] = [];
       sels.forEach((sel) => {
         document.querySelectorAll<HTMLElement>(sel).forEach((el) => {

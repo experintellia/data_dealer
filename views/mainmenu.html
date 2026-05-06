@@ -1,4 +1,4 @@
-<%  
+<%
   var game = _.game();
   var logoclass = game.setup.locale;
 %>
@@ -7,14 +7,14 @@
     var u = (game.data && game.data.user) || {};
     var displayName = u.display_name || u.name || '';
   %>
-  <div class="MainMenuXP">
-    <div class="MainMenuXPName" data-testid="dd-mobile-displayname"><%= displayName %></div>
-    <div class="MainMenuXPBar"></div>
+  <div class="mm-xp">
+    <div class="mm-xp-name" data-testid="dd-mobile-displayname"><%= displayName %></div>
+    <div class="mm-xp-bar"></div>
   </div>
-  <div class="UserActions">
-    <div id="LocaleToggle" class="UserButton"><%= game.setup.localeShort === 'de' ? '🇩🇪🇦🇹🇨🇭 DE' : '🇺🇸🇬🇧🇦🇺 EN' %></div>
-    <div id="UserData" class="UserButton"><%= _._('About') %></div>
+  <div class="mm-actions">
+    <div id="LocaleToggle" class="mm-user-btn"><%= game.setup.localeShort === 'de' ? '🇩🇪🇦🇹🇨🇭 DE' : '🇺🇸🇬🇧🇦🇺 EN' %></div>
+    <div id="UserData" class="mm-user-btn"><%= _._('About') %></div>
   </div>
-  <div id="MainMenuButtons" class="MainMenuButtons">
-    <% _.each(D.buttons, function(button) { %> <div class="MainMenuButton<% if (button.states.active) { print(' active') }; %>" data-button-id="<%= button.id %>"><%= button.label %></div> <% }); %>
+  <div class="mm-tabs">
+    <% _.each(D.buttons, function(button) { %> <div class="mm-tab<% if (button.states.active) { print(' active') }; %>" data-button-id="<%= button.id %>"><%= button.label %></div> <% }); %>
   </div>

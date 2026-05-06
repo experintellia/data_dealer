@@ -37,7 +37,7 @@ for (const vp of VIEWPORTS) {
       timeout: 50_000,
     });
 
-    await page.locator('.MainMenuButton[data-button-id="Missions"]').dispatchEvent('click');
+    await page.locator('.mm-tab[data-button-id="Missions"]').dispatchEvent('click');
     await page.waitForTimeout(800);
 
     const layout = await page.evaluate(() => {

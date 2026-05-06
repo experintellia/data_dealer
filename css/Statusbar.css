@@ -277,60 +277,9 @@
   font-size: 14px;
 }
 
-/* Cloned XP / level bar shown next to the tabs ≤ 926 px (the in-stage
- * Statusbar XP item is hidden in the same band). */
-
-@media (max-width: 926px) {
-  .Statusbar .StatusItem.XP {
-    display: none;
-  }
-  .MainMenuXP {
-    display: block;
-    position: absolute;
-    top: 4px;
-    left: 28px;
-    z-index: 5;
-    transform: scale(1.1);
-    transform-origin: top left;
-  }
-  .MainMenuXP .MainMenuXPName {
-    font-family: Bowlby, sans-serif;
-    font-size: 11px;
-    line-height: 12px;
-    color: #fff;
-    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
-    margin-bottom: -1px;
-    padding-left: 18px;
-    max-width: 156px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    box-sizing: border-box;
-  }
-  .MainMenuXP .StatusItem.XP .StatusIcon.xp {
-    left: -19px;
-  }
-  .MainMenuXP .StatusItem.XP .StatusTextLevel {
-    left: -14px;
-    width: 28px;
-    height: 25px;
-    line-height: 25px;
-    text-align: center;
-    font-size: 14px;
-    color: #333;
-  }
-  .MainMenuXP .StatusItem.XP .StatusText {
-    text-align: center;
-    width: 128px;
-    box-sizing: border-box;
-  }
-}
-
-@media (min-width: 927px) {
-  .MainMenuXP {
-    display: none;
-  }
-}
+/* The cloned XP/level bar shown next to the tabs ≤ 926 px lives in
+ * css/MainMenu.css under `.mm-xp` — the in-stage Statusbar XP item is
+ * also hidden in that band, see MainMenu.css. */
 
 /* Mobile sizing: scale items up via CSS `zoom` (which reflows layout —
  * unlike transform: scale, no negative-margin compensation needed) so

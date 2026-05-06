@@ -25,7 +25,7 @@ test('conveyor: parent anchored inside viewport, right edge visible', async ({ p
   await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
     timeout: 50_000,
   });
-  await page.locator('.MainMenuButton[data-button-id="Database"]').dispatchEvent('click');
+  await page.locator('.mm-tab[data-button-id="Database"]').dispatchEvent('click');
   await page.waitForTimeout(800);
 
   const layout = await page.evaluate(() => {
@@ -57,7 +57,7 @@ test('conveyor: anchored to the bottom of the visible viewport', async ({ page }
   await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
     timeout: 50_000,
   });
-  await page.locator('.MainMenuButton[data-button-id="Database"]').dispatchEvent('click');
+  await page.locator('.mm-tab[data-button-id="Database"]').dispatchEvent('click');
   await page.waitForTimeout(800);
 
   const layout = await page.evaluate(() => {
@@ -80,7 +80,7 @@ test('conveyor: PipeBack paints behind the belt sprite (not on top)', async ({ p
   await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
     timeout: 50_000,
   });
-  await page.locator('.MainMenuButton[data-button-id="Database"]').dispatchEvent('click');
+  await page.locator('.mm-tab[data-button-id="Database"]').dispatchEvent('click');
   await page.waitForTimeout(800);
 
   const layout = await page.evaluate(() => {
@@ -111,7 +111,7 @@ test('zoom controls: float above the conveyor (not covered)', async ({ page }) =
   await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
     timeout: 50_000,
   });
-  await page.locator('.MainMenuButton[data-button-id="Database"]').dispatchEvent('click');
+  await page.locator('.mm-tab[data-button-id="Database"]').dispatchEvent('click');
   await page.waitForTimeout(800);
 
   const layout = await page.evaluate(() => {
