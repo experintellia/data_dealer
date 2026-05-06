@@ -2971,8 +2971,13 @@ button {
   .ViewTabMenu {
     width: auto;
     max-width: 100%;
-    /* Tabs grow to fill the row equally instead of clinging to their
-     * content width with empty rails on either side. */
+  }
+}
+
+/* In-view (Topscores) tab strip mobile layout — same threshold as the
+ * main-menu mobile mode in MainMenu.css so the two transitions align. */
+@media (max-width: 926px) {
+  .ViewTabMenu {
     display: flex;
     gap: 4px;
     padding: 0 6px;
@@ -2981,6 +2986,16 @@ button {
   .ViewTabMenu .ViewTabMenuButton {
     flex: 1 1 0;
     margin: 0;
+    top: 0;
+    min-height: 44px;
+    font-size: 16px;
+    line-height: 25px;
+    padding: 4px 8px 4px 8px;
+    box-sizing: border-box;
+    text-align: center;
+  }
+  .ViewTabMenu .ViewTabMenuButton.active {
+    top: 0;
   }
 }
 
@@ -3009,17 +3024,6 @@ button {
     min-width: 44px;
     min-height: 44px;
     line-height: 36px;
-  }
-
-  .ViewTabMenuButton {
-    min-height: 44px;
-    font-size: 16px;
-    line-height: 25px;
-    padding: 4px 14px 8px 14px;
-  }
-
-  .ViewTabMenuButton + .ViewTabMenuButton {
-    margin-left: 4px;
   }
 
   /* Body / dialog text: minimum 16px so iOS doesn't zoom on focus and
