@@ -2971,6 +2971,16 @@ button {
   .ViewTabMenu {
     width: auto;
     max-width: 100%;
+    /* Tabs grow to fill the row equally instead of clinging to their
+     * content width with empty rails on either side. */
+    display: flex;
+    gap: 4px;
+    padding: 0 6px;
+    box-sizing: border-box;
+  }
+  .ViewTabMenu .ViewTabMenuButton {
+    flex: 1 1 0;
+    margin: 0;
   }
 }
 
