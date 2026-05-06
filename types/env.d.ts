@@ -15,6 +15,7 @@ export interface JQueryLike {
   text(content: string): unknown;
   trigger(ev: string, args?: unknown[]): unknown;
   append(child: unknown): unknown;
+  attr(name: string): string | undefined;
   on(ev: string, handler: (...args: unknown[]) => void): unknown;
   off(ev?: string): unknown;
   fail(handler: (...args: unknown[]) => unknown): JQueryLike;

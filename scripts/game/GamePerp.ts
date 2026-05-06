@@ -47,7 +47,8 @@ export interface RenderNodeLike {
 export interface RenderPopupLike {
   open?: boolean;
   trigger(ev: string, args?: unknown[]): void;
-  close(): void;
+  close(cb?: () => void): void;
+  on(ev: string, handler: (...args: unknown[]) => void): void;
   remove?(): void;
 }
 
@@ -244,11 +245,6 @@ export class GamePerp extends GameNode {
    *  on a missing or malformed `data.result`. */
   protected _serverError(data: unknown): void {
     this.Error?.('The computer says NOOOO', data);
-  }
-
-  protected static _stopProp(e: unknown): void {
-    const fn = (e as { stopPropagation?: () => void } | null | undefined)?.stopPropagation;
-    if (typeof fn === 'function') fn.call(e);
   }
 
   override initEventHandlers(): void {
