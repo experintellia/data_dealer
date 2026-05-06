@@ -281,13 +281,22 @@
  * css/MainMenu.css under `.mm-xp` — the in-stage Statusbar XP item is
  * also hidden in that band, see MainMenu.css. */
 
-/* Mobile sizing: scale items up via CSS `zoom` (which reflows layout —
- * unlike transform: scale, no negative-margin compensation needed) so
- * the row fills the viewport with ~8 px reserved for side padding.
+/* Mobile sizing.
  *
- * Natural width of the 4 visible items (XP hidden ≤ 926 px) is
- * 142 + 140 + 144 + 130 = 556 px; each band picks the largest zoom
- * that still fits at the band's lower bound. */
+ * 651–926 px: keep the single-row layout and scale items up with CSS
+ * `zoom` (which reflows layout — unlike transform: scale, no negative-
+ * margin compensation needed) so the row fills the viewport.  Natural
+ * width of the 4 visible items (XP hidden ≤ 926 px) is
+ * 142 + 140 + 144 + 130 = 556 px.
+ *
+ * ≤ 580 px: single-row scaling collapses each item below its legible
+ * minimum, so switch to a 2-column × 2-row grid.  DOM order is
+ * Profiles, Cash, AP, Karma; `order` reshuffles them so the rows pair
+ * Profiles | Karma (long bars on top) and Cash | AP (short bars
+ * below).  Items keep their natural sizes — the grid's two columns
+ * each shrink to the wider item's `max-content` (142 + 144 + 12 px
+ * gap = 298 px), which fits even a 320 px viewport with comfortable
+ * side padding. */
 
 @media (max-width: 926px) {
   .Statusbar .StatusItem.Profiles,
@@ -310,26 +319,23 @@
   }
 }
 
-@media (max-width: 580px) and (min-width: 501px) {
-  .Statusbar .StatusItem {
-    zoom: 0.88;
+@media (max-width: 580px) {
+  .Statusbar {
+    display: grid !important;
+    grid-template-columns: max-content max-content;
+    justify-content: center;
+    align-items: start;
+    column-gap: 12px;
+    row-gap: 14px;
   }
-}
 
-@media (max-width: 500px) and (min-width: 421px) {
-  .Statusbar .StatusItem {
-    zoom: 0.74;
+  .Statusbar .StatusItem.Karma {
+    order: 2;
   }
-}
-
-@media (max-width: 420px) and (min-width: 351px) {
-  .Statusbar .StatusItem {
-    zoom: 0.61;
+  .Statusbar .StatusItem.Cash {
+    order: 3;
   }
-}
-
-@media (max-width: 350px) {
-  .Statusbar .StatusItem {
-    zoom: 0.56;
+  .Statusbar .StatusItem.AP {
+    order: 4;
   }
 }

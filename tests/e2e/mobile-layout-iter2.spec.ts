@@ -5,8 +5,9 @@
  *     tapped (the original star bar in the in-stage Statusbar is hidden
  *     on mobile, so the menu copy is the only entry point)
  *   - the username label sits above the XP bar
- *   - statusbar items (Profiles/Cash/AP/Karma) sit on a single row
- *     within the viewport, no horizontal clipping
+ *   - statusbar items (Profiles/Cash/AP/Karma) sit in a 2×2 grid
+ *     (Profiles | Karma on row 1, Cash | AP on row 2) within the
+ *     viewport, no horizontal clipping
  */
 
 import { expect, test } from '@playwright/test';
@@ -91,29 +92,49 @@ test('iter2: username label sits above the cloned XP bar', async ({ page }) => {
   expect(layout.nameFont).toBeLessThanOrEqual(14);
 });
 
-test('iter2: 4 statusbar items fit on a single row inside the viewport', async ({ page }) => {
+test('iter2: 4 statusbar items form a 2×2 grid inside the viewport', async ({ page }) => {
   await page.goto('/?devtools=1');
   await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
     timeout: 50_000,
   });
 
+  const TOL = 4;
   const layout = await page.evaluate(() => {
-    const items = Array.from(
-      document.querySelectorAll<HTMLElement>('.Statusbar .StatusItem:not([data-status-id="XP"])')
-    );
-    const tops = items.map((e) => Math.round(e.getBoundingClientRect().top));
-    const rights = items.map((e) => e.getBoundingClientRect().right);
-    const lefts = items.map((e) => e.getBoundingClientRect().left);
+    const rect = (id: string) => {
+      const el = document.querySelector<HTMLElement>(
+        `.Statusbar .StatusItem[data-status-id="${id}"]`
+      );
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { top: r.top, left: r.left, right: r.right };
+    };
+    const profiles = rect('Profiles');
+    const cash = rect('Cash');
+    const ap = rect('AP');
+    const karma = rect('karma');
+    if (!profiles || !cash || !ap || !karma) return null;
     return {
-      uniqueRows: Array.from(new Set(tops)).length,
-      itemCount: items.length,
-      maxRight: Math.max(...rights),
-      minLeft: Math.min(...lefts),
+      profiles,
+      cash,
+      ap,
+      karma,
+      maxRight: Math.max(profiles.right, cash.right, ap.right, karma.right),
+      minLeft: Math.min(profiles.left, cash.left, ap.left, karma.left),
       vw: window.innerWidth,
     };
   });
-  expect(layout.itemCount).toBe(4);
-  expect(layout.uniqueRows, 'status items wrap to 2 rows').toBe(1);
+  expect(layout).not.toBeNull();
+  if (!layout) return;
   expect(layout.maxRight).toBeLessThanOrEqual(layout.vw + 1);
   expect(layout.minLeft).toBeGreaterThanOrEqual(-1);
+
+  // Row 1: Profiles | Karma; Row 2: Cash | AP.
+  expect(Math.abs(layout.profiles.top - layout.karma.top)).toBeLessThanOrEqual(TOL);
+  expect(Math.abs(layout.cash.top - layout.ap.top)).toBeLessThanOrEqual(TOL);
+  expect(layout.cash.top).toBeGreaterThan(layout.profiles.top + TOL);
+
+  // Col 1: Profiles + Cash; Col 2: Karma + AP.
+  expect(Math.abs(layout.profiles.left - layout.cash.left)).toBeLessThanOrEqual(TOL);
+  expect(Math.abs(layout.karma.left - layout.ap.left)).toBeLessThanOrEqual(TOL);
+  expect(layout.karma.left).toBeGreaterThan(layout.profiles.left + TOL);
 });
