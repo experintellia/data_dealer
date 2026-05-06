@@ -17,7 +17,9 @@
 // `GameRoot.prototype.X = function () {...}` assignments in Game.js
 // for now; later PRs in the wave migrate them one batch at a time.
 
+import { getRender } from '../Render.js';
 import appModule from '../app.js';
+import i18n from '../i18n.js';
 import setup from '../setup.js';
 import { getTypeSettings } from '../type_settings.js';
 import {
@@ -25,7 +27,9 @@ import {
   type GameNodeConfig,
   _ids,
   clear as clearRegistry,
+  eachByGestalt,
   get,
+  getAllByGestalt,
   getByGestalt,
   getById,
   getByType,
@@ -70,6 +74,14 @@ interface RenderRootLike {
   };
   setSize?(opts: { width?: number; height?: number }): void;
   render?(): void;
+  addPopup?(popup: unknown): void;
+  // FX hooks driven by makeNotifications.  All optional; the Stage
+  // owns the implementations (Render.js).
+  FXMissionComplete?(): void;
+  FXLevelUpBling?(level: number | true): void;
+  FXKarmaBling?(amount: number): void;
+  FXNoCash?(): void;
+  FXError?(): void;
 }
 
 /** ViewMap render-node surface needed by `_centerActiveView` /
@@ -82,6 +94,10 @@ interface ViewMapRenderLike extends RenderRootLike {
   updateScroller?(): void;
   parentNode?: { width?: number; height?: number };
   getPosition?(): { x: number; y: number };
+  /** Direct-on-renderNode `scrollTo(pos, durationMs)` — distinct from
+   *  `scroller.scrollTo(x, y, animate, zoom)` above; used by tutorial
+   *  scripted-events in `makeNotifications`. */
+  scrollTo?(pos: { x: number; y: number }, durationMs?: number): void;
 }
 
 /** A "View" GameNode (Imperium / Database) — owns a ViewMap-shaped
@@ -101,6 +117,16 @@ interface Level {
   ap_inc_value: number;
   ap_inc_interval: number;
   [key: string]: unknown;
+}
+
+/** Render Popup surface used by `openNotification`.  Same forward-
+ *  ref shape as GamePerp's `RenderPopupLike` — duplicated here to
+ *  keep this file self-contained until Render.js is typed. */
+interface RenderPopupLike {
+  open?: boolean;
+  trigger(ev: string, args?: unknown[]): void;
+  close(cb?: () => void): void;
+  on(ev: string, handler: (...args: unknown[]) => void): void;
 }
 
 interface AniTickerLike {
@@ -170,6 +196,100 @@ interface GameValuesPayload {
  *  caller).  Forward-ref; collapses when Missions itself extracts. */
 interface MissionsLike {
   updateMissions(missions: unknown, gv: GameValuesPayload): void;
+  getMission(gestalt: string): {
+    data: Record<string, unknown>;
+    states: Record<string, boolean>;
+    [key: string]: unknown;
+  };
+}
+
+/** Notification cue payload — what `cueNotification` queues and
+ *  `openNotification` renders.  All fields are emergent from the
+ *  many `makeNotifications` branches; no single source of truth.
+ *  Field types include `| undefined` so the partial-construction
+ *  pattern (`const n: Notification = {}; n.x = maybe()`) round-trips
+ *  under `exactOptionalPropertyTypes`. */
+interface Notification {
+  game_type?: string | undefined;
+  config?: NotificationConfig | undefined;
+  states?: Record<string, boolean> | undefined;
+  scriptedEvents?: Array<() => void> | undefined;
+  mission?: unknown;
+  mission_active_gestalt?: string | undefined;
+  mission_decorator?: string | undefined;
+  perp?: { data: Record<string, unknown> } | undefined;
+  title?: string | undefined;
+  text?: string | undefined;
+  says?: string | undefined;
+  description?: string | undefined;
+  selectortitle?: string | undefined;
+  karma_dec?: number | undefined;
+  button?: string | undefined;
+  providedKarma?: ProvidedKarmaRow[] | undefined;
+  data?: Record<string, unknown> | undefined;
+  // Tutorial scripted-event fields (compiled into scriptedEvents):
+  viewmap?: string | undefined;
+  viewmapPos?: { x: number; y: number } | undefined;
+  buyPerp?: string | undefined;
+  buyParent?: string | undefined;
+  buyPerpPos?: { x: number; y: number } | undefined;
+  integrateProfileSet?: boolean | undefined;
+  nodelay?: boolean | undefined;
+  nonblocking?: number | undefined;
+  [key: string]: unknown;
+}
+
+interface NotificationConfig {
+  template?: string;
+  extendClass?: string;
+  delay?: number;
+  delayScript?: number;
+  placeBottom?: boolean;
+  templateData?: unknown;
+  popupContainer?: unknown;
+  [key: string]: unknown;
+}
+
+/** Karmalauter-typed entry compiled by `compileProvidedKarma`.
+ *  Pushed onto `data.providedKarma` and into popup_karma.html. */
+interface ProvidedKarmaRow {
+  gestalt: string;
+  data: Record<string, unknown> & {
+    slot_background?: unknown;
+    required_level?: number;
+    price?: number;
+    karma_points?: number;
+  };
+  locked?: boolean;
+}
+
+/** Server payload to `makeNotifications`.  Each top-level field is
+ *  an independent branch (mission_complete, levelup, perps, …) and
+ *  fires its own cue. */
+interface MakeNotificationsPayload {
+  mission_complete?: string;
+  mission_active?: string;
+  levelup?: number | true;
+  perps?: string[];
+  powerups?: Record<string, Array<{ game_gestalt: string; [key: string]: unknown }>>;
+  karma?: { gestalt: string; dec: number; karma_value?: number };
+  simplemessage?: { text: string };
+  story?: { text: string };
+  storyPerp?: GameNode & {
+    ViewMap?: { id?: string };
+    renderNode?: { getPosition?(): { x: number; y: number } };
+  };
+  tutorial?: Notification[];
+  [key: string]: unknown;
+}
+
+/** Subclass-method surfaces touched by `makeNotifications`'s
+ *  `data.perps` and `data.powerups` branches. */
+interface NewItemsLike {
+  markNewItems?(): void;
+  checkProvidedByLevel?(): void;
+  checkProvidedByRequiredPerps?(): void;
+  highlightTabs?: string[];
 }
 
 let _aniTicker: AniTickerLike | null = null;
@@ -203,7 +323,11 @@ export class GameRoot extends GameNode {
   DBTokensLength = 0;
   DBTokensLengthMax = 0;
   IPerps: Record<string, true> = {};
-  NotificationQueue: unknown[] = [];
+  NotificationQueue: Notification[] = [];
+  /** `raw_data` mirrors the engine's authoritative state snapshot for
+   *  read-only helpers (mission-briefing-seen lookup, etc.).  Set by
+   *  `loadGame` (still in Game.js). */
+  raw_data?: { mission_briefings_seen?: Record<string, boolean>; [key: string]: unknown };
 
   // Field assignments preserved from the legacy `GameRoot.prototype.X
   // = ...` block — exposed for callers that read `groot.get` / `groot.
@@ -250,6 +374,8 @@ export class GameRoot extends GameNode {
     height?: number;
     levels?: Level[];
     game_values?: GameValuesPayload;
+    providedKarma?: ProvidedKarmaRow[];
+    slot_background?: unknown;
     [key: string]: unknown;
   } = {};
   override renderNode?: NonNullable<GameNode['renderNode']> & RenderRootLike;
@@ -275,11 +401,6 @@ export class GameRoot extends GameNode {
     renderDBQueue?: { render?(): void };
     checkNotifications?(): void;
   };
-
-  // Notification mixins still live in Game.js (migrate in a follow-up
-  // PR).  Declared optional so `updateGameValues` can dispatch through
-  // the typed reference.
-  makeNotifications?(data: Record<string, unknown>): void;
 
   notificationPopup?: NonNullable<GameNode['renderPopup']> & {
     render?(): void;
@@ -820,7 +941,7 @@ export class GameRoot extends GameNode {
     // levelup-only side effects.
     if (gv.ap_snapshot !== undefined && levelup === true && !silent) {
       this.getDatabase?.().checkNotifications?.();
-      this.makeNotifications?.({ levelup: this.xp_level.number });
+      this.makeNotifications({ levelup: this.xp_level.number });
     }
   }
 
@@ -924,6 +1045,489 @@ export class GameRoot extends GameNode {
       Math.max(0, Math.round(((this.xp_value - this.xp_level.xp_min) / span) * 96))
     );
     this.renderStatusbar?.FXUpdateXP?.(silent);
+  }
+
+  // -------------------------------------------------------------------
+  // Notifications + Karmalauter buy flow (extracted in PR 23 of #147)
+  // -------------------------------------------------------------------
+
+  cueNotification(notification: Notification): void {
+    this.NotificationQueue.push(notification);
+  }
+
+  /** No-op stub preserved from legacy.  Likely intended to kick the
+   *  queue but never wired — `openNotification` runs at the tail of
+   *  `makeNotifications` instead. */
+  startNotificationQueue(): void {}
+
+  uncueNotification(notification: Notification): void {
+    const index = this.NotificationQueue.indexOf(notification);
+    if (index !== -1) this.NotificationQueue.splice(index, 1);
+  }
+
+  compileProvidedKarma(): ProvidedKarmaRow[] {
+    this.data.providedKarma = [];
+    this.getTypes('Karmalauter').forEach((v) => {
+      const td = (v.type_data ?? {}) as ProvidedKarmaRow['data'];
+      // Mutates the shared typeRegistry entry through `v.type_data`'s
+      // reference — idempotent (same value every call); legacy
+      // preserved the side effect.  See the popup_karma.html template
+      // which reads `slot_background` off each row's `data`.
+      td.slot_background = this.data.slot_background;
+      const row: ProvidedKarmaRow = {
+        gestalt: v.gestalt ?? '',
+        data: td,
+      };
+      // FIXME: lock level
+      if ((td.required_level ?? 0) > this.xp_level.number) row.locked = true;
+      this.data.providedKarma?.push(row);
+    });
+    this.data.providedKarma = (this.data.providedKarma ?? []).slice().sort((a, b) => {
+      return (a.data.price ?? 0) - (b.data.price ?? 0);
+    });
+    return this.data.providedKarma;
+  }
+
+  BuyKarma(bgestalt: string): void {
+    const remote = appModule.getApplication().remote as {
+      buyKarma?(g: string): {
+        done(
+          cb: (data: {
+            result?: {
+              error?: number;
+              game_values?: GameValuesPayload;
+              levelup?: boolean;
+              missions?: unknown;
+            };
+          }) => void
+        ): unknown;
+      };
+    };
+    const fn = remote.buyKarma;
+    if (!fn) return;
+    fn(bgestalt).done((data) => {
+      if (!data.result) {
+        this.Error?.('The computer says NOOOO', data);
+        return;
+      }
+      const r = data.result;
+      if (r.error !== undefined) {
+        // Probably no cash
+        if (this.renderPopup && this.renderPopup.open) {
+          this.renderPopup.trigger('no_cash');
+        } else {
+          this.renderNode?.FXNoCash?.();
+        }
+        return;
+      }
+      const td = this.getTypeData(bgestalt) as { karma_points?: number } | undefined;
+      const karma_points = td?.karma_points ?? 0;
+      const karma_value = this.karma_value;
+      const karma_up = karma_points + karma_value <= 100 ? karma_points : 100 - karma_value;
+      if (this.renderPopup) {
+        this.renderPopup.trigger('popup_close');
+        this.renderNode?.FXKarmaBling?.(karma_up);
+      }
+      if (this.notificationPopup) {
+        this.notificationPopup.trigger('popup_close');
+        this.renderNode?.FXKarmaBling?.(karma_up);
+      }
+      // TODO: Karma Up Animation?
+      this.updateGameValues(r.game_values ?? {}, r.levelup === true, r.missions);
+    });
+  }
+
+  openNotification(notification: Notification): RenderPopupLike | undefined {
+    const config = (notification.config ?? {}) as NotificationConfig;
+    if (this.notificationPopup) return undefined;
+
+    const popupTemplateData: Record<string, unknown> = {
+      status_icons: this.data.status_icons,
+      states: notification.states ?? {},
+      data: { ...notification, id: this.id },
+      groot: this,
+    };
+
+    config.template = config.template || 'notification.html';
+    config.templateData = popupTemplateData;
+    config.popupContainer = this;
+
+    const Render = getRender() as unknown as {
+      Popup: new (cfg: unknown) => RenderPopupLike;
+    };
+    const popup = new Render.Popup(config) as RenderPopupLike & {
+      notificationMission?: string;
+      callback?: () => void;
+    };
+    this.notificationPopup = popup;
+    // Tag the popup with the mission gestalt so the popup_close
+    // handler in initPopupEvents can persist the dismissal directly.
+    // Persisting in popup.callback (which only fires via popup.close
+    // (cb)) was unreliable — popup_close fires the moment the user
+    // clicks X, before the close animation/timeout chain that
+    // triggers the callback.
+    if (notification.mission_active_gestalt) {
+      popup.notificationMission = notification.mission_active_gestalt;
+    }
+
+    window.setTimeout(() => {
+      notification.scriptedEvents?.forEach((s) => s());
+    }, config.delayScript ?? 0);
+
+    window.setTimeout(() => {
+      this.renderNode?.addPopup?.(popup);
+      this.initPopupEvents?.(popup);
+    }, config.delay ?? 0);
+
+    popup.callback = () => {
+      this.uncueNotification(notification);
+      delete this.notificationPopup;
+      const next = this.NotificationQueue[0];
+      if (next) this.openNotification(next);
+    };
+
+    if (notification.nonblocking) {
+      window.setTimeout(() => popup.trigger('popup_close'), notification.nonblocking);
+    }
+    return popup;
+  }
+
+  /** Build notification cues from the server's payload and kick the
+   *  queue.  Each top-level field of `data` is an independent branch
+   *  (mission / levelup / perps / powerups / karma / simplemessage /
+   *  story / tutorial); cues land in `NotificationQueue`, are sorted
+   *  by `sort_types` priority, then `openNotification` fires for the
+   *  head. */
+  makeNotifications(data: MakeNotificationsPayload): void {
+    const speed = setup.debug ? 0 : 1;
+
+    if (data.mission_complete && this.Missions) {
+      const mission = this.Missions.getMission(data.mission_complete);
+      const n: Notification = mergeData({}, mission.data) as Notification;
+      n.game_type = 'MissionComplete';
+      n.mission_decorator = i18n.gettext('Mission complete!');
+      n.states = mission.states;
+      n.config = {
+        template: 'popup_mission_complete.html',
+        extendClass: 'Mission',
+        delay: 2500,
+        delayScript: 1000,
+      };
+      n.scriptedEvents = [
+        () => {
+          this.renderNode?.FXMissionComplete?.();
+        },
+      ];
+      this.cueNotification(n);
+    }
+    if (data.mission_active && this.Missions) {
+      // Only show the briefing if the player hasn't already
+      // dismissed it.  The seen-flag is persisted via the
+      // dismissMissionBriefing op so it survives webxdc replay
+      // across reloads.
+      const seenBriefings = this.raw_data?.mission_briefings_seen ?? {};
+      if (!seenBriefings[data.mission_active]) {
+        const mission = this.Missions.getMission(data.mission_active);
+        const n: Notification = mergeData({}, mission.data) as Notification;
+        n.game_type = 'MissionNew';
+        n.states = mission.states;
+        n.mission_decorator = i18n.gettext('New Mission!');
+        n.mission = mission;
+        n.mission_active_gestalt = data.mission_active;
+        n.config = { template: 'popup_mission.html', extendClass: 'Mission' };
+        this.cueNotification(n);
+      }
+    }
+    if (data.levelup) {
+      const n: Notification = {
+        game_type: 'LevelUp',
+        config: {
+          template: 'levelup.html',
+          extendClass: 'Tutorial',
+          placeBottom: true,
+          delay: 1200,
+        },
+        scriptedEvents: [
+          () => {
+            this.renderNode?.FXLevelUpBling?.(data.levelup as number | true);
+          },
+        ],
+      };
+      this.cueNotification(n);
+    }
+    // FIXME: this turns off notifications during tutorials in
+    // general; currently only set by level.
+    if (data.perps && this.xp_level.number > this.notification_level) {
+      data.perps.forEach((gestalt) => {
+        const type = this.getType(gestalt);
+        const tdata = this.getTypeData(gestalt);
+        if (!type || !tdata || getByGestalt(gestalt)) return;
+        const n: Notification = {
+          game_type: type.game_type,
+          config: { extendClass: 'NewItems' },
+        };
+        let parentIsBuilt = false;
+        const parentTypes = this.getParentTypes(gestalt);
+        parentTypes.forEach((parentType) => {
+          const parentTypeData = parentType.type_data as
+            | { title?: string; [k: string]: unknown }
+            | undefined;
+          const parentsBuilt = getAllByGestalt(parentType.gestalt ?? '').length;
+          if (parentsBuilt > 0) parentIsBuilt = true;
+          n.perp = { data: tdata };
+          n.title = (tdata as { ntitle?: string }).ntitle;
+          n.says = i18n.gettext('Mark says:');
+          const ntext = (tdata as { ntext?: string }).ntext ?? '';
+          if (parentTypeData?.title) {
+            n.text = globalThis._.sprintf(ntext, globalThis._.span(parentTypeData.title));
+            eachByGestalt(parentType.gestalt ?? '', (v) => {
+              if (v.renderNode) {
+                const sub = v as GameNode & NewItemsLike;
+                sub.markNewItems?.();
+                sub.checkProvidedByLevel?.();
+                sub.checkProvidedByRequiredPerps?.();
+                sub.highlightTabs = sub.highlightTabs ?? [];
+                if (n.game_type) sub.highlightTabs.push(n.game_type);
+              }
+            });
+          } else {
+            n.text = globalThis._.sprintf(
+              ntext,
+              globalThis._.span((tdata as { title?: string }).title ?? '')
+            );
+          }
+        });
+        if (parentIsBuilt) this.cueNotification(n);
+      });
+    }
+    // Powerup Notifications.  FIXME same as `data.perps`.
+    if (data.powerups && this.xp_level.number > this.notification_level) {
+      // remap the response and prepare the types' data.
+      interface PowReg {
+        game_type?: string | undefined;
+        type_data?:
+          | (Record<string, unknown> & { ntitle?: string; ntext?: string; notification?: boolean })
+          | undefined;
+        projects: Array<
+          GameNode &
+            NewItemsLike & {
+              addType?(g: string, d: unknown): void;
+              getType?(g: string): TypeEntry | undefined;
+              data?: { title?: string; [k: string]: unknown };
+            }
+        >;
+      }
+      const pow_register: Record<string, PowReg> = {};
+      Object.entries(data.powerups).forEach(([projectgestalt, project_pows]) => {
+        const project = getByGestalt(projectgestalt) as
+          | (GameNode &
+              NewItemsLike & {
+                addType?(g: string, d: unknown): void;
+                getType?(g: string): TypeEntry | undefined;
+                data?: { title?: string; [k: string]: unknown };
+              })
+          | undefined;
+        if (!project) return;
+        project_pows.forEach((powerup) => {
+          const powgestalt = powerup.game_gestalt;
+          if (!project.getType?.(powgestalt)) project.addType?.(powgestalt, powerup);
+          const powerup_type = project.getType?.(powgestalt) as TypeEntry | undefined;
+          if (!powerup_type) return;
+          const reg = (pow_register[powgestalt] ??= { projects: [] });
+          reg.game_type = powerup_type.game_type;
+          reg.type_data = powerup_type.type_data as PowReg['type_data'];
+          if (!reg.projects.includes(project)) reg.projects.push(project);
+        });
+      });
+
+      Object.values(pow_register).forEach((reg) => {
+        const n: Notification = {
+          config: { extendClass: 'NewItems' },
+          game_type: reg.game_type,
+          perp: { data: reg.type_data ?? {} },
+          title: reg.type_data?.ntitle,
+        };
+        let projectstext = '';
+        // add those decorators and make the projects notification text
+        reg.projects.forEach((project, k) => {
+          project.markNewItems?.();
+          project.highlightTabs = project.highlightTabs ?? [];
+          if (n.game_type) project.highlightTabs.push(n.game_type);
+          const sep = k < reg.projects.length - 1 ? ', ' : '';
+          projectstext = projectstext + (project.data?.title ?? '') + sep;
+        });
+        n.says = i18n.gettext('Mark says:');
+        n.text = globalThis._.sprintf(reg.type_data?.ntext ?? '', globalThis._.span(projectstext));
+        // popup only if notification = true;
+        if (reg.type_data?.notification) this.cueNotification(n);
+      });
+    }
+    // Karmalizer Notification
+    if (data.karma) {
+      this.compileProvidedKarma();
+      const gestalt = data.karma.gestalt;
+      const td = this.getTypeData(gestalt) as Record<string, unknown> | undefined;
+      const n: Notification = { ...(td ?? {}) };
+      n.selectortitle = i18n.gettext('Choose your counter measures');
+      n.karma_dec = data.karma.dec;
+      n.button = i18n.gettext('Do nothing');
+      n.config = { template: 'popup_karma.html', extendClass: 'Alert', delay: 650 };
+      n.providedKarma = this.data.providedKarma;
+      const type = this.getType(gestalt);
+      n.game_type = type?.game_type;
+      this.cueNotification(n);
+    }
+
+    // Simplemessage
+    if (data.simplemessage) {
+      this.cueNotification({
+        game_type: 'Story',
+        button: i18n.gettext('Next'),
+        description: data.simplemessage.text,
+        says: i18n.gettext('Mark says:'),
+        config: {
+          template: 'notification_tutorial.html',
+          extendClass: 'Tutorial',
+          placeBottom: true,
+          delay: 0,
+        },
+      });
+    }
+
+    // Tutorials and Missions
+    if (data.story && data.storyPerp) {
+      const storyPerp = data.storyPerp;
+      this.cueNotification({
+        game_type: 'Story',
+        button: i18n.gettext('Next'),
+        description: data.story.text,
+        says: i18n.gettext('Mark says:'),
+        scriptedEvents: [
+          () => {
+            const viewMapId = storyPerp.ViewMap?.id;
+            if (viewMapId) this.trigger('switch_view', [viewMapId]);
+            const pos = storyPerp.renderNode?.getPosition?.();
+            const av = this.activeView?.renderNode;
+            if (pos && av?.scrollTo) av.scrollTo(pos, 1000);
+          },
+        ],
+        config: {
+          template: 'notification_tutorial.html',
+          extendClass: 'Tutorial',
+          placeBottom: true,
+          delay: 0,
+        },
+      });
+    }
+    if (data.tutorial) {
+      data.tutorial.forEach((tutorial) => {
+        const n: Notification = tutorial;
+        n.button = i18n.gettext('Next');
+        n.says = i18n.gettext('Mark says:');
+        n.config = {
+          template: 'notification_tutorial.html',
+          extendClass: 'Tutorial',
+          placeBottom: true,
+          delay: 600 * speed,
+          delayScript: 0,
+        };
+        n.game_type = 'Tutorial';
+        // TODO: handle/compile scripted events.  See legacy comments
+        // in Game.js for the field-by-field plan.
+        n.scriptedEvents = [];
+        if (n.viewmap) {
+          n.config.delay = 0;
+          // FIXME: Hack for CMS fail
+          n.scriptedEvents.push(() => {
+            if (n.viewmap === 'empire001') n.viewmap = 'Imperium';
+            if (n.viewmap === 'database001') n.viewmap = 'Database';
+            if (n.viewmap) this.trigger('switch_view', [n.viewmap]);
+          });
+        }
+        if (n.viewmapPos) {
+          n.config.delay = (n.nodelay ? 500 : 1000) * speed;
+          n.scriptedEvents.push(() => {
+            const av = this.activeView?.renderNode;
+            if (n.viewmapPos && av?.scrollTo) {
+              av.scrollTo({ x: n.viewmapPos.x, y: n.viewmapPos.y }, 1000);
+            }
+          });
+        }
+        if (n.buyPerp && n.buyParent) {
+          const existing = getByGestalt(n.buyPerp);
+          n.config.delay = (existing ? 650 : n.nodelay ? 500 : 3000) * speed;
+          n.scriptedEvents.push(() => {
+            if (!n.buyParent || !n.buyPerp) return;
+            const parentNode = getByGestalt(n.buyParent) as
+              | (GameNode & {
+                  renderNode?: {
+                    DecoratorNew?: { remove(): void };
+                    getPosition?(): { x: number; y: number };
+                  };
+                  BuyPerp?(g: string, pos?: { x: number; y: number }): void;
+                })
+              | undefined;
+            if (!parentNode) return;
+            parentNode.renderNode?.DecoratorNew?.remove();
+            const buyPerp = getByGestalt(n.buyPerp) as
+              | { renderNode?: { getPosition?(): { x: number; y: number } } }
+              | undefined;
+            if (!buyPerp) {
+              parentNode.BuyPerp?.(n.buyPerp, n.buyPerpPos);
+            } else {
+              const pos = buyPerp.renderNode?.getPosition?.();
+              const av = this.activeView?.renderNode;
+              if (pos && av?.scrollTo) {
+                av.scrollTo({ x: pos.x, y: pos.y - 40 });
+              }
+            }
+          });
+        }
+        if (n.integrateProfileSet) {
+          n.config.delay = (n.nodelay ? 500 : 5000) * speed;
+          n.scriptedEvents.push(() => {
+            const db = this.getDatabase?.() as
+              | {
+                  queue?: { set?: Array<{ origin?: { gestalt?: string }; psid?: string }> };
+                  mergeCued?(psid: string): void;
+                }
+              | undefined;
+            const ps = db?.queue?.set?.find((p) => p.origin?.gestalt === 'city002');
+            if (ps?.psid && db?.mergeCued) db.mergeCued(ps.psid);
+          });
+        }
+        this.cueNotification(n);
+      });
+    }
+
+    // sort em by type!
+    const sort_types = [
+      'Error',
+      'Story',
+      'MissionComplete',
+      'LevelUp',
+      'Tutorial',
+      'Karmalizer',
+      'CityPerp',
+      'ProxyPerp',
+      'ProjectPerp',
+      'AgentPerp',
+      'ContactPerp',
+      'PusherPerp',
+      'ClientPerp',
+      'TokenPerp',
+      'UpgradePowerup',
+      'AdPowerup',
+      'TeamMemberPowerup',
+      'MissionNew',
+    ];
+    this.NotificationQueue.sort((a, b) => {
+      const ai = sort_types.indexOf(a.game_type ?? '');
+      const bi = sort_types.indexOf(b.game_type ?? '');
+      return ai - bi;
+    });
+    const head = this.NotificationQueue[0];
+    if (head) this.openNotification(head);
   }
 
   // -------------------------------------------------------------------
