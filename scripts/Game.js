@@ -33,7 +33,7 @@ import {
   remove,
 } from './game/GameNode.js';
 import { GamePerp, setAniTicker } from './game/GamePerp.js';
-import { GameRoot, setAniTickerForGameRoot } from './game/GameRoot.js';
+import { GameRoot, setAPTickerForGameRoot, setAniTickerForGameRoot } from './game/GameRoot.js';
 import { Imperium } from './game/Imperium.js';
 import { Mission } from './game/Mission.js';
 import { Missions } from './game/Missions.js';
@@ -976,66 +976,6 @@ var Game = function () {
     return popup;
   };
 
-  GameRoot.prototype.initStatusBar = function () {
-    this.data.status_bar.gameNode = this;
-    this.updateStatusBarValues();
-  };
-
-  GameRoot.prototype.setLevel = function (levelnum, nolevelup) {
-    var lvl;
-    if (levelnum) {
-      lvl = this.getLevel(levelnum);
-    } else {
-      lvl = this.getLevel();
-    }
-    if (lvl !== this.getLevelByXP(this.xp_value)) {
-      this.xp_value = lvl.xp_min;
-    }
-    this.xp_level = lvl;
-    APTicker.interval = lvl.ap_inc_interval;
-    if (!nolevelup) {
-      APTicker.reset();
-    }
-    this.setAP();
-    this.setXP();
-    return this.xp_level;
-  };
-
-  GameRoot.prototype.getLevel = function (level) {
-    if (level) {
-      return this.data.levels[level - 1];
-    } else {
-      return this.data.levels[this.data.game_values.xp_level - 1];
-    }
-  };
-  GameRoot.prototype.getLevelByXP = function (xp) {
-    if (!xp) {
-      return {};
-    }
-    var level = _.find(this.data.levels, function (lvl) {
-      return xp >= lvl.xp_min && xp <= lvl.xp_max;
-    });
-    return level;
-  };
-
-  GameRoot.prototype.APTick = function () {
-    if (this.xp_level.ap_max > this.ap_value) {
-      this.ap_value += this.xp_level.ap_inc_value;
-      this.setAP();
-      // Remove No-AP decorators
-      this.renderNode.jdomelem.find('.Popup .no_AP').removeClass('no_AP disabled active');
-    }
-  };
-
-  GameRoot.prototype.updateStatusBarValues = function () {
-    // Map and evantually crunch game_values to statusbar values, without rendering
-    this.setProfiles();
-    this.setCash();
-    this.setAP();
-    this.setKarma();
-    this.setXP();
-  };
-
   GameRoot.prototype.initGameValues = function () {
     var gv = this.data.game_values; // FIXME: Added var; check for side-effects
     this.ap_value = gv.ap_initial;
@@ -1569,6 +1509,10 @@ var Game = function () {
   // retires when AniTicker is itself extracted from Game.js.
   setAniTicker(AniTicker);
   setAniTickerForGameRoot(AniTicker);
+  // APTicker (level-derived AP regen interval) is consumed by
+  // GameRoot.setLevel and GameRoot.APTick; injected the same way as
+  // AniTicker until APTicker itself is extracted from this IIFE.
+  setAPTickerForGameRoot(APTicker);
 
   return Game;
 };
