@@ -3321,39 +3321,39 @@ button {
   /* Pin the conveyor strip to .DatabaseQueue's bottom so its visual
      bottom (with `transform-origin: bottom left` shrinking toward the
      same anchor) sits right at the Stage's bottom-12 line.
-     Cropped to 5 slots wide on mobile (was 6 on desktop): the belt
+     Cropped to 4 slots wide on mobile (was 6 on desktop): the belt
      sprite is a fixed 720-px image, so we just shorten the layout box
-     to 620 px (5×100 + 120 pipe) and hide the abrupt right edge of
+     to 520 px (4×100 + 120 pipe) and hide the abrupt right edge of
      the sprite with `overflow: hidden`.  The .DatabaseQueuePipe
      overlay sits at `right: 0` of the now-shorter conveyor and masks
      the cut. */
   .DatabaseQueueConveyor {
-    --conv-s: clamp(0.4, calc((100vw - 24px) / 620px), 1);
+    --conv-s: clamp(0.4, calc((100vw - 24px) / 520px), 1);
     transform: scale(var(--conv-s));
     transform-origin: bottom left;
     top: auto !important;
     bottom: 0 !important;
     left: 0 !important;
     right: auto !important;
-    /* Box width 620 (= 5×100 + 120 pipe) clips the 720-px belt sprite
+    /* Box width 520 (= 4×100 + 120 pipe) clips the 720-px belt sprite
        at its right edge.  We do NOT add `overflow: hidden` here — the
        items extend upward via `top: -58` (peek above the belt) and
        overflow:hidden would clip them too.  The belt sprite is a
        background-image so it's already constrained by the box width;
        the abrupt right edge sits exactly under the .DatabaseQueuePipe
-       overlay (x=500–620 in design coords), which masks the cut. */
-    width: 620px !important;
+       overlay (x=400–520 in design coords), which masks the cut. */
+    width: 520px !important;
   }
-  /* Wrap caps just inside the pipe so 5 belt slots are visible AND the
-     6th queue item can render under the pipe.  Without item 5 in the
+  /* Wrap caps just inside the pipe so 4 belt slots are visible AND the
+     5th queue item can render under the pipe.  Without that item in the
      DOM, the front pipe's transparency exposes only the PipeBack
-     sprite's red dot — when item 5 (queue full) renders inside the
+     sprite's red dot — when the queue-full item renders inside the
      pipe area, its blue colour shows through the transparency and
      covers the red, giving the "ready to integrate" cue.  Wrap right
-     edge at 608 (= 8 + 6×100) lets item 5 render at left:508–608
-     fully inside the conveyor's 620 design width. */
+     edge at 508 (= 8 + 5×100) lets that item render at left:408–508
+     fully inside the conveyor's 520 design width. */
   .DatabaseQueueWrap {
-    max-width: 608px !important;
+    max-width: 508px !important;
   }
   /* The conveyor's `transform: scale` creates a new stacking context,
    * which traps PipeBack (z-index:-1) ahead of the belt sprite when
