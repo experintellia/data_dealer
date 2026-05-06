@@ -31,7 +31,7 @@ beforeAll(() => {
   localeDe = JSON.parse(readFileSync(join(root, 'i18n', 'de_AT.json'), 'utf8'));
   localeEn = JSON.parse(readFileSync(join(root, 'i18n', 'en_US.json'), 'utf8'));
 
-  var typeSettingsSrc = readFileSync(join(root, 'scripts', 'type_settings.js'), 'utf8');
+  var typeSettingsSrc = readFileSync(join(root, 'scripts', 'type_settings.ts'), 'utf8');
   var localEngineSrc = readFileSync(join(root, 'scripts', 'LocalEngine.ts'), 'utf8');
   goalsTextWorkflows = extractGoalsTextWorkflows(typeSettingsSrc);
   goalsTextMsgids = extractGoalsTextMsgids(typeSettingsSrc);
@@ -57,17 +57,16 @@ function extractGoalsTextWorkflows(src) {
 
 // ── helper: extract display string msgids from goals_texts ────────────────────
 //
-// Each goals_texts entry maps a workflow key to _._("msgid").  This extracts
-// the msgid strings so we can verify they exist in the locale files.
+// Each goals_texts entry maps a workflow key to i18n.gettext("msgid").  This
+// extracts the msgid strings so we can verify they exist in the locale files.
 
 function extractGoalsTextMsgids(src) {
   var match = src.match(/["']?goals_texts["']?\s*:\s*\{([^}]+)\}/);
   if (!match) return [];
   var block = match[1];
   var msgids = [];
-  // Matches: _._("goal Charge Perp %s") or _._(  'goal Buy Perp %s'  )
-  // Note: _._( = identifier _ + dot + method _ + open-paren (one dot, not two).
-  var re = /_\._\(\s*["']([^"']+)["']\s*\)/g;
+  // Matches: i18n.gettext("goal Charge Perp %s") or i18n.gettext(  'goal Buy Perp %s'  )
+  var re = /i18n\.gettext\(\s*["']([^"']+)["']\s*\)/g;
   var m;
   while ((m = re.exec(block)) !== null) {
     msgids.push(m[1]);
