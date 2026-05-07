@@ -8,56 +8,24 @@
 // is inherited.
 //
 // Extracted from scripts/Render.js's IIFE in PR 35 of issue #147.
-//
-// Cable handling crosses an extraction boundary: `Cable` and
-// `PerpCable` still live in Render.js's IIFE.  `cableTo` constructs
-// a PerpCable, so we late-bind the constructor through
-// `setPerpCableCtor()` — Render.js wires it immediately after
-// PerpCable is defined.
+// PR #221 (Decorator family) shrunk the IIFE further; PR 37 lands
+// `Cable` / `PerpCable` in scripts/render/RenderCables.ts and
+// retires the `setPerpCableCtor` injection seam this file used to
+// own — `cableTo` now constructs `RenderPerpCable` directly.
 
+import { type PerpCableConfig, RenderPerpCable } from './RenderCables.js';
 import { type JQueryNodeElem, RenderNode } from './RenderNode.js';
 import { type PerpSpriteConfig, RenderPerpSprite } from './RenderPerpSprite.js';
 import { RenderSet } from './RenderSet.js';
 import { RenderSprite, type SpriteConfig, type SpriteFrameMap } from './RenderSprite.js';
 
-// ── injection seam: PerpCable still lives in Render.js's IIFE ───────────────
-
-export interface PerpCableLike extends RenderNode {
-  perpFrom: RenderPerp;
-  perpTo: RenderPerp;
-  length: number;
-  cableMaxLength: number;
-  noWobble?: boolean;
-  FXConnect(cb?: () => void): void;
-  FXDisconnect(cb?: () => void): void;
-  FXWobbleTension(tension: number): void;
-  FXToggleConnect(progress: number): void;
-  FXStraighten(straightness: number): void;
-  FXDataIn(cb?: () => void): void;
-  FXDataOut(cb?: () => void): void;
-}
-
-export interface PerpCableCtor {
-  new (config: PerpCableConfig, perpFrom: RenderPerp, perpTo: RenderPerp): PerpCableLike;
-}
-
-export interface PerpCableConfig {
-  hidden?: boolean;
-  [key: string]: unknown;
-}
-
-let _perpCableCtor: PerpCableCtor | undefined;
-
-export function setPerpCableCtor(ctor: PerpCableCtor): void {
-  _perpCableCtor = ctor;
-}
-
-function newPerpCable(config: PerpCableConfig, from: RenderPerp, to: RenderPerp): PerpCableLike {
-  if (!_perpCableCtor) {
-    throw new Error('RenderPerp: PerpCable ctor seam not wired (call setPerpCableCtor).');
-  }
-  return new _perpCableCtor(config, from, to);
-}
+// `RenderPerpCable` is the concrete cable type Perp.cableTo returns.
+// Re-exported under the prior `PerpCableLike` name so external
+// callers (Game.js still references `cable.perpTo` / `cable.length`
+// / `cable.FXDataIn` etc. via this structural surface) keep
+// compiling.
+export type PerpCableLike = RenderPerpCable;
+export type { PerpCableConfig };
 
 // ── jQuery surface ──────────────────────────────────────────────────────────
 
@@ -336,7 +304,7 @@ export class RenderPerp extends RenderSprite {
       return 'Could not connect';
     }
     const cfg = config ?? {};
-    const perpcable = newPerpCable(cfg, this, otherperp);
+    const perpcable = new RenderPerpCable(cfg, this, otherperp);
     this.parentNode.addChild(perpcable);
     return perpcable;
   }
