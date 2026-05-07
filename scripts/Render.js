@@ -9,6 +9,8 @@ import { RenderCircle as RenderCircleClass } from './render/RenderCircle.js';
 import { RenderDragHandler } from './render/RenderDragHandler.js';
 import { RenderNode, setRenderNodeRegistry, setRenderNodeTickers } from './render/RenderNode.js';
 import { applyRenderNodeFX } from './render/RenderNodeFX.js';
+import { RenderPerp as RenderPerpClass, setPerpCableCtor } from './render/RenderPerp.js';
+import { RenderPerpSprite as RenderPerpSpriteClass } from './render/RenderPerpSprite.js';
 import { RenderSet } from './render/RenderSet.js';
 import { RenderSprite as RenderSpriteClass } from './render/RenderSprite.js';
 import { RenderText as RenderTextClass } from './render/RenderText.js';
@@ -281,391 +283,26 @@ var Render = function () {
   /////////////////////////////
   // The Perp
   /////////////////////////////
+  //
+  // Extracted to scripts/render/RenderPerp.ts in PR 35 of issue
+  // #147.  Aliased back to `Perp` so existing in-IIFE call sites
+  // and the publisher entry keep working unchanged.  Cable handling
+  // crosses an extraction boundary: `Cable` / `PerpCable` still
+  // live in this IIFE, so RenderPerp late-binds the PerpCable
+  // constructor through `setPerpCableCtor()` — wired below, just
+  // after PerpCable is defined.
 
-  var Perp = function (config) {
-    // Interactive Sprite with decorations, usually lives on a ViewMap.
-    // Special config settings:
-    // config.cables
-    config = config || {};
-    if (config.x === undefined || config.y === undefined) {
-      this.placeRandom = { x: 1024, y: 800 };
-    }
-    this._id = _instances.length;
-    this.frameSrc = config.frameSrc || config.frame_src || 'MainSprites.png';
-    this.frameMap = config.frameMap ||
-      config.frame_map || {
-        normal: { x: 0, y: 0, width: 80, height: 80, pivotx: 0, pivoty: 0 },
-      };
-    this.frame = config.frame || 'normal';
-    this.clickable = config.clickable || true;
-    this.detectCollisions = true;
-    this.draggable = config.draggable || true;
-    this.cables = config.cables || new Set();
-    this.perpSprite = config.perpSprite || undefined;
-    this.jdomelem = $("<div class='Perp'></div>");
-    this.domelem = this.jdomelem[0];
-    this.init(config);
-    this.initUI();
-
-    if (!config.frameSrc || !config.frameMap) {
-      console.log('ERROR: could not render perp ' + config.id, config);
-    }
-
-    if (this.perpSprite) {
-      this.perpSprite = new PerpSprite(this.perpSprite, this._id);
-      this.addChild(this.perpSprite);
-    }
-
-    this.setFrameSrc(this.frameSrc);
-    this.setFrame(this.frame);
-  };
-
-  extend(Perp, Sprite);
-
-  Perp.prototype.getCableTo = function (perpTo) {
-    var cable;
-    this.cables.each(function (c) {
-      if (c.perpTo === perpTo) {
-        cable = c;
-      }
-    });
-    return cable;
-  };
-
-  Perp.prototype.initUI = function () {
-    // Initialize Perp UI mouse and touch events
-    // TODO: wrap events in eventhandlers and move this to Node Class
-    var perp = this;
-
-    // FIXME: MANUAL ADD
-
-    perp.on('vclick', function (e) {
-      e.stopPropagation();
-    });
-    perp.on('vdblclick', function (e) {
-      e.stopPropagation();
-    });
-
-    perp.on('dragstart', function (e) {
-      e.stopPropagation();
-      perp.setFrame('drag');
-      perp.setZ(100);
-      if (perp.perpSprite) {
-        perp.perpSprite.offsetX += 2;
-        perp.perpSprite.offsetY += 5;
-        perp.perpSprite.draw();
-      }
-      perp.decorators.hide();
-      if (!perp.sticky && !perp.dragalong) {
-        perp.cables.each(function (cable) {
-          if (cable.noWobble) {
-            cable.FXToggleConnect(0);
-          } else {
-            cable.FXWobbleTension(0.5);
-          }
-        });
-      } else if (!perp.sticky && perp.dragalong) {
-        perp.cables.each(function (cable) {
-          cable.FXStraighten(0);
-        });
-      } else if (perp.sticky) {
-        perp.cables.each(function (cable) {
-          var othernode = cable.perpFrom === perp ? cable.perpTo : cable.perpFrom;
-          if (othernode.sticky) {
-            if (cable.noWobble) {
-              cable.FXToggleConnect(0);
-            } else {
-              cable.FXWobbleTension(0.5);
-            }
-          } else {
-            othernode.dragalong = true;
-            othernode.useDragHandler.addListener(othernode);
-          }
-        });
-      }
-      /*
-          perp.cables.each(function(cable){
-            if (perp.dragalong) {
-              cable.FXStraighten(0);
-            }
-            else if (cable.perpTo == perp) cable.FXWobbleTension(0.5);
-          });
-        */
-    });
-
-    perp.on('dragend', function (e) {
-      e.stopPropagation();
-
-      perp.setZ(0);
-
-      perp.setFrame('normal');
-      perp.draw();
-      if (perp.perpSprite) {
-        perp.perpSprite.offsetX -= 2;
-        perp.perpSprite.offsetY -= 5;
-        perp.perpSprite.draw();
-      }
-      perp.decorators.show();
-      perp.decorators.draw();
-      perp.cables.each(function (cable) {
-        if (perp.dragalong) {
-          cable.FXStraighten(1);
-        } else {
-          if (cable.noWobble) {
-            cable.FXToggleConnect(1);
-          } else {
-            cable.FXWobbleTension(1);
-          }
-        }
-      });
-      perp.dragalong = false;
-    });
-    perp.on('mousedown touchstart', function (e) {
-      e.stopPropagation();
-    });
-    perp.on('vmouseover', function (e) {
-      e.stopPropagation();
-      // FIXME: Write own Event Wrapper for hover events
-      if (e.target !== perp.domelem) {
-        return;
-      }
-      if (!perp.dragging) {
-        perp.setFrame('hover');
-        perp.FXBounce();
-      } else {
-        perp.setFrame('drag');
-      }
-    });
-    perp.on('vmouseout', function (e) {
-      e.stopPropagation();
-      if (perp.dragging) {
-        perp.setFrame('drag');
-      } else {
-        perp.setFrame('normal');
-      }
-    });
-  };
-
-  Perp.prototype.dragBound = function (pos) {
-    if (!this.parentNode) {
-      return;
-    }
-    if (pos.x < 35) {
-      pos.x = 35;
-    } else if (pos.x > this.parentNode.width - 35) {
-      pos.x = this.parentNode.width - 35;
-    }
-    if (pos.y < 100) {
-      pos.y = 100;
-    } else if (pos.y > this.parentNode.height - 100) {
-      pos.y = this.parentNode.height - 100;
-    }
-  };
-
-  Perp.prototype.moveTo = function (pos) {
-    // Used during animations, to also draw and render other Nodes affected by movement.
-    //if (this.dragging) this.setPosition({x:pos.x-2,y:pos.y-4});
-    //else this.setPosition(pos);
-    this.setPosition(pos);
-    this.cables.draw();
-    this.decorators.draw();
-  };
-
-  // FIXME random placement, remove
-  Perp.prototype.setRandomPosition = function (originPos) {
-    var tries = 0;
-    var originPos = originPos || { x: 1024, y: 800 };
-    var randomPos = function (pos) {
-      return {
-        x: pos.x + 60 * (Math.random() < 0.5 ? 1 : -1),
-        y: pos.y + 40 * (Math.random() < 0.5 ? 1 : -1),
-      };
-    };
-    var testPos = this.useDragHandler.getCollisionPos(this, originPos);
-    while (tries < 500 && testPos.coll === true) {
-      testPos = randomPos(testPos);
-      if (this.placeParentRadius) {
-        testPos = this.testParentRadius(testPos, this.placeParentRadius);
-      }
-      testPos.coll = this.useDragHandler.testCollisions(this, testPos);
-      tries += 1;
-    }
-    this.setPosition(testPos);
-  };
-
-  Perp.prototype.onAddInit = function () {
-    if (this.draggable) {
-      this.setDraggable(true);
-    }
-    if (this.clickable) {
-      this.setClickable(true);
-    }
-    if (this.placeRandom) {
-      this.setRandomPosition(this.placeRandom);
-    }
-    this.updateRenderProp();
-    this.draw();
-  };
-
-  Perp.prototype.cableTo = function (otherperp, config) {
-    // Connect this Perp to another one, Perps need to live on the same Node, usually a ViewMap.
-    if (!this.parentNode || !otherperp.parentNode || this.parentNode !== otherperp.parentNode) {
-      return 'Could not connect';
-    }
-    config = config || {};
-    var perpcable = new PerpCable(config, this, otherperp);
-    this.parentNode.addChild(perpcable);
-    return perpcable;
-  };
-
-  Perp.prototype.cableAnimatedTo = function (otherperp, config, cb) {
-    config = config || {};
-    config.hidden = true;
-    var cable = this.cableTo(otherperp, config);
-    cable.FXConnect(cb);
-    return cable;
-  };
-
-  Perp.prototype.cableAnimatedRemove = function (otherperp, config) {
-    var cable = this.getCableTo(otherperp);
-    if (!cable) {
-      return;
-    }
-    cable.FXDisconnect(function () {
-      cable.remove();
-    });
-  };
-
-  Perp.prototype.draw = function () {
-    // Update domelem to current settings
-    if (this.dragging) {
-      this.moveTo(this.getPosition());
-    } else {
-      this.setPosition(this.getPosition());
-    }
-    this.setTransform(this.getTransform());
-    this.setSize(this.getSize());
-    this.setOpacity(this.opacity);
-    if (this.perpSprite) {
-      this.perpSprite.updatePosition();
-    }
-  };
-
-  Perp.prototype.getCablesToOrigin = function () {
-    // Doesn't work on a graph, obviously
-    var cables = [];
-    var perp = this;
-    if (!perp.cables.set.length) {
-      return cables;
-    }
-    var parentPerp = this;
-    perp.cables.each(function (cable) {
-      if (cable.perpTo === perp) {
-        parentPerp = cable.perpFrom;
-        cables.push(cable);
-        _.each(parentPerp.getCablesToOrigin(), function (pcable) {
-          cables.push(pcable);
-        });
-      }
-    });
-    return cables;
-  };
-
-  Perp.prototype.FXDataOut = function (cb) {
-    var cables = this.getCablesToOrigin();
-    // Set duration to FXDataIn Duration
-    var duration = 500;
-    var delay = 0;
-    _.each(cables, function (cable, k) {
-      duration = cable.length * 2;
-      if (k === cables.length - 1) {
-        var endPerp = cable.perpFrom;
-        window.setTimeout(function () {
-          cable.FXDataIn(function () {
-            endPerp.FXFeedMe();
-            if (cb) {
-              cb();
-            }
-          });
-        }, delay);
-      } else {
-        window.setTimeout(function () {
-          cable.FXDataIn(function () {
-            if (cb) {
-              cb();
-            }
-          });
-        }, delay);
-      }
-      delay = delay + duration;
-    });
-    return delay;
-  };
-
-  // TODO: Make Loop with FX Start/Stop options
-  Perp.prototype.FXDataIn = function (cb) {
-    var cables = this.getCablesToOrigin().reverse();
-    // Set duration to FXDataOut Duration
-    var duration = 500;
-    var delay = 0;
-    _.each(cables, function (cable, k) {
-      duration = cable.length * 2;
-      if (k === cables.length - 1) {
-        window.setTimeout(function () {
-          cable.FXDataOut(cb);
-        }, delay);
-      } else {
-        window.setTimeout(function () {
-          cable.FXDataOut();
-        }, delay);
-      }
-      delay = delay + duration;
-    });
-    return delay;
-  };
+  var Perp = RenderPerpClass;
 
   /////////////////////////////
   // The PerpSprite
   /////////////////////////////
+  //
+  // Extracted to scripts/render/RenderPerpSprite.ts in PR 35 of
+  // issue #147.  Aliased back to `PerpSprite` so the publisher
+  // entry keeps working unchanged.
 
-  var PerpSprite = function (config) {
-    config = config || {};
-    this._id = _instances.length;
-    this.frameSrc = config.frameSrc || config.frame_src;
-    this.frameMap = config.frameMap || config.frame_map;
-    this.frame = config.frame || 'normal';
-    this.jdomelem = $("<div class='PerpSprite'></div>").attr('id', 'PerpSprite' + this._id);
-    this.domelem = this.jdomelem[0];
-    this.init(config);
-  };
-
-  extend(PerpSprite, Sprite);
-
-  PerpSprite.prototype.onAddInit = function () {
-    var node = this;
-    node.parentNode.perpSprite = this;
-
-    // Set position to parent pivot:
-    _.each(this.frameMap, function (frame, k) {
-      if (!frame.pivotx) {
-        frame.pivotx = node.parentNode.frameMap.normal.pivotx;
-      }
-      if (!frame.hasOwnProperty('pivoty')) {
-        frame.pivoty = node.parentNode.frameMap.normal.pivoty;
-      }
-    });
-
-    this.setFrameSrc(this.frameSrc);
-    this.setFrame(this.frame);
-    node.setPosition({ x: node.parentNode.offsetX, y: node.parentNode.offsetY });
-
-    this.draw();
-    this.updateRenderProp();
-  };
-
-  PerpSprite.prototype.updatePosition = function () {
-    this.setPosition({ x: this.parentNode.offsetX, y: this.parentNode.offsetY });
-  };
+  var PerpSprite = RenderPerpSpriteClass;
 
   /////////////////////////////
   // The Decorator (Dummy Example)
@@ -1574,6 +1211,10 @@ var Render = function () {
   };
 
   extend(PerpCable, Cable);
+
+  // Wire the late-bound PerpCable seam used by RenderPerp.cableTo /
+  // cableAnimatedTo (PR 35 of issue #147).
+  setPerpCableCtor(PerpCable);
 
   PerpCable.prototype.getPoints = function () {
     return {
