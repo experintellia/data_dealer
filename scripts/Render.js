@@ -4,6 +4,8 @@
 // so this module is safe to bundle alongside code that runs before
 // the vendor `<script>` tags execute.
 import appModule from './app.js';
+import { RenderButtonInline as RenderButtonInlineClass } from './render/RenderButtonInline.js';
+import { RenderCircle as RenderCircleClass } from './render/RenderCircle.js';
 import { RenderDragHandler } from './render/RenderDragHandler.js';
 import { RenderNode, setRenderNodeRegistry, setRenderNodeTickers } from './render/RenderNode.js';
 import { applyRenderNodeFX } from './render/RenderNodeFX.js';
@@ -241,48 +243,13 @@ var Render = function () {
   /////////////////////////////
   // The Circle
   /////////////////////////////
+  //
+  // Extracted to scripts/render/RenderCircle.ts in PR 34 of issue
+  // #147.  Imported as `RenderCircleClass` and aliased back to
+  // `Circle` so the publisher entry and any external consumer keeps
+  // working unchanged.
 
-  var Circle = function (config) {
-    config = config || {};
-    this._id = _instances.length;
-    this.radius = config.radius || 32;
-    this.fill = config.fill || '#C00';
-    this.stroke = config.stroke || '#F00';
-    this.strokeWidth = config.strokeWidth || 0;
-    this.jdomelem = $("<canvas class='Circle'></canvas>").attr('id', 'Circle' + this._id);
-    this.domelem = this.jdomelem[0];
-    this.init(config);
-  };
-
-  extend(Circle, Node);
-
-  Circle.prototype.draw = function () {
-    this.setSize({
-      width: this.radius * 2 + this.strokeWidth * 2,
-      height: this.radius * 2 + this.strokeWidth * 2,
-    });
-    this.setOffset({
-      x: this.width / 2,
-      y: this.height / 2,
-    });
-    this.setTransform(this.getTransform());
-    this.setOpacity(this.opacity);
-
-    var canvas = this.domelem;
-    canvas.width = this.width;
-    canvas.height = this.height;
-    var ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.beginPath();
-    ctx.lineWidth = this.strokeWidth;
-    ctx.arc(this.offsetX, this.offsetY, this.radius, 0, 2 * Math.PI, false);
-    ctx.strokeStyle = this.stroke;
-    ctx.fillStyle = this.fill;
-    if (this.strokeWidth) {
-      ctx.stroke();
-    }
-    ctx.fill();
-  };
+  var Circle = RenderCircleClass;
 
   /////////////////////////////
   // The Text
@@ -2495,27 +2462,13 @@ var Render = function () {
 
   // FIXME: Find a better way to implement Buttons, Menus
   // and all that stuff that doesn't actually need generic RenderNode stuff
-  var ButtonInline = function (config) {
-    config = config || {};
-    this._id = _instances.length;
-    this.display = 'inline-block';
-    this.position = 'relative';
-    this.textAlign = config.textAlign || 'center';
-    this.textFontSize = config.textFontSize || '20px';
-    this.jdomelem = $("<div class='Button'></div>");
-    this.domelem = this.jdomelem[0];
-    this.init(config);
-  };
+  //
+  // Extracted to scripts/render/RenderButtonInline.ts in PR 34 of
+  // issue #147.  Imported as `RenderButtonInlineClass` and aliased
+  // back to `ButtonInline` so the publisher entry and any external
+  // consumer keeps working unchanged.
 
-  extend(ButtonInline, Text);
-
-  // Dispable Positioning for Buttons
-  ButtonInline.prototype.setPosition = function () {
-    return false;
-  };
-  ButtonInline.prototype.setTransform = function () {
-    return false;
-  };
+  var ButtonInline = RenderButtonInlineClass;
 
   /////////////////////////////
   //       The Statusbar
