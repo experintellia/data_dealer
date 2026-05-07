@@ -101,6 +101,11 @@ interface DragHandlerLike {
   off(ev: string): void;
   trigger(ev: string, params?: unknown[]): void;
   dragstart(e: NodeDomEvent): void;
+  getCollisionPos(
+    node: RenderNode,
+    newPos: { x: number; y: number }
+  ): { x: number; y: number; coll: boolean };
+  testCollisions(node: RenderNode, newPos: { x: number; y: number }): boolean;
 }
 
 interface CableLike {
