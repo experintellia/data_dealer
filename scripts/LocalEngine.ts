@@ -1833,9 +1833,12 @@ function _repairStuckMissionGoals(state: LocalState): MissionAdvanceResult | nul
     var mg = updatedGoals.filter(function (g) {
       return g.mission === mGestalt;
     });
-    return mg.length > 0 && mg.every(function (g) {
-      return g.complete;
-    });
+    return (
+      mg.length > 0 &&
+      mg.every(function (g) {
+        return g.complete;
+      })
+    );
   });
 
   if (!changed && !hasFinishedActiveMission) return null;
