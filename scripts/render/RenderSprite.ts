@@ -1,0 +1,95 @@
+// Render-side `Sprite` primitive — a div with a CSS background-image
+// from a sprite-sheet, indexed by named frames.  Foundation for Perp,
+// PerpSprite, the FX bling animations, and several decorator types.
+//
+// Extracted from scripts/Render.js's IIFE in PR 32 of issue #147.
+// Pairs with RenderText as the two leaf visual primitives the rest
+// of the Render wave depends on.
+
+import setup from '../setup.js';
+import { type JQueryNodeElem, type NodeConfig, RenderNode } from './RenderNode.js';
+
+export interface SpriteFrame {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  pivotx: number;
+  pivoty: number;
+}
+
+export type SpriteFrameMap = Record<string, SpriteFrame>;
+
+interface JQuerySpriteElem {
+  0: HTMLElement;
+  attr(name: string, value: string): unknown;
+}
+
+function getJQuery(): (selector: string) => JQuerySpriteElem {
+  const jq = (globalThis.jQuery ?? globalThis.$) as
+    | ((selector: string) => JQuerySpriteElem)
+    | undefined;
+  if (!jq) {
+    throw new Error('RenderSprite requires the jQuery global to be loaded.');
+  }
+  return jq;
+}
+
+export type SpriteConfig = NodeConfig & {
+  frame?: string;
+  frameSrc?: string;
+  frameMap?: SpriteFrameMap;
+};
+
+export class RenderSprite extends RenderNode {
+  declare frameSrc: string;
+  declare frameMap: SpriteFrameMap;
+  frame: string;
+  spriteSrc: string | undefined = undefined;
+
+  static {
+    RenderSprite.prototype.frameSrc = '';
+    RenderSprite.prototype.frameMap = {
+      normal: { x: 0, y: 0, width: 0, height: 0, pivotx: 0, pivoty: 0 },
+    };
+  }
+
+  constructor(config: SpriteConfig = {}) {
+    const $ = getJQuery();
+    const jdomelem = $("<div class='Sprite'></div>") as unknown as JQueryNodeElem;
+    super({ ...config, jdomelem });
+    // super → RenderNode.init → setAttrs(config) has already assigned
+    // frameSrc / frameMap / frame from `config` (when present).  Apply
+    // the legacy `frame || 'normal'` fallback explicitly.
+    this.frame = config.frame ?? 'normal';
+    this.setFrameSrc(this.frameSrc);
+    this.setFrame(this.frame);
+    this.draw();
+  }
+
+  setFrameSrc(src: string | undefined): void {
+    if (!this.frameSrc) {
+      return;
+    }
+    this.spriteSrc = src;
+    this.css({
+      'background-image': 'url(' + setup.imagePathPrefix + this.frameSrc + ')',
+    });
+  }
+
+  setFrame(frame: string): void {
+    if (!this.frameMap || !Object.prototype.hasOwnProperty.call(this.frameMap, frame)) {
+      return;
+    }
+    const map = this.frameMap[frame];
+    if (!map) return;
+    this.frame = frame;
+    this.width = map.width;
+    this.height = map.height;
+    if (map.pivotx && map.pivoty) {
+      this.setOffset({ x: map.pivotx, y: map.pivoty });
+    }
+    this.domelem.style.backgroundPosition = -map.x + 'px ' + -map.y + 'px';
+    this.draw();
+  }
+}
