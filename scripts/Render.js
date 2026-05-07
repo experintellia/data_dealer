@@ -4,6 +4,7 @@
 // so this module is safe to bundle alongside code that runs before
 // the vendor `<script>` tags execute.
 import appModule from './app.js';
+import { RenderSet } from './render/RenderSet.js';
 import setup from './setup.js';
 import utilDefault from './util.js';
 
@@ -409,80 +410,15 @@ var Render = function () {
 
   ///////////////////////////////////////////
   // The Set
-  // An array of Nodes with some shortcuts
   ///////////////////////////////////////////
-
+  //
+  // Extracted to scripts/render/RenderSet.ts in PR 29 of issue #147.
+  // Imported as `RenderSet`, aliased back to `Set` here so the
+  // existing `new Set()` call sites inside this IIFE keep working
+  // unchanged.  RenderSet extends scripts/game/OrderedSet.ts so the
+  // common collection surface is no longer duplicated.
   // biome-ignore lint/suspicious/noShadowRestrictedNames: legacy collection class predates ES6 Set
-  var Set = function (set) {
-    if (!set) {
-      set = [];
-    }
-    //this._id = _instances.length;
-    //addSet(this);
-    this.set = set;
-    this.length = this.set.length;
-    return this;
-  };
-
-  Set.prototype.add = function (node) {
-    this.set.push(node);
-    this.length = this.set.length;
-  };
-
-  Set.prototype.remove = function (node) {
-    var index = this.set.indexOf(node);
-    if (index !== -1) {
-      this.set.splice(index, 1);
-    }
-    this.length = this.set.length;
-  };
-
-  Set.prototype.each = function (func) {
-    if (!func) {
-      return;
-    }
-    for (var n = 0; n < this.set.length; n++) {
-      var node = this.set[n];
-      func(node);
-    }
-    this.length = this.set.length;
-  };
-
-  Set.prototype.hide = function () {
-    this.each(function (node) {
-      node.hide();
-    });
-  };
-
-  Set.prototype.show = function () {
-    this.each(function (node) {
-      node.show();
-    });
-  };
-
-  Set.prototype.fade = function (opa) {
-    this.each(function (node) {
-      node.setOpacity(opa);
-    });
-  };
-
-  Set.prototype.draw = function () {
-    this.each(function (node) {
-      node.draw();
-    });
-  };
-
-  Set.prototype.removeAll = function () {
-    while (this.set.length > 0) {
-      var node = this.set[0];
-      this.remove(node);
-      node.remove();
-    }
-  };
-
-  Set.prototype.clear = function () {
-    this.set.length = 0;
-  };
+  var Set = RenderSet;
 
   /////////////////////////////////////////////
   // The SlowTicker
