@@ -8,38 +8,15 @@
 // with its own canvas-arc countdown render).
 //
 // Extracted from scripts/Render.js's IIFE in PR 36 of issue #147.
-//
-// `DecoratorTimer` registers itself with `SlowTicker` for the
-// per-second countdown sweep — that singleton still lives in
-// Render.js's IIFE, so a `setRenderDecoratorSlowTicker()` seam
-// late-binds it (Render.js wires the seam right after SlowTicker
-// is defined).
+// PR #225 (top-level UI) shrunk the IIFE further; PR 40 lands
+// `SlowTicker` in scripts/render/RenderSlowTicker.ts and retires
+// the `setRenderDecoratorSlowTicker` injection seam this file
+// used to own — DecoratorTimer imports the singleton directly.
 
 import { type JQueryNodeElem, type NodeConfig, RenderNode } from './RenderNode.js';
+import { RenderSlowTicker } from './RenderSlowTicker.js';
 import { RenderSprite, type SpriteConfig, type SpriteFrameMap } from './RenderSprite.js';
 import { RenderText, type TextConfig } from './RenderText.js';
-
-// ── seam: SlowTicker singleton lives in Render.js's IIFE ────────────────────
-
-export interface SlowTickerLike {
-  addListener(node: RenderNode): void;
-  removeListener(node: RenderNode): void;
-}
-
-let _slowTicker: SlowTickerLike | undefined;
-
-export function setRenderDecoratorSlowTicker(t: SlowTickerLike): void {
-  _slowTicker = t;
-}
-
-function getSlowTicker(): SlowTickerLike {
-  if (!_slowTicker) {
-    throw new Error(
-      'RenderDecorators: SlowTicker seam not wired (call setRenderDecoratorSlowTicker).'
-    );
-  }
-  return _slowTicker;
-}
 
 // ── jQuery / underscore vendor surfaces ─────────────────────────────────────
 
@@ -517,7 +494,7 @@ export class RenderDecoratorTimer extends RenderSprite implements DecoratorBase 
     }
 
     // FIXME: Write own slower Timer Ticker
-    getSlowTicker().addListener(this);
+    RenderSlowTicker.addListener(this);
 
     this.initUI();
     this.updateRenderProp();
@@ -556,7 +533,7 @@ export class RenderDecoratorTimer extends RenderSprite implements DecoratorBase 
 
     if (this.done) return;
     if (perc > 100) {
-      getSlowTicker().removeListener(this);
+      RenderSlowTicker.removeListener(this);
       this.FXSnooze();
       this.done = true;
       this.decoratedNode.trigger('TimerEnd');

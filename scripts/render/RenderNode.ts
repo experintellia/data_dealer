@@ -5,58 +5,28 @@
 // collections, and the click/drag wiring.
 //
 // Extracted from scripts/Render.js's IIFE in PR 31 of issue #147.
-// Densest seam in the Render.js wave: ~620 LOC of core methods.  The
-// FX/animation methods (FXBounce, FXSpark, FXKatsching, …) are
-// deliberately left inline in Render.js for now — they instantiate
-// Sprite/Text (which themselves extend Node), so moving them would
-// require constructor-injection seams for every visual primitive.
-// They will follow once Sprite + Text are extracted.
-//
-// Two seams keep this module decoupled from Render.js's IIFE state:
-//   - `setRenderNodeRegistry`  — the IIFE owns `_instances` / `_ids` /
-//     `add` / `remove`; we late-bind to those so Node's `init` and
-//     `remove` can allocate / release `_id`s without importing Render.
-//   - `setRenderNodeTickers` — `remove()` unregisters from the
-//     CreateJS Ticker and from Render's SlowTicker singleton.
-//
-// Render.js wires both seams immediately after importing this module.
+// PR 40 lands the `_instances` / `_ids` registry in
+// scripts/render/renderRegistry.ts and retires the
+// `setRenderNodeRegistry` injection seam this file used to own.
+// `setRenderNodeTickers` stays — it bridges to the CreateJS Ticker
+// singleton which remains shimmed inside Render.js's IIFE for the
+// time being.
 
 import { OrderedSet } from '../game/OrderedSet.js';
 import { RenderSet } from './RenderSet.js';
+import { nodeCount, registerNode, unregisterNode } from './renderRegistry.js';
 
 // ── seam interfaces ─────────────────────────────────────────────────────────
-
-export interface RenderNodeRegistry {
-  /** Number of slots in the underlying `_instances` array — used to
-   *  allocate a fresh `_id` for a new Node. */
-  count(): number;
-  /** Register a node in `_instances` (by `_id`) and `_ids` (by `id`). */
-  add(node: RenderNode): void;
-  /** Drop the node from both registries by its `_id`. */
-  remove(id: number): void;
-}
 
 export interface RenderNodeTickers {
   tickerRemove(node: RenderNode): void;
   slowTickerRemove(node: RenderNode): void;
 }
 
-let _registry: RenderNodeRegistry | undefined;
 let _tickers: RenderNodeTickers | undefined;
-
-export function setRenderNodeRegistry(r: RenderNodeRegistry): void {
-  _registry = r;
-}
 
 export function setRenderNodeTickers(t: RenderNodeTickers): void {
   _tickers = t;
-}
-
-function getRegistry(): RenderNodeRegistry {
-  if (!_registry) {
-    throw new Error('RenderNode: registry seam not wired (call setRenderNodeRegistry).');
-  }
-  return _registry;
 }
 
 // ── DOM / jQuery surface that Node touches ──────────────────────────────────
@@ -243,10 +213,9 @@ export class RenderNode {
 
   init(config?: NodeConfig): void {
     const cfg: NodeConfig = config ?? {};
-    const reg = getRegistry();
-    this._id = reg.count();
+    this._id = nodeCount();
     this.id = (cfg.id as string | undefined) ?? 'Node' + this._id;
-    reg.add(this);
+    registerNode(this);
 
     this.children = new RenderSet<RenderNode>();
     this.decorators = new RenderSet<RenderNode>();
@@ -306,7 +275,7 @@ export class RenderNode {
       this.perpFrom.cables.remove(this);
     }
     this.jdomelem.remove();
-    getRegistry().remove(this._id);
+    unregisterNode(this._id);
   }
 
   addChild(child: RenderNode): RenderNode {

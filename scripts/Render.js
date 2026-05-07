@@ -19,14 +19,14 @@ import {
   RenderDecoratorNew as RenderDecoratorNewClass,
   RenderDecoratorReady as RenderDecoratorReadyClass,
   RenderDecoratorTimer as RenderDecoratorTimerClass,
-  setRenderDecoratorSlowTicker,
 } from './render/RenderDecorators.js';
 import { RenderDragHandler } from './render/RenderDragHandler.js';
-import { RenderNode, setRenderNodeRegistry, setRenderNodeTickers } from './render/RenderNode.js';
+import { RenderNode, setRenderNodeTickers } from './render/RenderNode.js';
 import { applyRenderNodeFX } from './render/RenderNodeFX.js';
 import { RenderPerp as RenderPerpClass } from './render/RenderPerp.js';
 import { RenderPerpSprite as RenderPerpSpriteClass } from './render/RenderPerpSprite.js';
 import { RenderSet } from './render/RenderSet.js';
+import { RenderSlowTicker } from './render/RenderSlowTicker.js';
 import { RenderSprite as RenderSpriteClass } from './render/RenderSprite.js';
 import { RenderText as RenderTextClass } from './render/RenderText.js';
 import {
@@ -45,6 +45,7 @@ import {
   RenderViewTab as RenderViewTabClass,
   setRenderViewsConfig,
 } from './render/RenderViews.js';
+import { _ids, _instances, clearAllNodes, getNode, getNodeById } from './render/renderRegistry.js';
 import { renderSpriteHtml } from './render/renderSpriteHelper.js';
 import setup from './setup.js';
 import utilDefault from './util.js';
@@ -125,40 +126,14 @@ var Render = function () {
   /////////////////////////////////////////////
   // Some generic tools and getter functions
   /////////////////////////////////////////////
-
-  var _instances = [];
-  var _ids = {};
-
-  var add = function (node) {
-    _instances[node._id] = node;
-    _ids[node.id] = node;
-  };
-
-  var get = function (_id) {
-    return _instances[_id];
-  };
-
-  var getById = function (id) {
-    return _ids[id];
-  };
-
-  var remove = function (_id) {
-    if (get(_id)) {
-      delete _ids[get(_id).id];
-    }
-    _instances[_id] = undefined;
-  };
-
-  var clear = function () {
-    // Clear everything that has been rendered so far
-    for (var n = 0; n < _instances.length; n++) {
-      var node = _instances[n];
-      if (node) {
-        node.remove();
-      }
-    }
-    _instances.length = 0;
-  };
+  //
+  // Extracted to scripts/render/renderRegistry.ts in PR 40 of
+  // issue #147.  Imported as live ESM bindings (`_instances`,
+  // `_ids`, `getNode`, `getNodeById`, `clearAllNodes`) so the
+  // publisher's `_instances:` / `_ids:` / `get:` / `getById:` /
+  // `clear:` entries keep working unchanged.  The seam from
+  // PR #216 (`setRenderNodeRegistry`) is retired — RenderNode
+  // imports the registry helpers directly now.
 
   /////////////////////////////////////////////
   // The Draghandler
@@ -186,40 +161,14 @@ var Render = function () {
   /////////////////////////////////////////////
   // The SlowTicker
   /////////////////////////////////////////////
+  //
+  // Extracted to scripts/render/RenderSlowTicker.ts in PR 40 of
+  // issue #147.  Aliased back to `SlowTicker` so the publisher
+  // entry keeps working unchanged.  The PR #221
+  // `setRenderDecoratorSlowTicker` injection seam is retired —
+  // RenderDecorators imports the singleton directly now.
 
-  // Written as Singleton, like original Ticker
-
-  var SlowTicker = {
-    start: function () {
-      if (!this.timeout) {
-        this.tick();
-      }
-    },
-    tick: function () {
-      this.listeners.each(function (node) {
-        node.tick();
-      });
-      this.timeout = window.setTimeout(function () {
-        SlowTicker.tick();
-      }, renderConf.slowTickerFrameRate);
-    },
-    addListener: function (node) {
-      this.listeners.add(node);
-    },
-    removeListener: function (node) {
-      this.listeners.remove(node);
-    },
-    stop: function () {
-      window.clearTimeout(this.timeout);
-      this.timeout = undefined;
-    },
-  };
-  SlowTicker.listeners = new Set();
-  SlowTicker.start();
-
-  // Wire the SlowTicker seam used by RenderDecoratorTimer (PR 36 of
-  // issue #147).
-  setRenderDecoratorSlowTicker(SlowTicker);
+  var SlowTicker = RenderSlowTicker;
 
   /////////////////////////////
   // The Node
@@ -231,30 +180,15 @@ var Render = function () {
   // existing in-IIFE call sites (`extend(Sprite, Node)`,
   // `Node.prototype.FXX = …`, `new Node(…)`) keep working unchanged.
   //
-  // RenderNode is decoupled from this IIFE's state via two seams:
-  //   - `setRenderNodeRegistry` wires up the `_instances` / `_ids`
-  //     registers that live in this file's outer scope.
-  //   - `setRenderNodeTickers` wires up `Ticker` and `SlowTicker` so
-  //     `RenderNode#remove()` can unregister from both.
-  // Both seams must be wired before any `new Node(…)` runs, which is
-  // why we set them up immediately after the alias.
-  //
-  // The FX/animation methods (FXSimple … FXElasticTo) below stay in
-  // this file for now — they construct Sprite/Text instances which
-  // themselves extend Node, so moving them needs constructor seams
-  // for every visual primitive.  They mutate `RenderNode.prototype`
-  // through the alias, so subclass instances pick them up via the
-  // prototype chain just like with the legacy class.
+  // PR 40 of issue #147 retired the `setRenderNodeRegistry` seam —
+  // RenderNode imports the registry helpers directly from
+  // scripts/render/renderRegistry.ts.  Only the Ticker bridge stays
+  // (CreateJS Ticker still lives in this IIFE; once it's extracted
+  // too the final cleanup PR can convert this whole file to TS and
+  // drop `setRenderNodeTickers` along with the rest of the IIFE
+  // shell).
 
   var Node = RenderNode;
-
-  setRenderNodeRegistry({
-    count: function () {
-      return _instances.length;
-    },
-    add: add,
-    remove: remove,
-  });
 
   setRenderNodeTickers({
     tickerRemove: function (node) {
@@ -449,9 +383,9 @@ var Render = function () {
     _instances: _instances,
     _ids: _ids,
     //_sets: _sets,
-    get: get,
-    getById: getById,
-    clear: clear,
+    get: getNode,
+    getById: getNodeById,
+    clear: clearAllNodes,
     DragHandler: DragHandler,
     Set: Set,
     Node: Node,
