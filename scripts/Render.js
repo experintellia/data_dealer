@@ -7,6 +7,8 @@ import appModule from './app.js';
 import { RenderDragHandler } from './render/RenderDragHandler.js';
 import { RenderNode, setRenderNodeRegistry, setRenderNodeTickers } from './render/RenderNode.js';
 import { RenderSet } from './render/RenderSet.js';
+import { RenderSprite } from './render/RenderSprite.js';
+import { RenderText } from './render/RenderText.js';
 import setup from './setup.js';
 import utilDefault from './util.js';
 
@@ -1250,130 +1252,25 @@ var Render = function () {
   /////////////////////////////
   // The Text
   /////////////////////////////
+  //
+  // Extracted to scripts/render/RenderText.ts in PR 32 of issue #147.
+  // Aliased back to `Text` so the existing in-IIFE call sites
+  // (`new Text(...)` in FXBling / FXBlingQueue, the publisher entry)
+  // keep working unchanged.
 
-  var Text = function (config) {
-    config = config || {};
-    this._id = _instances.length;
-    this.jdomelem = $("<div class='Text'></div>").attr('id', 'Text' + this._id);
-    this.domelem = this.jdomelem[0];
-    this.init(config);
-  };
-
-  extend(Text, Node);
-
-  Text.prototype.text = '';
-  Text.prototype.textAlign = 'center';
-
-  Text.prototype.updateRenderProp = function () {
-    // Update misc render properties, API for FONT-Settings etc...
-    this.css({
-      top: 0,
-      left: 0,
-      'text-align': this.textAlign,
-      'z-index': this.z,
-      position: this.position,
-    });
-  };
-
-  Text.prototype.draw = function () {
-    // Update domelem to current settings
-    this.setTransform(this.getTransform());
-    this.setPosition(this.getPosition());
-    this.setOpacity(this.opacity);
-  };
-
-  Text.prototype.onAddInit = function () {
-    this.updateText(this.text);
-    this.draw();
-  };
-
-  Text.prototype.updateText = function (text) {
-    if (!text) {
-      text = this.text;
-    }
-
-    this.text = text = _.crlf2html(text);
-    this.updateRenderProp();
-    this.jdomelem.html(text);
-    this.updateSize();
-    var newOffset = { x: 0, y: 0 };
-    var width = this.jdomelem.width() || 200;
-    if (this.textAlign === 'center') {
-      newOffset.x = Math.round(width / 2);
-    } else if (this.textAlign === 'right') {
-      newOffset.x = width;
-    }
-    this.setOffset(newOffset);
-  };
-
-  Text.prototype.updateSize = function () {
-    this.width = this.jdomelem.width() || 200;
-  };
-
-  Text.prototype.ssetSize = function () {
-    this.updateRenderProp();
-    this.updateSize();
-  };
+  var Text = RenderText;
 
   /////////////////////////////
   // The Sprite
   /////////////////////////////
+  //
+  // Extracted to scripts/render/RenderSprite.ts in PR 32 of issue #147.
+  // Aliased back to `Sprite` so the existing in-IIFE call sites
+  // (`new Sprite(...)` in many FX methods, `extend(Perp, Sprite)`,
+  // `extend(PerpSprite, Sprite)`, the publisher entry) keep working
+  // unchanged.
 
-  var Sprite = function (config) {
-    // Basic Sprite, div container with background image using spritemap
-    // Special config settings:
-    // config.frameSrc - Image source for the spritemap
-    // config.frameMap - framemap coordinates and offsets
-    // config.frame    - the currently active frame
-    config = config || {};
-    this._id = _instances.length;
-    this.frameSrc = config.frameSrc;
-    this.frameMap = config.frameMap;
-    this.frame = config.frame || 'normal';
-    this.jdomelem = $("<div class='Sprite'></div>").attr('id', 'Sprite' + this._id);
-    this.domelem = this.jdomelem[0];
-    this.init(config);
-    this.setFrameSrc(this.frameSrc);
-    this.setFrame(this.frame);
-    this.draw();
-  };
-
-  Sprite.prototype.frameSrc = '';
-  Sprite.prototype.frameMap = {
-    normal: { x: 0, y: 0, width: 0, height: 0, pivotx: 0, pivoty: 0 },
-  };
-
-  extend(Sprite, Node);
-
-  Sprite.prototype.setFrameSrc = function (src) {
-    // Set the Framemap source
-    if (!this.frameSrc) {
-      return;
-    }
-    this.spriteSrc = src;
-    this.css({
-      'background-image': 'url(' + setup.imagePathPrefix + this.frameSrc + ')',
-    });
-  };
-
-  Sprite.prototype.setFrame = function (frame) {
-    // Switch to a named frame on the spritemap
-    if (!this.frameMap || !this.frameMap.hasOwnProperty(frame)) {
-      return;
-    }
-    var map = this.frameMap[frame];
-    this.frame = frame;
-    this.width = map.width;
-    this.height = map.height;
-    if (map.pivotx && map.pivoty) {
-      this.setOffset({
-        x: map.pivotx,
-        y: map.pivoty,
-      });
-    }
-    this.domelem.style.backgroundPosition = -map.x + 'px ' + -map.y + 'px';
-    this.draw();
-  };
+  var Sprite = RenderSprite;
 
   /////////////////////////////
   // The Perp

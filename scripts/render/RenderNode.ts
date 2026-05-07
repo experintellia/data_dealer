@@ -61,7 +61,7 @@ function getRegistry(): RenderNodeRegistry {
 
 // ── DOM / jQuery surface that Node touches ──────────────────────────────────
 
-interface JQueryNodeElem {
+export interface JQueryNodeElem {
   0: HTMLElement;
   attr(name: string): string | undefined;
   attr(name: string, value: string): unknown;
