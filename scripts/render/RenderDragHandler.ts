@@ -41,7 +41,11 @@ interface JQueryEventTarget {
 export interface DraggableNode {
   offsetX: number;
   offsetY: number;
-  dragStartPos: { x: number; y: number };
+  // `T | undefined` (not optional `T?`) so the declared RenderNode
+  // shape (which uses the `T | undefined` form for
+  // `exactOptionalPropertyTypes` reasons) lines up.  Legacy nodes
+  // lazy-allocate this on first `addListener` call.
+  dragStartPos: { x: number; y: number } | undefined;
   dragging: boolean;
   getPosition(): { x: number; y: number };
   getSize(): { width: number; height: number };
@@ -306,9 +310,13 @@ export class RenderDragHandler {
       }
       for (const node of this.listeners) {
         node.trigger('dragmove');
+        // Node's `addListener` has just set this; if a caller
+        // mutated it to undefined out from under us, fall back to
+        // the current position.
+        const start = node.dragStartPos ?? { x: 0, y: 0 };
         const newPos = {
-          x: node.dragStartPos.x + this.dragVector.x,
-          y: node.dragStartPos.y + this.dragVector.y,
+          x: start.x + this.dragVector.x,
+          y: start.y + this.dragVector.y,
         };
         if (e.shiftKey) {
           newPos.x = Math.round(newPos.x / 20) * 20;

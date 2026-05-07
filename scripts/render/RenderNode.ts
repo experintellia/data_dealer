@@ -78,6 +78,9 @@ export interface JQueryNodeElem {
 
 interface NodeDomEvent {
   shiftKey?: boolean;
+  pageX?: number;
+  pageY?: number;
+  timeStamp?: number;
   preventDefault(): void;
   stopPropagation(): void;
 }
@@ -94,8 +97,16 @@ function getJQuery(): JQueryFactory {
 
 // ── structural surfaces for cross-class fields ──────────────────────────────
 
+// Structural surface RenderNode needs from the drag handler.  Kept
+// loose (`scale: number; domelem: Window`) so RenderViews / RenderPerp
+// can assign a real `RenderDragHandler` instance without dragging
+// the full implementation type into RenderNode's import graph
+// (RenderDragHandler doesn't import RenderNode, so this is purely
+// to keep the TS variance check happy when callers narrow further).
 interface DragHandlerLike {
-  collisionNodes: OrderedSet<RenderNode>;
+  scale: number;
+  domelem: Window;
+  collisionNodes: OrderedSet<{ getPosition(): { x: number; y: number } }>;
   addListener(node: RenderNode): void;
   on(ev: string, fn: (e: NodeDomEvent) => void): void;
   off(ev: string): void;
