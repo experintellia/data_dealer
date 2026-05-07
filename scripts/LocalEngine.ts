@@ -1803,7 +1803,9 @@ function _completeMissionsIfReady(
 }
 
 // Flips goals where current_amount >= amount but complete=false (caused by
-// progression handlers that updated current_amount without setting complete).
+// progression handlers that updated current_amount without setting complete),
+// and also drives mission completion for missions whose goals were all
+// flagged complete at seed time but never left active_missions.
 // Returns null when nothing needed repair so callers can skip persistence.
 function _repairStuckMissionGoals(state: LocalState): MissionAdvanceResult | null {
   var goals = state.mission_goals || [];

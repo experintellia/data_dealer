@@ -1650,6 +1650,8 @@ describe('loadGame — completes mission whose goals were auto-completed at seed
     expect(getState().active_missions).not.toContain(HEIDI_MISSION);
   });
 
+  // Reward baseline (cash 2000, xp 1) comes from HEIDI_MISSION's rewards in
+  // the live ruleset; if those change this assertion will need updating.
   it('pays out the mission reward when an already-finished mission is detected at load time', async () => {
     const baseGv = Object.assign({}, mkBuyPerpState().game_values, {
       cash_value: 100,
