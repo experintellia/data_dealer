@@ -1730,40 +1730,52 @@ function _completeMissionsIfReady(
 ): MissionAdvanceResult {
   var ruleset = _getRuleset();
   var completed: string[] = [];
-  var stillActive = activeMissions.filter(function (mGestalt) {
-    var goals = updatedGoals.filter(function (g) {
-      return g.mission === mGestalt;
-    });
-    if (!goals.length) return true;
-    if (
-      goals.every(function (g) {
-        return g.complete;
-      })
-    ) {
-      completed.push(mGestalt);
-      return false;
-    }
-    return true;
-  });
+  var newActive = activeMissions.slice();
 
-  var newActive = stillActive.slice();
-  if (ruleset && ruleset.missions && completed.length) {
-    _eachMissionDef(ruleset, function (def) {
-      var td = def.type_data;
-      if (!td) return;
-      var req = td.required_mission;
-      var gestalt = td.gestalt;
-      if (!req || !gestalt || newActive.indexOf(gestalt) !== -1) return;
-      if (completed.indexOf(req) === -1) return;
-      var seededGestalt: string = gestalt;
-      newActive.push(seededGestalt);
-      (td.goals || []).forEach(function (g) {
-        updatedGoals = updatedGoals.concat([_seedGoalRow(seededGestalt, g)]);
+  // Loop so a cascade activation whose buy_perp goals auto-complete (because
+  // the player already owns the targets) is itself recognized as finished
+  // in the same pass — otherwise the mission stays in active_missions with
+  // every goal checked off.
+  while (true) {
+    var newlyCompleted: string[] = [];
+    var stillActive = newActive.filter(function (mGestalt) {
+      var goals = updatedGoals.filter(function (g) {
+        return g.mission === mGestalt;
       });
+      if (!goals.length) return true;
+      if (
+        goals.every(function (g) {
+          return g.complete;
+        })
+      ) {
+        newlyCompleted.push(mGestalt);
+        return false;
+      }
+      return true;
     });
-    // Auto-complete buy_perp goals for items the player already owns so a
-    // mission that unlocks after the item was bought doesn't get stuck.
-    updatedGoals = _autoCompleteBuyPerpGoals(updatedGoals, getState().nodes);
+
+    if (!newlyCompleted.length) break;
+    completed = completed.concat(newlyCompleted);
+    newActive = stillActive;
+
+    if (ruleset && ruleset.missions) {
+      _eachMissionDef(ruleset, function (def) {
+        var td = def.type_data;
+        if (!td) return;
+        var req = td.required_mission;
+        var gestalt = td.gestalt;
+        if (!req || !gestalt || newActive.indexOf(gestalt) !== -1) return;
+        if (newlyCompleted.indexOf(req) === -1) return;
+        var seededGestalt: string = gestalt;
+        newActive.push(seededGestalt);
+        (td.goals || []).forEach(function (g) {
+          updatedGoals = updatedGoals.concat([_seedGoalRow(seededGestalt, g)]);
+        });
+      });
+      // Auto-complete buy_perp goals for items the player already owns so a
+      // mission that unlocks after the item was bought doesn't get stuck.
+      updatedGoals = _autoCompleteBuyPerpGoals(updatedGoals, getState().nodes);
+    }
   }
 
   var updatedMissions = activeMissions.filter(function (m) {
@@ -1814,7 +1826,19 @@ function _repairStuckMissionGoals(state: LocalState): MissionAdvanceResult | nul
     return goal;
   });
 
-  if (!changed) return null;
+  // Also catches missions whose goals were auto-completed at seed time
+  // (e.g. buy_perp targets the player already owned): the goals are flagged
+  // complete but the mission never left active_missions.
+  var hasFinishedActiveMission = activeMissions.some(function (mGestalt) {
+    var mg = updatedGoals.filter(function (g) {
+      return g.mission === mGestalt;
+    });
+    return mg.length > 0 && mg.every(function (g) {
+      return g.complete;
+    });
+  });
+
+  if (!changed && !hasFinishedActiveMission) return null;
   return _completeMissionsIfReady(updatedGoals, activeMissions);
 }
 
