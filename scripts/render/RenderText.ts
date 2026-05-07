@@ -45,8 +45,11 @@ export class RenderText extends RenderNode {
   }
 
   constructor(config: TextConfig = {}) {
-    const $ = getJQuery();
-    const jdomelem = $("<div class='Text'></div>") as unknown as JQueryNodeElem;
+    // Respect a subclass-supplied jdomelem (e.g. ButtonInline's
+    // `<div class='Button'>` wrapper).  Only fall through to the
+    // default Text container when no subclass overrode it.
+    const jdomelem =
+      config.jdomelem ?? (getJQuery()("<div class='Text'></div>") as unknown as JQueryNodeElem);
     super({ ...config, jdomelem });
   }
 

@@ -55,8 +55,12 @@ export class RenderSprite extends RenderNode {
   }
 
   constructor(config: SpriteConfig = {}) {
-    const $ = getJQuery();
-    const jdomelem = $("<div class='Sprite'></div>") as unknown as JQueryNodeElem;
+    // Respect a subclass-supplied jdomelem (e.g. DecoratorTimer's
+    // custom `<div class='DecoratorTimer'>` wrapper that already
+    // holds the canvas + text children).  Only fall through to the
+    // default Sprite container when no subclass overrode it.
+    const jdomelem =
+      config.jdomelem ?? (getJQuery()("<div class='Sprite'></div>") as unknown as JQueryNodeElem);
     super({ ...config, jdomelem });
     // super → RenderNode.init → setAttrs(config) has already assigned
     // frameSrc / frameMap / frame from `config` (when present).  Apply
