@@ -850,8 +850,7 @@ export class RenderStage extends RenderNode {
     // `<div class='MainMenu'>` wrapper).  Same pattern as the
     // PR #221 jdomelem-clobber fix in RenderSprite/RenderText.
     const jdomelem =
-      (config.jdomelem as unknown as JQueryViewElem | undefined) ??
-      $("<div class='Stage'></div>");
+      (config.jdomelem as unknown as JQueryViewElem | undefined) ?? $("<div class='Stage'></div>");
     const jdomelem2 = $("<div class='PopupContainer Top NoClose'></div>");
     jdomelem.append(jdomelem2);
 
