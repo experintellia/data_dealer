@@ -5,6 +5,11 @@
 // the vendor `<script>` tags execute.
 import appModule from './app.js';
 import { RenderButtonInline as RenderButtonInlineClass } from './render/RenderButtonInline.js';
+import {
+  RenderCable as RenderCableClass,
+  RenderPerpCable as RenderPerpCableClass,
+  setRenderCableResolution,
+} from './render/RenderCables.js';
 import { RenderCircle as RenderCircleClass } from './render/RenderCircle.js';
 import {
   RenderDecoratorAmount as RenderDecoratorAmountClass,
@@ -19,7 +24,7 @@ import {
 import { RenderDragHandler } from './render/RenderDragHandler.js';
 import { RenderNode, setRenderNodeRegistry, setRenderNodeTickers } from './render/RenderNode.js';
 import { applyRenderNodeFX } from './render/RenderNodeFX.js';
-import { RenderPerp as RenderPerpClass, setPerpCableCtor } from './render/RenderPerp.js';
+import { RenderPerp as RenderPerpClass } from './render/RenderPerp.js';
 import { RenderPerpSprite as RenderPerpSpriteClass } from './render/RenderPerpSprite.js';
 import { RenderSet } from './render/RenderSet.js';
 import { RenderSprite as RenderSpriteClass } from './render/RenderSprite.js';
@@ -300,11 +305,9 @@ var Render = function () {
   //
   // Extracted to scripts/render/RenderPerp.ts in PR 35 of issue
   // #147.  Aliased back to `Perp` so existing in-IIFE call sites
-  // and the publisher entry keep working unchanged.  Cable handling
-  // crosses an extraction boundary: `Cable` / `PerpCable` still
-  // live in this IIFE, so RenderPerp late-binds the PerpCable
-  // constructor through `setPerpCableCtor()` — wired below, just
-  // after PerpCable is defined.
+  // and the publisher entry keep working unchanged.  PR 37
+  // retired the `setPerpCableCtor` seam — RenderPerp.cableTo
+  // imports `RenderPerpCable` directly now.
 
   var Perp = RenderPerpClass;
 
@@ -337,426 +340,19 @@ var Render = function () {
   var DecoratorAmount = RenderDecoratorAmountClass;
 
   /////////////////////////////
-  // The Cable
+  // The Cable + PerpCable
   /////////////////////////////
+  //
+  // Extracted to scripts/render/RenderCables.ts in PR 37 of issue
+  // #147.  Aliased back to `Cable` / `PerpCable` so the publisher
+  // entries and any external consumer keeps working unchanged.
+  // The `setPerpCableCtor` seam from PR #220 is now retired —
+  // RenderPerp.cableTo imports RenderPerpCable directly.
 
-  // TODO: Embed Image data or find other solutions to reduce requests
+  setRenderCableResolution(renderConf.cableResolution);
 
-  var SparkImg = new Image();
-  SparkImg.src = 'img/sprite_spark.png';
-  var SparkImg0 = new Image();
-  SparkImg0.src = 'img/sprite_spark_small.png';
-  var PlugImg = new Image();
-  PlugImg.src = 'img/sprite_plug.png';
-
-  var KrapsImg = new Image();
-  KrapsImg.src = 'img/sprite_kraps.png';
-  var KrapsImg0 = new Image();
-  KrapsImg0.src = 'img/sprite_kraps_small.png';
-  var GulpImg = new Image();
-  GulpImg.src = 'img/sprite_gulp.png';
-
-  var Cable = function (config) {
-    // Simple cable with canvas render method, to connect perps use Subclass PerpCable
-    config = config || {};
-    this._id = _instances.length;
-    this.tension = config.tension || 1;
-    this.cableMaxLength = config.cableMaxLength || 400;
-    this.z = -1;
-    this.offsetX = config.offsetX || 16;
-    this.offsetY = config.offsetY || 16;
-    this.pointFrom = config.pointFrom || { x: 350, y: 50 };
-    this.pointTo = config.pointTo || { x: 550, y: 250 };
-    this.jdomelem = $("<canvas class='Cable'>Cable" + this._id + '</canvas>').attr(
-      'id',
-      'Cable' + this._id
-    );
-    this.domelem = this.jdomelem[0];
-    this.init(config);
-    //this.draw();
-  };
-
-  extend(Cable, Node);
-
-  Cable.prototype.straightness = 1;
-  Cable.prototype.progress = 1;
-  Cable.prototype.dataposIn = 0;
-  Cable.prototype.dataposOut = 0;
-  // Modes: in, out, "inout"
-  Cable.prototype.mode = 'in';
-  Cable.prototype.colorIn = '#16A3D7';
-  Cable.prototype.colorOut = '#E85E2B';
-
-  Cable.prototype.getPoints = function () {
-    return {
-      p1: this.pointFrom,
-      p5: this.pointTo,
-    };
-  };
-
-  Cable.prototype.getLength = function () {
-    // This is the old Becier fallback, not in use currently
-    var p = this.getPoints();
-    var cx = p.p1.x < p.p5.x ? p.p1.x : p.p5.x;
-    var cy = p.p1.y < p.p5.y ? p.p1.y : p.p5.y;
-    var x = p.p1.x - cx + this.offsetX;
-    var y = p.p1.y - cy + this.offsetY;
-    var x2 = p.p5.x - cx + this.offsetX;
-    var y2 = p.p5.y - cy + this.offsetY;
-    var dx = x2 - x,
-      dy = y2 - y;
-    var len = Math.sqrt(dx * dx + dy * dy);
-    return len;
-  };
-
-  Cable.prototype.draw = function () {
-    if (this.hidden || this.progress <= 0) {
-      this.css({
-        display: 'none',
-      });
-      return;
-    } else {
-      this.css({
-        display: 'block',
-      });
-    }
-
-    var offset = 0;
-    if (this.mode === 'inout') {
-      offset = 4;
-    }
-    var p = this.getPoints();
-    this.domelem.width = this.width = Math.abs(p.p1.x - p.p5.x) + this.offsetX * 2;
-    this.domelem.height = this.height = Math.abs(p.p1.y - p.p5.y) + this.offsetY * 2;
-    var cx = p.p1.x < p.p5.x ? p.p1.x : p.p5.x;
-    var cy = p.p1.y < p.p5.y ? p.p1.y : p.p5.y;
-
-    //path.setSize({width:this.width,height:this.height});
-    this.setTransform(this.getTransform());
-    //var modeoff = (this.mode === 'in') ? 0 : 6;
-    this.setPosition({ x: cx, y: cy });
-    var tension = this.tension;
-    var cableMaxLength = this.cableMaxLength;
-    var x = p.p1.x - cx + this.offsetX;
-    var y = p.p1.y - cy + this.offsetY;
-    var x2 = p.p5.x - cx + this.offsetX;
-    var y2 = p.p5.y - cy + this.offsetY;
-    //var xa = p.p2.x-cx;
-    //var ya = p.p2.y-cy;
-    //var xb = p.p3.x-cx;
-    //var yb = p.p3.y-cy;
-    //var xc = p.p4.x-cx;
-    //var yc = p.p4.y-cy;
-
-    var dx = x2 - x,
-      dy = y2 - y;
-    var len = Math.sqrt(dx * dx + dy * dy);
-    this.length = len;
-    //tension = (Math.abs(x-p.p3.x)+Math.abs(y-p.p3.y))/len;
-    var sinefreq = 360;
-    var dxa = Math.abs(dx);
-    var dya = Math.abs(dy);
-    var slope = dx * dy > 0 ? -1 : 1;
-    var radalpha = dxa < dya ? Math.asin(dx / len) : Math.asin(dy / len);
-    var radbeta = Math.PI / 2 - Math.abs(radalpha);
-    var sineamp = (len / 4 / Math.tan(radbeta)) * slope;
-
-    // adjust for flatter curve
-    //sineamp = sineamp * 0.5;
-
-    // Resolution of path:
-    var seqs = renderConf.cableResolution;
-    //var seqs = renderConf.cableResolution+(1-this.straightness)*10;
-    // Dash Array
-    var da = [seqs, 0];
-    //var da = [seqs,0+(1-this.straightness)*10];
-
-    var ctx = this.domelem.getContext('2d');
-    var rot = Math.atan2(dy, dx);
-    ctx.lineWidth = 6;
-
-    ctx.translate(x, y);
-    ctx.rotate(rot);
-
-    var dc = da.length;
-    var di = 0,
-      draw = true;
-    var vari = 0;
-    var snu;
-    var stretch = cableMaxLength - len;
-    var flatness = stretch < 0 ? 0 : (stretch / cableMaxLength) * this.straightness;
-    var progress = len * this.progress;
-
-    // Orange Cable (Data out of DB)
-    if (this.mode === 'out' || this.mode === 'inout') {
-      ctx.beginPath();
-      ctx.moveTo(len - offset, offset);
-      //ctx.lineTo(dx,0);
-      //ctx.lineTo(dx,dy);
-      //ctx.lineTo(0,dy);
-      //ctx.lineTo(0,0);
-      //ctx.rotate(rot);
-      x = 0;
-      snu = sinefreq / len;
-      while (x < progress) {
-        x += da[di++ % dc];
-        if (x > len) {
-          x = len;
-        }
-        vari = Math.sin((x * snu * Math.PI) / 180) * sineamp * flatness;
-        vari = vari + Math.sin((x * snu * ((1 - tension) * 15) * Math.PI) / 180) * 15 * flatness;
-        draw ? ctx.lineTo(len - x, -vari + offset) : ctx.moveTo(len - x, -vari + offset);
-        //draw ? ctx.rect(x, vari,1,vari): ctx.moveTo(x, vari);
-        //draw ? ctx.arc(x, varisum, 10-Math.abs(vari2), 0 , 2 * Math.PI, false): ctx.moveTo(x, vari);
-        draw = !draw;
-
-        //ctx.lineTo(x, vari);
-      }
-
-      // "#16A3D7" "#E85E2B";
-      //ctx.lineCap = 'round';
-      ctx.lineCap = 'butt';
-      ctx.strokeStyle = this.colorOut;
-      ctx.stroke();
-
-      if (this.progress > 0 && this.progress < 1) {
-        x = offset;
-        progress = len * this.progress;
-        x = len - progress;
-        x = x - 16;
-        vari = Math.sin((x * snu * Math.PI) / 180) * sineamp * flatness;
-        vari = vari + Math.sin((x * snu * ((1 - tension) * 18) * Math.PI) / 180) * 15 * flatness;
-        ctx.drawImage(GulpImg, x, vari - 8 + offset);
-      }
-    }
-
-    // Blue Cable (Data into DB)
-    if (this.mode === 'in' || this.mode === 'inout') {
-      /* Fallback to Bezier Drawing
-          ctx.beginPath();
-          ctx.moveTo(x,y);
-          ctx.quadraticCurveTo(xa, ya, xb, yb);
-          ctx.quadraticCurveTo(xc, yc, x2, y2);
-
-          ctx.strokeStyle="red";
-          ctx.stroke();
-          return;
-          */
-
-      ctx.beginPath();
-      ctx.moveTo(0 - offset, 0 - offset);
-      //ctx.lineTo(dx,0);
-      //ctx.lineTo(dx,dy);
-      //ctx.lineTo(0,dy);
-      //ctx.lineTo(0,0);
-      dc = da.length;
-      di = 0;
-      draw = true;
-      x = 0;
-      vari = 0;
-      snu = sinefreq / len;
-      stretch = cableMaxLength - len;
-      flatness = stretch < 0 ? 0 : (stretch / cableMaxLength) * this.straightness;
-      progress = len * this.progress;
-      while (x < progress) {
-        x += da[di++ % dc];
-        if (x > len) {
-          x = len;
-        }
-        vari = Math.sin((x * snu * Math.PI) / 180) * sineamp * flatness;
-        vari = vari + Math.sin((x * snu * ((1 - tension) * 15) * Math.PI) / 180) * 15 * flatness;
-        draw ? ctx.lineTo(x, vari - offset) : ctx.moveTo(x, vari - offset);
-        //draw ? ctx.rect(x, vari,1,vari): ctx.moveTo(x, vari);
-        //draw ? ctx.arc(x, varisum, 10-Math.abs(vari2), 0 , 2 * Math.PI, false): ctx.moveTo(x, vari);
-        draw = !draw;
-
-        //ctx.lineTo(x, vari);
-      }
-
-      // "#16A3D7" "#E85E2B";
-      //ctx.lineCap = 'round';
-      ctx.lineCap = 'butt';
-      ctx.strokeStyle = this.colorIn;
-      ctx.stroke();
-      if (this.progress > 0 && this.progress < 1) {
-        x = 0 - offset;
-        progress = len * this.progress;
-        x = progress;
-        x = x + 8;
-        vari = Math.sin((x * snu * Math.PI) / 180) * sineamp * flatness;
-        vari = vari + Math.sin((x * snu * ((1 - tension) * 18) * Math.PI) / 180) * 15 * flatness;
-        ctx.drawImage(PlugImg, x - 8, vari - 8 - offset);
-      }
-    }
-
-    // Data Sprites
-
-    var datapos;
-
-    if (this.dataposIn > 0 && this.dataposIn < 1) {
-      x = 0 - offset;
-      datapos = len * this.dataposIn;
-      x = datapos;
-      x = x - 10;
-      vari = Math.sin((x * snu * Math.PI) / 180) * sineamp * flatness;
-      vari = vari + Math.sin((x * snu * ((1 - tension) * 18) * Math.PI) / 180) * 15 * flatness;
-      //vari = vari + (Math.sin(x * 90/len * 15 * Math.PI/180)*15)*flatness;
-      ctx.drawImage(SparkImg0, x - 12, vari - 12 - offset);
-      x = x + 10;
-      vari = Math.sin((x * snu * Math.PI) / 180) * sineamp * flatness;
-      vari = vari + Math.sin((x * snu * ((1 - tension) * 18) * Math.PI) / 180) * 15 * flatness;
-      //vari = vari + (Math.sin(x * 90/len * 15 * Math.PI/180)*15)*flatness;
-      //ctx.drawImage(SparkImg,x-16,vari-16);
-      ctx.drawImage(SparkImg, x - 16, vari - 16 - offset);
-      x = x + 10;
-      vari = Math.sin((x * snu * Math.PI) / 180) * sineamp * flatness;
-      vari = vari + Math.sin((x * snu * ((1 - tension) * 15) * Math.PI) / 180) * 15 * flatness;
-      //vari = vari + (Math.sin(x * 90/len * 15 * Math.PI/180)*15)*flatness;
-      ctx.drawImage(SparkImg0, x - 12, vari - 12 - offset);
-    }
-    if (this.dataposOut > 0 && this.dataposOut < 1) {
-      x = offset;
-      datapos = len * this.dataposOut;
-      x = datapos;
-      x = x - 10;
-      vari = Math.sin((x * snu * Math.PI) / 180) * sineamp * flatness;
-      vari = vari + Math.sin((x * snu * ((1 - tension) * 18) * Math.PI) / 180) * 15 * flatness;
-      ctx.drawImage(KrapsImg0, x - 12, vari - 12 + offset);
-      //vari = vari + (Math.sin(x * 90/len * 15 * Math.PI/180)*15)*flatness;
-      x = x + 10;
-      vari = Math.sin((x * snu * Math.PI) / 180) * sineamp * flatness;
-      vari = vari + Math.sin((x * snu * ((1 - tension) * 18) * Math.PI) / 180) * 15 * flatness;
-      //vari = vari + (Math.sin(x * 90/len * 15 * Math.PI/180)*15)*flatness;
-      //ctx.drawImage(SparkImg,x-16,vari-16);
-      ctx.drawImage(KrapsImg, x - 16, vari - 16 + offset);
-      x = x + 10;
-      vari = Math.sin((x * snu * Math.PI) / 180) * sineamp * flatness;
-      vari = vari + Math.sin((x * snu * ((1 - tension) * 15) * Math.PI) / 180) * 15 * flatness;
-      //vari = vari + (Math.sin(x * 90/len * 15 * Math.PI/180)*15)*flatness;
-      ctx.drawImage(KrapsImg0, x - 12, vari - 12 + offset);
-    }
-
-    //ctx.lineTo(x, 0);
-    //ctx.lineCap = 'round';
-    //ctx.fillStyle="#16A3D7";
-    //ctx.fill();
-  };
-
-  Cable.prototype.FXWobbleTension = function (tension) {
-    var duration = tension < 1 ? 300 : 500;
-    //this.dataposIn=0;
-    //this.dataposOut=0;
-    // Cue Tweens like this!!! Finally got it to work;
-    return this.FXSimpleCue({ tension: tension }, duration, 'easeOut');
-  };
-
-  Cable.prototype.FXToggleConnect = function (progress) {
-    var duration = progress < 1 ? 200 : 800;
-    return this.FXSimpleCue({ progress: progress }, duration, 'sineInOut');
-  };
-
-  Cable.prototype.FXStraighten = function (straightness) {
-    var easing = straightness === 1 ? 'easeOut' : 'linear';
-    var duration = straightness === 1 ? 200 : 100;
-    return this.FXSimpleCue({ straightness: straightness }, duration, easing);
-  };
-
-  Cable.prototype.FXConnect = function (cb) {
-    this.progress = 0;
-    this.show();
-    //cable.dataposIn=0;
-    //return this.FXSimple({dataposIn:1,progress:1},1000,'sineInOut');
-    return this.FXSimpleCue({ progress: 1 }, 1000, 'sineInOut', cb);
-  };
-
-  Cable.prototype.FXDisconnect = function (cb) {
-    this.progress = 1;
-    return this.FXSimpleCue({ progress: 0 }, 500, 'sineInOut', cb);
-  };
-
-  Cable.prototype.FXDataIn = function (cb) {
-    var duration = this.length * 2;
-    this.FXSimpleCue({ dataposIn: 1 }, 0);
-    return this.FXSimpleCue({ dataposIn: 0 }, duration, 'linear', cb);
-    //cable.dataposIn=1;
-    //cable.tension=1;
-    //return this.FXSimple({datapos:1},1000,'sineInOut',function(){
-    /*
-      var tween = this.FXSimple({dataposIn:0},500,'linear',function(){
-        cable.dataposIn=1;
-        if (cb) {
-          cb();
-        }
-      });
-      */
-    /*
-      Ticker.addListener(cable);
-      // Cue Tweens like this!!! Finally got it to work;
-      if (!Tween.hasActiveTweens(this)) {
-        this.FXAnimation = Tween.get(cable).to({dataposIn:1},0,Ease.linear).to({dataposIn:0},500)
-        .call(function(){
-          Ticker.removeListener(cable);
-        });
-      } else if (Tween.hasActiveTweens(this)) {
-        Ticker.addListener(cable);
-        this.FXAnimation
-        .call(function(){
-          Ticker.addListener(cable);
-        })
-        .to({dataposIn:1},0,Ease.linear).to({dataposIn:0},500)
-        .call(function(){
-          Ticker.removeListener(cable);
-        });
-      }
-      */
-  };
-
-  Cable.prototype.FXDataOut = function (cb) {
-    var duration = this.length * 2;
-    this.FXSimpleCue({ dataposOut: 0 }, 0);
-    return this.FXSimpleCue({ dataposOut: 1 }, duration, 'linear', cb);
-  };
-
-  /////////////////////////////
-  // The PerpCable
-  /////////////////////////////
-
-  var PerpCable = function (config, perpFrom, perpTo) {
-    // Connection cable with perps as start and endpoint...
-    config = config || {};
-    this._id = _instances.length;
-    this.tension = config.tension || 1;
-    //this.cableMaxLength = config.cableMaxLength || 480;
-    // Clip to 480px, so Cables usually are never longer than 512 (texture size)
-    this.cableMaxLength = config.cableMaxLength || 480;
-    this.z = -1;
-    this.offsetX = config.offsetX || 16;
-    this.offsetY = config.offsetY || 16;
-    this.perpFrom = perpFrom;
-    this.perpTo = perpTo;
-    //if (!perpFrom.sticky) perpFrom.cables.push(this);
-    perpFrom.cables.add(this);
-    perpTo.cables.add(this);
-    this.pointFrom = this.perpFrom.getPosition();
-    this.pointTo = this.perpTo.getPosition();
-    this.jdomelem = $("<canvas class='Cable'></canvas>").attr('id', 'Cable' + this._id);
-    this.domelem = this.jdomelem[0];
-    this.init(config);
-    //this.draw();
-  };
-
-  extend(PerpCable, Cable);
-
-  // Wire the late-bound PerpCable seam used by RenderPerp.cableTo /
-  // cableAnimatedTo (PR 35 of issue #147).
-  setPerpCableCtor(PerpCable);
-
-  PerpCable.prototype.getPoints = function () {
-    return {
-      p1: this.perpFrom.getPosition(),
-      p5: this.perpTo.getPosition(),
-    };
-  };
+  var Cable = RenderCableClass;
+  var PerpCable = RenderPerpCableClass;
 
   /////////////////////////////
   // The ViewTab
