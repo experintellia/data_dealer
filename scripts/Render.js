@@ -7,8 +7,8 @@ import appModule from './app.js';
 import { RenderDragHandler } from './render/RenderDragHandler.js';
 import { RenderNode, setRenderNodeRegistry, setRenderNodeTickers } from './render/RenderNode.js';
 import { RenderSet } from './render/RenderSet.js';
-import { RenderSprite } from './render/RenderSprite.js';
-import { RenderText } from './render/RenderText.js';
+import { RenderSprite as RenderSpriteClass } from './render/RenderSprite.js';
+import { RenderText as RenderTextClass } from './render/RenderText.js';
 import setup from './setup.js';
 import utilDefault from './util.js';
 
@@ -1254,23 +1254,27 @@ var Render = function () {
   /////////////////////////////
   //
   // Extracted to scripts/render/RenderText.ts in PR 32 of issue #147.
-  // Aliased back to `Text` so the existing in-IIFE call sites
-  // (`new Text(...)` in FXBling / FXBlingQueue, the publisher entry)
-  // keep working unchanged.
+  // Imported as `RenderTextClass` and aliased back to `Text` so the
+  // existing in-IIFE call sites (`new Text(...)` in FXBling /
+  // FXBlingQueue, the publisher entry) keep working unchanged.
 
-  var Text = RenderText;
+  var Text = RenderTextClass;
 
   /////////////////////////////
   // The Sprite
   /////////////////////////////
   //
   // Extracted to scripts/render/RenderSprite.ts in PR 32 of issue #147.
-  // Aliased back to `Sprite` so the existing in-IIFE call sites
-  // (`new Sprite(...)` in many FX methods, `extend(Perp, Sprite)`,
-  // `extend(PerpSprite, Sprite)`, the publisher entry) keep working
-  // unchanged.
+  // Imported as `RenderSpriteClass` (not `RenderSprite`) because this
+  // IIFE already owns a legacy `var RenderSprite = function(...)`
+  // helper further down — `var` hoisting would otherwise shadow the
+  // imported binding and leave `Sprite` resolving to `undefined`,
+  // which detonates the first `extend(Perp, Sprite)` call.  Aliased
+  // back to `Sprite` so the in-IIFE call sites (`new Sprite(...)`
+  // in many FX methods, `extend(Perp, Sprite)`, `extend(PerpSprite,
+  // Sprite)`, the publisher entry) keep working unchanged.
 
-  var Sprite = RenderSprite;
+  var Sprite = RenderSpriteClass;
 
   /////////////////////////////
   // The Perp
