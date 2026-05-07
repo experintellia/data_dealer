@@ -1594,6 +1594,104 @@ describe('buyPerp — mission activating after nurse already owned seeds goal as
   });
 });
 
+// Regression: an active mission whose goals were all auto-completed at seed
+// time (e.g. buy_perp targets the player already owned) was left stuck in
+// active_missions because _repairStuckMissionGoals only inspected goals
+// where complete=false.
+describe('loadGame — completes mission whose goals were auto-completed at seed time', () => {
+  const HEIDI_MISSION = '16f302f84b84498a734dfdbe1a7794b9000';
+  const AGENT_NODE = {
+    game_id: 'node_agent',
+    game_type: 'AgentPerp',
+    full_type: 'AgentPerp:agent004',
+    gestalt: 'agent004',
+    full_path: 'Imperium.agent004',
+    instance_data: {},
+  };
+  const CONTACT_NODE = {
+    game_id: 'node_contact',
+    game_type: 'ContactPerp',
+    full_type: 'ContactPerp:contact026',
+    gestalt: 'contact026',
+    full_path: 'Imperium.contact026',
+    instance_data: {},
+  };
+
+  it('removes mission from active_missions when all buy_perp goals are already complete', async () => {
+    setState(
+      Object.assign(mkBuyPerpState(), {
+        active_missions: [HEIDI_MISSION],
+        mission_goals: [
+          {
+            mission: HEIDI_MISSION,
+            workflow: 'buy_perp',
+            target: 'agent004',
+            amount: 0,
+            position: 1,
+            current_amount: 1,
+            complete: true,
+          },
+          {
+            mission: HEIDI_MISSION,
+            workflow: 'buy_perp',
+            target: 'contact026',
+            amount: 0,
+            position: 2,
+            current_amount: 1,
+            complete: true,
+          },
+        ],
+        nodes: mkBuyPerpState().nodes.concat([AGENT_NODE, CONTACT_NODE]),
+      })
+    );
+
+    await loadGame();
+
+    expect(getState().active_missions).not.toContain(HEIDI_MISSION);
+  });
+
+  // Reward baseline (cash 2000, xp 1) comes from HEIDI_MISSION's rewards in
+  // the live ruleset; if those change this assertion will need updating.
+  it('pays out the mission reward when an already-finished mission is detected at load time', async () => {
+    const baseGv = Object.assign({}, mkBuyPerpState().game_values, {
+      cash_value: 100,
+      xp_value: 0,
+    });
+    setState(
+      Object.assign(mkBuyPerpState(), {
+        game_values: baseGv,
+        active_missions: [HEIDI_MISSION],
+        mission_goals: [
+          {
+            mission: HEIDI_MISSION,
+            workflow: 'buy_perp',
+            target: 'agent004',
+            amount: 0,
+            position: 1,
+            current_amount: 1,
+            complete: true,
+          },
+          {
+            mission: HEIDI_MISSION,
+            workflow: 'buy_perp',
+            target: 'contact026',
+            amount: 0,
+            position: 2,
+            current_amount: 1,
+            complete: true,
+          },
+        ],
+        nodes: mkBuyPerpState().nodes.concat([AGENT_NODE, CONTACT_NODE]),
+      })
+    );
+
+    await loadGame();
+
+    expect(getState().game_values.cash_value).toBe(2100);
+    expect(getState().game_values.xp_value).toBe(1);
+  });
+});
+
 // ── setLocale ────────────────────────────────────────────────────────────────
 
 describe('setLocale', () => {
