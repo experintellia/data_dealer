@@ -7,7 +7,7 @@
 // `perpCtors[name]` (typed direct map, PR 17 of issue #147); the
 // known-name `Game.TokenPerp` reference uses a direct import.
 
-import { getRender } from '../Render.js';
+import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
 import i18n from '../i18n.js';
 import {
@@ -20,6 +20,7 @@ import {
   getByType,
   getFirstId,
 } from './GameNode.js';
+import { type RenderPopupLike } from './GamePerp.js';
 import { OrderedSet } from './OrderedSet.js';
 import { ProfileSet } from './ProfileSet.js';
 import { TokenPerp } from './TokenPerp.js';
@@ -30,9 +31,10 @@ import { perpCtors } from './perpCtors.js';
 // Local types
 // ---------------------------------------------------------------------------
 
-interface RenderMenuLike {
-  addButton(label: string, id: string, states: Record<string, boolean>): void;
-}
+// RenderMenuLike — replaced with a Pick of the actual MainMenu instance
+// type to retire the structural triplicate that lived here, in
+// Imperium.ts, Missions.ts, and Topscores.ts.
+type RenderMenuLike = Pick<InstanceType<RenderApi['MainMenu']>, 'addButton'>;
 
 interface RenderNodeLike {
   addChild?(node: unknown, ...args: unknown[]): void;
@@ -62,12 +64,8 @@ interface RenderNodeLike {
   trigger(ev: string, args?: unknown[]): void;
 }
 
-interface RenderPopupLike {
-  open?: boolean;
-  trigger(ev: string, args?: unknown[]): void;
-  close(): void;
-  on(ev: string, handler: (...args: unknown[]) => void): void;
-}
+// RenderPopupLike — re-imported from GamePerp.ts (canonical definition).
+// Was triplicated across Database / GameRoot / GameNode prior to this PR.
 
 /** GameRoot's surface this class touches.  Narrow forward-ref interface;
  *  will collapse when GameRoot is extracted to its own typed module. */
@@ -225,28 +223,8 @@ export class Database extends GameNode {
     return this.renderNode as RenderNodeLike | undefined;
   }
 
-  private getRenderModule(): {
-    Popup: new (cfg: unknown) => RenderPopupLike;
-    DBQueue: new (
-      cfg: unknown
-    ) => RenderNodeLike & {
-      gameNode?: Database;
-      render(): void;
-    };
-    DecoratorNew: new (cfg: unknown) => unknown;
-    getById(id: unknown): unknown;
-  } {
-    return getRender() as unknown as {
-      Popup: new (cfg: unknown) => RenderPopupLike;
-      DBQueue: new (
-        cfg: unknown
-      ) => RenderNodeLike & {
-        gameNode?: Database;
-        render(): void;
-      };
-      DecoratorNew: new (cfg: unknown) => unknown;
-      getById(id: unknown): unknown;
-    };
+  private getRenderModule(): Pick<RenderApi, 'Popup' | 'DBQueue' | 'DecoratorNew' | 'getById'> {
+    return getRender();
   }
 
   compileSuperTokens(): void {
@@ -330,7 +308,9 @@ export class Database extends GameNode {
       popupContainer: this,
     };
 
-    const popup = new Render.Popup(popupConfig);
+    const popup = new Render.Popup(
+      popupConfig as unknown as ConstructorParameters<RenderApi['Popup']>[0]
+    ) as unknown as RenderPopupLike;
     this.renderPopup = popup;
     this.renderApi?.addPopup?.(popup);
 
@@ -443,7 +423,12 @@ export class Database extends GameNode {
     // FIXME: name should be in data
     groot.renderMenu.addButton(i18n.gettext('Database'), this.id, this.states);
     this.compileSuperTokens();
-    this.renderDBQueue = new Render.DBQueue({ data: this.data, queue: this.queue });
+    this.renderDBQueue = new Render.DBQueue({
+      data: this.data,
+      queue: this.queue,
+    } as unknown as ConstructorParameters<RenderApi['DBQueue']>[0]) as unknown as NonNullable<
+      Database['renderDBQueue']
+    >;
     this.renderDBQueue.gameNode = this;
     this.renderApi?.addChild?.(this.renderDBQueue, true);
   }
@@ -722,7 +707,9 @@ export class Database extends GameNode {
       popupContainer: this,
     };
 
-    const popup = new Render.Popup(popupConfig);
+    const popup = new Render.Popup(
+      popupConfig as unknown as ConstructorParameters<RenderApi['Popup']>[0]
+    ) as unknown as RenderPopupLike;
     this.renderPopup = popup;
     (gnode.renderNode as RenderNodeLike | undefined)?.addPopup?.(popup);
 

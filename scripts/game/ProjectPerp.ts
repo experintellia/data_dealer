@@ -11,7 +11,7 @@
 //
 // Extracted from scripts/Game.js's IIFE in PR 15 of issue #147.
 
-import { getRender } from '../Render.js';
+import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
 import i18n from '../i18n.js';
 import { type GameNodeConfig } from './GameNode.js';
@@ -664,9 +664,7 @@ export class ProjectPerp extends GamePerp {
     gperp.setState('chargeRunning', false);
     const timer = gperp.renderTimer as { FXPuff?(): void } | undefined;
     timer?.FXPuff?.();
-    const Render = getRender() as unknown as {
-      DecoratorReady: new () => DecoratorReadyLike;
-    };
+    const Render = getRender() as Pick<RenderApi, 'DecoratorReady'>;
     const rn = this.renderNode as RenderNodeLike | undefined;
     const deco = rn?.addDecorator?.(new Render.DecoratorReady()) as DecoratorReadyLike | undefined;
     if (!deco) return;

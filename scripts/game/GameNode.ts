@@ -19,12 +19,22 @@
 // don't crash on module load if those modules haven't initialised yet.
 
 import type { JQueryLike, JQueryStatic } from '../../types/env.d.ts';
-import { getRender } from '../Render.js';
+import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
 import setup from '../setup.js';
 import { getTypeSettings } from '../type_settings.js';
 import { OrderedSet } from './OrderedSet.js';
 import { mergeData } from './mergeData.js';
+
+// Typed dynamic constructor pick — replaces the loose
+// `(Render as Record<string, unknown>)[renderType]` lookup that used to
+// live in `render()`.  Constraining the key to `keyof RenderApi` makes
+// the lookup typed at the call site (`pickRenderCtor('Node')` → typeof
+// RenderNode etc.); callers that need to fall through to `undefined`
+// when `renderType` is empty / off-API check before calling.
+function pickRenderCtor<K extends keyof RenderApi>(k: K): RenderApi[K] {
+  return getRender()[k];
+}
 
 function _$(): JQueryStatic {
   const fn = jQuery ?? globalThis.$;
@@ -230,15 +240,18 @@ interface RenderNodeLike {
   [key: string]: unknown;
 }
 
-interface RenderPopupLike {
-  open?: boolean;
-  close(cb?: () => void): void;
-  trigger(ev: string, args?: unknown[]): void;
-  on(ev: string, handler: (...args: unknown[]) => void): void;
+// RenderPopupLike — was duplicated across GameNode / GameRoot / GamePerp
+// / Database / ProjectPerp.  Now imports the canonical declaration from
+// GamePerp.ts (a type-only import — no runtime cycle); the GameNode-side
+// extras (notification-popup tagging, jdomelem delegation handle) live
+// in `RenderPopupGameNodeExtras` below and merge in via `&`.
+import type { RenderPopupLike as RenderPopupBase } from './GamePerp.js';
+interface RenderPopupGameNodeExtras {
   jdomelem?: { on(ev: string, sel: string, handler: (e: unknown) => void): void };
   notificationMission?: string | null;
   callback?: () => void;
 }
+type RenderPopupLike = RenderPopupBase & RenderPopupGameNodeExtras;
 
 /** GameRoot surface this base class touches in its mixin methods.
  *  Narrow forward-ref interface; collapses when GameRoot itself
@@ -251,12 +264,10 @@ interface GameRootForGameNode {
 }
 
 // `Render[renderType]` is dynamic — each renderType key resolves to a
-// different constructor.  Captured loosely; the per-subclass extractions in
-// later PRs can tighten this once specific Render types are in scope.
-interface RenderModule {
-  getById(id: unknown): { addChild(node: RenderNodeLike): void } | null;
-  [key: string]: unknown;
-}
+// different constructor.  Resolved via the typed `pickRenderCtor` helper
+// at the top of this module; the previous `RenderModule` structural
+// surface (`[key:string]: unknown`) is retired in favour of a
+// `keyof RenderApi`-constrained lookup.
 
 // ---------------------------------------------------------------------------
 // GameNode
@@ -588,8 +599,14 @@ export class GameNode {
     const render = this.renderData;
 
     if (render && render.config && !render.config.no_render) {
-      const Render = getRender() as unknown as RenderModule;
-      const RenderCtor = (Render as Record<string, unknown>)[this.renderType ?? ''] as
+      const Render = getRender();
+      const renderType = this.renderType ?? '';
+      // Constrain the dynamic ctor lookup to `keyof RenderApi`; bail
+      // out for renderType values not on the API (e.g. unset / typo).
+      if (!(renderType in Render)) {
+        return;
+      }
+      const RenderCtor = pickRenderCtor(renderType as keyof RenderApi) as unknown as
         | (new (
             cfg: RenderConfig
           ) => RenderNodeLike)
@@ -603,9 +620,9 @@ export class GameNode {
       node.gameNode = this;
       // Put RenderNode in its place:
       if (render.parentNode) {
-        const parentNode = Render.getById(render.parentNode);
+        const parentNode = Render.getById(render.parentNode as string);
         if (parentNode) {
-          parentNode.addChild(node);
+          (parentNode as unknown as { addChild(n: RenderNodeLike): void }).addChild(node);
         }
       }
 
@@ -650,16 +667,14 @@ export class GameNode {
     ptd.groot = groot;
     gnode.popupTemplateData = ptd;
 
-    const Render = getRender() as unknown as {
-      Popup: new (cfg: unknown) => RenderPopupLike;
-    };
+    const Render = getRender() as Pick<RenderApi, 'Popup'>;
     const popup = new Render.Popup({
       gameNode: this,
       template: config.template || 'popup.html',
       extendClass: config.extendClass || '',
       templateData: gnode.popupTemplateData,
       popupContainer: this,
-    });
+    } as unknown as ConstructorParameters<RenderApi['Popup']>[0]) as unknown as RenderPopupLike;
     this.renderPopup = popup;
 
     (gnode.renderNode as RenderNodeLike | undefined)?.addPopup?.(popup);

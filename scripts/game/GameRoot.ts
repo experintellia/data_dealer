@@ -17,7 +17,7 @@
 // `GameRoot.prototype.X = function () {...}` assignments in Game.js
 // for now; later PRs in the wave migrate them one batch at a time.
 
-import { getRender } from '../Render.js';
+import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
 import i18n from '../i18n.js';
 import setup from '../setup.js';
@@ -41,6 +41,7 @@ import {
   getGestalt,
   getParentFromPath,
 } from './GameNode.js';
+import type { RenderPopupLike } from './GamePerp.js';
 import { Imperium } from './Imperium.js';
 import { Mission } from './Mission.js';
 import { Missions } from './Missions.js';
@@ -132,15 +133,10 @@ interface Level {
   [key: string]: unknown;
 }
 
-/** Render Popup surface used by `openNotification`.  Same forward-
- *  ref shape as GamePerp's `RenderPopupLike` — duplicated here to
- *  keep this file self-contained until Render.js is typed. */
-interface RenderPopupLike {
-  open?: boolean;
-  trigger(ev: string, args?: unknown[]): void;
-  close(cb?: () => void): void;
-  on(ev: string, handler: (...args: unknown[]) => void): void;
-}
+// Render Popup surface used by `openNotification` — re-imports the
+// canonical `RenderPopupLike` from GamePerp.ts (was duplicated across
+// GameRoot / GameNode / GamePerp / Database / ProjectPerp before this
+// PR).
 
 /** Render MainMenu instance — created in `extendRender`. */
 interface MainMenuLike extends RenderRootLike {
@@ -1296,10 +1292,10 @@ export class GameRoot extends GameNode {
     config.templateData = popupTemplateData;
     config.popupContainer = this;
 
-    const Render = getRender() as unknown as {
-      Popup: new (cfg: unknown) => RenderPopupLike;
-    };
-    const popup = new Render.Popup(config) as RenderPopupLike & {
+    const Render = getRender() as Pick<RenderApi, 'Popup'>;
+    const popup = new Render.Popup(
+      config as unknown as ConstructorParameters<RenderApi['Popup']>[0]
+    ) as unknown as RenderPopupLike & {
       notificationMission?: string;
       callback?: () => void;
     };
@@ -1770,10 +1766,7 @@ export class GameRoot extends GameNode {
   }
 
   override extendRender(): void {
-    const Render = getRender() as unknown as {
-      MainMenu: new (cfg: unknown) => MainMenuLike;
-      Statusbar: new (data: unknown) => RenderStatusbarLike & { domelem?: unknown };
-    };
+    const Render = getRender() as Pick<RenderApi, 'MainMenu' | 'Statusbar'>;
     if (this.renderMenu) this.renderMenu.remove();
     const menu = new Render.MainMenu({
       gameNode: this,
@@ -1787,10 +1780,14 @@ export class GameRoot extends GameNode {
         userdata: this.userdata,
         buttons: [],
       },
-    });
+    } as unknown as ConstructorParameters<RenderApi['MainMenu']>[0]) as unknown as MainMenuLike & {
+      domelem?: unknown;
+    };
 
     this.initStatusBar();
-    const statusbar = new Render.Statusbar(this.data.status_bar);
+    const statusbar = new Render.Statusbar(
+      this.data.status_bar as unknown as ConstructorParameters<RenderApi['Statusbar']>[0]
+    ) as unknown as RenderStatusbarLike & { domelem?: unknown };
     this.renderStatusbar = statusbar as NonNullable<typeof this.renderStatusbar>;
 
     const stage = this.renderNode as

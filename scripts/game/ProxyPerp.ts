@@ -3,7 +3,7 @@
 // label decorator that updates after every render.  Extracted from
 // scripts/Game.js's IIFE in PR 13 of issue #147.
 
-import { getRender } from '../Render.js';
+import { type RenderApi, getRender } from '../Render.js';
 import i18n from '../i18n.js';
 import { type GameNodeConfig } from './GameNode.js';
 import { GamePerp, type RenderNodeLike } from './GamePerp.js';
@@ -49,9 +49,7 @@ export class ProxyPerp extends GamePerp {
   updateRenderSlotStatus(): void {
     const node = this.renderNode as RenderNodeLike | undefined;
     if (!node) return;
-    const Render = getRender() as unknown as {
-      DecoratorLabel: new (cfg: { text: string }) => unknown;
-    };
+    const Render = getRender() as Pick<RenderApi, 'DecoratorLabel'>;
     const dataRec = this.data as {
       label?: string;
       used_slots?: number;

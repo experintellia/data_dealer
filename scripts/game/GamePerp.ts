@@ -10,7 +10,7 @@
 // their own dynamic lookups against `perpCtors[name]` directly in
 // PR 17 of issue #147; this seam stays only for GamePerp's case.
 
-import { getRender } from '../Render.js';
+import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
 import i18n from '../i18n.js';
 import { GameNode, getAllByGestalt, getByFirstId, getFirstId } from './GameNode.js';
@@ -171,18 +171,11 @@ export class GamePerp extends GameNode {
     return this.renderNode as RenderNodeLike | undefined;
   }
 
-  private getRenderModule(): {
-    Popup: new (cfg: unknown) => RenderPopupLike;
-    DecoratorLabel: new (cfg: unknown) => unknown;
-    DecoratorNew: new (cfg: unknown) => unknown;
-    DecoratorTimer: new (cfg: unknown) => { FXSproing?(): void };
-  } {
-    return getRender() as unknown as {
-      Popup: new (cfg: unknown) => RenderPopupLike;
-      DecoratorLabel: new (cfg: unknown) => unknown;
-      DecoratorNew: new (cfg: unknown) => unknown;
-      DecoratorTimer: new (cfg: unknown) => { FXSproing?(): void };
-    };
+  private getRenderModule(): Pick<
+    RenderApi,
+    'Popup' | 'DecoratorLabel' | 'DecoratorNew' | 'DecoratorTimer'
+  > {
+    return getRender();
   }
 
   // -------------------------------------------------------------------
@@ -232,8 +225,8 @@ export class GamePerp extends GameNode {
     this.renderTimer = this.renderApi?.addDecorator?.(
       new Render.DecoratorTimer({
         duration: conf.duration,
-        serverTime: conf.serverTime,
-        serverStartTime: conf.serverStart,
+        ...(conf.serverTime !== undefined ? { serverTime: conf.serverTime } : {}),
+        ...(conf.serverStart !== undefined ? { serverStartTime: conf.serverStart } : {}),
       })
     ) as { FXSproing?(): void } | undefined;
     this.renderTimer?.FXSproing?.();
@@ -324,7 +317,7 @@ export class GamePerp extends GameNode {
       template: this.popupTemplate,
       templateData: this.popupTemplateData,
       popupContainer: this.ViewMap,
-    });
+    } as unknown as ConstructorParameters<RenderApi['Popup']>[0]) as unknown as RenderPopupLike;
 
     if (replaceExisting && this.renderPopup) {
       (this.renderPopup as RenderPopupLike).remove?.();
