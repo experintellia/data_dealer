@@ -23,9 +23,7 @@ type SpriteFrameMap = Record<string, SpriteFrame>;
 
 export interface SpriteHelperConfig {
   frameSrc?: string;
-  frame_src?: string;
   frameMap?: SpriteFrameMap;
-  frame_map?: SpriteFrameMap;
   frame?: string;
   className?: string;
   dataButtonId?: string;
@@ -41,8 +39,8 @@ export function renderSpriteHtml(config: SpriteHelperConfig | undefined, frame?:
     return '';
   }
   const $ = getRenderJQuery('renderSpriteHtml');
-  const frameSrc = config.frameSrc || config.frame_src;
-  const frameMap = config.frameMap || config.frame_map;
+  const frameSrc = config.frameSrc;
+  const frameMap = config.frameMap;
   if (!frameSrc || !frameMap) return '';
   const activeFrame = frame || config.frame || 'normal';
 
