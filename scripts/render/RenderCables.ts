@@ -55,17 +55,11 @@ function getSprites(): CableSprites {
   return _sprites;
 }
 
-// ── the cableResolution config knob (Render.js owns this) ───────────────────
+// ── cable resolution ─────────────────────────────────────────────────────────
 //
-// Render.js sets `renderConf.cableResolution = 2` at IIFE-body time.
-// Pass it in via a setter so this module doesn't have to re-read
-// the global config object.
+// Static value 2 — controls the path step-size in the draw routine.
 
-let _cableResolution = 2;
-
-export function setRenderCableResolution(n: number): void {
-  _cableResolution = n;
-}
+const _cableResolution = 2;
 
 // ── Cable (base) ────────────────────────────────────────────────────────────
 
