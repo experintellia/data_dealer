@@ -9,11 +9,15 @@
 // scope, so it can move out wholesale.
 //
 // Shape:
-//   - `applyRenderNodeFX({ Ticker, Tween, Ease })` — called once from
-//     Render.js after the IIFE has resolved the CreateJS vendor
-//     globals.  Mutates `RenderNode.prototype` so subclass instances
-//     (Sprite, Perp, Decorator, Cable, …) pick the methods up through
-//     the prototype chain just like the legacy assignment block did.
+//   - `applyRenderNodeFX({ Tween, Ease })` — called once from Render.ts
+//     after the IIFE has resolved the CreateJS vendor globals.
+//     Mutates `RenderNode.prototype` so subclass instances (Sprite,
+//     Perp, Decorator, Cable, …) pick the methods up through the
+//     prototype chain just like the legacy assignment block did.
+//     Ticker addressing goes through the `tickerAddListener` /
+//     `tickerRemoveListener` shim in `./renderCreatejsTicker.js`,
+//     which lazily resolves the CreateJS Ticker singleton on first
+//     use.
 //   - The FX bodies stay verbatim in spirit — same Tween chains, same
 //     callback semantics, same Sprite/Text constructions, same
 //     subclass-touch points (`DecoratorAmount`, `gameNode.GameRoot`,
@@ -22,13 +26,9 @@
 import { RenderNode } from './RenderNode.js';
 import { RenderSprite, type SpriteConfig } from './RenderSprite.js';
 import { RenderText, type TextConfig } from './RenderText.js';
+import { tickerAddListener, tickerRemoveListener } from './renderCreatejsTicker.js';
 
 // ── CreateJS vendor surface (typed local to this file) ──────────────────────
-
-interface CreateJSTickerLike {
-  addListener(target: object): void;
-  removeListener(target: object): void;
-}
 
 interface TweenChain {
   to(props: Record<string, unknown>, duration?: number, ease?: unknown): TweenChain;
@@ -54,7 +54,6 @@ interface EaseLike {
 }
 
 export interface RenderNodeFXDeps {
-  Ticker: CreateJSTickerLike;
   Tween: TweenStatic;
   Ease: EaseLike;
 }
@@ -202,7 +201,7 @@ function computeQueueItemOPos(
 // ── the applier ─────────────────────────────────────────────────────────────
 
 export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
-  const { Ticker, Tween, Ease } = deps;
+  const { Tween, Ease } = deps;
   const proto = RenderNode.prototype;
 
   proto.FXSimple = function (
@@ -212,11 +211,11 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
     easing: string,
     callback?: () => void
   ): TweenChain {
-    Ticker.addListener(this);
+    tickerAddListener(this);
     this.FXAnimation = Tween.get(this, { override: true })
       .to(config, duration, Ease[easing])
       .call(() => {
-        Ticker.removeListener(this);
+        tickerRemoveListener(this);
         if (callback) callback();
       });
     return this.FXAnimation;
@@ -229,23 +228,23 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
     easing?: string,
     callback?: () => void
   ): TweenChain | undefined {
-    Ticker.addListener(this);
+    tickerAddListener(this);
     const ease = easing !== undefined ? Ease[easing] : undefined;
     if (!Tween.hasActiveTweens(this) || !this.FXAnimation) {
       this.FXAnimation = Tween.get(this)
         .to(config, duration, ease)
         .call(() => {
-          Ticker.removeListener(this);
+          tickerRemoveListener(this);
           if (callback) callback();
         });
     } else if (Tween.hasActiveTweens(this)) {
-      Ticker.addListener(this);
+      tickerAddListener(this);
       this.FXAnimation.call(() => {
-        Ticker.addListener(this);
+        tickerAddListener(this);
       })
         .to(config, duration, ease)
         .call(() => {
-          Ticker.removeListener(this);
+          tickerRemoveListener(this);
           if (callback) callback();
         });
     }
@@ -257,22 +256,22 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
     time: number,
     callback?: () => void
   ): TweenChain | undefined {
-    Ticker.addListener(this);
+    tickerAddListener(this);
     if (!Tween.hasActiveTweens(this) || !this.FXAnimation) {
       this.FXAnimation = Tween.get(this)
         .wait(time)
         .call(() => {
-          Ticker.removeListener(this);
+          tickerRemoveListener(this);
           if (callback) callback();
         });
     } else if (Tween.hasActiveTweens(this)) {
-      Ticker.addListener(this);
+      tickerAddListener(this);
       this.FXAnimation.call(() => {
-        Ticker.addListener(this);
+        tickerAddListener(this);
       })
         .wait(time)
         .call(() => {
-          Ticker.removeListener(this);
+          tickerRemoveListener(this);
           if (callback) callback();
         });
     }
@@ -294,7 +293,7 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
     easing: string,
     callback?: () => void
   ): TweenChain {
-    Ticker.addListener(this);
+    tickerAddListener(this);
     return Tween.get(this, { override: true, loop: true })
       .to(config.one, duration, Ease[easing])
       .to(config.two, duration, Ease[easing])
@@ -304,13 +303,13 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
   };
 
   proto.FXBounce = function (this: RenderNode): TweenChain {
-    Ticker.addListener(this);
+    tickerAddListener(this);
     return Tween.get(this, { override: true })
       .to({ scaleX: 1.15, scaleY: 1.15 }, 31, Ease.easeOut)
       .to({ scaleX: 1.1, scaleY: 1.1 }, 31, Ease.easeIn)
       .to({ scaleX: 1, scaleY: 1 }, 200, Ease.bounceOut)
       .call(() => {
-        Ticker.removeListener(this);
+        tickerRemoveListener(this);
       });
   };
 
@@ -330,8 +329,8 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
       } as SpriteConfig);
     }
     const spinner = this.spinner;
-    Ticker.addListener(this);
-    Ticker.addListener(spinner);
+    tickerAddListener(this);
+    tickerAddListener(spinner);
     this.DecoratorAmount?.hide();
 
     spinner.setFrame('normal');
@@ -347,8 +346,8 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
       .to({ scaleX: sps, scaleY: sps, rotate: -1000 * speed }, duration * speed, Ease.easeIn)
       .to({ scaleX: 0.8, scaleY: 0.8, rotate: -2000 * speed, opacity: 0 }, 500 * speed, Ease.easeIn)
       .call(() => {
-        Ticker.removeListener(this);
-        Ticker.removeListener(spinner);
+        tickerRemoveListener(this);
+        tickerRemoveListener(spinner);
         this.FXBounce();
         this.FXBling({ text, extendClass: 'ProfileBlingSmall' });
         this.DecoratorAmount?.show();
@@ -375,8 +374,8 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
       z: 5000,
       opacity: 1,
     } as SpriteConfig);
-    Ticker.addListener(this);
-    Ticker.addListener(spark);
+    tickerAddListener(this);
+    tickerAddListener(spark);
     this.DecoratorAmount?.hide();
     spark.setFrame('normal');
 
@@ -452,9 +451,9 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
       z: 5000,
       opacity: 1,
     } as SpriteConfig);
-    Ticker.addListener(this);
-    Ticker.addListener(spinner);
-    Ticker.addListener(spark);
+    tickerAddListener(this);
+    tickerAddListener(spinner);
+    tickerAddListener(spark);
     this.DecoratorAmount?.hide();
     spinner.setFrame('normal');
     spark.setFrame('normal');
@@ -503,8 +502,8 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
       .to({ scaleX: sps, scaleY: sps, rotate: -1000 * speed }, 2000 * speed, Ease.easeIn)
       .to({ scaleX: 0.8, scaleY: 0.8, rotate: -2000 * speed, opacity: 0 }, 500 * speed, Ease.easeIn)
       .call(() => {
-        Ticker.removeListener(this);
-        Ticker.removeListener(spinner);
+        tickerRemoveListener(this);
+        tickerRemoveListener(spinner);
         this.FXBounce();
         this.FXBling({ text });
         this.DecoratorAmount?.show();
@@ -540,7 +539,7 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
   };
 
   proto.FXSproing = function (this: RenderNode, cb?: () => void): TweenChain {
-    Ticker.addListener(this);
+    tickerAddListener(this);
     this.setTransform({ scaleX: 0.6, scaleY: 0 });
     this.setOpacity(0);
     return Tween.get(this, { override: true })
@@ -548,7 +547,7 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
       .to({ scaleX: 1.1, scaleY: 0.8, opacity: 1 }, 100, Ease.easeIn)
       .to({ scaleX: 1, scaleY: 1 }, 500, Ease.elasticOut)
       .call(() => {
-        Ticker.removeListener(this);
+        tickerRemoveListener(this);
         if (cb) cb();
       });
   };
@@ -579,8 +578,8 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
     } as SpriteConfig;
     const spark = new RenderSprite(sparkConf);
     const spark2 = new RenderSprite(sparkConf);
-    Ticker.addListener(spark);
-    Ticker.addListener(spark2);
+    tickerAddListener(spark);
+    tickerAddListener(spark2);
 
     spark.setFrame('normal');
     spark2.setFrame('normal');
@@ -635,8 +634,8 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
     } as SpriteConfig;
     const spark = new RenderSprite(sparkConf);
     const spark2 = new RenderSprite(sparkConf);
-    Ticker.addListener(spark);
-    Ticker.addListener(spark2);
+    tickerAddListener(spark);
+    tickerAddListener(spark2);
 
     spark.setFrame('normal');
     spark2.setFrame('normal');
@@ -663,7 +662,7 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
       .wait(500)
       .to({ scaleX: 2, scaleY: 2, opacity: 0 }, 250, Ease.easeOut)
       .call(() => {
-        Ticker.removeListener(this);
+        tickerRemoveListener(this);
         if (cb) {
           cb();
           this.remove();
@@ -1040,12 +1039,12 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
     pos: { x: number; y: number },
     callb?: () => void
   ): TweenChain {
-    Ticker.addListener(this);
+    tickerAddListener(this);
     return Tween.get(this, { override: true })
       .to({ x: pos.x, y: pos.y }, 500, Ease.elasticOut)
       .call(() => {
         if (callb) callb();
-        Ticker.removeListener(this);
+        tickerRemoveListener(this);
       });
   };
 }
