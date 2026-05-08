@@ -2,9 +2,6 @@
 // jQuery is loaded as a global from a vendor `<script>` tag in
 // index.html; read lazily off globalThis inside wait() so this
 // module's top-level evaluation does not depend on $ existing yet.
-//
-// File converted from util.js to util.ts in PR 26 of issue #147;
-// `@ts-nocheck` quarantine dropped.
 
 import type { JQueryStatic } from '../types/env.d.ts';
 

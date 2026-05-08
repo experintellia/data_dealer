@@ -10,9 +10,6 @@
 //   window.__dd.clearNowOverride();                // revert to real wall clock
 //   window.__dd.getZoom();                          // current zoom of active ViewMap
 //   window.__dd.setZoom(0.6);                       // jump zoom (no animation)
-//
-// File converted from devtools.js in PR 27 of issue #147; `@ts-nocheck`
-// quarantine dropped.
 
 import { advance, clearOverride, setOverride } from './clock.js';
 

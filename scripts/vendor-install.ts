@@ -25,9 +25,6 @@
 //   zynga-animate: https://raw.githubusercontent.com/zynga/scroller/7d460ea/src/Animate.js
 //   zynga-scroller:https://raw.githubusercontent.com/zynga/scroller/dadd850/src/Scroller.js
 //   sprintf:       https://raw.githubusercontent.com/alexei/sprintf.js/192bc60/src/sprintf.js
-//
-// File converted from vendor-install.js in PR 27 of issue #147; `@ts-nocheck`
-// quarantine dropped.
 
 import { execSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync } from 'node:fs';

@@ -8,9 +8,6 @@
 //   - the `init(data)` factory that constructs `GameRoot` and
 //     calls `loadGame(data)`;
 //   - the `getGame()` accessor (memoised — one Game per page).
-//
-// File converted from Game.js to Game.ts in PR 25 of issue #147.
-// `@ts-nocheck` quarantine dropped.  Strict-TS enforced.
 
 import appModule from './app.js';
 import { GameNode } from './game/GameNode.js';

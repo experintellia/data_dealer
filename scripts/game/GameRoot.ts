@@ -795,7 +795,7 @@ export class GameRoot extends GameNode {
   }
 
   // -------------------------------------------------------------------
-  // Camera / zoom (extracted in PR 20 of issue #147)
+  // Camera / zoom
   // -------------------------------------------------------------------
 
   /** The active ViewMap for camera math — `activeView` if set,
@@ -924,7 +924,7 @@ export class GameRoot extends GameNode {
   }
 
   // -------------------------------------------------------------------
-  // Status bar / level / XP (extracted in PR 21 of issue #147)
+  // Status bar / level / XP
   // -------------------------------------------------------------------
 
   initStatusBar(): void {
@@ -1008,7 +1008,7 @@ export class GameRoot extends GameNode {
   }
 
   // -------------------------------------------------------------------
-  // Game values (extracted in PR 22 of issue #147)
+  // Game values
   // -------------------------------------------------------------------
 
   /** Hydrates the GameRoot's value-state from the bootstrap
@@ -1676,7 +1676,6 @@ export class GameRoot extends GameNode {
 
   // -------------------------------------------------------------------
   // View getters, BuyPerp dispatch, render hooks, refresh, loadGame
-  // (extracted in PR 24 of issue #147 — final GameRoot migration)
   // -------------------------------------------------------------------
 
   /** FIXME: this is just a wrapper. */

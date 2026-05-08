@@ -5,13 +5,8 @@
 // `cableAnimatedRemove`, `getCableTo`, `getCablesToOrigin`), and the
 // `FXDataIn` / `FXDataOut` data-flow choreography.  Extends
 // `RenderSprite` so the frame-map / setFrame / setFrameSrc surface
-// is inherited.
-//
-// Extracted from scripts/Render.js's IIFE in PR 35 of issue #147.
-// PR #221 (Decorator family) shrunk the IIFE further; PR 37 lands
-// `Cable` / `PerpCable` in scripts/render/RenderCables.ts and
-// retires the `setPerpCableCtor` injection seam this file used to
-// own — `cableTo` now constructs `RenderPerpCable` directly.
+// is inherited. `cableTo` now constructs `RenderPerpCable` directly
+// from scripts/render/RenderCables.ts.
 
 import { type PerpCableConfig, RenderPerpCable } from './RenderCables.js';
 import { RenderNode } from './RenderNode.js';

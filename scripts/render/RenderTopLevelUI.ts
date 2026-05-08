@@ -30,8 +30,6 @@
 //     surfaced via the `_.mixin({ RenderAmount })` registration
 //     below) and the shared sprite-tile lookup live together.
 //
-// Extracted from scripts/Render.js's IIFE in PR 39 of issue #147.
-//
 // Subclass-supplied jdomelem precedence: every parent in this file
 // uses `config.jdomelem ?? <default>` so subclass `<div class='X'>`
 // wrappers survive `super()`.  This pattern was established by
