@@ -14,6 +14,11 @@ if (variant !== 'hq' && variant !== 'casual') {
   throw new Error(`BUILD_VARIANT must be 'hq' or 'casual', got '${variant}'`);
 }
 
+// Release builds (CI tag pipeline) set BUILD_RELEASE=1 to drop sourcemaps
+// from the .xdc.  Dev/test builds keep sourcemaps so a tester loading the
+// .xdc into Delta Chat can debug against the original sources.
+const isRelease = process.env.BUILD_RELEASE === '1';
+
 // Plugin: for the casual variant, after vite-plugin-static-copy has run,
 // replace the canonical dist/img/ + dist/icon.png with the pre-quantized
 // counterparts (img-casual/, icon-casual.png).  This keeps the in-bundle
@@ -176,6 +181,28 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // Tree-shaking and minification (esbuild) come for free from Rollup
+    // + Vite defaults — set them explicitly so the .xdc artifact never
+    // accidentally regresses to an unminified bundle if a future Vite
+    // major flips a default.
+    minify: 'esbuild',
+    // Sourcemaps in dev/test (.xdc files attached to PRs); stripped from
+    // release artifacts to keep tag-built .xdc bytes lean and avoid
+    // shipping original-source paths to end users.  Gated via
+    // BUILD_RELEASE=1 (set by .github/workflows/test.yml on tag builds).
+    sourcemap: !isRelease,
+    // Default is 4096; pin it so the threshold for inlining small icons
+    // / fonts vs. shipping them as separate dist/ files is visible in
+    // config rather than implicit in Vite version bumps.
+    assetsInlineLimit: 4096,
+    // Vite's default 500 kB warning fires noisily on every build at the
+    // current ~1.1 MB minified bundle.  webxdc apps load once from local
+    // storage; HTTP-request elimination via code-splitting wouldn't help
+    // (every chunk just becomes another file inside the .xdc).  See #192
+    // "Out of scope".  Raise the threshold to 1500 kB so the warning
+    // resurfaces only if the bundle grows past where re-evaluating the
+    // single-chunk decision actually makes sense.
+    chunkSizeWarningLimit: 1500,
     rollupOptions: {
       input: 'scripts/esm-entry.js',
       output: {
