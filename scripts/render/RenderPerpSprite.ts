@@ -12,10 +12,7 @@ import { RenderNode } from './RenderNode.js';
 import { RenderSprite, type SpriteConfig, type SpriteFrame } from './RenderSprite.js';
 import { getRenderJQuery } from './_jqueryShim.js';
 
-export type PerpSpriteConfig = SpriteConfig & {
-  frame_src?: string;
-  frame_map?: SpriteConfig['frameMap'];
-};
+export type PerpSpriteConfig = SpriteConfig;
 
 export class RenderPerpSprite extends RenderSprite {
   constructor(config: PerpSpriteConfig = {}) {
@@ -23,8 +20,6 @@ export class RenderPerpSprite extends RenderSprite {
     const jdomelem = $("<div class='PerpSprite'></div>");
     super({
       ...config,
-      frameSrc: config.frameSrc ?? config.frame_src,
-      frameMap: config.frameMap ?? config.frame_map,
       frame: config.frame ?? 'normal',
       jdomelem: jdomelem,
     } as SpriteConfig);
