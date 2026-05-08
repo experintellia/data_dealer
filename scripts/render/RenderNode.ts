@@ -38,7 +38,7 @@ interface DragHandlerLike {
   domelem: Window;
   collisionNodes: OrderedSet<{ getPosition(): { x: number; y: number } }>;
   addListener(node: RenderNode): void;
-  on(ev: string, fn: (e: NodeDomEvent) => void): void;
+  on(ev: string, fn: (e: NodeDomEvent, ...args: unknown[]) => void): void;
   off(ev: string): void;
   trigger(ev: string, params?: unknown[]): void;
   dragstart(e: NodeDomEvent): void;
@@ -596,7 +596,7 @@ export class RenderNode {
     this.draw();
   }
 
-  on(event: string, func: (e: NodeDomEvent) => void): void {
+  on(event: string, func: (e: NodeDomEvent, ...args: unknown[]) => void): void {
     this.jdomelem.on(event, func);
   }
 
