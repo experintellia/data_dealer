@@ -8,13 +8,10 @@
 //   - vendor-globals binding (jQuery `$`, underscore `_`,
 //     `Scroller`, `core`, CreateJS `Easel` / `Tween` / `Sound` /
 //     `Ticker` / `Ease`),
-//   - the CreateJS `Ticker.{addListener,removeListener,setFPS}`
-//     compat-shim that bolts the legacy listener-array API onto
-//     the modern `EventDispatcher`,
 //   - one-time seam wirings for the modules that legitimately
 //     can't pull these vendor globals on their own
-//     (`setRenderNodeTickers` / `applyRenderNodeFX` /
-//     `setRenderCableResolution` / `setRenderViewsConfig`),
+//     (`applyRenderNodeFX` / `setRenderCableResolution` /
+//     `setRenderViewsConfig`),
 //   - the underscore `_.mixin({ RenderAmount, RenderSprite })`
 //     template-helper registration,
 //   - the publisher object that re-exports every Render* class /
@@ -41,7 +38,7 @@ import {
   RenderDecoratorTimer,
 } from './render/RenderDecorators.js';
 import { RenderDragHandler } from './render/RenderDragHandler.js';
-import { RenderNode, setRenderNodeTickers } from './render/RenderNode.js';
+import { RenderNode } from './render/RenderNode.js';
 import { applyRenderNodeFX } from './render/RenderNodeFX.js';
 import { RenderPerp } from './render/RenderPerp.js';
 import { RenderPerpSprite } from './render/RenderPerpSprite.js';
@@ -65,6 +62,7 @@ import {
   RenderViewTab,
   setRenderViewsConfig,
 } from './render/RenderViews.js';
+import { tickerSetFPS, tickerSetUseRAF } from './render/renderCreatejsTicker.js';
 import { _ids, _instances, clearAllNodes, getNode, getNodeById } from './render/renderRegistry.js';
 import { renderSpriteHtml } from './render/renderSpriteHelper.js';
 import setup from './setup.js';
@@ -74,19 +72,12 @@ import setup from './setup.js';
 // Read off `globalThis.createjs` at factory-call time (the
 // `<script>` tag for createjs-2015.11.26 loads before the ESM
 // bundle).  Typed locally since there's no `@types/createjs`.
-
-interface CreateJSTickerLike {
-  addListener?(target: object): void;
-  removeListener?(target: object): void;
-  addEventListener(event: 'tick', fn: () => void): void;
-  removeEventListener(event: 'tick', fn: () => void): void;
-  setFPS?(fps: number): void;
-  framerate: number;
-  useRAF: boolean;
-}
+// The CreateJS Ticker singleton + its legacy listener-array shim
+// live in `./render/renderCreatejsTicker.js` — Render.ts only needs
+// `Tween` / `Ease` for the FX seam now.
 
 interface CreateJSGlobal {
-  Ticker: CreateJSTickerLike;
+  Ticker: unknown;
   Tween: unknown;
   Ease: unknown;
 }
@@ -146,42 +137,8 @@ function Render(): RenderApi {
   if (!cj) {
     throw new Error('Render(): globalThis.createjs not loaded.');
   }
-  const Ticker = cj.Ticker;
   const Tween = cj.Tween;
   const Ease = cj.Ease;
-
-  // Shim CreateJS legacy Ticker.{addListener,removeListener,setFPS}
-  // onto the current EventDispatcher API so Render's tick-object
-  // callers work.
-  if (typeof Ticker.addListener !== 'function') {
-    const _tickHandlers = new WeakMap<object, () => void>();
-    Ticker.addListener = (obj: object): void => {
-      if (_tickHandlers.has(obj)) {
-        return;
-      }
-      const fn = (): void => {
-        const tickable = obj as { tick?: () => void };
-        if (typeof tickable.tick === 'function') {
-          tickable.tick();
-        }
-      };
-      _tickHandlers.set(obj, fn);
-      Ticker.addEventListener('tick', fn);
-    };
-    Ticker.removeListener = (obj: object): void => {
-      const fn = _tickHandlers.get(obj);
-      if (fn) {
-        Ticker.removeEventListener('tick', fn);
-        _tickHandlers.delete(obj);
-      }
-    };
-  }
-  // Always override setFPS so we use the modern `framerate=` setter
-  // even when the legacy method still exists (it logs a deprecation
-  // warning on every call in current TweenJS builds).
-  Ticker.setFPS = (fps: number): void => {
-    Ticker.framerate = fps;
-  };
 
   const renderConf = {
     cableResolution: 2,
@@ -191,27 +148,19 @@ function Render(): RenderApi {
     viewMapStopZone: setup.viewMapStopZone,
   };
 
-  Ticker.setFPS(renderConf.tickerFramerate);
-  Ticker.useRAF = true;
+  // First call into renderCreatejsTicker installs the legacy
+  // listener-array shim onto the CreateJS Ticker singleton, so
+  // RenderNodeFX's `Ticker.addListener` calls find a function.
+  tickerSetFPS(renderConf.tickerFramerate);
+  tickerSetUseRAF(true);
 
   // ── seam wirings ─────────────────────────────────────────────────────────
   //
-  // RenderNode's `remove()` unregisters from CreateJS Ticker and
-  // RenderSlowTicker — both targets are fully resolved at this
-  // point.  RenderNodeFX needs Ticker / Tween / Ease handed in
-  // since it can't read off the createjs global at module load
-  // (createjs script tag may not have parsed yet).
-  setRenderNodeTickers({
-    tickerRemove: (node) => {
-      Ticker.removeListener?.(node);
-    },
-    slowTickerRemove: (node) => {
-      RenderSlowTicker.removeListener(node);
-    },
-  });
-
+  // RenderNodeFX needs Ticker / Tween / Ease handed in since it
+  // can't read off the createjs global at module load (createjs
+  // script tag may not have parsed yet).
   applyRenderNodeFX({
-    Ticker: Ticker as unknown as Parameters<typeof applyRenderNodeFX>[0]['Ticker'],
+    Ticker: cj.Ticker as unknown as Parameters<typeof applyRenderNodeFX>[0]['Ticker'],
     Tween: Tween as Parameters<typeof applyRenderNodeFX>[0]['Tween'],
     Ease: Ease as Parameters<typeof applyRenderNodeFX>[0]['Ease'],
   });
