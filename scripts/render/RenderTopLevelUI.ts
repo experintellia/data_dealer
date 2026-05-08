@@ -40,67 +40,15 @@
 
 import appModule from '../app.js';
 import setup from '../setup.js';
-import { type JQueryNodeElem, type NodeConfig, RenderNode } from './RenderNode.js';
+import { type NodeConfig, RenderNode } from './RenderNode.js';
 import { RenderSprite, type SpriteConfig, type SpriteFrameMap } from './RenderSprite.js';
+import { type JQueryRenderElem, type JQueryRenderEvent, getRenderJQuery } from './_jqueryShim.js';
 import { renderSpriteHtml } from './renderSpriteHelper.js';
 
 // ── jQuery / underscore vendor surfaces ─────────────────────────────────────
 
-interface JQueryUIElem {
-  0: HTMLElement;
-  attr(name: string, value?: string | number): string | undefined | JQueryUIElem;
-  addClass(cls: string): JQueryUIElem;
-  removeClass(cls: string): JQueryUIElem;
-  toggleClass(cls: string, force?: boolean): JQueryUIElem;
-  hasClass(cls: string): boolean;
-  append(child: unknown): JQueryUIElem;
-  empty(): JQueryUIElem;
-  remove(): JQueryUIElem;
-  html(content?: string): string | JQueryUIElem;
-  find(selector: string): JQueryUIElem;
-  filter(selector: string): JQueryUIElem;
-  parents(selector: string): JQueryUIElem;
-  parent(): JQueryUIElem;
-  nextAll(selector: string): JQueryUIElem;
-  text(value?: string): string;
-  show(): JQueryUIElem;
-  hide(): JQueryUIElem;
-  toggle(): JQueryUIElem;
-  width(value?: number): number | JQueryUIElem;
-  height(value?: number): number | JQueryUIElem;
-  on(
-    ev: string,
-    selectorOrHandler: string | ((e: UIEventLike) => void),
-    handler?: (e: UIEventLike) => void
-  ): JQueryUIElem;
-  off(ev?: string, handler?: (...args: unknown[]) => unknown): JQueryUIElem;
-  trigger(ev: string, params?: unknown[]): JQueryUIElem;
-  offset(): { left: number; top: number };
-  css(props: Record<string, string | number>): JQueryUIElem;
-  animate(props: Record<string, string | number>, duration?: number, cb?: () => void): JQueryUIElem;
-  each(fn: (this: HTMLElement) => void): JQueryUIElem;
-  clone(): JQueryUIElem;
-  length: number;
-}
-
-interface UIEventLike {
-  pageX?: number;
-  pageY?: number;
-  shiftKey?: boolean;
-  type?: string;
-  preventDefault(): void;
-  stopPropagation(): void;
-}
-
-function getJQuery(): (selector: string | Element | object) => JQueryUIElem {
-  const jq = (globalThis.jQuery ?? globalThis.$) as
-    | ((selector: string | Element | object) => JQueryUIElem)
-    | undefined;
-  if (!jq) {
-    throw new Error('RenderTopLevelUI requires the jQuery global to be loaded.');
-  }
-  return jq;
-}
+type JQueryUIElem = JQueryRenderElem;
+type UIEventLike = JQueryRenderEvent;
 
 interface UnderscoreUILike {
   _(key: string): string;
@@ -209,9 +157,9 @@ export class RenderStatusbar extends RenderNode {
   }
 
   constructor(config: StatusbarConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderTopLevelUI');
     const jdomelem = (config.jdomelem ?? $("<div class='Statusbar'></div>")) as JQueryUIElem;
-    super({ ...config, jdomelem: jdomelem as unknown as JQueryNodeElem });
+    super({ ...config, jdomelem: jdomelem });
 
     if (this.profiles) {
       this.profiles_val = this.profiles.val;
@@ -259,7 +207,7 @@ export class RenderStatusbar extends RenderNode {
     if (this.parentNode) {
       this.x = this.parentNode.getSize().width / 2;
     }
-    const jq = this.jdomelem as unknown as JQueryUIElem;
+    const jq = this.jdomelem;
     jq.empty();
     const html = getApp().renderView(this.template, this);
     jq.append(html);
@@ -384,8 +332,8 @@ export class RenderStatusbar extends RenderNode {
 
   initUI(): void {
     const node = this;
-    const $ = getJQuery();
-    const jq = node.jdomelem as unknown as JQueryUIElem;
+    const $ = getRenderJQuery('RenderTopLevelUI');
+    const jq = node.jdomelem;
 
     jq.on('click touchend', '.StatusItem', function (this: HTMLElement, e: UIEventLike) {
       e.stopPropagation();
@@ -429,14 +377,14 @@ export type StatusItemConfig = SpriteConfig;
 
 export class RenderStatusItem extends RenderSprite {
   constructor(config: StatusItemConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderTopLevelUI');
     const jdomelem = $("<div class='StatusItem'></div>");
     super({
       ...config,
       frameSrc: config.frameSrc ?? 'MainSprites.png',
       frameMap: config.frameMap ?? STATUS_ITEM_DEFAULT_FRAMEMAP,
       frame: 'normal',
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     } as SpriteConfig);
   }
 }
@@ -463,12 +411,12 @@ export class RenderDBQueue extends RenderNode {
   }
 
   constructor(config: DBQueueConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderTopLevelUI');
     const jdomelem = (config.jdomelem ?? $("<div class='DatabaseQueue'></div>")) as JQueryUIElem;
-    super({ ...config, jdomelem: jdomelem as unknown as JQueryNodeElem });
+    super({ ...config, jdomelem: jdomelem });
 
     const node = this;
-    const jq = node.jdomelem as unknown as JQueryUIElem;
+    const jq = node.jdomelem;
     jq.off();
 
     jq.on('click touchend', '.Button:not(.disabled)[data-button-id="DatabaseUpgrades"]', (e) => {
@@ -510,9 +458,9 @@ export class RenderDBQueue extends RenderNode {
 
   FXMerge(psid: string, inc: number, dup: number, wait: number): void {
     const _u = getUnderscore();
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderTopLevelUI');
     void $;
-    const jq = this.jdomelem as unknown as JQueryUIElem;
+    const jq = this.jdomelem;
     const ps = jq.find('.DatabaseQueueItem[data-psid=' + psid + ']');
     const after = ps.nextAll('.DatabaseQueueItem');
     ps.addClass('disabled');
@@ -533,7 +481,7 @@ export class RenderDBQueue extends RenderNode {
       ps.animate({ top: '102' }, 250, () => {
         let del = 0;
         after.each(function (this: HTMLElement) {
-          const $this = getJQuery()(this);
+          const $this = getRenderJQuery('RenderTopLevelUI')(this);
           $this.animate({ left: '-=100' }, 250 + del);
           del += 50;
         });
@@ -554,7 +502,7 @@ export class RenderDBQueue extends RenderNode {
       this.x = this.parentNode.parentNode.getSize().width / 2;
       this.y = this.parentNode.parentNode.getSize().height - this.height;
     }
-    const jq = this.jdomelem as unknown as JQueryUIElem;
+    const jq = this.jdomelem;
     jq.empty();
     const html = getApp().renderView(this.template, this);
     jq.append(html);
@@ -570,7 +518,7 @@ export class RenderDBQueue extends RenderNode {
 
 interface PopupContainerLike {
   renderNode: RenderNode & {
-    popupContainerDomelem?: JQueryNodeElem;
+    popupContainerDomelem?: JQueryRenderElem;
   };
   lock?(): void;
   unlock?(): void;
@@ -614,15 +562,15 @@ export class RenderPopup extends RenderNode {
   }
 
   constructor(config: PopupConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderTopLevelUI');
     const jdomelem = (config.jdomelem ?? $("<div class='Popup'></div>")) as JQueryUIElem;
-    super({ ...config, jdomelem: jdomelem as unknown as JQueryNodeElem });
+    super({ ...config, jdomelem: jdomelem });
     this.initBaseUI();
   }
 
   initBaseUI(): void {
     const node = this;
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderTopLevelUI');
     const tdata = this.templateData;
     if (tdata.data?.popup_sprite && !tdata.data.popup_sprite.html) {
       tdata.data.popup_sprite.html = renderSpriteHtml(
@@ -641,7 +589,7 @@ export class RenderPopup extends RenderNode {
 
     node.render();
 
-    const jq = node.jdomelem as unknown as JQueryUIElem;
+    const jq = node.jdomelem;
 
     jq.on('click touchend', (e) => {
       e.stopPropagation();
@@ -650,14 +598,15 @@ export class RenderPopup extends RenderNode {
 
     if (this.popupContainer) {
       this.popupContainer.lock?.();
-      const containerJ = this.popupContainer.renderNode
-        .popupContainerDomelem as unknown as JQueryUIElem;
-      containerJ.on('click touchend', function (this: HTMLElement, _e: UIEventLike) {
-        if (!$(this).hasClass('NoClose')) {
-          node.trigger('popup_close');
-          node.trigger('popup_cancel');
-        }
-      });
+      const containerJ = this.popupContainer.renderNode.popupContainerDomelem;
+      if (containerJ) {
+        containerJ.on('click touchend', function (this: HTMLElement, _e: UIEventLike) {
+          if (!$(this).hasClass('NoClose')) {
+            node.trigger('popup_close');
+            node.trigger('popup_cancel');
+          }
+        });
+      }
     }
 
     node.on('no_cash', () => {
@@ -749,15 +698,16 @@ export class RenderPopup extends RenderNode {
       };
       jq.on('touchend click', '.TutorialBody', advanceTutorial);
       if (this.popupContainer) {
-        const $tutorialContainer = this.popupContainer.renderNode
-          .popupContainerDomelem as unknown as JQueryUIElem;
-        $tutorialContainer.on('touchend click', advanceTutorial);
-        node.on('popup_close', () => {
-          $tutorialContainer.off(
-            'touchend click',
-            advanceTutorial as unknown as (...args: unknown[]) => unknown
-          );
-        });
+        const $tutorialContainer = this.popupContainer.renderNode.popupContainerDomelem;
+        if ($tutorialContainer) {
+          $tutorialContainer.on('touchend click', advanceTutorial);
+          node.on('popup_close', () => {
+            $tutorialContainer.off(
+              'touchend click',
+              advanceTutorial as unknown as (...args: unknown[]) => unknown
+            );
+          });
+        }
       }
     }
 
@@ -985,7 +935,7 @@ export class RenderPopup extends RenderNode {
   }
 
   render(): void {
-    const jq = this.jdomelem as unknown as JQueryUIElem;
+    const jq = this.jdomelem;
     const _u = getUnderscore();
     jq.empty();
     const html = getApp().renderView(this.template, this.templateData);
@@ -1009,7 +959,7 @@ export class RenderPopup extends RenderNode {
   }
 
   renderDataTab(): void {
-    const jq = this.jdomelem as unknown as JQueryUIElem;
+    const jq = this.jdomelem;
     const app = getApp();
     const htmlPS = app.renderView('profileset.html', this.templateData);
     const htmlButt = app.renderView('buttons_project.html', this.templateData);
@@ -1030,7 +980,7 @@ export class RenderPopup extends RenderNode {
       typelower: pcat.typelower,
       pkey,
     });
-    const jq = this.jdomelem as unknown as JQueryUIElem;
+    const jq = this.jdomelem;
     const jtab = jq.find('.PopupTab.Powerups[data-tab="' + pkey + '"]');
     jtab.find('.Subpop.InSelector').remove();
     jtab.find('.Subpop.Selector').remove();
@@ -1038,7 +988,7 @@ export class RenderPopup extends RenderNode {
   }
 
   override onAddInit(): void {
-    const jq = this.jdomelem as unknown as JQueryUIElem;
+    const jq = this.jdomelem;
     const heightVal = jq.height();
     if (typeof heightVal === 'number') this.height = heightVal;
     const pbody = jq.find('.PopupBody');
@@ -1064,7 +1014,7 @@ export class RenderPopup extends RenderNode {
 
   close(cb?: () => void): void {
     this.open = false;
-    const jq = this.jdomelem as unknown as JQueryUIElem;
+    const jq = this.jdomelem;
     jq.on('otransitionend MSTransitionEnd transitionend webkitTransitionEnd', () => {
       this.remove();
     });
@@ -1109,14 +1059,14 @@ export class RenderMissionPerp extends RenderNode {
   }
 
   constructor(config: MissionPerpConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderTopLevelUI');
     const jdomelem = (config.jdomelem ?? $("<div class='MissionPerp'></div>")) as JQueryUIElem;
     super({
       ...config,
       position: 'relative',
       display: 'block',
       clickable: true,
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     });
     this.frame = config.frame ?? 'normal';
     this.draw();
@@ -1154,7 +1104,7 @@ export class RenderMissionPerp extends RenderNode {
   }
 
   render(): void {
-    const jq = this.jdomelem as unknown as JQueryUIElem;
+    const jq = this.jdomelem;
     jq.removeClass('active');
     jq.removeClass('complete');
     const states = (
@@ -1221,14 +1171,14 @@ export class RenderTopscorePerp extends RenderNode {
   }
 
   constructor(config: TopscorePerpConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderTopLevelUI');
     const jdomelem = (config.jdomelem ?? $("<div class='TopscorePerp'></div>")) as JQueryUIElem;
     super({
       ...config,
       position: 'relative',
       hidden: true,
       clickable: true,
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     });
     this.frame = config.frame ?? 'normal';
     this.draw();
@@ -1258,7 +1208,7 @@ export class RenderTopscorePerp extends RenderNode {
   }
 
   render(): void {
-    const jq = this.jdomelem as unknown as JQueryUIElem;
+    const jq = this.jdomelem;
     jq.empty();
     const html = getApp().renderView(this.template, this);
     jq.append(html);
@@ -1284,7 +1234,7 @@ export class RenderTopscorePerp extends RenderNode {
       e.stopPropagation();
       const parent = this.parentNode;
       if (parent) {
-        (parent.jdomelem as unknown as JQueryUIElem).find('.TopscorePerp').removeClass('active');
+        parent.jdomelem.find('.TopscorePerp').removeClass('active');
       }
     });
     this.on('states', (e) => {
@@ -1297,7 +1247,7 @@ export class RenderTopscorePerp extends RenderNode {
   }
 
   renderRank(): void {
-    const jq = this.jdomelem as unknown as JQueryUIElem;
+    const jq = this.jdomelem;
     const rank = jq.find('.TopscoreRank');
     rank.empty();
     const gnode = this.gameNode as unknown as
@@ -1312,7 +1262,7 @@ export class RenderTopscorePerp extends RenderNode {
   }
 
   renderList(): void {
-    const jq = this.jdomelem as unknown as JQueryUIElem;
+    const jq = this.jdomelem;
     const list = jq.find('.TopscoreList');
     list.empty();
     const gnode = this.gameNode as unknown as
@@ -1344,7 +1294,7 @@ export function renderAmountHtml(
   upgradeAmount?: number,
   upgradeAbsAmount?: number
 ): string {
-  const $ = getJQuery();
+  const $ = getRenderJQuery('RenderTopLevelUI');
   const _u = getUnderscore();
 
   const frameSrc = 'MainSprites.png';

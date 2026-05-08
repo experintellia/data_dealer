@@ -28,7 +28,8 @@
 import appModule from '../app.js';
 import setup from '../setup.js';
 import { RenderDragHandler } from './RenderDragHandler.js';
-import { type JQueryNodeElem, type NodeConfig, RenderNode } from './RenderNode.js';
+import { type NodeConfig, RenderNode } from './RenderNode.js';
+import { type JQueryRenderElem, type JQueryRenderEvent, getRenderJQuery } from './_jqueryShim.js';
 import { type SpriteHelperConfig, renderSpriteHtml } from './renderSpriteHelper.js';
 
 // ── seam: app + renderConf ──────────────────────────────────────────────────
@@ -54,51 +55,10 @@ function getApp(): AppLike {
   return appModule.getApplication() as unknown as AppLike;
 }
 
-// ── jQuery surface ──────────────────────────────────────────────────────────
+// ── jQuery surface (consolidated) ──────────────────────────────────────────
 
-interface JQueryViewElem {
-  0: HTMLElement;
-  attr(name: string, value?: string): string | undefined | unknown;
-  addClass(cls: string): unknown;
-  removeClass(cls: string): unknown;
-  toggleClass(cls: string, force?: boolean): unknown;
-  append(child: unknown): unknown;
-  empty(): unknown;
-  html(content?: string): unknown;
-  find(selector: string): JQueryViewElem;
-  text(): string;
-  on(
-    ev: string,
-    selector: string | ((e: ViewDomEvent) => void),
-    handler?: (e: ViewDomEvent) => void
-  ): unknown;
-  off(ev?: string): unknown;
-  trigger(ev: string, params?: unknown[]): unknown;
-  offset(): { left: number; top: number };
-  css(props: Record<string, string | number>): unknown;
-}
-
-interface ViewDomEvent {
-  pageX?: number;
-  pageY?: number;
-  timeStamp?: number;
-  scale?: number;
-  deltaY?: number;
-  deltaMode?: number;
-  touches?: ArrayLike<{ pageX: number; pageY: number; target?: { tagName?: string } }>;
-  preventDefault(): void;
-  stopPropagation(): void;
-}
-
-function getJQuery(): (selector: string | object) => JQueryViewElem {
-  const jq = (globalThis.jQuery ?? globalThis.$) as
-    | ((selector: string | object) => JQueryViewElem)
-    | undefined;
-  if (!jq) {
-    throw new Error('RenderViews requires the jQuery global to be loaded.');
-  }
-  return jq;
-}
+type JQueryViewElem = JQueryRenderElem;
+type ViewDomEvent = JQueryRenderEvent;
 
 // ── Scroller (vendor) ───────────────────────────────────────────────────────
 
@@ -161,7 +121,7 @@ export class RenderViewTab extends RenderNode {
   declare lastButton: JQueryViewElem | undefined;
 
   constructor(config: ViewTabConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderViews');
     const jdomelem = $("<div class='ViewTab'></div>");
     const jdomelem1 = $("<div class='ViewTabContainer'></div>");
     const jdomelem3 = $("<div class='PopupContainer'></div>");
@@ -181,12 +141,12 @@ export class RenderViewTab extends RenderNode {
       clickable: false,
       width: config.width ?? 960,
       height: config.height ?? 960,
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     });
 
     this.jdomelem1 = jdomelem1;
     this.jdomelem3 = jdomelem3;
-    this.popupContainerDomelem = jdomelem3 as unknown as JQueryNodeElem;
+    this.popupContainerDomelem = jdomelem3;
     this.domelem1 = jdomelem1[0];
 
     const node = this;
@@ -233,9 +193,7 @@ export class RenderViewTab extends RenderNode {
         const root = (node.gameNode as unknown as { GameRoot?: GameRootForView } | undefined)
           ?.GameRoot;
         if (node.parentNode) {
-          (node.parentNode.jdomelem as unknown as JQueryViewElem).addClass(
-            'Active' + (jdomelem.attr('id') as string)
-          );
+          node.parentNode.jdomelem.addClass('Active' + (jdomelem.attr('id') as string));
         }
         if (root?.renderMenu) {
           root.renderMenu.jdomelem.find('.mm-tab').removeClass('active');
@@ -246,9 +204,7 @@ export class RenderViewTab extends RenderNode {
         node.trigger('viewtab_selected');
       } else {
         if (node.parentNode) {
-          (node.parentNode.jdomelem as unknown as JQueryViewElem).removeClass(
-            'Active' + (jdomelem.attr('id') as string)
-          );
+          node.parentNode.jdomelem.removeClass('Active' + (jdomelem.attr('id') as string));
         }
         node.FXHide();
       }
@@ -267,7 +223,7 @@ export class RenderViewTab extends RenderNode {
       child.hide();
     }
     if (ui_elem) {
-      (this.jdomelem as unknown as JQueryViewElem).append(child.domelem);
+      this.jdomelem.append(child.domelem);
     } else {
       this.jdomelem1.append(child.domelem);
     }
@@ -298,11 +254,11 @@ export class RenderViewTab extends RenderNode {
   }
 
   FXShow(): void {
-    (this.jdomelem as unknown as JQueryViewElem).addClass('active');
+    this.jdomelem.addClass('active');
   }
 
   FXHide(): void {
-    (this.jdomelem as unknown as JQueryViewElem).removeClass('active');
+    this.jdomelem.removeClass('active');
   }
 
   /** Legacy stub — body computed dimensions but didn't apply them.
@@ -351,7 +307,7 @@ export class RenderViewMap extends RenderNode {
   _cancelWheelZoom: () => void = () => undefined;
 
   constructor(config: ViewMapConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderViews');
     const jdomelem = $("<div class='ViewMap'></div>");
     const jdomelem1 = $("<div class='ViewMapContainer'></div>");
     const jdomelem2 = $(
@@ -383,13 +339,13 @@ export class RenderViewMap extends RenderNode {
       offsetY: 0, // Scroller needs offset 0
       width: config.width ?? 2920,
       height: config.height ?? 2200,
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     });
 
     this.jdomelem1 = jdomelem1;
     this.jdomelem2 = jdomelem2;
     this.jdomelem3 = jdomelem3;
-    this.popupContainerDomelem = jdomelem3 as unknown as JQueryNodeElem;
+    this.popupContainerDomelem = jdomelem3;
     this.jdomelemZoom = jdomelemZoom;
     this.domelem1 = jdomelem1[0];
     this.domelem2 = jdomelem2[0];
@@ -406,9 +362,7 @@ export class RenderViewMap extends RenderNode {
       if (value) {
         this.FXShow();
         if (this.parentNode) {
-          (this.parentNode.jdomelem as unknown as JQueryViewElem).addClass(
-            'Active' + (jdomelem.attr('id') as string)
-          );
+          this.parentNode.jdomelem.addClass('Active' + (jdomelem.attr('id') as string));
         }
         if (root?.renderMenu) {
           root.renderMenu.jdomelem.find('.mm-tab').removeClass('active');
@@ -418,9 +372,7 @@ export class RenderViewMap extends RenderNode {
         }
       } else {
         if (this.parentNode) {
-          (this.parentNode.jdomelem as unknown as JQueryViewElem).removeClass(
-            'Active' + (jdomelem.attr('id') as string)
-          );
+          this.parentNode.jdomelem.removeClass('Active' + (jdomelem.attr('id') as string));
         }
         this.FXHide();
       }
@@ -432,7 +384,7 @@ export class RenderViewMap extends RenderNode {
       child.hide();
     }
     if (ui_elem) {
-      (this.jdomelem as unknown as JQueryViewElem).append(child.domelem);
+      this.jdomelem.append(child.domelem);
     } else {
       this.jdomelem1.append(child.domelem);
     }
@@ -558,8 +510,8 @@ export class RenderViewMap extends RenderNode {
     this.updateScroller();
     scroller.scrollTo(-initx, -inity);
 
-    const $ = getJQuery();
-    const jq = this.jdomelem as unknown as JQueryViewElem;
+    const $ = getRenderJQuery('RenderViews');
+    const jq = this.jdomelem;
     jq.on('dblclick', '.ZoomControls', (e) => {
       e.stopPropagation();
     });
@@ -598,8 +550,8 @@ export class RenderViewMap extends RenderNode {
       e.preventDefault();
       const parent = this.parentNode;
       if (!parent) return;
-      const offset = (this.jdomelem as unknown as JQueryViewElem).offset();
-      const parentOffset = (parent.jdomelem as unknown as JQueryViewElem).offset();
+      const offset = this.jdomelem.offset();
+      const parentOffset = parent.jdomelem.offset();
       const pageX = e.pageX ?? 0;
       const pageY = e.pageY ?? 0;
       const dragScale = this.dragHandler?.scale ?? 1;
@@ -639,7 +591,7 @@ export class RenderViewMap extends RenderNode {
         const touch = touchEvt.touches[0];
         const parent = this.parentNode;
         if (!touch || !parent) return;
-        const parentOffset = (parent.jdomelem as unknown as JQueryViewElem).offset();
+        const parentOffset = parent.jdomelem.offset();
         this.userAbsPos = {
           x: touch.pageX - parentOffset.left,
           y: touch.pageY - parentOffset.top,
@@ -711,7 +663,7 @@ export class RenderViewMap extends RenderNode {
       );
     }
 
-    void $; // referenced inside delegated handlers via getJQuery() above.
+    void $; // referenced inside delegated handlers via getRenderJQuery('RenderViews') above.
 
     // Mouse-wheel zoom: continuous and smoothly tweened.
     this._wheelZoomTarget = null;
@@ -744,7 +696,7 @@ export class RenderViewMap extends RenderNode {
       (e) => {
         const wheelEvt = e as WheelEvent;
         wheelEvt.preventDefault();
-        const offset = (this.jdomelem as unknown as JQueryViewElem).offset();
+        const offset = this.jdomelem.offset();
         const unit = wheelEvt.deltaMode === 1 ? 16 : wheelEvt.deltaMode === 2 ? 400 : 1;
         const delta = Math.max(-400, Math.min(400, wheelEvt.deltaY * unit));
         const factor = 0.999 ** delta;
@@ -785,7 +737,7 @@ export class RenderViewMap extends RenderNode {
   setZoomScale(scale: number): void {
     this.zoomScale = scale;
     if (this.dragHandler) this.dragHandler.scale = 1 / scale;
-    const jq = this.jdomelem as unknown as JQueryViewElem;
+    const jq = this.jdomelem;
     if (scale < 0.75) {
       jq.addClass('zoomHide2');
     } else {
@@ -823,11 +775,11 @@ export class RenderViewMap extends RenderNode {
   }
 
   FXShow(): void {
-    (this.jdomelem as unknown as JQueryViewElem).addClass('active');
+    this.jdomelem.addClass('active');
   }
 
   FXHide(): void {
-    (this.jdomelem as unknown as JQueryViewElem).removeClass('active');
+    this.jdomelem.removeClass('active');
   }
 }
 
@@ -845,12 +797,11 @@ export class RenderStage extends RenderNode {
   declare userAbsPos: { x: number; y: number } | undefined;
 
   constructor(config: StageConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderViews');
     // Respect a subclass-supplied jdomelem (e.g. MainMenu's
     // `<div class='MainMenu'>` wrapper).  Same pattern as the
     // PR #221 jdomelem-clobber fix in RenderSprite/RenderText.
-    const jdomelem =
-      (config.jdomelem as unknown as JQueryViewElem | undefined) ?? $("<div class='Stage'></div>");
+    const jdomelem = config.jdomelem ?? $("<div class='Stage'></div>");
     const jdomelem2 = $("<div class='PopupContainer Top NoClose'></div>");
     jdomelem.append(jdomelem2);
 
@@ -863,11 +814,11 @@ export class RenderStage extends RenderNode {
       width: config.width ?? 960,
       height: config.height ?? 600,
       position: 'relative',
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     });
 
     this.jdomelem2 = jdomelem2;
-    this.popupContainerDomelem = jdomelem2 as unknown as JQueryNodeElem;
+    this.popupContainerDomelem = jdomelem2;
     this.dragHandler = new RenderDragHandler();
     this.useDragHandler = this.dragHandler;
     this.initUI();
@@ -878,7 +829,7 @@ export class RenderStage extends RenderNode {
     this.on('mousemove', (e) => {
       const pageX = (e as ViewDomEvent).pageX ?? 0;
       const pageY = (e as ViewDomEvent).pageY ?? 0;
-      const offset = (this.jdomelem as unknown as JQueryViewElem).offset();
+      const offset = this.jdomelem.offset();
       this.userAbsPos = { x: pageX - offset.left, y: pageY - offset.top };
     });
     this.on('mousedown touchstart', (e) => {
@@ -886,7 +837,7 @@ export class RenderStage extends RenderNode {
       document.getSelection()?.removeAllRanges();
       const pageX = (e as ViewDomEvent).pageX ?? 0;
       const pageY = (e as ViewDomEvent).pageY ?? 0;
-      const offset = (this.jdomelem as unknown as JQueryViewElem).offset();
+      const offset = this.jdomelem.offset();
       this.userClickAbsPos = { x: pageX - offset.left, y: pageY - offset.top };
     });
   }
@@ -957,7 +908,7 @@ export class RenderMainMenu extends RenderStage {
   }
 
   constructor(config: MainMenuConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderViews');
     const jdomelem = $("<div class='MainMenu'></div>");
 
     super({
@@ -966,7 +917,7 @@ export class RenderMainMenu extends RenderStage {
       height: config.height ?? 48,
       z: 1000,
       position: 'relative',
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     });
 
     this.data = config.data ?? { buttons: [] };
@@ -981,25 +932,17 @@ export class RenderMainMenu extends RenderStage {
     // Setup Button Events
     const root = (this.gameNode as unknown as { GameRoot?: GameRootForMain } | undefined)?.GameRoot;
 
-    (this.jdomelem as unknown as JQueryViewElem).on(
-      'click touchend',
-      '#LocaleToggle:not(.disabled)',
-      (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        root?.trigger?.('toggle_locale');
-      }
-    );
-    (this.jdomelem as unknown as JQueryViewElem).on(
-      'click touchend',
-      '#UserData:not(.disabled)',
-      (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        root?.trigger?.('user_data');
-      }
-    );
-    (this.jdomelem as unknown as JQueryViewElem).on(
+    this.jdomelem.on('click touchend', '#LocaleToggle:not(.disabled)', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      root?.trigger?.('toggle_locale');
+    });
+    this.jdomelem.on('click touchend', '#UserData:not(.disabled)', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      root?.trigger?.('user_data');
+    });
+    this.jdomelem.on(
       'click touchend',
       '.mm-tab:not(.disabled)',
       function (this: HTMLElement, e: ViewDomEvent) {
@@ -1011,7 +954,7 @@ export class RenderMainMenu extends RenderStage {
     );
 
     // Forward .mm-xp taps to the same `click_status.XP` event.
-    (this.jdomelem as unknown as JQueryViewElem).on(
+    this.jdomelem.on(
       'click touchend',
       '.mm-xp .StatusItem',
       function (this: HTMLElement, e: ViewDomEvent) {
@@ -1045,7 +988,7 @@ export class RenderMainMenu extends RenderStage {
 
   render(): void {
     const html = getApp().renderView(this.template, this.data);
-    (this.jdomelem as unknown as JQueryViewElem).html(html);
+    this.jdomelem.html(html);
     // Invalidate the in-place XP cache so the next renderXP repopulates
     // the freshly-emptied .mm-xp-bar slot instead of memo-skipping.
     this._xpSlot = null;
@@ -1077,7 +1020,7 @@ export class RenderMainMenu extends RenderStage {
       level: sb.XP_level,
     };
     if (!this._xpSlot) {
-      const slot = (this.jdomelem as unknown as JQueryViewElem).find('.mm-xp-bar') as unknown as {
+      const slot = this.jdomelem.find('.mm-xp-bar') as unknown as {
         0?: HTMLElement;
       };
       this._xpSlot = slot[0] ?? null;
@@ -1107,13 +1050,13 @@ export class RenderMainMenu extends RenderStage {
   }
 
   override lock(): void {
-    const jq = this.jdomelem as unknown as JQueryViewElem;
+    const jq = this.jdomelem;
     jq.addClass('locked');
     jq.find('.mm-user-btn, .mm-tab').addClass('disabled');
   }
 
   override unlock(): void {
-    const jq = this.jdomelem as unknown as JQueryViewElem;
+    const jq = this.jdomelem;
     jq.removeClass('locked');
     jq.find('.mm-user-btn, .mm-tab').removeClass('disabled');
   }

@@ -8,23 +8,9 @@
 // Trimmed since the legacy declared but never read `textFontSize` —
 // preserved here verbatim for any external config callers.
 
-import { type JQueryNodeElem, type NodeConfig } from './RenderNode.js';
+import { type NodeConfig } from './RenderNode.js';
 import { RenderText, type TextConfig } from './RenderText.js';
-
-interface JQueryButtonElem {
-  0: HTMLElement;
-  attr(name: string, value: string): unknown;
-}
-
-function getJQuery(): (selector: string) => JQueryButtonElem {
-  const jq = (globalThis.jQuery ?? globalThis.$) as
-    | ((selector: string) => JQueryButtonElem)
-    | undefined;
-  if (!jq) {
-    throw new Error('RenderButtonInline requires the jQuery global to be loaded.');
-  }
-  return jq;
-}
+import { getRenderJQuery } from './_jqueryShim.js';
 
 export type ButtonInlineConfig = TextConfig & {
   textFontSize?: string;
@@ -34,7 +20,7 @@ export class RenderButtonInline extends RenderText {
   textFontSize: string;
 
   constructor(config: ButtonInlineConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderButtonInline');
     const jdomelem = $("<div class='Button'></div>");
     // Mirror the legacy in-constructor defaults that override Text /
     // RenderNode prototype values (display='inline-block',
@@ -44,7 +30,7 @@ export class RenderButtonInline extends RenderText {
       position: 'relative',
       textAlign: config.textAlign ?? 'center',
       ...config,
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     } as TextConfig & NodeConfig);
     this.textFontSize = config.textFontSize ?? '20px';
   }

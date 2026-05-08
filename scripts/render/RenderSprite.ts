@@ -7,7 +7,8 @@
 // of the Render wave depends on.
 
 import setup from '../setup.js';
-import { type JQueryNodeElem, type NodeConfig, RenderNode } from './RenderNode.js';
+import { type NodeConfig, RenderNode } from './RenderNode.js';
+import { getRenderJQuery } from './_jqueryShim.js';
 
 export interface SpriteFrame {
   x: number;
@@ -19,21 +20,6 @@ export interface SpriteFrame {
 }
 
 export type SpriteFrameMap = Record<string, SpriteFrame>;
-
-interface JQuerySpriteElem {
-  0: HTMLElement;
-  attr(name: string, value: string): unknown;
-}
-
-function getJQuery(): (selector: string) => JQuerySpriteElem {
-  const jq = (globalThis.jQuery ?? globalThis.$) as
-    | ((selector: string) => JQuerySpriteElem)
-    | undefined;
-  if (!jq) {
-    throw new Error('RenderSprite requires the jQuery global to be loaded.');
-  }
-  return jq;
-}
 
 export type SpriteConfig = NodeConfig & {
   frame?: string;
@@ -60,7 +46,7 @@ export class RenderSprite extends RenderNode {
     // holds the canvas + text children).  Only fall through to the
     // default Sprite container when no subclass overrode it.
     const jdomelem =
-      config.jdomelem ?? (getJQuery()("<div class='Sprite'></div>") as unknown as JQueryNodeElem);
+      config.jdomelem ?? getRenderJQuery('RenderSprite')("<div class='Sprite'></div>");
     super({ ...config, jdomelem });
     // super → RenderNode.init → setAttrs(config) has already assigned
     // frameSrc / frameMap / frame from `config` (when present).  Apply

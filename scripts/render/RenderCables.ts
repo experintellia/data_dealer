@@ -16,25 +16,11 @@
 // `GulpImg`) used by the cable draw routine moved here too; they
 // were IIFE-locals in Render.js with no external readers.
 
-import { type JQueryNodeElem, type NodeConfig, RenderNode } from './RenderNode.js';
+import { type NodeConfig, RenderNode } from './RenderNode.js';
 // Type-only import breaks the runtime cycle with RenderPerp.
 import type { RenderPerp } from './RenderPerp.js';
 import { RenderSet } from './RenderSet.js';
-
-interface JQueryCableElem {
-  0: HTMLCanvasElement;
-  attr(name: string, value: string): unknown;
-}
-
-function getJQuery(): (selector: string) => JQueryCableElem {
-  const jq = (globalThis.jQuery ?? globalThis.$) as
-    | ((selector: string) => JQueryCableElem)
-    | undefined;
-  if (!jq) {
-    throw new Error('RenderCables requires the jQuery global to be loaded.');
-  }
-  return jq;
-}
+import { getRenderJQuery } from './_jqueryShim.js';
 
 // ── shared sprite tiles for the cable draw routine ──────────────────────────
 //
@@ -126,8 +112,7 @@ export class RenderCable extends RenderNode {
 
   constructor(config: CableConfig = {}) {
     const jdomelem =
-      config.jdomelem ??
-      (getJQuery()("<canvas class='Cable'></canvas>") as unknown as JQueryNodeElem);
+      config.jdomelem ?? getRenderJQuery('RenderCables')("<canvas class='Cable'></canvas>");
     super({
       ...config,
       z: config.z ?? -1,
@@ -388,7 +373,7 @@ export class RenderPerpCable extends RenderCable {
   perpTo: RenderPerp;
 
   constructor(config: PerpCableConfig, perpFrom: RenderPerp, perpTo: RenderPerp) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderCables');
     const jdomelem = $("<canvas class='Cable'></canvas>");
     // Clip to 480px, so Cables usually are never longer than 512 (texture size)
     super({
@@ -397,7 +382,7 @@ export class RenderPerpCable extends RenderCable {
       cableMaxLength: config.cableMaxLength ?? 480,
       offsetX: config.offsetX ?? 16,
       offsetY: config.offsetY ?? 16,
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
       pointFrom: perpFrom.getPosition(),
       pointTo: perpTo.getPosition(),
     });

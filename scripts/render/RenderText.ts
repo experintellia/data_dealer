@@ -7,27 +7,11 @@
 // Pairs with RenderSprite as the two leaf visual primitives every
 // remaining Render class either is or extends.
 
-import { type JQueryNodeElem, type NodeConfig, RenderNode } from './RenderNode.js';
-
-interface JQueryTextElem {
-  0: HTMLElement;
-  attr(name: string, value: string): unknown;
-  html(content: string): unknown;
-  width(): number | undefined;
-}
+import { type NodeConfig, RenderNode } from './RenderNode.js';
+import { getRenderJQuery } from './_jqueryShim.js';
 
 interface UnderscoreCrlf {
   crlf2html(text: string): string;
-}
-
-function getJQuery(): (selector: string) => JQueryTextElem {
-  const jq = (globalThis.jQuery ?? globalThis.$) as
-    | ((selector: string) => JQueryTextElem)
-    | undefined;
-  if (!jq) {
-    throw new Error('RenderText requires the jQuery global to be loaded.');
-  }
-  return jq;
 }
 
 export type TextConfig = NodeConfig & {
@@ -48,8 +32,7 @@ export class RenderText extends RenderNode {
     // Respect a subclass-supplied jdomelem (e.g. ButtonInline's
     // `<div class='Button'>` wrapper).  Only fall through to the
     // default Text container when no subclass overrode it.
-    const jdomelem =
-      config.jdomelem ?? (getJQuery()("<div class='Text'></div>") as unknown as JQueryNodeElem);
+    const jdomelem = config.jdomelem ?? getRenderJQuery('RenderText')("<div class='Text'></div>");
     super({ ...config, jdomelem });
   }
 
@@ -83,10 +66,10 @@ export class RenderText extends RenderNode {
     t = _.crlf2html(t);
     this.text = t;
     this.updateRenderProp();
-    (this.jdomelem as unknown as JQueryTextElem).html(t);
+    this.jdomelem.html(t);
     this.updateSize();
     const newOffset = { x: 0, y: 0 };
-    const width = (this.jdomelem as unknown as JQueryTextElem).width() ?? 200;
+    const width = this.jdomelem.width() ?? 200;
     if (this.textAlign === 'center') {
       newOffset.x = Math.round(width / 2);
     } else if (this.textAlign === 'right') {
@@ -96,7 +79,7 @@ export class RenderText extends RenderNode {
   }
 
   updateSize(): void {
-    this.width = (this.jdomelem as unknown as JQueryTextElem).width() ?? 200;
+    this.width = this.jdomelem.width() ?? 200;
   }
 
   /** Note the legacy double-`s` typo: `ssetSize`.  Preserved here

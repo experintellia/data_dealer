@@ -14,10 +14,11 @@
 // own — `cableTo` now constructs `RenderPerpCable` directly.
 
 import { type PerpCableConfig, RenderPerpCable } from './RenderCables.js';
-import { type JQueryNodeElem, RenderNode } from './RenderNode.js';
+import { RenderNode } from './RenderNode.js';
 import { type PerpSpriteConfig, RenderPerpSprite } from './RenderPerpSprite.js';
 import { RenderSet } from './RenderSet.js';
 import { RenderSprite, type SpriteConfig, type SpriteFrameMap } from './RenderSprite.js';
+import { getRenderJQuery } from './_jqueryShim.js';
 
 // `RenderPerpCable` is the concrete cable type Perp.cableTo returns.
 // Re-exported under the prior `PerpCableLike` name so external
@@ -26,22 +27,6 @@ import { RenderSprite, type SpriteConfig, type SpriteFrameMap } from './RenderSp
 // compiling.
 export type PerpCableLike = RenderPerpCable;
 export type { PerpCableConfig };
-
-// ── jQuery surface ──────────────────────────────────────────────────────────
-
-interface JQueryPerpElem {
-  0: HTMLElement;
-}
-
-function getJQuery(): (selector: string) => JQueryPerpElem {
-  const jq = (globalThis.jQuery ?? globalThis.$) as
-    | ((selector: string) => JQueryPerpElem)
-    | undefined;
-  if (!jq) {
-    throw new Error('RenderPerp requires the jQuery global to be loaded.');
-  }
-  return jq;
-}
 
 interface UnderscoreEachLike {
   each<T>(list: T[] | Record<string, T>, fn: (item: T, key: number | string) => void): void;
@@ -71,7 +56,7 @@ export class RenderPerp extends RenderSprite {
   declare dragalong: boolean;
 
   constructor(config: PerpConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderPerp');
     const jdomelem = $("<div class='Perp'></div>");
     const placeRandom =
       config.x === undefined || config.y === undefined ? { x: 1024, y: 800 } : undefined;
@@ -109,7 +94,7 @@ export class RenderPerp extends RenderSprite {
       draggable: config.draggable || true,
       cables: cables as unknown as RenderNode['cables'],
       perpSprite: perpSpriteInstance,
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     } as SpriteConfig);
 
     if (placeRandom) {
