@@ -14,6 +14,7 @@
 
 import { OrderedSet } from '../game/OrderedSet.js';
 import { RenderSet } from './RenderSet.js';
+import { type JQueryRenderElem, type JQueryRenderEvent, getRenderJQuery } from './_jqueryShim.js';
 import { nodeCount, registerNode, unregisterNode } from './renderRegistry.js';
 
 // ── seam interfaces ─────────────────────────────────────────────────────────
@@ -30,40 +31,15 @@ export function setRenderNodeTickers(t: RenderNodeTickers): void {
 }
 
 // ── DOM / jQuery surface that Node touches ──────────────────────────────────
+//
+// `JQueryNodeElem` is re-exported as a type alias to the shared
+// `JQueryRenderElem` so existing config-type imports
+// (`NodeConfig.jdomelem: JQueryNodeElem`) and the cross-module
+// boundary type stay stable while the underlying surface
+// consolidates.  See scripts/render/_jqueryShim.ts.
 
-export interface JQueryNodeElem {
-  0: HTMLElement;
-  attr(name: string): string | undefined;
-  attr(name: string, value: string): unknown;
-  addClass(cls: string): unknown;
-  removeClass(cls: string): unknown;
-  append(child: unknown): unknown;
-  empty(): unknown;
-  remove(): unknown;
-  css(props: Record<string, string | number>): unknown;
-  on(ev: string, handler: (e: NodeDomEvent) => void): unknown;
-  off(ev?: string): unknown;
-  trigger(ev: string, args?: unknown[]): unknown;
-}
-
-interface NodeDomEvent {
-  shiftKey?: boolean;
-  pageX?: number;
-  pageY?: number;
-  timeStamp?: number;
-  preventDefault(): void;
-  stopPropagation(): void;
-}
-
-type JQueryFactory = (selector: string | Element | object) => JQueryNodeElem;
-
-function getJQuery(): JQueryFactory {
-  const jq = (globalThis.jQuery ?? globalThis.$) as JQueryFactory | undefined;
-  if (!jq) {
-    throw new Error('RenderNode requires the jQuery global to be loaded.');
-  }
-  return jq;
-}
+export type JQueryNodeElem = JQueryRenderElem;
+type NodeDomEvent = JQueryRenderEvent;
 
 // ── structural surfaces for cross-class fields ──────────────────────────────
 
@@ -205,7 +181,7 @@ export class RenderNode {
     if (cfg.jdomelem) {
       this.jdomelem = cfg.jdomelem;
     } else {
-      this.jdomelem = getJQuery()("<div class='Node'></div>");
+      this.jdomelem = getRenderJQuery('RenderNode')("<div class='Node'></div>");
     }
     this.domelem = cfg.domelem ?? this.jdomelem[0];
     this.init(cfg);
@@ -222,7 +198,7 @@ export class RenderNode {
 
     this.setAttrs(cfg);
     if (!this.jdomelem) {
-      this.jdomelem = getJQuery()(this.domelem);
+      this.jdomelem = getRenderJQuery('RenderNode')(this.domelem);
     }
     this.jdomelem.attr('id', this.id);
     this.updateClass();

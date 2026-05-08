@@ -8,6 +8,7 @@
 // function(...)` is retired in PR 38 of issue #147.
 
 import setup from '../setup.js';
+import { getRenderJQuery } from './_jqueryShim.js';
 
 interface SpriteFrame {
   x: number;
@@ -30,25 +31,6 @@ export interface SpriteHelperConfig {
   dataButtonId?: string;
 }
 
-interface JQuerySpriteElem {
-  0: HTMLElement;
-  attr(name: string, value: string): unknown;
-  addClass(cls: string): unknown;
-  width(value: number): unknown;
-  height(value: number): unknown;
-  css(props: Record<string, string | number>): unknown;
-}
-
-function getJQuery(): (selector: string) => JQuerySpriteElem {
-  const jq = (globalThis.jQuery ?? globalThis.$) as
-    | ((selector: string) => JQuerySpriteElem)
-    | undefined;
-  if (!jq) {
-    throw new Error('renderSpriteHtml requires the jQuery global to be loaded.');
-  }
-  return jq;
-}
-
 /** Builds a `<div class='RenderSprite'>` HTML string for the given
  *  frame-map config, with the background-image / background-position /
  *  width / height / pivot-offset CSS pre-baked.  Returns an empty
@@ -58,7 +40,7 @@ export function renderSpriteHtml(config: SpriteHelperConfig | undefined, frame?:
   if (!config || !config.frameSrc || !config.frameMap) {
     return '';
   }
-  const $ = getJQuery();
+  const $ = getRenderJQuery('renderSpriteHtml');
   const frameSrc = config.frameSrc || config.frame_src;
   const frameMap = config.frameMap || config.frame_map;
   if (!frameSrc || !frameMap) return '';

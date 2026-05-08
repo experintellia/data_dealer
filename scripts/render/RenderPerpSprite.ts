@@ -8,23 +8,9 @@
 // Pairs with RenderPerp — Perp's ctor wires `new RenderPerpSprite()`
 // when `config.perpSprite` is set.
 
-import { type JQueryNodeElem, RenderNode } from './RenderNode.js';
+import { RenderNode } from './RenderNode.js';
 import { RenderSprite, type SpriteConfig, type SpriteFrame } from './RenderSprite.js';
-
-interface JQueryPerpSpriteElem {
-  0: HTMLElement;
-  attr(name: string, value: string): unknown;
-}
-
-function getJQuery(): (selector: string) => JQueryPerpSpriteElem {
-  const jq = (globalThis.jQuery ?? globalThis.$) as
-    | ((selector: string) => JQueryPerpSpriteElem)
-    | undefined;
-  if (!jq) {
-    throw new Error('RenderPerpSprite requires the jQuery global to be loaded.');
-  }
-  return jq;
-}
+import { getRenderJQuery } from './_jqueryShim.js';
 
 export type PerpSpriteConfig = SpriteConfig & {
   frame_src?: string;
@@ -33,14 +19,14 @@ export type PerpSpriteConfig = SpriteConfig & {
 
 export class RenderPerpSprite extends RenderSprite {
   constructor(config: PerpSpriteConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderPerpSprite');
     const jdomelem = $("<div class='PerpSprite'></div>");
     super({
       ...config,
       frameSrc: config.frameSrc ?? config.frame_src,
       frameMap: config.frameMap ?? config.frame_map,
       frame: config.frame ?? 'normal',
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     } as SpriteConfig);
   }
 

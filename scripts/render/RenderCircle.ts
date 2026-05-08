@@ -5,22 +5,8 @@
 //
 // Extracted from scripts/Render.js's IIFE in PR 34 of issue #147.
 
-import { type JQueryNodeElem, type NodeConfig, RenderNode } from './RenderNode.js';
-
-interface JQueryCircleElem {
-  0: HTMLCanvasElement;
-  attr(name: string, value: string): unknown;
-}
-
-function getJQuery(): (selector: string) => JQueryCircleElem {
-  const jq = (globalThis.jQuery ?? globalThis.$) as
-    | ((selector: string) => JQueryCircleElem)
-    | undefined;
-  if (!jq) {
-    throw new Error('RenderCircle requires the jQuery global to be loaded.');
-  }
-  return jq;
-}
+import { type NodeConfig, RenderNode } from './RenderNode.js';
+import { getRenderJQuery } from './_jqueryShim.js';
 
 export type CircleConfig = NodeConfig & {
   radius?: number;
@@ -37,9 +23,9 @@ export class RenderCircle extends RenderNode {
   strokeWidth: number;
 
   constructor(config: CircleConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderCircle');
     const jdomelem = $("<canvas class='Circle'></canvas>");
-    super({ ...config, jdomelem: jdomelem as unknown as JQueryNodeElem });
+    super({ ...config, jdomelem: jdomelem });
     this.radius = config.radius ?? 32;
     this.fill = config.fill ?? '#C00';
     this.stroke = config.stroke ?? '#F00';

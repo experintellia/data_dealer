@@ -13,36 +13,15 @@
 // the `setRenderDecoratorSlowTicker` injection seam this file
 // used to own — DecoratorTimer imports the singleton directly.
 
-import { type JQueryNodeElem, type NodeConfig, RenderNode } from './RenderNode.js';
+import { type NodeConfig, RenderNode } from './RenderNode.js';
 import { RenderSlowTicker } from './RenderSlowTicker.js';
 import { RenderSprite, type SpriteConfig, type SpriteFrameMap } from './RenderSprite.js';
 import { RenderText, type TextConfig } from './RenderText.js';
+import { type JQueryRenderElem, getRenderJQuery } from './_jqueryShim.js';
 
-// ── jQuery / underscore vendor surfaces ─────────────────────────────────────
-
-interface JQueryDecoratorElem {
-  0: HTMLElement;
-  attr(name: string, value?: string | Record<string, unknown>): unknown;
-  append(child: unknown): unknown;
-  find(selector: string): { remove(): void };
-  show(): unknown;
-  hide(): unknown;
-  text(value: string): unknown;
-  animate(props: Record<string, unknown>, duration?: number): unknown;
-  clone(): JQueryDecoratorElem;
-  addClass(cls: string): unknown;
-  hidden?: boolean;
-}
-
-type JQueryFactory = (selector: string | Element | object) => JQueryDecoratorElem;
-
-function getJQuery(): JQueryFactory {
-  const jq = (globalThis.jQuery ?? globalThis.$) as JQueryFactory | undefined;
-  if (!jq) {
-    throw new Error('RenderDecorators requires the jQuery global to be loaded.');
-  }
-  return jq;
-}
+// Local alias kept for the internal `getReadyText` template-cache
+// type; functionally equivalent to JQueryRenderElem.
+type JQueryDecoratorElem = JQueryRenderElem;
 
 interface UnderscoreI18nLike {
   _(key: string): string;
@@ -88,9 +67,9 @@ export class RenderDecorator extends RenderNode implements DecoratorBase {
   offsetToParent: { x: number; y: number };
 
   constructor(config: DecoratorConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderDecorators');
     const jdomelem = $("<div class='Decorator'></div>");
-    super({ ...config, jdomelem: jdomelem as unknown as JQueryNodeElem });
+    super({ ...config, jdomelem: jdomelem });
     this.offsetToParent = config.offsetToParent ?? { x: 0, y: 0 };
   }
 
@@ -139,7 +118,7 @@ let _textCollectGear: JQueryDecoratorElem | undefined;
 let _textCollectCash: JQueryDecoratorElem | undefined;
 
 function getReadyText(mode: 'profile' | 'money' | 'gear'): JQueryDecoratorElem {
-  const $ = getJQuery();
+  const $ = getRenderJQuery('RenderDecorators');
   const _u = getUnderscore();
   if (mode === 'money') {
     if (!_textCollectCash) {
@@ -164,7 +143,7 @@ export class RenderDecoratorReady extends RenderSprite implements DecoratorBase 
   offsetToParent: { x: number; y: number };
 
   constructor(config: DecoratorReadyConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderDecorators');
     const jdomelem = $("<div class='DecoratorReady'></div>");
     jdomelem.attr('data-testid', 'dd-collect-ready');
 
@@ -180,7 +159,7 @@ export class RenderDecoratorReady extends RenderSprite implements DecoratorBase 
       frameMap,
       frame: config.frame ?? 'normal',
       clickable: true,
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     } as SpriteConfig);
 
     this.offsetToParent = config.offsetToParent ?? { x: 0, y: -30 };
@@ -201,7 +180,7 @@ export class RenderDecoratorReady extends RenderSprite implements DecoratorBase 
   initUI(): void {
     this.on('vclick', (e) => {
       e.stopPropagation();
-      (this.jdomelem as unknown as JQueryDecoratorElem).find('.DecoratorReadyText').remove();
+      this.jdomelem.find('.DecoratorReadyText').remove();
     });
     this.on('vdblclick', (e) => {
       e.stopPropagation();
@@ -236,13 +215,13 @@ export class RenderDecoratorLabel extends RenderText implements DecoratorBase {
   textFontSize: string;
 
   constructor(config: DecoratorLabelConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderDecorators');
     const jdomelem = $("<div class='DecoratorLabel'></div>");
     super({
       ...config,
       text: config.text ?? 'Label',
       clickable: false,
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     } as TextConfig);
     this.offsetToParent = config.offsetToParent ?? { x: 0, y: 0 };
     this.textFontSize = '13px';
@@ -282,7 +261,7 @@ export class RenderDecoratorNew extends RenderText implements DecoratorBase {
   declare arrow: boolean | undefined;
 
   constructor(config: DecoratorNewConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderDecorators');
     const jdomelem = $("<div class='DecoratorNew'></div>");
     if (config.extendClass) {
       jdomelem.addClass(config.extendClass);
@@ -291,7 +270,7 @@ export class RenderDecoratorNew extends RenderText implements DecoratorBase {
       ...config,
       text: config.text ?? 'New!',
       clickable: true,
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     } as TextConfig);
     this.offsetToParent = config.offsetToParent ?? { x: 0, y: 0 };
     this.textFontSize = '13px';
@@ -311,9 +290,7 @@ export class RenderDecoratorNew extends RenderText implements DecoratorBase {
     this.initUI();
     this.updateText();
     if (this.arrow) {
-      (this.jdomelem as unknown as JQueryDecoratorElem).append(
-        '<br /><div class="DecoratorNewArrow"></div>'
-      );
+      this.jdomelem.append('<br /><div class="DecoratorNewArrow"></div>');
     }
     this.draw();
   }
@@ -350,7 +327,7 @@ export class RenderDecoratorGear extends RenderSprite implements DecoratorBase {
   offsetToParent: { x: number; y: number };
 
   constructor(config: DecoratorGearConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderDecorators');
     const jdomelem = $("<div class='DecoratorGear'></div>");
     const frameMap = config.frameMap ?? FRAME_GEAR_DEFAULT;
     super({
@@ -361,7 +338,7 @@ export class RenderDecoratorGear extends RenderSprite implements DecoratorBase {
       clickable: true,
       width: frameMap.normal?.width,
       height: frameMap.normal?.height,
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     } as SpriteConfig);
     this.offsetToParent = config.offsetToParent ?? { x: 30, y: -30 };
   }
@@ -440,7 +417,7 @@ export class RenderDecoratorTimer extends RenderSprite implements DecoratorBase 
   static readonly textReadyIn: () => string = () => getUnderscore()._('Ready in') + ' ';
 
   constructor(config: DecoratorTimerConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderDecorators');
     const jdomelem = $("<div class='DecoratorTimer'></div>");
 
     const frameMap = config.frameMap ?? FRAME_TIMER_DEFAULT;
@@ -467,7 +444,7 @@ export class RenderDecoratorTimer extends RenderSprite implements DecoratorBase 
       clickable: true,
       width: frameMap.normal?.width,
       height: frameMap.normal?.height,
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     } as SpriteConfig);
 
     this.serverTime = serverTime;
@@ -589,7 +566,7 @@ export class RenderDecoratorAmount extends RenderSprite implements DecoratorBase
   jdomelem3: JQueryDecoratorElem;
 
   constructor(config: DecoratorAmountConfig = {}) {
-    const $ = getJQuery();
+    const $ = getRenderJQuery('RenderDecorators');
     const jdomelem = $("<div class='DecoratorAmount'></div>");
     const jdomelem2 = $("<div class='DecoratorAmountValue'></div>");
     const jdomelem3 = $("<div class='DecoratorAmountNum'></div>");
@@ -601,7 +578,7 @@ export class RenderDecoratorAmount extends RenderSprite implements DecoratorBase
       frameSrc: 'MainSprites.png',
       frameMap: FRAME_AMOUNT_DEFAULT,
       frame: 'normal',
-      jdomelem: jdomelem as unknown as JQueryNodeElem,
+      jdomelem: jdomelem,
     } as SpriteConfig);
 
     this.offsetToParent = { x: 0, y: 35 };
