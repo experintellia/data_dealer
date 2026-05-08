@@ -3,14 +3,12 @@
 // point-to-point form; `PerpCable` extends it to track two `RenderPerp`
 // endpoints, register itself with their `cables` sets, and refresh
 // its endpoints from each perp's live position on every draw.
-//
-// Extracted from scripts/Render.js's IIFE in PR 37 of issue #147.
-// Retires the `setPerpCableCtor()` seam from PR #220 — RenderPerp
-// can now `import { RenderPerpCable }` directly, since the type
-// circularity (RenderPerpCable's `perpFrom`/`perpTo` reference
-// RenderPerp; RenderPerp.cableTo constructs RenderPerpCable) is
-// broken at the runtime level by `import type` for the perp
-// reference inside this file.
+// Retires the `setPerpCableCtor()` seam — RenderPerp can now
+// `import { RenderPerpCable }` directly, since the type circularity
+// (RenderPerpCable's `perpFrom`/`perpTo` reference RenderPerp;
+// RenderPerp.cableTo constructs RenderPerpCable) is broken at the
+// runtime level by `import type` for the perp reference inside
+// this file.
 //
 // The shared sprite tile images (`SparkImg`, `PlugImg`, `KrapsImg`,
 // `GulpImg`) used by the cable draw routine moved here too; they

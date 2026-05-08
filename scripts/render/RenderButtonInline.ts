@@ -2,11 +2,8 @@
 // button (`display: inline-block; position: relative`), with no
 // position / transform handling so the host's CSS layout owns
 // placement.  Used by Statusbar / MainMenu / popup chrome for the
-// hand-styled button widgets.
-//
-// Extracted from scripts/Render.js's IIFE in PR 34 of issue #147.
-// Trimmed since the legacy declared but never read `textFontSize` —
-// preserved here verbatim for any external config callers.
+// hand-styled button widgets. The legacy `textFontSize` property is
+// preserved for any external config callers.
 
 import { type NodeConfig } from './RenderNode.js';
 import { RenderText, type TextConfig } from './RenderText.js';

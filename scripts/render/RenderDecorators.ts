@@ -6,12 +6,8 @@
 // shows / draws relative to its `decoratedNode`, and most reuse the
 // shared `decoratorDraw` placement logic (DecoratorTimer overrides
 // with its own canvas-arc countdown render).
-//
-// Extracted from scripts/Render.js's IIFE in PR 36 of issue #147.
-// PR #225 (top-level UI) shrunk the IIFE further; PR 40 lands
-// `SlowTicker` in scripts/render/RenderSlowTicker.ts and retires
-// the `setRenderDecoratorSlowTicker` injection seam this file
-// used to own — DecoratorTimer imports the singleton directly.
+// DecoratorTimer imports `SlowTicker` directly from
+// scripts/render/RenderSlowTicker.ts.
 
 import { type NodeConfig, RenderNode } from './RenderNode.js';
 import { RenderSlowTicker } from './RenderSlowTicker.js';

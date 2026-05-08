@@ -2,10 +2,8 @@
 // (scripts/game/OrderedSet.ts) with the bulk-action methods the
 // renderer's children / decorators / cables collections need
 // (`hide` / `show` / `fade` / `draw` / `removeAll`).
-//
-// Extracted from scripts/Render.js's IIFE in PR 29 of issue #147.
-// First seam in the Render.js wave — establishes the
-// scripts/render/ directory and the OrderedSet-share pattern.
+// Establishes the scripts/render/ directory and the OrderedSet-share
+// pattern.
 
 import { OrderedSet } from '../game/OrderedSet.js';
 

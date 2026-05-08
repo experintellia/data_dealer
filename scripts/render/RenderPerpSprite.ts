@@ -3,10 +3,8 @@
 // when its own entries omit `pivotx`/`pivoty`, then snaps to the
 // parent's offset.  Used by Perp subclasses that need a secondary
 // foreground sprite (e.g. ContactPerp's expression layer).
-//
-// Extracted from scripts/Render.js's IIFE in PR 35 of issue #147.
-// Pairs with RenderPerp — Perp's ctor wires `new RenderPerpSprite()`
-// when `config.perpSprite` is set.
+// Perp's ctor wires `new RenderPerpSprite()` when `config.perpSprite`
+// is set.
 
 import { RenderNode } from './RenderNode.js';
 import { RenderSprite, type SpriteConfig, type SpriteFrame } from './RenderSprite.js';

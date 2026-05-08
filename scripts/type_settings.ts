@@ -1,8 +1,7 @@
 // Some fixtures that are currently not handled or provided by dd_cms.
-// File converted from type_settings.js in PR 28 of issue #147; the
-// `@ts-nocheck` quarantine is dropped and the legacy `_._('msgid')`
-// underscore-mixin lookup is replaced with direct `i18n.gettext`
-// calls (the mixin was already pointed at `i18n.gettext` by app.ts).
+// The legacy `_._('msgid')` underscore-mixin lookup is replaced with
+// direct `i18n.gettext` calls (the mixin was already pointed at
+// `i18n.gettext` by app.ts).
 
 import i18n from './i18n.js';
 

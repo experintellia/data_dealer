@@ -1,11 +1,9 @@
 // Render-side `RenderSprite` helper — a small utility (NOT the
 // `RenderSprite` class!) that takes a frame-map config and returns
 // an HTML string suitable for templates' `<%= … %>` interpolation.
-//
 // Lives in its own module so MainMenu (in RenderViews.ts) and Popup
-// (still inline in Render.js) can both import it without
-// duplicating the body.  Render.js's IIFE-local `var RenderSprite =
-// function(...)` is retired in PR 38 of issue #147.
+// (still inline in Render.js) can both import it without duplicating
+// the body.
 
 import setup from '../setup.js';
 import { getRenderJQuery } from './_jqueryShim.js';

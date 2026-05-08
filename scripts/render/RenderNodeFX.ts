@@ -2,11 +2,9 @@
 // `FXBounce`, `FXSpark`, `FXKatsching`, `FXKarmaBling`, `FXLevelUpBling`,
 // `FXMissionComplete`, `FXBling`, `FXBlingQueue`, …) that legacy code
 // attached to `Node.prototype` inside the Render.js IIFE.
-//
-// Extracted from scripts/Render.js's IIFE in PR 33 of issue #147.
 // Now that `RenderSprite` and `RenderText` are real importable classes
-// (PR #217) the FX block no longer depends on the IIFE's closure
-// scope, so it can move out wholesale.
+// the FX block no longer depends on the IIFE's closure scope, so it can
+// move out wholesale.
 //
 // Shape:
 //   - `applyRenderNodeFX({ Ticker, Tween, Ease })` — called once from

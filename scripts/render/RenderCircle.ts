@@ -2,8 +2,6 @@
 // configurable radius / fill / stroke.  Used today only for a
 // commented-out cursor experiment in ViewMap, and exported via the
 // publisher for any external tooling.
-//
-// Extracted from scripts/Render.js's IIFE in PR 34 of issue #147.
 
 import { type NodeConfig, RenderNode } from './RenderNode.js';
 import { getRenderJQuery } from './_jqueryShim.js';

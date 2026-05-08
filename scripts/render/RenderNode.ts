@@ -3,14 +3,9 @@
 // Statusbar, ViewMap, …) extends via util.extend.  Owns positioning,
 // transforms, opacity, the DOM/jQuery wrapper, the children/decorators
 // collections, and the click/drag wiring.
-//
-// Extracted from scripts/Render.js's IIFE in PR 31 of issue #147.
-// PR 40 lands the `_instances` / `_ids` registry in
-// scripts/render/renderRegistry.ts and retires the
-// `setRenderNodeRegistry` injection seam this file used to own.  The
-// `setRenderNodeTickers` injection seam retired alongside the
-// extraction of `renderCreatejsTicker.ts` and direct
-// `RenderSlowTicker` import.
+// The `_instances` / `_ids` registry lives in scripts/render/renderRegistry.ts.
+// Injection seams for `setRenderNodeRegistry` and `setRenderNodeTickers`
+// have been retired in favor of direct imports.
 
 import { OrderedSet } from '../game/OrderedSet.js';
 import { RenderSet } from './RenderSet.js';

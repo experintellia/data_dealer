@@ -2,8 +2,6 @@
 // (CRLF-normalised) text content, with measured width fed back to the
 // Node bounding box so positioning honours `textAlign`.  Used by FXBling,
 // FXBlingQueue, the popup body and several decorator subtypes.
-//
-// Extracted from scripts/Render.js's IIFE in PR 32 of issue #147.
 // Pairs with RenderSprite as the two leaf visual primitives every
 // remaining Render class either is or extends.
 

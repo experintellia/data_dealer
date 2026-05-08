@@ -19,11 +19,6 @@
 //     / `ViewMap` / etc.) so external consumers and the
 //     publisher-introspecting devtools stamp keep working
 //     unchanged.
-//
-// PR 41 of issue #147 — the final-cleanup PR — closes #147 by
-// dropping the last `@ts-nocheck` marker, flipping
-// `allowJs: false` in tsconfig, and converting this residual
-// shell to strict TS.
 
 import { RenderButtonInline } from './render/RenderButtonInline.js';
 import { RenderCable, RenderPerpCable, setRenderCableResolution } from './render/RenderCables.js';

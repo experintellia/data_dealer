@@ -2,11 +2,8 @@
 // that DecoratorTimer registers itself with for the per-second
 // countdown sweep.  Written as a singleton, like the original
 // CreateJS Ticker, but with its own setTimeout loop instead of
-// hooking into the Easel render loop.
-//
-// Lifted out of Render.js's IIFE in PR 40 of issue #147.  Retires
-// the `setRenderDecoratorSlowTicker()` seam from PR #221 —
-// RenderDecorators imports this singleton directly now.
+// hooking into the Easel render loop. RenderDecorators imports
+// this singleton directly now.
 //
 // Auto-starts on first import.  Module-load timing is fine: the
 // loop body just walks the (initially empty) `listeners` set, and

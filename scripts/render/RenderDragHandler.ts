@@ -1,12 +1,8 @@
 // Render-side `DragHandler` — manages window-level drag state for
 // the renderer's draggable nodes (perps + popup).  Reads pointer / touch
 // events off `$(window)` and dispatches `dragstart` / `dragmove` /
-// `dragend` to listening nodes.
-//
-// Extracted from scripts/Render.js's IIFE in PR 30 of issue #147.
-// Second seam in the Render.js wave (after RenderSet).  Self-contained:
-// depends only on the jQuery `$` global and the previously-extracted
-// RenderSet.
+// `dragend` to listening nodes. Self-contained: depends only on the
+// jQuery `$` global and the previously-extracted RenderSet.
 
 import { OrderedSet } from '../game/OrderedSet.js';
 

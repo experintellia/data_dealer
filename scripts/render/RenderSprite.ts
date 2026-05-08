@@ -1,8 +1,6 @@
 // Render-side `Sprite` primitive — a div with a CSS background-image
 // from a sprite-sheet, indexed by named frames.  Foundation for Perp,
 // PerpSprite, the FX bling animations, and several decorator types.
-//
-// Extracted from scripts/Render.js's IIFE in PR 32 of issue #147.
 // Pairs with RenderText as the two leaf visual primitives the rest
 // of the Render wave depends on.
 

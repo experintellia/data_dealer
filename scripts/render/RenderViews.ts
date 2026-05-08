@@ -16,8 +16,6 @@
 //     the .mm-tab nav, the cloned mobile XP bar, and forwards
 //     button clicks to GameRoot.
 //
-// Extracted from scripts/Render.js's IIFE in PR 38 of issue #147.
-//
 // Two seam dependencies:
 //   - `setRenderViewsApp` — for `app.renderView(template, data)` and
 //     `app.game.resetZoom()`.  app is a singleton initialised by
