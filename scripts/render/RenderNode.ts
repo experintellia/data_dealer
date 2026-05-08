@@ -7,28 +7,17 @@
 // Extracted from scripts/Render.js's IIFE in PR 31 of issue #147.
 // PR 40 lands the `_instances` / `_ids` registry in
 // scripts/render/renderRegistry.ts and retires the
-// `setRenderNodeRegistry` injection seam this file used to own.
-// `setRenderNodeTickers` stays — it bridges to the CreateJS Ticker
-// singleton which remains shimmed inside Render.js's IIFE for the
-// time being.
+// `setRenderNodeRegistry` injection seam this file used to own.  The
+// `setRenderNodeTickers` injection seam retired alongside the
+// extraction of `renderCreatejsTicker.ts` and direct
+// `RenderSlowTicker` import.
 
 import { OrderedSet } from '../game/OrderedSet.js';
 import { RenderSet } from './RenderSet.js';
+import { RenderSlowTicker } from './RenderSlowTicker.js';
 import { type JQueryRenderElem, type JQueryRenderEvent, getRenderJQuery } from './_jqueryShim.js';
+import { tickerRemoveListener } from './renderCreatejsTicker.js';
 import { nodeCount, registerNode, unregisterNode } from './renderRegistry.js';
-
-// ── seam interfaces ─────────────────────────────────────────────────────────
-
-export interface RenderNodeTickers {
-  tickerRemove(node: RenderNode): void;
-  slowTickerRemove(node: RenderNode): void;
-}
-
-let _tickers: RenderNodeTickers | undefined;
-
-export function setRenderNodeTickers(t: RenderNodeTickers): void {
-  _tickers = t;
-}
 
 // ── DOM / jQuery surface that Node touches ──────────────────────────────────
 //
@@ -225,10 +214,8 @@ export class RenderNode {
   }
 
   remove(): void {
-    if (_tickers) {
-      _tickers.tickerRemove(this);
-      _tickers.slowTickerRemove(this);
-    }
+    tickerRemoveListener(this);
+    RenderSlowTicker.removeListener(this);
     if (this.decoratedNode) {
       this.decoratedNode.decorators.remove(this);
     }
