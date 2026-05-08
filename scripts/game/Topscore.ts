@@ -37,7 +37,7 @@ interface RankingResult {
 // app.remote's return type is widened.
 interface DoneFailChain {
   done(cb: (data: { result?: RankingResult }) => void): DoneFailChain;
-  fail(cb: (data: unknown) => void): DoneFailChain;
+  fail(cb: (data: { error?: string | number; message?: string }) => void): DoneFailChain;
 }
 
 interface TopscoreRenderNode {
@@ -93,7 +93,7 @@ export class Topscore extends GameNode {
           console.error('getRanking failed', data);
         }
       })
-      .fail(function (data: unknown) {
+      .fail(function (data) {
         console.error('getRanking failed', data);
       });
   }
