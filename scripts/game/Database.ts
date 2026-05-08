@@ -185,7 +185,7 @@ interface BuyPerpResult {
 
 interface DoneFailChain<T> {
   done(cb: (data: { result?: T }) => void): DoneFailChain<T>;
-  fail(cb: (data: unknown) => void): DoneFailChain<T>;
+  fail(cb: (data: { error?: string | number; message?: string }) => void): DoneFailChain<T>;
 }
 
 // ---------------------------------------------------------------------------
