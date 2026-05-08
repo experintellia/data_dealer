@@ -186,7 +186,7 @@ export class RenderViewTab extends RenderNode {
 
     // LISTEN TO STATES
     // FIXME: redundant to viewmap code
-    node.on('states_active', ((e: ViewDomEvent, value: unknown) => {
+    node.on('states_active', (e: ViewDomEvent, value: unknown) => {
       void e;
       if (value) {
         node.FXShow();
@@ -208,7 +208,7 @@ export class RenderViewTab extends RenderNode {
         }
         node.FXHide();
       }
-    }) as unknown as (e: ViewDomEvent) => void);
+    });
   }
 
   render(): void {
@@ -355,7 +355,7 @@ export class RenderViewMap extends RenderNode {
     this.zoomScale = config.zoomScale ?? 1;
 
     // LISTEN TO STATES
-    this.on('states_active', ((e: ViewDomEvent, value: unknown) => {
+    this.on('states_active', (e: ViewDomEvent, value: unknown) => {
       e.stopPropagation();
       const root = (this.gameNode as unknown as { GameRoot?: GameRootForView } | undefined)
         ?.GameRoot;
@@ -376,7 +376,7 @@ export class RenderViewMap extends RenderNode {
         }
         this.FXHide();
       }
-    }) as unknown as (e: ViewDomEvent) => void);
+    });
   }
 
   override addChild(child: RenderNode, ui_elem?: boolean): RenderNode {

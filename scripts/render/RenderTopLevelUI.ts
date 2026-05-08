@@ -702,10 +702,7 @@ export class RenderPopup extends RenderNode {
         if ($tutorialContainer) {
           $tutorialContainer.on('touchend click', advanceTutorial);
           node.on('popup_close', () => {
-            $tutorialContainer.off(
-              'touchend click',
-              advanceTutorial as unknown as (...args: unknown[]) => unknown
-            );
+            $tutorialContainer.off('touchend click', advanceTutorial);
           });
         }
       }
@@ -859,7 +856,8 @@ export class RenderPopup extends RenderNode {
       }
     );
 
-    node.on('close_powerup', ((_e: UIEventLike, cb?: () => void) => {
+    node.on('close_powerup', (_e: UIEventLike, ...args: unknown[]) => {
+      const cb = args[0] as (() => void) | undefined;
       const jelem = node.lastButton;
       if (!jelem) return;
       jelem.removeClass('active');
@@ -872,7 +870,7 @@ export class RenderPopup extends RenderNode {
       if (cb) {
         window.setTimeout(cb, 400);
       }
-    }) as unknown as (e: UIEventLike) => void);
+    });
 
     jq.on(
       'click touchend',

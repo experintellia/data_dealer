@@ -77,12 +77,12 @@ export interface JQueryRenderElem<E extends HTMLElement = HTMLElement> {
   height(value: number): JQueryRenderElem<E>;
 
   // events
-  on(
+  on<E2 extends JQueryRenderEvent = JQueryRenderEvent>(
     event: string,
-    selectorOrHandler: string | ((e: JQueryRenderEvent) => void),
-    handler?: (e: JQueryRenderEvent) => void
+    selectorOrHandler: string | ((e: E2, ...args: unknown[]) => void),
+    handler?: (e: E2, ...args: unknown[]) => void
   ): JQueryRenderElem<E>;
-  off(event?: string, handler?: (...args: unknown[]) => unknown): JQueryRenderElem<E>;
+  off(event?: string, handler?: (e: JQueryRenderEvent) => void): JQueryRenderElem<E>;
   trigger(event: string, params?: unknown[]): JQueryRenderElem<E>;
 
   // layout / styling
