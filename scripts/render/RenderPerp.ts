@@ -35,8 +35,6 @@ interface UnderscoreEachLike {
 // ── config shape ────────────────────────────────────────────────────────────
 
 export type PerpConfig = SpriteConfig & {
-  frame_src?: string;
-  frame_map?: SpriteFrameMap;
   cables?: RenderSet<PerpCableLike>;
   perpSprite?: PerpSpriteConfig | RenderPerpSprite;
   draggable?: boolean;
@@ -61,11 +59,10 @@ export class RenderPerp extends RenderSprite {
     const placeRandom =
       config.x === undefined || config.y === undefined ? { x: 1024, y: 800 } : undefined;
 
-    const frameSrc = config.frameSrc ?? config.frame_src ?? 'MainSprites.png';
-    const frameMap: SpriteFrameMap = config.frameMap ??
-      config.frame_map ?? {
-        normal: { x: 0, y: 0, width: 80, height: 80, pivotx: 0, pivoty: 0 },
-      };
+    const frameSrc = config.frameSrc ?? 'MainSprites.png';
+    const frameMap: SpriteFrameMap = config.frameMap ?? {
+      normal: { x: 0, y: 0, width: 80, height: 80, pivotx: 0, pivoty: 0 },
+    };
     const frame = config.frame ?? 'normal';
     const cables = config.cables ?? new RenderSet<PerpCableLike>();
 
