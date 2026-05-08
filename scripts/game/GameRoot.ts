@@ -1804,11 +1804,10 @@ export class GameRoot extends GameNode {
     stage.gameNode = this;
     const $ = globalThis.$;
     if (!$) return;
-    const setupLike = setup as unknown as { debug?: boolean; renderContainer?: string };
-    if (setupLike.debug) {
-      $(setupLike.renderContainer ?? '').addClass?.('debugmode');
+    if (setup.debug) {
+      $(setup.renderContainer).addClass?.('debugmode');
     }
-    const containerSel = setupLike.renderContainer ?? '';
+    const containerSel = setup.renderContainer;
     $(containerSel).append(menu.domelem);
     menu.initUI?.();
     $(containerSel).append(stage.domelem);
