@@ -28,7 +28,6 @@
 // `allowJs: false` in tsconfig, and converting this residual
 // shell to strict TS.
 
-import appModule from './app.js';
 import { RenderButtonInline } from './render/RenderButtonInline.js';
 import { RenderCable, RenderPerpCable, setRenderCableResolution } from './render/RenderCables.js';
 import { RenderCircle } from './render/RenderCircle.js';
@@ -274,15 +273,5 @@ export function getRender(): RenderApi {
   }
   return _render;
 }
-
-// `appModule` is imported here to preserve the legacy
-// `var app = appModule.getApplication()` resolution timing — the
-// previous IIFE captured it inside the factory body so any
-// downstream `app.*` lookup ran *after* `app.start()` had been
-// dispatched.  The Render* modules that need the app singleton
-// (RenderViews, RenderTopLevelUI) read it lazily themselves; this
-// stays as a touchpoint to keep the `appModule` symbol live in
-// case future Render-side helpers want it back.
-void appModule;
 
 export default { getRender };
