@@ -13,7 +13,7 @@
 // the `setRenderDecoratorSlowTicker` injection seam this file
 // used to own — DecoratorTimer imports the singleton directly.
 
-import { type NodeConfig, RenderNode } from './RenderNode.js';
+import { type DecoType, type NodeConfig, RenderNode } from './RenderNode.js';
 import { RenderSlowTicker } from './RenderSlowTicker.js';
 import { RenderSprite, type SpriteConfig, type SpriteFrameMap } from './RenderSprite.js';
 import { RenderText, type TextConfig } from './RenderText.js';
@@ -139,7 +139,7 @@ function getReadyText(mode: 'profile' | 'money' | 'gear'): JQueryDecoratorElem {
 }
 
 export class RenderDecoratorReady extends RenderSprite implements DecoratorBase {
-  declare decoType: string;
+  declare decoType: DecoType;
   offsetToParent: { x: number; y: number };
 
   constructor(config: DecoratorReadyConfig = {}) {
@@ -210,7 +210,7 @@ export type DecoratorLabelConfig = TextConfig & {
 };
 
 export class RenderDecoratorLabel extends RenderText implements DecoratorBase {
-  declare decoType: string;
+  declare decoType: DecoType;
   offsetToParent: { x: number; y: number };
   textFontSize: string;
 
@@ -255,7 +255,7 @@ export type DecoratorNewConfig = TextConfig & {
 };
 
 export class RenderDecoratorNew extends RenderText implements DecoratorBase {
-  declare decoType: string;
+  declare decoType: DecoType;
   offsetToParent: { x: number; y: number };
   textFontSize: string;
   declare arrow: boolean | undefined;
@@ -323,7 +323,7 @@ export type DecoratorGearConfig = SpriteConfig & {
 };
 
 export class RenderDecoratorGear extends RenderSprite implements DecoratorBase {
-  declare decoType: string;
+  declare decoType: DecoType;
   offsetToParent: { x: number; y: number };
 
   constructor(config: DecoratorGearConfig = {}) {
@@ -400,7 +400,7 @@ export type DecoratorTimerConfig = SpriteConfig & {
 };
 
 export class RenderDecoratorTimer extends RenderSprite implements DecoratorBase {
-  declare decoType: string;
+  declare decoType: DecoType;
   offsetToParent: { x: number; y: number };
   serverTime: number;
   serverStartTime: number;
@@ -558,7 +558,7 @@ export type DecoratorAmountConfig = SpriteConfig & {
 };
 
 export class RenderDecoratorAmount extends RenderSprite implements DecoratorBase {
-  declare decoType: string;
+  declare decoType: DecoType;
   offsetToParent: { x: number; y: number };
   amount: number;
   declare text: string;

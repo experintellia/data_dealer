@@ -66,6 +66,23 @@ interface GameNodeLike {
   parentNode?: { renderNode: RenderNode };
 }
 
+// ── decorator slot typing ───────────────────────────────────────────────────
+//
+// Every decorator subclass in scripts/render/RenderDecorators.ts pins a
+// fixed `decoType` string on its prototype.  `addDecorator` uses that
+// string to populate the matching same-name slot on the decorated
+// node (so callers can read e.g. `rn.DecoratorGear?.setFrame(...)`).
+// Pinning the union here lets the slot fields and the dynamic write
+// in `addDecorator` stay narrowly typed without a `Record<string, …>`
+// cast.
+export type DecoType =
+  | 'DecoratorReady'
+  | 'DecoratorAmount'
+  | 'DecoratorGear'
+  | 'DecoratorLabel'
+  | 'DecoratorTimer'
+  | 'DecoratorNew';
+
 // ── config / setAttrs ───────────────────────────────────────────────────────
 
 export type NodeConfig = {
@@ -131,8 +148,18 @@ export class RenderNode {
   declare perpFrom: { cables: RenderSet<RenderNode> } | undefined;
   declare cables: (RenderSet<RenderNode> & { set: CableLike[] }) | undefined;
   declare detectCollisions: boolean | undefined;
-  declare decoType: string | undefined;
+  declare decoType: DecoType | undefined;
   declare dragBound: ((pos: { x: number; y: number }) => void) | undefined;
+
+  // Per-decoType slots populated by `addDecorator`.  Keyed by the
+  // decorator's `decoType` string — readers (e.g. `rn.DecoratorGear`)
+  // hit these declared fields directly rather than a Record-cast.
+  declare DecoratorReady: RenderNode | undefined;
+  declare DecoratorAmount: RenderNode | undefined;
+  declare DecoratorGear: RenderNode | undefined;
+  declare DecoratorLabel: RenderNode | undefined;
+  declare DecoratorTimer: RenderNode | undefined;
+  declare DecoratorNew: RenderNode | undefined;
   declare dragStartPos: { x: number; y: number } | undefined;
 
   // setDraggable / setClickable timer state.
@@ -274,11 +301,17 @@ export class RenderNode {
     }
     this.decorators.add(deco);
     if (deco.decoType) {
-      const slot = (this as unknown as Record<string, RenderNode | undefined>)[deco.decoType];
-      if (slot) {
-        slot.remove();
+      // The DecoType union members are exactly the names of the
+      // decorator slot fields declared above, so the assignment is
+      // sound — the indexed write is just sugar for the per-slot
+      // `this.DecoratorGear = deco` etc.  Pulled out into a typed
+      // alias so the index is checked, not cast through `unknown`.
+      const slots = this as Pick<RenderNode, DecoType>;
+      const existing = slots[deco.decoType];
+      if (existing) {
+        existing.remove();
       }
-      (this as unknown as Record<string, RenderNode>)[deco.decoType] = deco;
+      slots[deco.decoType] = deco;
     }
     deco.decoratedNode = this;
     this.parentNode.addChild(deco);

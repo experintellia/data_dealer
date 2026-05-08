@@ -108,10 +108,13 @@ declare module './RenderNode.js' {
     // Transient FX state planted on the instance.
     FXAnimation?: TweenChain;
     spinner?: RenderSprite;
-    // Subclass fields the FX bodies touch — Decorator family, click
-    // handlers, statusbar bling tracking.  Declared optional here so
-    // the FX methods type-check against any RenderNode subclass.
-    DecoratorAmount?: DecoratorAmountLike;
+    // Subclass fields the FX bodies touch — click handlers,
+    // statusbar bling tracking.  Declared optional here so the FX
+    // methods type-check against any RenderNode subclass.  The
+    // `DecoratorAmount` slot is declared on RenderNode itself
+    // (typed `RenderNode | undefined`) — FX call sites cast through
+    // `DecoratorAmountLike` where the `setAmount()` surface is
+    // needed.
     userClickAbsPos?: { x: number; y: number };
     renderBlings?: Record<string, RenderText>;
     zoomScale?: number;
@@ -352,7 +355,7 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
         this.FXBounce();
         this.FXBling({ text, extendClass: 'ProfileBlingSmall' });
         this.DecoratorAmount?.show();
-        this.DecoratorAmount?.setAmount();
+        (this.DecoratorAmount as DecoratorAmountLike | undefined)?.setAmount();
         spinner.remove();
         delete this.spinner;
         if (cb) cb();
