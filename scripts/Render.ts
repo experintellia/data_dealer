@@ -156,11 +156,11 @@ function Render(): RenderApi {
 
   // ── seam wirings ─────────────────────────────────────────────────────────
   //
-  // RenderNodeFX needs Ticker / Tween / Ease handed in since it
-  // can't read off the createjs global at module load (createjs
-  // script tag may not have parsed yet).
+  // RenderNodeFX needs Tween / Ease handed in since it can't read off
+  // the createjs global at module load (createjs script tag may not
+  // have parsed yet).  Ticker access lives in renderCreatejsTicker
+  // and resolves the singleton lazily on first use.
   applyRenderNodeFX({
-    Ticker: cj.Ticker as unknown as Parameters<typeof applyRenderNodeFX>[0]['Ticker'],
     Tween: Tween as Parameters<typeof applyRenderNodeFX>[0]['Tween'],
     Ease: Ease as Parameters<typeof applyRenderNodeFX>[0]['Ease'],
   });
