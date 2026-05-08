@@ -10,8 +10,7 @@
 //     `Ticker` / `Ease`),
 //   - one-time seam wirings for the modules that legitimately
 //     can't pull these vendor globals on their own
-//     (`applyRenderNodeFX` / `setRenderCableResolution` /
-//     `setRenderViewsConfig`),
+//     (`applyRenderNodeFX`),
 //   - the underscore `_.mixin({ RenderAmount, RenderSprite })`
 //     template-helper registration,
 //   - the publisher object that re-exports every Render* class /
@@ -21,7 +20,7 @@
 //     unchanged.
 
 import { RenderButtonInline } from './render/RenderButtonInline.js';
-import { RenderCable, RenderPerpCable, setRenderCableResolution } from './render/RenderCables.js';
+import { RenderCable, RenderPerpCable } from './render/RenderCables.js';
 import { RenderCircle } from './render/RenderCircle.js';
 import {
   RenderDecorator,
@@ -50,17 +49,10 @@ import {
   RenderTopscorePerp,
   renderAmountHtml,
 } from './render/RenderTopLevelUI.js';
-import {
-  RenderMainMenu,
-  RenderStage,
-  RenderViewMap,
-  RenderViewTab,
-  setRenderViewsConfig,
-} from './render/RenderViews.js';
+import { RenderMainMenu, RenderStage, RenderViewMap, RenderViewTab } from './render/RenderViews.js';
 import { tickerSetFPS, tickerSetUseRAF } from './render/renderCreatejsTicker.js';
 import { _ids, _instances, clearAllNodes, getNode, getNodeById } from './render/renderRegistry.js';
 import { renderSpriteHtml } from './render/renderSpriteHelper.js';
-import setup from './setup.js';
 
 // ── CreateJS vendor surface ────────────────────────────────────────────────
 //
@@ -135,18 +127,10 @@ function Render(): RenderApi {
   const Tween = cj.Tween;
   const Ease = cj.Ease;
 
-  const renderConf = {
-    cableResolution: 2,
-    tickerFramerate: 60,
-    slowTickerFrameRate: 120,
-    viewMapPerspective: setup.viewMapPerspective,
-    viewMapStopZone: setup.viewMapStopZone,
-  };
-
   // First call into renderCreatejsTicker installs the legacy
   // listener-array shim onto the CreateJS Ticker singleton, so
   // RenderNodeFX's `Ticker.addListener` calls find a function.
-  tickerSetFPS(renderConf.tickerFramerate);
+  tickerSetFPS(60);
   tickerSetUseRAF(true);
 
   // ── seam wirings ─────────────────────────────────────────────────────────
@@ -159,8 +143,6 @@ function Render(): RenderApi {
     Tween: Tween as Parameters<typeof applyRenderNodeFX>[0]['Tween'],
     Ease: Ease as Parameters<typeof applyRenderNodeFX>[0]['Ease'],
   });
-  setRenderCableResolution(renderConf.cableResolution);
-  setRenderViewsConfig({ viewMapStopZone: renderConf.viewMapStopZone });
 
   // ── underscore mixins (template-helper registration) ─────────────────────
 

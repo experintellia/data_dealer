@@ -16,12 +16,12 @@
 //     the .mm-tab nav, the cloned mobile XP bar, and forwards
 //     button clicks to GameRoot.
 //
-// Two seam dependencies:
+// One seam dependency remains:
 //   - `setRenderViewsApp` — for `app.renderView(template, data)` and
 //     `app.game.resetZoom()`.  app is a singleton initialised by
 //     scripts/app.ts; Render.js wires the seam at IIFE-body time.
-//   - `setRenderViewsConfig` — for `viewMapStopZone` (read off
-//     scripts/setup.ts).  Bundled with `app` in `setRenderViewsHooks`.
+//   `viewMapStopZone` is now read directly from `setup` (see
+//   scripts/setup.ts); the `setRenderViewsConfig` setter was retired.
 
 import appModule from '../app.js';
 import setup from '../setup.js';
@@ -30,23 +30,13 @@ import { type NodeConfig, RenderNode } from './RenderNode.js';
 import { type JQueryRenderElem, type JQueryRenderEvent, getRenderJQuery } from './_jqueryShim.js';
 import { type SpriteHelperConfig, renderSpriteHtml } from './renderSpriteHelper.js';
 
-// ── seam: app + renderConf ──────────────────────────────────────────────────
+// ── seam: app ───────────────────────────────────────────────────────────────
 
 interface AppLike {
   renderView(viewName: string, data?: unknown): string;
   game?: {
     resetZoom?(): void;
   };
-}
-
-export interface RenderViewsConfig {
-  viewMapStopZone: number;
-}
-
-let _config: RenderViewsConfig = { viewMapStopZone: 200 };
-
-export function setRenderViewsConfig(c: RenderViewsConfig): void {
-  _config = c;
 }
 
 function getApp(): AppLike {
@@ -421,8 +411,8 @@ export class RenderViewMap extends RenderNode {
   }
 
   override setPosition(pos: { x: number; y: number }): void {
-    if (_config.viewMapStopZone) {
-      const stopZone = _config.viewMapStopZone;
+    if (setup.viewMapStopZone) {
+      const stopZone = setup.viewMapStopZone;
       const parent = this.parentNode;
       if (parent) {
         const clipx = parent.width - this.getScaledSize().width - stopZone;
