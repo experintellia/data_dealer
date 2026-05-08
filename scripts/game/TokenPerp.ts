@@ -92,12 +92,13 @@ interface TokenSetEntry {
 
 export class TokenPerp extends GamePerp {
   override renderType = 'Perp';
-  // Note: legacy Game.js had `TokenPerp.prototype.cableType = 'inout'`
-  // assigned in the *Supertoken* prototype-defaults block at line 2509
-  // — almost certainly a typo (it overrides the earlier `'in'` set in
-  // the Token block).  Preserved as 'inout' here to match runtime; see
-  // issue #191 for the corrected value swap.
-  override cableType = 'inout' as const;
+  // `'in'` here, `'inout'` on SupertokenPerp.  Legacy Game.js had a
+  // copy-paste typo at line 2509 that swapped these (the SuperToken
+  // prototype-defaults block assigned `cableType = 'inout'` to
+  // *TokenPerp* and left SupertokenPerp inheriting GamePerp's
+  // `'in'` default).  PR #229 swaps to the intended values; see
+  // issue #191 for context.
+  override cableType = 'in' as const;
   override popupTemplate = 'popup_token.html';
 
   amount?: number;

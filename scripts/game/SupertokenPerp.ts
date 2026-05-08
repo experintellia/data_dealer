@@ -9,4 +9,9 @@ import { GamePerp } from './GamePerp.js';
 
 export class SupertokenPerp extends GamePerp {
   override renderType = 'Perp';
+  // `'inout'` matches the intended SuperToken behavior (it both
+  // contains tokens AND provides them upward).  Legacy Game.js had
+  // this assignment misrouted to TokenPerp via a copy-paste typo
+  // (line 2509) — fixed in PR #229; see issue #191 for context.
+  override cableType = 'inout' as const;
 }
