@@ -3,6 +3,7 @@
 // the Render API.  Extracted from scripts/Game.js's IIFE in PR 6 of
 // issue #147.
 
+import { type RenderApi } from '../Render.js';
 import * as bootMod from '../boot.js';
 import i18n from '../i18n.js';
 import {
@@ -24,18 +25,14 @@ interface TopscoreRenderNodeMenu {
   };
 }
 
-interface RenderMenuLike {
-  addButton(label: string, id: string, states: Record<string, boolean>): void;
-}
-
 // Local view of GameRoot's surface used by Topscores — declared standalone
 // rather than as `extends GameNode` because GameNode types `renderMenu`
 // loosely (RenderNodeLike) for the base class's needs and this file needs
-// the narrower `addButton` shape.  The cast at use sites goes through
-// `unknown` to bridge the two views; will dissolve when GameRoot is
-// extracted in a later PR.
+// the narrower `addButton` shape.  The renderMenu property reuses the
+// MainMenu instance type from Render.ts (PR retired the local
+// `RenderMenuLike` triplicate).
 interface GameRootWithMenu {
-  renderMenu: RenderMenuLike;
+  renderMenu: Pick<InstanceType<RenderApi['MainMenu']>, 'addButton'>;
   getTypeData(gestalt?: string): unknown;
 }
 

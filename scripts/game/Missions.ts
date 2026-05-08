@@ -2,15 +2,12 @@
 // one Mission child per active/completed mission gestalt.  Extracted from
 // scripts/Game.js's IIFE in PR 7 of issue #147.
 
+import { type RenderApi } from '../Render.js';
 import appModule from '../app.js';
 import i18n from '../i18n.js';
 import { GameNode, type GameNodeConfig, getByFirstId, getFirstId } from './GameNode.js';
 import { Mission } from './Mission.js';
 import { OrderedSet } from './OrderedSet.js';
-
-interface RenderMenuLike {
-  addButton(label: string, id: string, states: Record<string, boolean>): void;
-}
 
 interface RawMissionsData {
   missions: Array<{ gestalt?: string; type_data?: { gestalt?: string; [key: string]: unknown } }>;
@@ -19,7 +16,7 @@ interface RawMissionsData {
 }
 
 interface GameRootWithMissions {
-  renderMenu: RenderMenuLike;
+  renderMenu: Pick<InstanceType<RenderApi['MainMenu']>, 'addButton'>;
   renderNode?: { FXMissionGoalComplete?: () => void };
   addType(gestalt: string, data: unknown): unknown;
   getTypeData(gestalt?: string): Record<string, unknown> | undefined;

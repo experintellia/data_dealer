@@ -6,7 +6,7 @@
 //
 // Extracted from scripts/Game.js's IIFE in PR 15 of issue #147.
 
-import { getRender } from '../Render.js';
+import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
 import { type GameNodeConfig } from './GameNode.js';
 import {
@@ -230,11 +230,9 @@ export class ClientPerp extends GamePerp {
     gperp.setState('chargeRunning', false);
     const timer = gperp.renderTimer as { FXPuff?(): void } | undefined;
     timer?.FXPuff?.();
-    const Render = getRender() as unknown as {
-      DecoratorReady: new (cfg: { mode: string }) => DecoratorReadyLike;
-    };
+    const Render = getRender() as Pick<RenderApi, 'DecoratorReady'>;
     const deco = new Render.DecoratorReady({ mode: 'money' });
-    gperp.renderReady = deco;
+    gperp.renderReady = deco as unknown as DecoratorReadyLike;
     const rn = this.renderNode as RenderNodeLike | undefined;
     rn?.addDecorator?.(deco);
     deco.FXSproing();

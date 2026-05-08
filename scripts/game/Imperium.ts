@@ -2,15 +2,12 @@
 // Perp instances laid out).  Smallest extends-GameNode subclass.
 // Extracted from scripts/Game.js's IIFE in PR 8 of issue #147.
 
+import { type RenderApi } from '../Render.js';
 import i18n from '../i18n.js';
 import { GameNode } from './GameNode.js';
 
-interface RenderMenuLike {
-  addButton(label: string, id: string, states: Record<string, boolean>): void;
-}
-
 interface GameRootWithMenu {
-  renderMenu: RenderMenuLike;
+  renderMenu: Pick<InstanceType<RenderApi['MainMenu']>, 'addButton'>;
 }
 
 interface ImperiumRenderNode {

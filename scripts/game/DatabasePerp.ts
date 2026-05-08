@@ -7,7 +7,7 @@
 //
 // Extracted from scripts/Game.js's IIFE in PR 12 of issue #147.
 
-import { getRender } from '../Render.js';
+import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
 import i18n from '../i18n.js';
 import { getByFirstId, getByType, getFirstId } from './GameNode.js';
@@ -54,9 +54,7 @@ export class DatabasePerp extends GamePerp {
   BuyCity(bgestalt: string, placePos?: { x: number; y: number }): void {
     const gnode = this;
     const groot = this.groot;
-    const Render = getRender() as unknown as {
-      DecoratorNew: new (cfg: unknown) => unknown;
-    };
+    const Render = getRender() as Pick<RenderApi, 'DecoratorNew'>;
     const buyPerpFn = appModule.getApplication().remote.buyPerp;
     if (!buyPerpFn) return;
     const path = gnode.path || '';
