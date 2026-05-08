@@ -716,8 +716,19 @@ export class GameRoot extends GameNode {
   }
 
   /** Hardcoded `'city002'` lookup is preserved from legacy.  Suspected
-   *  copy-paste latent bug — should probably read `origintokengestalt`'s
-   *  origin link.  Tracked in issue #203. */
+   *  copy-paste latent bug — name says "given an origin-token
+   *  gestalt, return its origin gestalt", but the implementation
+   *  ignores the parameter and always probes for city002.  Tracked
+   *  in issue #203.
+   *
+   *  ⚠️ Has an active caller: `Mission.ts:151` uses this as a
+   *  truthiness gate in tutorial step-skip logic — a "naive" fix to
+   *  honor the parameter would change the truthy contract from
+   *  "city002 has any origin token" to "this specific profileset IS
+   *  an origin token", which would change which tutorial steps get
+   *  skipped.  The issue body's "zero callers" claim is stale; the
+   *  real fix needs gameplay-side investigation rather than a
+   *  refactor. */
   getOriginGestaltFromOriginTokenGestalt(_origintokengestalt: string): string | undefined {
     const origin = Object.values(this.DBOriginTokens).find(
       (ot) => ot.originGameNode?.gestalt === 'city002'
