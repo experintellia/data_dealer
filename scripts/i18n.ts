@@ -12,9 +12,12 @@ import deAT from '../i18n/de_AT.json' with { type: 'json' };
 import enUS from '../i18n/en_US.json' with { type: 'json' };
 import setup from './setup.js';
 
-/** Locale-table entry: msgctxt at [0], singular msgstr at [1], optional plural msgstr at [2]. */
-type I18nEntry = readonly (string | undefined)[];
-type I18nTable = Record<string, I18nEntry | undefined>;
+/** Union of all known translation keys derived directly from the canonical locale file. */
+type I18nKey = keyof typeof enUS;
+/** Locale-table entry: the actual value type from the JSON (metadata object or [msgctxt, msgstr] tuple). */
+type I18nEntry = (typeof enUS)[I18nKey];
+/** Typed over the exact key set of the canonical locale file — no unknown-key undefined overhead. */
+type I18nTable = typeof enUS;
 
 interface I18nApi {
   de_AT: I18nTable;
@@ -31,8 +34,8 @@ interface I18nApi {
 let locale = 'en_US';
 
 const i18n: I18nApi = {
-  de_AT: deAT as unknown as I18nTable,
-  en_US: enUS as unknown as I18nTable,
+  de_AT: deAT,
+  en_US: enUS,
 
   getLocale(): string {
     return locale;
@@ -55,9 +58,9 @@ const i18n: I18nApi = {
   gettext(msgid: string): string {
     const language = i18n[locale] as I18nTable | undefined;
     if (language) {
-      const message = language[msgid];
-      if (message && message.length > 0) {
-        return (message[1] as string | undefined) ?? msgid;
+      const message = language[msgid as I18nKey];
+      if (Array.isArray(message) && message[1]) {
+        return message[1];
       }
       console.warn('No %s translation available for msgid "%s"', locale, msgid);
     } else {
@@ -69,9 +72,10 @@ const i18n: I18nApi = {
   ngettext(msgid: string, msgidPlural: string, amount: number): string {
     const language = i18n[locale] as I18nTable | undefined;
     if (language) {
-      const message = language[msgid];
-      if (message && message.length > 0) {
-        const text = (amount === 1 ? message[1] : message[2]) as string | undefined;
+      const message = language[msgid as I18nKey];
+      if (Array.isArray(message) && message.length > 0) {
+        const arr = message as readonly (string | null | undefined)[];
+        const text = amount === 1 ? arr[1] : arr[2];
         if (text) return _.sprintf(text, _.toKSNum(amount));
       }
       console.warn('No %s translation available for msgid "%s"', locale, msgid);

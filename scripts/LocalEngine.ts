@@ -187,9 +187,12 @@ interface Ruleset {
   [key: string]: unknown;
 }
 
-/** i18n table entry: [msgctxt, msgstr]. */
-type I18nEntry = readonly [string, string];
-type I18nTable = Record<string, I18nEntry | undefined>;
+/** Union of all known translation keys derived from the canonical locale file. */
+type I18nKey = keyof typeof i18nEn;
+/** Locale-table entry: the actual value type from the JSON (metadata object or [msgctxt, msgstr] tuple). */
+type I18nEntry = (typeof i18nEn)[I18nKey];
+/** Typed over the exact key set of the canonical locale file. */
+type I18nTable = typeof i18nEn;
 
 /** Indexes built lazily over state.nodes. */
 interface NodeMaps {
@@ -339,9 +342,9 @@ export function setSendAchievement(fn: AchievementSender): void {
 function _t(msgid: string, ...subs: unknown[]): string {
   var state = getState();
   var locale: Locale = state && state.locale === 'en' ? 'en' : 'de';
-  var table = (locale === 'en' ? i18nEn : i18nDe) as unknown as I18nTable;
-  var entry = table[msgid];
-  var tmpl: string = entry && entry[1] ? entry[1] : msgid;
+  var table: I18nTable = locale === 'en' ? i18nEn : i18nDe;
+  var entry = table[msgid as I18nKey];
+  var tmpl: string = Array.isArray(entry) && entry[1] ? entry[1] : msgid;
   for (var i = 0; i < subs.length; i++) {
     tmpl = tmpl.replace('%s', String(subs[i]));
   }
