@@ -1053,7 +1053,7 @@ export class GameRoot extends GameNode {
       this.setCash(gv.cash_value, silent);
     }
     if (gv.ap_increment) {
-      this.useAP(gv.ap_increment);
+      this.useAP(gv.ap_increment, silent);
     }
     if (gv.karma_value !== undefined && gv.karma_value !== this.karma_value) {
       this.setKarma(gv.karma_value, silent);
@@ -1078,13 +1078,13 @@ export class GameRoot extends GameNode {
     }
   }
 
-  /** Additive AP delta wrapper.  Note: legacy `updateGameValues`
-   *  passed a `silent` arg here that was silently dropped (the
-   *  legacy signature accepted one param).  Preserved as-is to keep
-   *  this PR a pure migration; the latent flicker bug is tracked in
-   *  issue #207. */
-  useAP(inc: number): void {
-    this.setAP(this.ap_value + inc);
+  /** Additive AP delta wrapper.  `silent` forwards to `setAP` so
+   *  silent updateGameValues paths don't flicker the AP bar — fixed
+   *  in #228 (closes #207).  Legacy Game.js passed `silent` here
+   *  but `useAP`'s signature only ever accepted one arg, so the
+   *  silent flag was dropped at the call boundary. */
+  useAP(inc: number, silent?: boolean): void {
+    this.setAP(this.ap_value + inc, silent);
   }
 
   setAP(num?: number, silent?: boolean): void {
