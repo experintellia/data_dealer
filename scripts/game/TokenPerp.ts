@@ -17,10 +17,10 @@ import {
   type ChargeResult,
   type DoneFailChain,
   GamePerp,
-  type GameRootForPerp,
   type RenderNodeLike,
   type RenderPopupLike,
 } from './GamePerp.js';
+import type { GameRoot } from './GameRoot.js';
 import { ProfileSet } from './ProfileSet.js';
 
 interface DecoratorAmountLike {
@@ -73,18 +73,6 @@ interface NodeReadyPayload {
   last_upgrade_data?: unknown;
 }
 
-interface GameRootForTokenPerp extends GameRootForPerp {
-  ap_value: number;
-  profiles_value: number;
-  DBTokens: Record<string, number>;
-  DBTokensAbsolute: Record<string, number>;
-  getDatabase(): {
-    compileSuperTokens(): void;
-    checkNotifications(): void;
-  };
-  updateGears(): void;
-}
-
 interface TokenSetEntry {
   locked?: boolean;
   diffAmount?: number;
@@ -105,8 +93,8 @@ export class TokenPerp extends GamePerp {
   amount?: number;
   renderReady?: DecoratorReadyLike;
 
-  protected override get groot(): GameRootForTokenPerp {
-    return this.GameRoot as unknown as GameRootForTokenPerp;
+  protected override get groot(): GameRoot {
+    return this.GameRoot;
   }
 
   constructor(config: GameNodeConfig) {
@@ -366,7 +354,7 @@ export class TokenPerp extends GamePerp {
         if (data.result?.result) {
           if (popup) popup.trigger('popup_close');
           // FIXME: compile for checkNotifications
-          groot.getDatabase().compileSuperTokens();
+          groot.getDatabase()?.compileSuperTokens();
           gperp.setAmount(data.result.result.token_upgraded_amount);
           groot.updateGameValues(
             data.result.game_values || {},
@@ -381,7 +369,7 @@ export class TokenPerp extends GamePerp {
             rn?.DecoratorGear?.FXSproing();
             delete gperp.renderReady;
             window.setTimeout(function () {
-              groot.getDatabase().checkNotifications();
+              groot.getDatabase()?.checkNotifications();
               groot.updateGears();
             }, 2000);
           });
