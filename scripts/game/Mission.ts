@@ -33,17 +33,6 @@ interface TutorialStep {
   [key: string]: unknown;
 }
 
-interface GameRootWithMissions {
-  IPerps: Record<string, unknown>;
-  raw_data?: { mission_briefings_seen?: Record<string, unknown>; [key: string]: unknown };
-  DBTokensAbsolute: Record<string, number>;
-  Missions?: { children: { set: Mission[] } };
-  setState(state: string, value: boolean): void;
-  makeNotifications(data: Record<string, unknown>): void;
-  openGenericPopup(config: Record<string, unknown>): void;
-  hasOriginTokenForOrigin(originGestalt: string): boolean;
-}
-
 interface MissionsParent extends GameNode {
   Missions: Record<string, Mission>;
   getMission(gestalt: string): Mission | Record<string, never>;
@@ -89,7 +78,7 @@ export class Mission extends GameNode {
 
   updateGoal(goal: GoalShape): void {
     // TODO: take care of rendering
-    const groot = this.GameRoot as unknown as GameRootWithMissions;
+    const groot = this.GameRoot;
     // Legacy: `if ((goal.mission = this.gestalt)) { … }` — assigns the
     // gestalt onto goal and uses the truthy assigned value as the guard.
     // The translation below is behaviourally identical when `this.gestalt`
@@ -119,8 +108,7 @@ export class Mission extends GameNode {
   }
 
   openMissionPopup(): void {
-    const groot = this.GameRoot as unknown as GameRootWithMissions;
-    groot.openGenericPopup({
+    this.GameRoot.openGenericPopup({
       states: this.states,
       data: this.data,
       template: 'popup_mission.html',
@@ -129,7 +117,7 @@ export class Mission extends GameNode {
   }
 
   checkTutorial(): boolean {
-    const groot = this.GameRoot as unknown as GameRootWithMissions;
+    const groot = this.GameRoot;
     if (this.states.active && this.data.tutorial) {
       // If the player already dismissed the mission briefing, the NPC coach
       // intro has already been seen — skip re-queuing on reload.
@@ -152,7 +140,11 @@ export class Mission extends GameNode {
         }
       });
       steps = steps.slice(deletefrom);
-      groot.makeNotifications({ tutorial: steps });
+      // TutorialStep and Notification share most fields; their explicit
+      // `integrateProfileSet` types disagree (string vs boolean), but the
+      // legacy runtime schema (string) is preserved here.  Bridge via the
+      // unknown index signature.
+      groot.makeNotifications({ tutorial: steps as unknown as Record<string, unknown>[] });
       return true;
     }
     return false;
@@ -160,11 +152,11 @@ export class Mission extends GameNode {
 
   override extendEventHandlers(): void {
     const gnode = this;
-    const groot = this.GameRoot as unknown as GameRootWithMissions;
+    const groot = this.GameRoot;
 
     gnode.on('after_render', function () {
       if (gnode.states.active) {
-        if (gnode.checkTutorial()) {
+        if (gnode.checkTutorial() && gnode.gestalt !== undefined) {
           groot.makeNotifications({ mission_active: gnode.gestalt });
         }
       }
@@ -176,7 +168,9 @@ export class Mission extends GameNode {
       }
       if (!params) return;
       gnode.checkTutorial();
-      groot.makeNotifications({ mission_active: gnode.gestalt });
+      if (gnode.gestalt !== undefined) {
+        groot.makeNotifications({ mission_active: gnode.gestalt });
+      }
     });
 
     gnode.on('local_states_complete', function () {
@@ -195,7 +189,9 @@ export class Mission extends GameNode {
       if (gnode.data.tutorial) {
         groot.setState('tutorial_active', false);
       }
-      groot.makeNotifications({ mission_complete: gnode.gestalt });
+      if (gnode.gestalt !== undefined) {
+        groot.makeNotifications({ mission_complete: gnode.gestalt });
+      }
     });
 
     gnode.on('vclick', function (e: unknown) {
