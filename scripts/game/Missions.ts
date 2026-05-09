@@ -5,6 +5,7 @@
 import appModule from '../app.js';
 import i18n from '../i18n.js';
 import { GameNode, type GameNodeConfig, getByFirstId, getFirstId } from './GameNode.js';
+import { type DoneFailChain } from './GamePerp.js';
 import { Mission } from './Mission.js';
 import { OrderedSet } from './OrderedSet.js';
 
@@ -22,11 +23,6 @@ interface RecheckMissionsResult {
     complete_missions?: string[];
     mission_data?: { mission_goals?: Array<Record<string, unknown>> };
   };
-}
-
-interface DoneFailChain<T> {
-  done(cb: (data: { result?: T }) => void): DoneFailChain<T>;
-  fail(cb: (data: { error?: string | number; message?: string }) => void): DoneFailChain<T>;
 }
 
 export class Missions extends GameNode {
