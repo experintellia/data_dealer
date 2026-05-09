@@ -41,7 +41,7 @@ interface GameRootWithMissions {
   setState(state: string, value: boolean): void;
   makeNotifications(data: Record<string, unknown>): void;
   openGenericPopup(config: Record<string, unknown>): void;
-  getOriginGestaltFromOriginTokenGestalt(g: string): string | undefined;
+  hasOriginTokenForOrigin(originGestalt: string): boolean;
 }
 
 interface MissionsParent extends GameNode {
@@ -146,10 +146,7 @@ export class Mission extends GameNode {
         if (step.buyPerp && Object.prototype.hasOwnProperty.call(groot.IPerps, step.buyPerp)) {
           deletefrom = k;
         }
-        if (
-          step.integrateProfileSet &&
-          groot.getOriginGestaltFromOriginTokenGestalt(step.integrateProfileSet)
-        ) {
+        if (step.integrateProfileSet && groot.hasOriginTokenForOrigin(step.integrateProfileSet)) {
           deletefrom = k;
           step.nodelay = true;
         }
