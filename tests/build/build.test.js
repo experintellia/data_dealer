@@ -117,6 +117,47 @@ describe('dist/scripts/esm-bundle.js', () => {
   });
 });
 
+// Regression guard for the CSS-minification path in vite.config.js
+// (vite-plugin-static-copy `transform` running esbuild on each *.css).
+// Source CSS is hand-formatted with a leading space-indent on every
+// declaration; minified output has no such indentation and packs each
+// rule onto a long line.
+describe('dist/css/*.css are minified', () => {
+  const cssFiles = ['dd.css', 'Render.css', 'Statusbar.css', 'MainMenu.css'];
+  for (const f of cssFiles) {
+    it(`${f} is minified (no per-line indentation)`, async () => {
+      const { readFileSync } = await import('node:fs');
+      const css = readFileSync(join(root, 'dist', 'css', f), 'utf8');
+      // esbuild's CSS minifier outputs without leading-whitespace
+      // indented lines.  An unminified hand-written file has many.
+      const indentedLines = css.split('\n').filter((l) => /^\s+\S/.test(l));
+      expect(indentedLines.length).toBe(0);
+    });
+  }
+});
+
+// Regression guard for the JSON-compaction plugin (minifyStaticJson) in
+// vite.config.js.  Source rulesets and i18n catalogs are pretty-printed
+// with 2-space indent; the plugin re-stringifies without whitespace at
+// closeBundle.  Verify the indentation is gone — newline + space at the
+// start of any inner line is the unambiguous signal.
+describe('dist/data + dist/i18n JSON is whitespace-stripped', () => {
+  const samples = [
+    join('data', 'ruleset_3.de.json'),
+    join('data', 'ruleset_3.en.json'),
+    join('i18n', 'de_AT.json'),
+  ];
+  for (const rel of samples) {
+    it(`dist/${rel} has no indented lines`, async () => {
+      const { readFileSync } = await import('node:fs');
+      const text = readFileSync(join(root, 'dist', rel), 'utf8');
+      // JSON.stringify(x) with no third arg produces zero internal
+      // whitespace; \n  signals the source pretty-print survived.
+      expect(text).not.toMatch(/\n\s/);
+    });
+  }
+});
+
 // Both variants ship the same files (manifest, icon, scripts, etc.) — the
 // casual variant just has palette-quantized PNGs.  Run the same structural
 // assertions against both, plus a per-variant size sanity warning.
