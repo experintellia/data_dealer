@@ -443,21 +443,20 @@ export class Database extends GameNode {
     this.renderApi?.unlock?.();
   }
 
-  cue(
-    profileset: { profiles_value?: number; tokens_map?: Record<string, { amount?: number }> },
-    path: string,
-    collect_id: string
-  ): ProfileSet {
-    // Add a ProfileSet to the DB queue.
-    const origin = getByLastId(path);
+  cue(profileset: unknown, path: unknown, collect_id: unknown): ProfileSet {
+    // Add a ProfileSet to the DB queue.  Inputs come from server payloads
+    // (mission rewards, perp collect results) so the typed surface is
+    // intentionally permissive; we narrow what we actually read below.
+    const origin = typeof path === 'string' ? getByLastId(path) : undefined;
     const cfg: ConstructorParameters<typeof ProfileSet>[0] = {
-      psid: collect_id,
       markNew: true,
       sortByGestalt: true,
     };
+    if (typeof collect_id === 'string') cfg.psid = collect_id;
     if (origin) cfg.origin = origin;
-    if (typeof profileset.profiles_value === 'number')
-      cfg.profiles_value = profileset.profiles_value;
+    const profiles_value = (profileset as { profiles_value?: unknown } | null | undefined)
+      ?.profiles_value;
+    if (typeof profiles_value === 'number') cfg.profiles_value = profiles_value;
     const ps = new ProfileSet(cfg, profileset as ConstructorParameters<typeof ProfileSet>[1]);
     this.queue.prepend(ps);
     if (this.renderDBQueue) {

@@ -216,9 +216,7 @@ export class Missions extends GameNode {
     if (missions.mission_data && missions.mission_data.mission_goals) {
       missions.mission_data.mission_goals.forEach((goal) => {
         if ((goal as { complete?: boolean }).complete) {
-          (
-            groot.renderNode as { FXMissionGoalComplete?: () => void } | undefined
-          )?.FXMissionGoalComplete?.();
+          groot.renderNode?.FXMissionGoalComplete?.();
         }
       });
       this.updateMissionGoals(missions.mission_data.mission_goals);
@@ -232,15 +230,7 @@ export class Missions extends GameNode {
 
     if (missions.rewards && missions.rewards.profile_sets) {
       missions.rewards.profile_sets.forEach((ps) => {
-        groot
-          .getDatabase()
-          ?.cue(
-            ps.profile_set as Parameters<
-              NonNullable<ReturnType<typeof groot.getDatabase>>['cue']
-            >[0],
-            ps.origin,
-            ps.collect_id
-          );
+        groot.getDatabase()?.cue(ps.profile_set, ps.origin, ps.collect_id);
       });
     }
 
