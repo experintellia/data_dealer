@@ -331,10 +331,7 @@ export class RenderStatusbar extends RenderNode {
       jtext.show();
       const APT = groot.APTicker;
       node.startLoop(() => {
-        // APTicker.getRemainingTime() returns a Date (Game.ts) whose
-        // epoch-ms is the remaining ms; coerce to number for `toTime`.
-        const ms = APT?.getRemainingTime?.();
-        jtext.html(RenderStatusbar.textMoreIn() + span(toTime(ms ? +ms : 0)));
+        jtext.html(RenderStatusbar.textMoreIn() + span(toTime(APT?.getRemainingTime?.() ?? 0)));
       }, 1000);
     });
 
