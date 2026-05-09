@@ -7,6 +7,7 @@
 
 import appModule from '../app.js';
 import { GameNode } from './GameNode.js';
+import { type DoneFailChain } from './GamePerp.js';
 import { mergeData } from './mergeData.js';
 
 // app.remote handlers are wired up by app.start(); Topscore is only
@@ -35,10 +36,6 @@ interface RankingResult {
 // app.remote wrapping), not a native Promise — Game.js's call sites use
 // `.done()` / `.fail()`.  Captured loosely; later PRs may tighten when
 // app.remote's return type is widened.
-interface DoneFailChain {
-  done(cb: (data: { result?: RankingResult }) => void): DoneFailChain;
-  fail(cb: (data: { error?: string | number; message?: string }) => void): DoneFailChain;
-}
 
 interface TopscoreRenderNode {
   jdomelem?: {
@@ -73,7 +70,7 @@ export class Topscore extends GameNode {
     const gnode = this;
     const getRanking = appModule.getApplication().remote.getRanking;
     if (!getRanking) return;
-    const rankingCall = getRanking(t) as unknown as DoneFailChain;
+    const rankingCall = getRanking(t) as unknown as DoneFailChain<RankingResult>;
     rankingCall
       .done(function (data) {
         if (data.result && data.result.error === undefined) {
