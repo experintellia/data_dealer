@@ -45,9 +45,11 @@ export function span(text: string | number, cls?: string): string {
   return '<span class="' + (cls || 'highlight') + '">' + text + '</span>';
 }
 
-export function toTime(ms: number): string {
-  const date = new Date(ms || 0);
-  if (ms >= 3600000) {
+export function toTime(ms: number | Date): string {
+  // `+ms` handles both `Date` (via valueOf) and `number` identically.
+  const n = +ms || 0;
+  const date = new Date(n);
+  if (n >= 3600000) {
     return (
       pad0(date.getUTCHours(), 2) +
       ':' +
