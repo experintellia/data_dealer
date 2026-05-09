@@ -21,11 +21,13 @@
 // — verified by `grep -rn '<%-' views/` returning nothing), so the
 // implementation is intentionally minimal.
 
-import type { JQueryStatic } from '../types/env.d.ts';
-
 // ── primitive helpers ──────────────────────────────────────────────────────
 
-const KSNumFormat = new Intl.NumberFormat('de-DE');
+// `Intl.NumberFormat('de-DE')` alone defaults to maximumFractionDigits: 3,
+// which would silently regress against the legacy `_.numeral(n).format('0,0')`
+// (integer-only) contract — pin the fraction digits to 0 so a fractional
+// input renders as a rounded thousands-grouped integer.
+const KSNumFormat = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
 
 export function toKSNum(n: number): string {
   return KSNumFormat.format(n || 0);
@@ -279,16 +281,4 @@ function compile(text: string): (D: unknown, helpers: TemplateHelpers) => string
 export function compileTemplate(text: string): (data?: unknown) => string {
   const fn = compile(text);
   return (data?: unknown) => fn(data ?? {}, templateHelpers);
-}
-
-// ── jQuery accessor — convenience for callers that used to read $
-//   off the same global blob. Not strictly required by the underscore
-//   removal, but having a single typed accessor avoids re-declaring
-//   the global in every render module.
-export function getJQuery(): JQueryStatic {
-  const $ =
-    (globalThis as unknown as { jQuery?: JQueryStatic; $?: JQueryStatic }).jQuery ??
-    (globalThis as unknown as { $?: JQueryStatic }).$;
-  if (!$) throw new Error('dd-helpers: jQuery global not found');
-  return $;
 }
