@@ -798,3 +798,438 @@ test.describe('Section E — backdrop click dismissal', () => {
     await expect(page.locator('.PopupBody.Status').first()).toBeHidden({ timeout: 3_000 });
   });
 });
+
+// ── Section I: tab strip navigation (F.1–3 in #186) ──────────────────────
+//
+// CityPerp / ProjectPerp / UserData all expose a `.PopupMenu` tab strip.
+// Clicking a `.PopupMenuButton` flips the active class and shows the
+// matching `.PopupTab[data-tab="…"]` body while hiding all others (see
+// the delegated handler in scripts/render/RenderTopLevelUI.ts:736).  The
+// Preact port has to reproduce that contract exactly, so we pin it per
+// dialog instead of relying on the side-effect coverage from Section H.
+
+test.describe('Section I — popup tab strip navigation', () => {
+  test('CityPerp tab strip switches between Agents / Pushers / Bogus / City', async ({ page }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'CityPerp',
+      gestalt: 'city002',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupMenu',
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupMenu')).toBeVisible({ timeout: 3_000 });
+
+    // CityPerp.openPopup renders the popup_city shell, but the per-tab
+    // PopupTab bodies are emitted from `data.providedTabs`, which
+    // CityPerp.extendEventHandlers populates async via fetchProvided +
+    // compileProvided + updatePopup.  Drive the same chain so the tab
+    // bodies actually exist when we click the menu buttons.
+    await page.evaluate(() => {
+      const game = (window as any).__dd?._app?.game;
+      const gnode = game.getById('city002');
+      gnode.fetchProvided?.(function () {
+        gnode.compileProvided?.();
+        if (gnode.renderPopup) gnode.updatePopup?.();
+      });
+    });
+
+    // popup_city.html ships with both `data="data"` and `data-tab="AgentPerp"`
+    // initially marked active; the click handler clears every other active
+    // class so after clicking PusherPerp only PusherPerp's button stays
+    // active.  Walk all four tabs and assert visibility flips per click.
+    const tabs = ['AgentPerp', 'PusherPerp', 'ProxyPerp', 'CityPerp'];
+    for (const tab of tabs) {
+      await page
+        .locator(`.PopupContainer.lockOn .PopupMenuButton[data-tab="${tab}"]`)
+        .first()
+        .click({ force: true });
+      // Active class moves to the clicked button.
+      await expect(
+        page.locator(`.PopupContainer.lockOn .PopupMenuButton[data-tab="${tab}"].active`).first()
+      ).toBeVisible();
+      // The handler runs jq.find('.PopupTab').hide() then .show() on the
+      // matching one, so the visibility check is on the inline `display`
+      // style.  Read it directly: Playwright's `toBeVisible` rolls in a
+      // bounding-box / occlusion check that can false-negative when a
+      // popup body is sized via flex children, so a direct getComputedStyle
+      // poll is the closest match to the contract jQuery's .show() satisfies.
+      const visibility = await page.evaluate((t) => {
+        const all = document.querySelectorAll<HTMLElement>(
+          `.PopupContainer.lockOn .PopupTab[data-tab="${t}"]`
+        );
+        return Array.from(all).map((el) => getComputedStyle(el).display);
+      }, tab);
+      expect(visibility.some((d) => d !== 'none')).toBe(true);
+
+      // A different tab body is hidden via display:none.
+      const other = tabs.find((t) => t !== tab) as string;
+      const otherVisibility = await page.evaluate((t) => {
+        const all = document.querySelectorAll<HTMLElement>(
+          `.PopupContainer.lockOn .PopupTab[data-tab="${t}"]`
+        );
+        return Array.from(all).map((el) => getComputedStyle(el).display);
+      }, other);
+      expect(otherVisibility.every((d) => d === 'none')).toBe(true);
+    }
+    await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupMenu', 'x');
+  });
+
+  test('ProjectPerp tab strip switches between Data / Upgrades / Ads / Team', async ({ page }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ProjectPerp',
+      gestalt: 'project001',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupMenu',
+      boost: { cash: 5_000, xp_level: 2, xp_value: 20 },
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupMenu')).toBeVisible({ timeout: 3_000 });
+
+    // Drive fetchPowerups so the Upgrades / Ads / Team tab bodies render
+    // their slot rows (otherwise the tab body shows the "Loading…" spinner
+    // and the assertion below tests the wrong DOM).
+    await page.evaluate(() => {
+      const game = (window as any).__dd?._app?.game;
+      const gnode = game.getById('project001');
+      gnode.fetchPowerups(function () {
+        gnode.compilePowerups();
+        gnode.compileProfileSet?.();
+        if (gnode.renderPopup) gnode.updatePopup();
+      });
+    });
+
+    const tabs = ['data', 'UpgradePowerup', 'AdPowerup', 'TeamMemberPowerup'];
+    for (const tab of tabs) {
+      await page
+        .locator(`.PopupContainer.lockOn .PopupMenuButton[data-tab="${tab}"]`)
+        .first()
+        .click({ force: true });
+      await expect(
+        page.locator(`.PopupContainer.lockOn .PopupMenuButton[data-tab="${tab}"].active`).first()
+      ).toBeVisible();
+      const visibility = await page.evaluate((t) => {
+        const all = document.querySelectorAll<HTMLElement>(
+          `.PopupContainer.lockOn .PopupTab[data-tab="${t}"]`
+        );
+        return Array.from(all).map((el) => getComputedStyle(el).display);
+      }, tab);
+      expect(visibility.some((d) => d !== 'none')).toBe(true);
+    }
+    await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupMenu', 'x');
+  });
+
+  test('UserData tab strip switches between Settings and Debug when userdebug is on', async ({
+    page,
+  }) => {
+    await bootGame(page);
+    // popup_user_data.html only renders the .PopupMenu when
+    // game.setup.userdebug is truthy — the live setup module is mutable
+    // (groot.setup is the same singleton) so flipping the flag before
+    // opening the popup activates the Settings/Debug tabs.
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.setup.userdebug = true;
+      groot.trigger('user_data');
+    });
+    await expect(page.locator('.PopupBody.About .PopupMenu')).toBeVisible({ timeout: 3_000 });
+
+    // Click Debug → debug body shown, settings body hidden.
+    await page
+      .locator('.PopupBody.About .PopupMenuButton[data-tab="debug"]')
+      .first()
+      .click({ force: true });
+    await expect(
+      page.locator('.PopupBody.About .PopupMenuButton[data-tab="debug"].active').first()
+    ).toBeVisible();
+    await expect(
+      page.locator('.PopupBody.About .PopupTab[data-tab="debug"]').first()
+    ).toBeVisible();
+    await expect(
+      page.locator('.PopupBody.About .PopupTab[data-tab="settings"]').first()
+    ).toBeHidden();
+
+    // Click Settings → flip back.
+    await page
+      .locator('.PopupBody.About .PopupMenuButton[data-tab="settings"]')
+      .first()
+      .click({ force: true });
+    await expect(
+      page.locator('.PopupBody.About .PopupTab[data-tab="settings"]').first()
+    ).toBeVisible();
+    await expect(page.locator('.PopupBody.About .PopupTab[data-tab="debug"]').first()).toBeHidden();
+
+    await expectOpenAndClose(page, '.PopupBody.About', 'x');
+  });
+});
+
+// ── Section J: in-popup action handlers (buy / sell / integrate) ────────
+//
+// The popup wrappers don't just render the templates — they route button
+// clicks through `popup.trigger('button_click.<id>', [bgestalt, bdata])`
+// to a per-button handler in GameNode.initPopupEvents.  This section
+// pins each handler's contract so a Preact-port regression in the click
+// → engine RPC seam shows up here, not in some unrelated gameplay
+// surface.
+
+test.describe('Section J — in-popup action handlers', () => {
+  test('PowerupBuyButton purchases an upgrade and updates engine state', async ({ page }) => {
+    // project001's first upgrade (upgrade001) costs 160 cash and unlocks at
+    // xp_level 2 — same fixture the existing sweepstakes-upgrade.spec.ts
+    // uses, but driven through the popup's button_click event rather than
+    // the engine directly.  This pins the GameNode.initPopupEvents wiring:
+    // popup.trigger('button_click.PowerupBuyButton', [gestalt, slot]) →
+    // GamePerp.BuyPowerup → engine.buyPowerup → state mutation.
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ProjectPerp',
+      gestalt: 'project001',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupMenu',
+      boost: { cash: 5_000, xp_level: 2, xp_value: 20 },
+    });
+
+    const cashBefore = await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      return groot.cash_value;
+    });
+
+    // Fire the button_click event the popup's click delegator emits when a
+    // user taps the Invest button on a powerup-provided card.  Slot is a
+    // string in the wild because data-button-data attrs round-trip via the
+    // DOM (see RenderTopLevelUI.ts click handler), so match that shape.
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      const gnode = groot.getById('project001');
+      gnode.renderPopup.trigger('button_click.PowerupBuyButton', ['upgrade001', 0]);
+    });
+
+    // BuyPowerup does an async .done() chain; wait for the cash_value to
+    // settle to the expected post-purchase value (160 cheaper than before).
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const groot = (window as any).__dd?._app?.game;
+            return groot.cash_value;
+          }),
+        { timeout: 3_000 }
+      )
+      .toBe(cashBefore - 160);
+
+    // Engine state must carry the powerup on slot 0.
+    const node = await page.evaluate(async () => {
+      const boot = await new Promise<any>((res, rej) =>
+        (window as any).require(['boot'], res, rej)
+      );
+      const state = boot.getState();
+      return (state.nodes || []).find((n: any) => n.full_path === 'Imperium.project001');
+    });
+    expect(node?.instance_data?.powerups).toEqual([
+      expect.objectContaining({ slot: 0, gestalt: 'upgrade001' }),
+    ]);
+
+    await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupMenu', 'x');
+  });
+
+  test('PowerupSellButton sells a previously bought upgrade and refunds cash', async ({ page }) => {
+    // Engine.sellPowerup refunds half the price (see
+    // scripts/LocalEngine.ts:1196 and the floor in _applyRewardsToGv).
+    // We buy upgrade001 first (engine call), reload to materialise the
+    // gnode + its instance_data, then drive the sell through
+    // popup.trigger('button_click.PowerupSellButton', [gestalt, slot]).
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ProjectPerp',
+      gestalt: 'project001',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupMenu',
+      boost: { cash: 5_000, xp_level: 2, xp_value: 20 },
+    });
+    // Buy through the popup's button_click first so the rest of the flow
+    // (compilePowerups, slot taken) goes through the same wiring.  Use a
+    // numeric slot so the engine's strict-equals slot match in
+    // sellPowerup (LocalEngine.ts:1213) finds the entry on the second
+    // call below — ProjectPerp.SellPowerup runs Number.parseInt() on the
+    // slot before forwarding to the engine, so a string '0' would never
+    // === the number 0 the engine compares against.
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      const gnode = groot.getById('project001');
+      gnode.renderPopup.trigger('button_click.PowerupBuyButton', ['upgrade001', 0]);
+    });
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const groot = (window as any).__dd?._app?.game;
+            const gnode = groot.getById('project001');
+            return (gnode.data?.powerups || []).length;
+          }),
+        { timeout: 3_000 }
+      )
+      .toBeGreaterThan(0);
+
+    const cashAfterBuy = await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      return groot.cash_value;
+    });
+
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      const gnode = groot.getById('project001');
+      gnode.renderPopup.trigger('button_click.PowerupSellButton', ['upgrade001', 0]);
+    });
+
+    // Cash should rise (refund > 0); we don't pin the exact refund formula
+    // because that's the engine's contract under sweepstakes-upgrade.spec.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const groot = (window as any).__dd?._app?.game;
+            return groot.cash_value;
+          }),
+        { timeout: 3_000 }
+      )
+      .toBeGreaterThan(cashAfterBuy);
+
+    // The slot must be empty in engine state.
+    const node = await page.evaluate(async () => {
+      const boot = await new Promise<any>((res, rej) =>
+        (window as any).require(['boot'], res, rej)
+      );
+      const state = boot.getState();
+      return (state.nodes || []).find((n: any) => n.full_path === 'Imperium.project001');
+    });
+    expect(node?.instance_data?.powerups || []).toHaveLength(0);
+
+    await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupMenu', 'x');
+  });
+
+  test('PerpBuyButton on a karmalauter purchases karma and updates karma_value', async ({
+    page,
+  }) => {
+    // karma001 is the cheapest karmalauter (250 cash, +5 karma).
+    // engine.buyKarma doesn't gate on level (only cash), so we just need
+    // enough cash; route through the karma popup's PerpBuyButton click
+    // handler the same way a player tap would.
+    await bootGame(page);
+    const initialKarma = await page.evaluate(async () => {
+      const boot = await new Promise<any>((res, rej) =>
+        (window as any).require(['boot'], res, rej)
+      );
+      const state = boot.getState();
+      // Boost cash so engine.buyKarma accepts the call.
+      boot.setState({
+        ...state,
+        game_values: { ...state.game_values, cash_value: 5_000 },
+      });
+      const groot = (window as any).__dd?._app?.game;
+      // Mirror the boosted value into the GameRoot slot the templates
+      // read.  (boot.setState mutates the engine state but Game.js's
+      // own cash_value isn't reactively updated until updateGameValues
+      // fires.)
+      groot.cash_value = 5_000;
+      return groot.karma_value;
+    });
+
+    await openStatusPopup(page, 'karma');
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      // PerpBuyButton resolves to GameRoot.BuyPerp(gestalt) which routes
+      // Karmalauter → BuyKarma.  See scripts/game/GameNode.ts:772.
+      groot.renderPopup.trigger('button_click.PerpBuyButton', ['karma001']);
+    });
+
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const groot = (window as any).__dd?._app?.game;
+            return groot.karma_value;
+          }),
+        { timeout: 3_000 }
+      )
+      .toBeGreaterThan(initialKarma);
+
+    // Cleanup — popup may already have closed if BuyKarma triggered a level
+    // up notification chain; tolerate either state.
+    const open = await page.locator('.PopupContainer.lockOn').count();
+    if (open > 0) {
+      await page.evaluate(() => {
+        const groot = (window as any).__dd?._app?.game;
+        groot.renderPopup?.trigger('popup_close');
+      });
+    }
+  });
+
+  test('Profileset MainButton triggers integrate and increases profiles_value', async ({
+    page,
+  }) => {
+    // Re-uses the Section H flow: buy → reload → charge → advance clock →
+    // collect → cue.  Then drives the integrate path through the popup's
+    // MainButton click handler (the popup wires it via popup.on(
+    // 'button_click.MainButton') → gnode.mergeCued in
+    // scripts/game/Database.ts:675).
+    await bootGame(page);
+    await page.evaluate(async () => {
+      const eng = await new Promise<any>((res, rej) =>
+        (window as any).require(['LocalEngine'], res, rej)
+      );
+      await eng.buyPerp('Imperium', 'contact035');
+    });
+    await page.reload();
+    await bootGame(page);
+
+    const psid = await page.evaluate(async () => {
+      const eng = await new Promise<any>((res, rej) =>
+        (window as any).require(['LocalEngine'], res, rej)
+      );
+      await eng.chargePerp('Imperium.contact035');
+      (window as any).__dd.advanceNow(31_000);
+      const cr = await eng.collectPerp('Imperium.contact035');
+      const inner = cr?.result?.result;
+      const groot = (window as any).__dd?._app?.game;
+      const db = groot.getDatabase();
+      const ps = db.cue(inner.profile_set, inner.origin, inner.collect_id);
+      return ps.psid as string;
+    });
+    expect(psid).toBeTruthy();
+
+    const initialProfiles = await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      return groot.profiles_value || 0;
+    });
+
+    await page.evaluate((id) => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.trigger('switch_view', ['Database']);
+      const db = groot.getDatabase();
+      const ps = db.queue.set.find((p: any) => p.psid === id);
+      db.openProfileSetPopup(ps);
+    }, psid);
+
+    await expect(page.locator('[data-testid="dd-integrate-button"]').first()).toBeVisible({
+      timeout: 3_000,
+    });
+
+    // Click the integrate button via the popup's button_click event.
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.getDatabase().renderPopup.trigger('button_click.MainButton');
+    });
+
+    // Integration is async — engine.integrateCollected runs through a
+    // small chain.  Poll for profiles_value to grow.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const groot = (window as any).__dd?._app?.game;
+            return groot.profiles_value || 0;
+          }),
+        { timeout: 5_000 }
+      )
+      .toBeGreaterThan(initialProfiles);
+  });
+});
