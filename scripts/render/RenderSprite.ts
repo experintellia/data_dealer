@@ -49,6 +49,10 @@ export class RenderSprite extends RenderNode {
     // super → RenderNode.init → setAttrs(config) has already assigned
     // frameSrc / frameMap / frame from `config` (when present).  Apply
     // the legacy `frame || 'normal'` fallback explicitly.
+    // Ensure frameMap falls back to the prototype default if not set.
+    if (!this.frameMap || typeof this.frameMap !== 'object') {
+      this.frameMap = RenderSprite.prototype.frameMap;
+    }
     this.frame = config.frame ?? 'normal';
     this.setFrameSrc(this.frameSrc);
     this.setFrame(this.frame);
@@ -66,11 +70,15 @@ export class RenderSprite extends RenderNode {
   }
 
   setFrame(frame: string): void {
-    if (!this.frameMap || !Object.prototype.hasOwnProperty.call(this.frameMap, frame)) {
+    if (!this.frameMap || typeof this.frameMap !== 'object') {
+      return;
+    }
+    if (!Object.prototype.hasOwnProperty.call(this.frameMap, frame)) {
       return;
     }
     const map = this.frameMap[frame];
-    if (!map) return;
+    if (!map || typeof map !== 'object') return;
+    if (typeof map.x !== 'number' || typeof map.y !== 'number') return;
     this.frame = frame;
     this.width = map.width;
     this.height = map.height;
