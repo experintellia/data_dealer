@@ -1088,9 +1088,7 @@ export class RenderMissionPerp extends RenderNode {
     const jq = this.jdomelem;
     jq.removeClass('active');
     jq.removeClass('complete');
-    const states = (
-      this.gameNode as unknown as { states?: { active?: boolean; complete?: boolean } } | undefined
-    )?.states;
+    const states = this.gameNode?.states;
     if (states?.active) {
       jq.addClass('active');
     }
@@ -1322,6 +1320,6 @@ export function renderAmountHtml(
   // rather than `domelem.outerHTML` — preserves any attribute ordering
   // quirks downstream consumers might rely on.
   const wrapper = $('<div>') as JQueryUIElem;
-  wrapper.append(jdomelem.clone() as unknown as unknown);
+  wrapper.append(jdomelem.clone());
   return (wrapper.html() ?? '') as string;
 }
