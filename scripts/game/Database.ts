@@ -20,7 +20,7 @@ import {
   getByType,
   getFirstId,
 } from './GameNode.js';
-import { type RenderPopupLike } from './GamePerp.js';
+import { type DoneFailChain, type RenderPopupLike } from './GamePerp.js';
 import { type GameRoot } from './GameRoot.js';
 import { OrderedSet } from './OrderedSet.js';
 import { ProfileSet } from './ProfileSet.js';
@@ -141,11 +141,6 @@ interface BuyPerpResult {
     instance_data?: Record<string, unknown>;
   };
   error?: number;
-}
-
-interface DoneFailChain<T> {
-  done(cb: (data: { result?: T }) => void): DoneFailChain<T>;
-  fail(cb: (data: { error?: string | number; message?: string }) => void): DoneFailChain<T>;
 }
 
 // ---------------------------------------------------------------------------
