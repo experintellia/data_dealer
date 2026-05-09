@@ -2,7 +2,6 @@
 // one Mission child per active/completed mission gestalt.  Extracted from
 // scripts/Game.js's IIFE in PR 7 of issue #147.
 
-import { type RenderApi } from '../Render.js';
 import appModule from '../app.js';
 import i18n from '../i18n.js';
 import { GameNode, type GameNodeConfig, getByFirstId, getFirstId } from './GameNode.js';
@@ -13,21 +12,6 @@ interface RawMissionsData {
   missions: Array<{ gestalt?: string; type_data?: { gestalt?: string; [key: string]: unknown } }>;
   active_missions: string[];
   mission_goals?: Array<Record<string, unknown>>;
-}
-
-interface GameRootWithMissions {
-  renderMenu: Pick<InstanceType<RenderApi['MainMenu']>, 'addButton'>;
-  renderNode?: { FXMissionGoalComplete?: () => void };
-  addType(gestalt: string, data: unknown): unknown;
-  getTypeData(gestalt?: string): Record<string, unknown> | undefined;
-  fetchProjectPowerupData(gestalt: string, cb: () => void): void;
-  getDatabase(): { cue(profile_set: unknown, origin: string, collect_id: string): void };
-  updateGameValues(
-    game_values: Record<string, unknown>,
-    levelup: boolean,
-    missions: unknown,
-    quiet: boolean
-  ): void;
 }
 
 interface RecheckMissionsResult {
@@ -61,13 +45,12 @@ export class Missions extends GameNode {
   }
 
   override extendRender(): void {
-    const groot = this.GameRoot as unknown as GameRootWithMissions;
-    groot.renderMenu.addButton(i18n.gettext('Missions'), this.id, this.states);
+    this.GameRoot.renderMenu?.addButton?.(i18n.gettext('Missions'), this.id, this.states);
   }
 
   override extendEventHandlers(): void {
     const mroot = this;
-    const groot = this.GameRoot as unknown as GameRootWithMissions;
+    const groot = this.GameRoot;
 
     mroot.on('states_active', function (_e: unknown, params: unknown) {
       const remote = appModule.getApplication().remote;
@@ -94,7 +77,7 @@ export class Missions extends GameNode {
   }
 
   initMissions(raw_data: RawMissionsData): void {
-    const groot = this.GameRoot as unknown as GameRootWithMissions;
+    const groot = this.GameRoot;
     if (!this.Missions) {
       this.Missions = {};
     }
@@ -179,7 +162,7 @@ export class Missions extends GameNode {
   }
 
   checkProjectGoals(): void {
-    const groot = this.GameRoot as unknown as GameRootWithMissions;
+    const groot = this.GameRoot;
     const fetch_project_data: Record<string, Mission> = {};
     let update_missions: Mission[] = [];
 
@@ -218,7 +201,7 @@ export class Missions extends GameNode {
       profile_sets?: Array<{ profile_set: unknown; origin: string; collect_id: string }>;
     };
   }): void {
-    const groot = this.GameRoot as unknown as GameRootWithMissions;
+    const groot = this.GameRoot;
 
     if (missions.complete_missions) {
       missions.complete_missions.forEach((gestalt) => {
@@ -233,7 +216,9 @@ export class Missions extends GameNode {
     if (missions.mission_data && missions.mission_data.mission_goals) {
       missions.mission_data.mission_goals.forEach((goal) => {
         if ((goal as { complete?: boolean }).complete) {
-          groot.renderNode?.FXMissionGoalComplete?.();
+          (
+            groot.renderNode as { FXMissionGoalComplete?: () => void } | undefined
+          )?.FXMissionGoalComplete?.();
         }
       });
       this.updateMissionGoals(missions.mission_data.mission_goals);
@@ -247,7 +232,15 @@ export class Missions extends GameNode {
 
     if (missions.rewards && missions.rewards.profile_sets) {
       missions.rewards.profile_sets.forEach((ps) => {
-        groot.getDatabase().cue(ps.profile_set, ps.origin, ps.collect_id);
+        groot
+          .getDatabase()
+          ?.cue(
+            ps.profile_set as Parameters<
+              NonNullable<ReturnType<typeof groot.getDatabase>>['cue']
+            >[0],
+            ps.origin,
+            ps.collect_id
+          );
       });
     }
 
