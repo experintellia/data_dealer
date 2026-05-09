@@ -448,7 +448,11 @@ export class GameRoot extends GameNode {
   /** `raw_data` mirrors the engine's authoritative state snapshot for
    *  read-only helpers (mission-briefing-seen lookup, etc.).  Set by
    *  `loadGame` (still in Game.js). */
-  raw_data?: { mission_briefings_seen?: Record<string, boolean>; [key: string]: unknown };
+  raw_data?: {
+    mission_briefings_seen?: Record<string, boolean>;
+    tokens_seen?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
 
   // Field assignments preserved from the legacy `GameRoot.prototype.X
   // = ...` block — exposed for callers that read `groot.get` / `groot.
