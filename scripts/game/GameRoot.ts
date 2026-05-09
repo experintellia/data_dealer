@@ -287,7 +287,7 @@ interface Notification {
   buyPerp?: string | undefined;
   buyParent?: string | undefined;
   buyPerpPos?: { x: number; y: number } | undefined;
-  integrateProfileSet?: boolean | undefined;
+  integrateProfileSet?: string | undefined;
   nodelay?: boolean | undefined;
   nonblocking?: number | undefined;
   [key: string]: unknown;

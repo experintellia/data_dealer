@@ -41,6 +41,11 @@ interface MissionsParent extends GameNode {
 export class Mission extends GameNode {
   override renderType = 'MissionPerp';
   declare data: MissionDataShape;
+  // Mission instances are always constructed with a gestalt by Missions.ts
+  // (the loader skips entries lacking one — see Missions.ts:96).  Narrow
+  // the base class's `gestalt?: string` to required so handlers below can
+  // pass it to APIs typed `string` without `!== undefined` guards.
+  declare gestalt: string;
   popupTemplate = 'popup_mission.html';
 
   getBranch(_gestalt?: string): Mission[] {
@@ -81,12 +86,7 @@ export class Mission extends GameNode {
     const groot = this.GameRoot;
     // Legacy: `if ((goal.mission = this.gestalt)) { … }` — assigns the
     // gestalt onto goal and uses the truthy assigned value as the guard.
-    // The translation below is behaviourally identical when `this.gestalt`
-    // is defined (always true at runtime — `gestalt` is set by the
-    // constructor flow before any subclass method runs); the
-    // `this.gestalt !== undefined` skip exists only to satisfy
-    // exactOptionalPropertyTypes on `goal.mission?: string`.
-    if (this.gestalt !== undefined) goal.mission = this.gestalt;
+    goal.mission = this.gestalt;
     if (!goal.mission) return;
     const goals = this.data.goals || [];
     for (let k = 0; k < goals.length; k++) {
@@ -140,11 +140,7 @@ export class Mission extends GameNode {
         }
       });
       steps = steps.slice(deletefrom);
-      // TutorialStep and Notification share most fields; their explicit
-      // `integrateProfileSet` types disagree (string vs boolean), but the
-      // legacy runtime schema (string) is preserved here.  Bridge via the
-      // unknown index signature.
-      groot.makeNotifications({ tutorial: steps as unknown as Record<string, unknown>[] });
+      groot.makeNotifications({ tutorial: steps });
       return true;
     }
     return false;
@@ -156,7 +152,7 @@ export class Mission extends GameNode {
 
     gnode.on('after_render', function () {
       if (gnode.states.active) {
-        if (gnode.checkTutorial() && gnode.gestalt !== undefined) {
+        if (gnode.checkTutorial()) {
           groot.makeNotifications({ mission_active: gnode.gestalt });
         }
       }
@@ -168,9 +164,7 @@ export class Mission extends GameNode {
       }
       if (!params) return;
       gnode.checkTutorial();
-      if (gnode.gestalt !== undefined) {
-        groot.makeNotifications({ mission_active: gnode.gestalt });
-      }
+      groot.makeNotifications({ mission_active: gnode.gestalt });
     });
 
     gnode.on('local_states_complete', function () {
@@ -189,9 +183,7 @@ export class Mission extends GameNode {
       if (gnode.data.tutorial) {
         groot.setState('tutorial_active', false);
       }
-      if (gnode.gestalt !== undefined) {
-        groot.makeNotifications({ mission_complete: gnode.gestalt });
-      }
+      groot.makeNotifications({ mission_complete: gnode.gestalt });
     });
 
     gnode.on('vclick', function (e: unknown) {
