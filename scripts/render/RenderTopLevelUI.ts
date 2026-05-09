@@ -63,13 +63,6 @@ function getApp(): AppLike {
 
 // ── shared structural surfaces ──────────────────────────────────────────────
 
-interface GameRootForUI {
-  renderMenu?: { renderXP?(sb: RenderStatusbar): void };
-  ap_value: number;
-  xp_level: { ap_max: number; xp_min?: number; xp_max?: number };
-  APTicker: { getRemainingTime(): number };
-}
-
 interface StatusbarValueChannel {
   val: number;
   max: number;
@@ -200,7 +193,7 @@ export class RenderStatusbar extends RenderNode {
     this.draw();
 
     // Mirror to the MainMenu's mobile XP slot (CSS hides it on desktop).
-    const groot = (this.gameNode as unknown as { GameRoot?: GameRootForUI } | undefined)?.GameRoot;
+    const groot = this.gameNode?.GameRoot;
     if (groot?.renderMenu?.renderXP) {
       groot.renderMenu.renderXP(this);
     }
@@ -329,8 +322,7 @@ export class RenderStatusbar extends RenderNode {
 
     jq.on('mouseenter', '.StatusItem.AP', function (this: HTMLElement, e: UIEventLike) {
       e.stopPropagation();
-      const groot = (node.gameNode as unknown as { GameRoot?: GameRootForUI } | undefined)
-        ?.GameRoot;
+      const groot = node.gameNode?.GameRoot;
       if (!groot) return;
       if (groot.ap_value >= groot.xp_level.ap_max) {
         return;
@@ -339,7 +331,10 @@ export class RenderStatusbar extends RenderNode {
       jtext.show();
       const APT = groot.APTicker;
       node.startLoop(() => {
-        jtext.html(RenderStatusbar.textMoreIn() + span(toTime(APT.getRemainingTime())));
+        // APTicker.getRemainingTime() returns a Date (Game.ts) whose
+        // epoch-ms is the remaining ms; coerce to number for `toTime`.
+        const ms = APT?.getRemainingTime?.();
+        jtext.html(RenderStatusbar.textMoreIn() + span(toTime(ms ? +ms : 0)));
       }, 1000);
     });
 
@@ -1139,11 +1134,28 @@ export type TopscorePerpConfig = NodeConfig & {
   frame?: string;
 };
 
+// Topscore-specific gameNode shape: the `Topscore` GameNode subclass
+// owns a `scoretype` field (Topscore.ts).  Shadow-declared on the
+// render-side `gameNode` field so the rank/list templates can read
+// it without the residual `as unknown as` cast.  Mirrors the
+// (unexported) `GameNodeLike` in RenderNode.ts plus `scoretype`.
+interface TopscoreGameNodeLike {
+  trigger(ev: string, params?: unknown[]): void;
+  parentNode?: { renderNode: RenderNode; data?: Record<string, unknown> };
+  states?: Record<string, boolean>;
+  data?: Record<string, unknown>;
+  scoretype?: string;
+}
+
 export class RenderTopscorePerp extends RenderNode {
   declare frameSrc: string | undefined;
   declare frameMap: SpriteFrameMap | undefined;
   declare frame: string;
   declare template: string;
+  // Shadow the inherited `gameNode: GameNodeLike | undefined` with a
+  // Topscore-specific shape so renderRank/renderList can read
+  // `scoretype` without a cast.
+  declare gameNode: TopscoreGameNodeLike | undefined;
 
   static {
     RenderTopscorePerp.prototype.template = 'topscore.html';
@@ -1229,9 +1241,7 @@ export class RenderTopscorePerp extends RenderNode {
     const jq = this.jdomelem;
     const rank = jq.find('.TopscoreRank');
     rank.empty();
-    const gnode = this.gameNode as unknown as
-      | { data?: unknown; parentNode?: { data?: unknown }; scoretype?: string }
-      | undefined;
+    const gnode = this.gameNode;
     const html = getApp().renderView('topscore_rank.html', {
       data: gnode?.data,
       parentdata: gnode?.parentNode?.data,
@@ -1244,9 +1254,7 @@ export class RenderTopscorePerp extends RenderNode {
     const jq = this.jdomelem;
     const list = jq.find('.TopscoreList');
     list.empty();
-    const gnode = this.gameNode as unknown as
-      | { data?: unknown; parentNode?: { data?: unknown }; scoretype?: string }
-      | undefined;
+    const gnode = this.gameNode;
     const html = getApp().renderView('topscore_list.html', {
       data: gnode?.data,
       parentdata: gnode?.parentNode?.data,

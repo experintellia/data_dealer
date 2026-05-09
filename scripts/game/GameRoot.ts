@@ -83,6 +83,7 @@ interface RenderRootLike {
   jdomelem?: {
     find?(sel: string): {
       off?(ev?: string): void;
+      addClass?(cls: string): void;
       removeClass?(cls: string): void;
     };
     outerHeight?(): number;
@@ -90,6 +91,9 @@ interface RenderRootLike {
   setSize?(opts: { width?: number; height?: number }): void;
   render?(): void;
   addPopup?(popup: unknown): void;
+  /** Owned by RenderMainMenu (RenderViews.ts).  Cloned-XP-bar slot
+   *  refresh; `sb` is structurally a RenderStatusbar (XP_* scalars). */
+  renderXP?(sb: unknown): void;
   // FX hooks driven by makeNotifications.  All optional; the Stage
   // owns the implementations (Render.js).
   FXMissionComplete?(): void;
@@ -205,6 +209,9 @@ interface APTickerLike {
   reset(): void;
   start(offset?: number): void;
   addListener(node: GameNode): void;
+  /** Returns a Date whose epoch-ms equals the ms remaining until the
+   *  next AP tick — see Game.ts's APTicker singleton. */
+  getRemainingTime?(): Date;
 }
 
 /** Status-bar slot — one per game-value.  `val`/`max` drive the

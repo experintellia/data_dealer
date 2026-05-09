@@ -178,15 +178,15 @@ export class RenderViewTab extends RenderNode {
       void e;
       if (value) {
         node.FXShow();
-        const root = node.gameNode?.GameRoot as GameRootForView | undefined;
+        const root = node.gameNode?.GameRoot;
         if (node.parentNode) {
           node.parentNode.jdomelem.addClass('Active' + (jdomelem.attr('id') as string));
         }
-        if (root?.renderMenu) {
-          root.renderMenu.jdomelem.find('.mm-tab').removeClass('active');
+        if (root?.renderMenu?.jdomelem) {
+          root.renderMenu.jdomelem.find?.('.mm-tab')?.removeClass?.('active');
           root.renderMenu.jdomelem
-            .find('.mm-tab[data-button-id=' + node.id + ']')
-            .addClass('active');
+            .find?.('.mm-tab[data-button-id=' + node.id + ']')
+            ?.addClass?.('active');
         }
         node.trigger('viewtab_selected');
       } else {
@@ -259,13 +259,6 @@ export class RenderViewTab extends RenderNode {
 }
 
 // ── ViewMap ─────────────────────────────────────────────────────────────────
-
-// `GameNodeLike.GameRoot` exists post-#261, but `GameRoot.renderMenu` lands
-// on the upstream `RenderNodeLike` shape where `jdomelem` is `unknown`.
-// This local shim narrows just that jQuery surface for the tab-active code.
-interface GameRootForView {
-  renderMenu?: { jdomelem: JQueryViewElem };
-}
 
 export type ViewMapConfig = NodeConfig & {
   width?: number;
@@ -346,17 +339,17 @@ export class RenderViewMap extends RenderNode {
     // LISTEN TO STATES
     this.on('states_active', (e: ViewDomEvent, value: unknown) => {
       e.stopPropagation();
-      const root = this.gameNode?.GameRoot as GameRootForView | undefined;
+      const root = this.gameNode?.GameRoot;
       if (value) {
         this.FXShow();
         if (this.parentNode) {
           this.parentNode.jdomelem.addClass('Active' + (jdomelem.attr('id') as string));
         }
-        if (root?.renderMenu) {
-          root.renderMenu.jdomelem.find('.mm-tab').removeClass('active');
+        if (root?.renderMenu?.jdomelem) {
+          root.renderMenu.jdomelem.find?.('.mm-tab')?.removeClass?.('active');
           root.renderMenu.jdomelem
-            .find('.mm-tab[data-button-id=' + this.id + ']')
-            .addClass('active');
+            .find?.('.mm-tab[data-button-id=' + this.id + ']')
+            ?.addClass?.('active');
         }
       } else {
         if (this.parentNode) {

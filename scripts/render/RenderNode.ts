@@ -59,7 +59,7 @@ interface CableLike {
 
 interface GameNodeLike {
   trigger(ev: string, params?: unknown[]): void;
-  parentNode?: { renderNode: RenderNode };
+  parentNode?: { renderNode: RenderNode; data?: Record<string, unknown> };
   GameRoot?: GameRoot;
   states?: Record<string, boolean>;
   data?: Record<string, unknown>;
