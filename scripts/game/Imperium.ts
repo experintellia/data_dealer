@@ -2,13 +2,8 @@
 // Perp instances laid out).  Smallest extends-GameNode subclass.
 // Extracted from scripts/Game.js's IIFE in PR 8 of issue #147.
 
-import { type RenderApi } from '../Render.js';
 import i18n from '../i18n.js';
 import { GameNode } from './GameNode.js';
-
-interface GameRootWithMenu {
-  renderMenu: Pick<InstanceType<RenderApi['MainMenu']>, 'addButton'>;
-}
 
 interface ImperiumRenderNode {
   lock?(): void;
@@ -28,8 +23,7 @@ export class Imperium extends GameNode {
     this.setState('active', true);
     // FIXME: name should be in data
     // this.GameRoot.renderMenu.addButton(this.renderData.config.name, this.id, this.states);
-    const groot = this.GameRoot as unknown as GameRootWithMenu;
-    groot.renderMenu.addButton(i18n.gettext('My Empire'), this.id, this.states);
+    this.GameRoot.renderMenu?.addButton?.(i18n.gettext('My Empire'), this.id, this.states);
   }
 
   lock(): void {

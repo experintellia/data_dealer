@@ -23,6 +23,7 @@ import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
 import setup from '../setup.js';
 import { getTypeSettings } from '../type_settings.js';
+import type { GameRoot } from './GameRoot.js';
 import { OrderedSet } from './OrderedSet.js';
 import { mergeData } from './mergeData.js';
 
@@ -279,7 +280,7 @@ export class GameNode {
   children!: OrderedSet<GameNode>;
   states!: Record<string, boolean>;
   /** Backlink to the GameRoot instance (always _instances[0]). */
-  GameRoot!: GameNode;
+  GameRoot!: GameRoot;
   /** jQuery wrapper used as the GameNode's event bus. */
   jq!: JQueryLike;
 
@@ -349,7 +350,9 @@ export class GameNode {
     // _instances[0] is GameRoot by convention (first GameNode constructed).
     // Cast away the `| undefined` from get() — by the time any non-Root
     // GameNode is created, the Root must have been constructed first.
-    this.GameRoot = (get(0) as GameNode | undefined) ?? this;
+    // The `this` fallback covers GameRoot's own bootstrap (where it's the
+    // only GameNode in existence and therefore *is* the GameRoot).
+    this.GameRoot = (get(0) ?? this) as GameRoot;
     this.setAttrs(cfg);
     this.makeRenderConfig();
     this.jq = _$()(this);
