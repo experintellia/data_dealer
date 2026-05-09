@@ -20,7 +20,6 @@ import {
   type ChargeResult,
   type DoneFailChain,
   GamePerp,
-  type GameRootForPerp,
   type RenderNodeLike,
   type RenderPopupLike,
 } from './GamePerp.js';
@@ -108,14 +107,6 @@ interface PowerupSlotsBucket {
   slots_left: number;
 }
 
-interface GameRootForProjectPerp extends GameRootForPerp {
-  cash_value: number;
-  ap_value: number;
-  karma_value: number;
-  fetchProjectPowerupData(gestalt: string, cb?: () => void): void;
-  getDatabase(): { cue(ps: unknown, origin: unknown, collect_id: unknown): unknown };
-}
-
 export class ProjectPerp extends GamePerp {
   override renderType = 'Perp';
   override sticky = false;
@@ -123,8 +114,8 @@ export class ProjectPerp extends GamePerp {
 
   renderReady?: DecoratorReadyLike;
 
-  protected override get groot(): GameRootForProjectPerp {
-    return this.GameRoot as unknown as GameRootForProjectPerp;
+  protected override get groot() {
+    return this.GameRoot;
   }
 
   constructor(config: GameNodeConfig) {
@@ -629,7 +620,7 @@ export class ProjectPerp extends GamePerp {
             const newKarma = data.result.game_values?.karma_value ?? 0;
             const karma_dec = newKarma - groot.karma_value;
             groot.makeNotifications({
-              karma: { gestalt: data.result.karma_incident, karma_value: karma_dec },
+              karma: { gestalt: data.result.karma_incident, dec: karma_dec },
             });
           }
           deco.FXBling({ text: toKSNum(amount), extendClass: 'ProfileBling' });
@@ -637,7 +628,7 @@ export class ProjectPerp extends GamePerp {
             (gperp.renderNode as ProjectRenderNodeLike | undefined)?.FXDataOut?.();
             delete gperp.renderReady;
           });
-          groot.getDatabase().cue(inner.profile_set, inner.origin, inner.collect_id);
+          groot.getDatabase()?.cue(inner.profile_set, inner.origin, inner.collect_id);
           gperp.setState('idle', true);
         } else if (data.result?.error) {
           if (popup) popup.trigger('no_AP');
