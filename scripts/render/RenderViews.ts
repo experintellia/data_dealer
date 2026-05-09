@@ -178,8 +178,7 @@ export class RenderViewTab extends RenderNode {
       void e;
       if (value) {
         node.FXShow();
-        const root = (node.gameNode as unknown as { GameRoot?: GameRootForView } | undefined)
-          ?.GameRoot;
+        const root = node.gameNode?.GameRoot as GameRootForView | undefined;
         if (node.parentNode) {
           node.parentNode.jdomelem.addClass('Active' + (jdomelem.attr('id') as string));
         }
@@ -261,9 +260,11 @@ export class RenderViewTab extends RenderNode {
 
 // ── ViewMap ─────────────────────────────────────────────────────────────────
 
+// `GameNodeLike.GameRoot` exists post-#261, but `GameRoot.renderMenu` lands
+// on the upstream `RenderNodeLike` shape where `jdomelem` is `unknown`.
+// This local shim narrows just that jQuery surface for the tab-active code.
 interface GameRootForView {
   renderMenu?: { jdomelem: JQueryViewElem };
-  _cancelPendingCenter?: () => void;
 }
 
 export type ViewMapConfig = NodeConfig & {
@@ -345,8 +346,7 @@ export class RenderViewMap extends RenderNode {
     // LISTEN TO STATES
     this.on('states_active', (e: ViewDomEvent, value: unknown) => {
       e.stopPropagation();
-      const root = (this.gameNode as unknown as { GameRoot?: GameRootForView } | undefined)
-        ?.GameRoot;
+      const root = this.gameNode?.GameRoot as GameRootForView | undefined;
       if (value) {
         this.FXShow();
         if (this.parentNode) {
@@ -713,7 +713,7 @@ export class RenderViewMap extends RenderNode {
     if (!this.parentNode || !this.scroller) return;
     const vpCenter = this.parentNode.getCenterPosition();
     const duration = dur !== undefined ? dur : 300;
-    const root = (this.gameNode as unknown as { GameRoot?: GameRootForView } | undefined)?.GameRoot;
+    const root = this.gameNode?.GameRoot;
     root?._cancelPendingCenter?.();
     this.scroller.options.animating = duration > 0;
     this.scroller.options.animationDuration = duration;
@@ -918,7 +918,7 @@ export class RenderMainMenu extends RenderStage {
     this.render();
 
     // Setup Button Events
-    const root = (this.gameNode as unknown as { GameRoot?: GameRootForMain } | undefined)?.GameRoot;
+    const root = this.gameNode?.GameRoot;
 
     this.jdomelem.on('click touchend', '#LocaleToggle:not(.disabled)', (e) => {
       e.stopPropagation();
@@ -1055,8 +1055,4 @@ export class RenderMainMenu extends RenderStage {
     this.data.buttons.push(button);
     this.render();
   }
-}
-
-interface GameRootForMain {
-  trigger?(ev: string, params?: unknown[]): void;
 }
