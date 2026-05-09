@@ -1,7 +1,6 @@
-// Tests for GameRoot.getOriginGestaltFromOriginTokenGestalt and
-// GameRoot.hasOriginTokenForOrigin (issue #203 regression coverage).
+// Tests for GameRoot.hasOriginTokenForOrigin (issue #203 regression coverage).
 //
-// Both methods only read from `this.DBOriginTokens`. We invoke them via
+// The method only reads from `this.DBOriginTokens`. We invoke it via
 // Function.prototype.call against a stubbed `this`, which sidesteps the
 // full GameRoot/jQuery/Render bootstrap chain.
 
@@ -14,35 +13,6 @@ const fixture = () => ({
     origin003: { gestalt: 'origin003', originGameNode: { gestalt: 'city003' } },
     origin999: { gestalt: 'origin999' }, // missing originGameNode
   },
-});
-
-describe('GameRoot.getOriginGestaltFromOriginTokenGestalt (issue #203)', () => {
-  const fn = GameRoot.prototype.getOriginGestaltFromOriginTokenGestalt;
-
-  it('returns the origin gestalt for a known origin-token key', () => {
-    expect(fn.call(fixture(), 'origin002')).toBe('city002');
-    expect(fn.call(fixture(), 'origin003')).toBe('city003');
-  });
-
-  it('returns undefined for an unknown origin-token key', () => {
-    expect(fn.call(fixture(), 'originXXX')).toBeUndefined();
-  });
-
-  it('returns undefined when the origin-token has no originGameNode', () => {
-    expect(fn.call(fixture(), 'origin999')).toBeUndefined();
-  });
-
-  it('does not hardcode "city002": every key resolves independently', () => {
-    // Regression for the legacy bug where the parameter was ignored and
-    // the function always probed for city002.
-    const stub = {
-      DBOriginTokens: {
-        originA: { gestalt: 'originA', originGameNode: { gestalt: 'cityA' } },
-      },
-    };
-    expect(fn.call(stub, 'originA')).toBe('cityA');
-    expect(fn.call(stub, 'origin002')).toBeUndefined();
-  });
 });
 
 describe('GameRoot.hasOriginTokenForOrigin (issue #203)', () => {
@@ -59,5 +29,15 @@ describe('GameRoot.hasOriginTokenForOrigin (issue #203)', () => {
 
   it('is false when DBOriginTokens is empty', () => {
     expect(fn.call({ DBOriginTokens: {} }, 'city002')).toBe(false);
+  });
+
+  it('honors the parameter (regression: legacy bug hardcoded "city002")', () => {
+    const stub = {
+      DBOriginTokens: {
+        originA: { gestalt: 'originA', originGameNode: { gestalt: 'cityA' } },
+      },
+    };
+    expect(fn.call(stub, 'cityA')).toBe(true);
+    expect(fn.call(stub, 'city002')).toBe(false);
   });
 });

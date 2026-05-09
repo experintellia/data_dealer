@@ -711,10 +711,6 @@ export class GameRoot extends GameNode {
     });
   }
 
-  getOriginGestaltFromOriginTokenGestalt(origintokengestalt: string): string | undefined {
-    return this.DBOriginTokens[origintokengestalt]?.originGameNode?.gestalt;
-  }
-
   /** True when any compiled origin token points back to the given
    *  origin (city/profileset) gestalt. Used by tutorial step-skip
    *  logic to detect that a profileset has already been integrated. */
