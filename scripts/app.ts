@@ -1,8 +1,8 @@
 // Application root.  Wires LocalEngine handlers, the i18n layer, and
-// the Game/Render singletons.  Vendor libs ($, numeral, sprintf,
-// createjs) are read off globalThis at factory-body time — they are
-// loaded as plain `<script>` tags in index.html before this bundle
-// runs.  Their typed surfaces are declared once in types/env.d.ts.
+// the Game/Render singletons.  Vendor libs ($, sprintf, createjs) are
+// read off globalThis at factory-body time — they are loaded as plain
+// `<script>` tags in index.html before this bundle runs.  Their typed
+// surfaces are declared once in types/env.d.ts.
 //
 // View templates are compiled by the in-tree `compileTemplate` helper
 // (scripts/dd-helpers.ts); the underscore vendor lib is no longer

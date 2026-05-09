@@ -35,8 +35,6 @@ export interface JQueryStatic {
   when(...args: unknown[]): JQueryLike;
 }
 
-export type NumeralStatic = (n: number) => { format(fmt: string): string };
-
 export type SprintfFn = (template: string, ...subs: unknown[]) => string;
 
 declare global {
@@ -51,12 +49,11 @@ declare global {
   var webxdc: Webxdc<unknown> | undefined;
 
   // Vendor libs loaded via <script> tags before scripts/esm-bundle.js — see
-  // index.html.  Declared as bare globals so `$`, `numeral`, `sprintf`
-  // resolve to the typed surfaces above without per-call-site casts.
+  // index.html.  Declared as bare globals so `$` and `sprintf` resolve to
+  // the typed surfaces above without per-call-site casts.
   // jQuery / $ is a real `| undefined` because some test environments don't
   // load it; the others are present whenever this bundle runs.
   var jQuery: JQueryStatic | undefined;
   var $: JQueryStatic | undefined;
-  var numeral: NumeralStatic;
   var sprintf: SprintfFn;
 }

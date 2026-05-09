@@ -11,7 +11,6 @@
 //   tweenjs       bower: 0.4.1      npm: latest (1.x) — only used post-getToken
 //   preloadjs     bower: 0.3.1      npm: latest (1.x) — LoadQueue API is stable
 //   soundjs       bower: 0.4.1      npm: latest (1.x) — only used post-getToken
-//   jquery-migrate bower: 1.2.1     npm: latest (4.x) — only used post-getToken
 //   zynga-animate — no npm pkg; vendored verbatim
 //   zynga-scroller — no npm pkg; vendored from upstream + AMD wrapper
 //
@@ -19,6 +18,12 @@
 // supplies the formatting helpers (toKSNum, sprintf, span, …), the tiny
 // `compileTemplate` replacement for `_.template`, and native swaps for
 // the shuffle/debounce/keys/clone uses sprinkled around the codebase.
+//
+// `jquery-migrate` and `numeral`/`numeral-de` were removed as part of the
+// same vendor-trimming pass: jquery-migrate had zero call sites for any
+// API it shims (verified by grepping `scripts/`), and numeral was used at
+// a single call site (`toKSNum` in dd-helpers.ts) which now uses
+// `Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 })` natively.
 //
 // scripts/ modules are pure ESM, bundled via Vite into
 // scripts/esm-bundle.js; vendor libs ship as plain `<script>` tags
@@ -60,23 +65,11 @@ function cp(src: string, dest: string): void {
 console.log('Installing npm-sourced vendor packages…');
 run('npm init -y');
 run(
-  [
-    'npm install --save-exact',
-    'jquery',
-    'jquery-migrate',
-    'numeral@1.4.5',
-    'easeljs',
-    'tweenjs',
-    'soundjs',
-    'sprintf-js',
-  ].join(' ')
+  ['npm install --save-exact', 'jquery', 'easeljs', 'tweenjs', 'soundjs', 'sprintf-js'].join(' ')
 );
 
 console.log('\nCopying to vendor/…');
 cp('jquery/dist/jquery.min.js', 'jquery.js');
-cp('jquery-migrate/dist/jquery-migrate.min.js', 'jquery-migrate.js');
-cp('numeral/numeral.js', 'numeral.js');
-cp('numeral/languages/de-de.js', 'numeral-de.js');
 cp('easeljs/lib/easeljs.min.js', 'easeljs.js');
 cp('tweenjs/lib/tweenjs.min.js', 'tweenjs.js');
 cp('soundjs/lib/soundjs.min.js', 'soundjs.js');
