@@ -49,16 +49,6 @@ interface ProfileSetOriginNode {
   id?: string;
 }
 
-/** GameRoot's surface this class touches.  Will collapse when GameRoot
- *  is extracted into its own typed module. */
-interface GameRootForProfileSet {
-  DBTokens: Record<string, number>;
-  DBTokensAbsolute: Record<string, number>;
-  profiles_value: number;
-  raw_data?: { tokens_seen?: Record<string, unknown>; [key: string]: unknown };
-  getTypeData(gestalt?: string): Record<string, unknown> | undefined;
-}
-
 /** ProfileSet config — extends the base GameNodeConfig with the
  *  ProfileSet-specific fields that callers stamp on at construction time
  *  (Database.cue and the various Perp `BuyToken` flows). */
@@ -102,7 +92,7 @@ export class ProfileSet extends GameNode {
   constructor(config: ProfileSetConfig, tokens: TokensInput) {
     // Used both as a Template and as a cued object in DBQueue.
     super(config);
-    const groot = this.GameRoot as unknown as GameRootForProfileSet;
+    const groot = this.GameRoot;
 
     // Shallow clone to match legacy `_.clone(tokens)` — array → slice
     // (elements shared by reference), object → top-level shallow copy
@@ -238,7 +228,7 @@ export class ProfileSet extends GameNode {
   }
 
   updateNewMarker(): void {
-    const groot = this.GameRoot as unknown as GameRootForProfileSet;
+    const groot = this.GameRoot;
     const seenMap: Record<string, unknown> = (groot.raw_data && groot.raw_data.tokens_seen) || {};
     this.tokens_set.forEach((token) => {
       if (
