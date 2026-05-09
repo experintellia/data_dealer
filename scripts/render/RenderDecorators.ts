@@ -339,10 +339,7 @@ export class RenderDecoratorGear extends RenderSprite implements DecoratorBase {
   override onAddInit(): void {
     const dec = this.decoratedNode;
     if (dec) {
-      const gameNode = dec.gameNode as unknown as
-        | { data?: { is_supertoken?: boolean } }
-        | undefined;
-      const isSupertoken = gameNode?.data?.is_supertoken === true;
+      const isSupertoken = dec.gameNode?.data?.is_supertoken === true;
       if (!isSupertoken) {
         this.offsetToParent = {
           x: dec.width / 2 - 11,
@@ -583,10 +580,8 @@ export class RenderDecoratorAmount extends RenderSprite implements DecoratorBase
     this.jdomelem2.animate({ width: Math.round((a / 100) * 60) }, 600);
     if (a < 25) {
       this.jdomelem3.show();
-      const dec = this.decoratedNode as unknown as
-        | { gameNode?: { data?: { absoluteAmount?: number } } }
-        | undefined;
-      const absolute = dec?.gameNode?.data?.absoluteAmount ?? 0;
+      const dec = this.decoratedNode;
+      const absolute = (dec?.gameNode?.data?.absoluteAmount as number | undefined) ?? 0;
       this.jdomelem3.text(toKSNum(absolute));
     } else {
       this.jdomelem3.hide();

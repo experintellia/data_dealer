@@ -7,6 +7,7 @@
 // Injection seams for `setRenderNodeRegistry` and `setRenderNodeTickers`
 // have been retired in favor of direct imports.
 
+import type { GameRoot } from '../game/GameRoot.js';
 import { OrderedSet } from '../game/OrderedSet.js';
 import { RenderSet } from './RenderSet.js';
 import { RenderSlowTicker } from './RenderSlowTicker.js';
@@ -59,6 +60,9 @@ interface CableLike {
 interface GameNodeLike {
   trigger(ev: string, params?: unknown[]): void;
   parentNode?: { renderNode: RenderNode };
+  GameRoot?: GameRoot;
+  states?: Record<string, boolean>;
+  data?: Record<string, unknown>;
 }
 
 // ── decorator slot typing ───────────────────────────────────────────────────
