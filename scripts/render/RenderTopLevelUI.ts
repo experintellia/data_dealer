@@ -37,30 +37,18 @@
 // reviewer flagged it as worth a header-level note.
 
 import appModule from '../app.js';
+import { span, sprintf, toKSNum, toTime } from '../dd-helpers.js';
+import i18n from '../i18n.js';
 import setup from '../setup.js';
 import { type NodeConfig, RenderNode } from './RenderNode.js';
 import { RenderSprite, type SpriteConfig, type SpriteFrameMap } from './RenderSprite.js';
 import { type JQueryRenderElem, type JQueryRenderEvent, getRenderJQuery } from './_jqueryShim.js';
 import { renderSpriteHtml } from './renderSpriteHelper.js';
 
-// ── jQuery / underscore vendor surfaces ─────────────────────────────────────
+// ── jQuery surface ──────────────────────────────────────────────────────────
 
 type JQueryUIElem = JQueryRenderElem;
 type UIEventLike = JQueryRenderEvent;
-
-interface UnderscoreUILike {
-  _(key: string): string;
-  toKSNum(n: number): string;
-  toTime(ms: number): string;
-  span(text: string, cls?: string): string;
-  sprintf(template: string, ...subs: unknown[]): string;
-  each<T>(list: T[] | Record<string, T>, fn: (item: T, key: number | string) => void): void;
-  mixin(mixins: Record<string, unknown>): void;
-}
-
-function getUnderscore(): UnderscoreUILike {
-  return globalThis._ as unknown as UnderscoreUILike;
-}
 
 interface AppLike {
   renderView(viewName: string, data?: unknown): string;
@@ -141,7 +129,7 @@ export class RenderStatusbar extends RenderNode {
   loop?: number;
 
   declare template: string;
-  static readonly textMoreIn: () => string = () => getUnderscore()._('More Energy in') + ' ';
+  static readonly textMoreIn: () => string = () => i18n.gettext('More Energy in') + ' ';
 
   static {
     const p = RenderStatusbar.prototype;
@@ -350,9 +338,8 @@ export class RenderStatusbar extends RenderNode {
       const jtext = $(this).find('.StatusRemain');
       jtext.show();
       const APT = groot.APTicker;
-      const _u = getUnderscore();
       node.startLoop(() => {
-        jtext.html(RenderStatusbar.textMoreIn() + _u.span(_u.toTime(APT.getRemainingTime())));
+        jtext.html(RenderStatusbar.textMoreIn() + span(toTime(APT.getRemainingTime())));
       }, 1000);
     });
 
@@ -404,8 +391,8 @@ export class RenderDBQueue extends RenderNode {
     p.z = 10;
     p.offsetX = 720 / 2;
     p.offsetY = -58;
-    p.textProfilesNew = () => getUnderscore()._('%s New');
-    p.textUpdated = () => getUnderscore()._('%s Updated');
+    p.textProfilesNew = () => i18n.gettext('%s New');
+    p.textUpdated = () => i18n.gettext('%s Updated');
   }
 
   constructor(config: DBQueueConfig = {}) {
@@ -455,7 +442,6 @@ export class RenderDBQueue extends RenderNode {
   }
 
   FXMerge(psid: string, inc: number, dup: number, wait: number): void {
-    const _u = getUnderscore();
     const $ = getRenderJQuery('RenderTopLevelUI');
     void $;
     const jq = this.jdomelem;
@@ -463,12 +449,12 @@ export class RenderDBQueue extends RenderNode {
     const after = ps.nextAll('.DatabaseQueueItem');
     ps.addClass('disabled');
     this.FXBlingQueue({
-      text: _u.sprintf(this.textProfilesNew(), _u.toKSNum(inc)),
+      text: sprintf(this.textProfilesNew(), toKSNum(inc)),
       wait: 200,
       extendClass: 'ProfileBlingNew',
     });
     this.FXBlingQueue({
-      text: _u.sprintf(this.textUpdated(), _u.toKSNum(dup)),
+      text: sprintf(this.textUpdated(), toKSNum(dup)),
       wait: 500,
       extendClass: 'ProfileBlingUpdated',
     });
@@ -712,7 +698,6 @@ export class RenderPopup extends RenderNode {
       function (this: HTMLElement, e: UIEventLike) {
         e.stopPropagation();
         e.preventDefault();
-        const _u = getUnderscore();
         const spop = $(this).parents('.Subpop[data-subpop-id="buyslots"]');
         const button = spop.find('.Button[data-button-id="PowerupBuySlotsButton"]');
         let num = Number.parseInt((button.attr('data-button-data') as string | undefined) ?? '0');
@@ -722,7 +707,7 @@ export class RenderPopup extends RenderNode {
         const max_slots = left;
         num = num + 1 > max_slots ? num : num + 1;
         price = price * num;
-        jprice.text(_u.toKSNum(price));
+        jprice.text(toKSNum(price));
         spop.find('.BuySlotsNum').text(String(num));
         spop.find('.BuySlotsNum').text(String(num));
         button.attr('data-button-data', num);
@@ -735,7 +720,6 @@ export class RenderPopup extends RenderNode {
       function (this: HTMLElement, e: UIEventLike) {
         e.stopPropagation();
         e.preventDefault();
-        const _u = getUnderscore();
         const spop = $(this).parents('.Subpop[data-subpop-id="buyslots"]');
         const button = spop.find('.Button[data-button-id="PowerupBuySlotsButton"]');
         let num = Number.parseInt((button.attr('data-button-data') as string | undefined) ?? '0');
@@ -743,7 +727,7 @@ export class RenderPopup extends RenderNode {
         let price = Number.parseInt((jprice.attr('data-slot-cost') as string | undefined) ?? '0');
         num = num - 1 < 1 ? 1 : num - 1;
         price = price * num;
-        jprice.text(_u.toKSNum(price));
+        jprice.text(toKSNum(price));
         spop.find('.BuySlotsNum').text(String(num));
         button.attr('data-button-data', num);
       }
@@ -932,7 +916,6 @@ export class RenderPopup extends RenderNode {
 
   render(): void {
     const jq = this.jdomelem;
-    const _u = getUnderscore();
     jq.empty();
     const html = getApp().renderView(this.template, this.templateData);
     jq.append(html);
@@ -947,10 +930,12 @@ export class RenderPopup extends RenderNode {
       jq.find('.PopupText.TabText[data-tab="' + (mbutton.attr('data-tab') as string) + '"]').show();
     }
 
-    if (this.templateData.highlightTabs) {
-      _u.each(this.templateData.highlightTabs, (tabid) => {
+    const tabs = this.templateData.highlightTabs;
+    if (tabs) {
+      const list = Array.isArray(tabs) ? tabs : Object.values(tabs);
+      for (const tabid of list) {
         jq.find('.PopupMenuButton[data-tab="' + (tabid as string) + '"]').addClass('TabArrowNew');
-      });
+      }
     }
   }
 
@@ -1291,7 +1276,6 @@ export function renderAmountHtml(
   upgradeAbsAmount?: number
 ): string {
   const $ = getRenderJQuery('RenderTopLevelUI');
-  const _u = getUnderscore();
 
   const frameSrc = 'MainSprites.png';
   const activeFrame = frame || 'normal';
@@ -1329,7 +1313,7 @@ export function renderAmountHtml(
 
     if (upgradeAmount < 25 && upgradeAbsAmount !== undefined) {
       const jdomelem3 = $("<div class='DecoratorAmountNum'></div>");
-      jdomelem3.text(_u.toKSNum(upgradeAbsAmount));
+      jdomelem3.text(toKSNum(upgradeAbsAmount));
       jdomelem.append(jdomelem3);
     }
   }

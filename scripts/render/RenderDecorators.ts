@@ -9,6 +9,8 @@
 // DecoratorTimer imports `SlowTicker` directly from
 // scripts/render/RenderSlowTicker.ts.
 
+import { toKSNum, toTime } from '../dd-helpers.js';
+import i18n from '../i18n.js';
 import { type DecoType, type NodeConfig, RenderNode } from './RenderNode.js';
 import { RenderSlowTicker } from './RenderSlowTicker.js';
 import { RenderSprite, type SpriteConfig, type SpriteFrameMap } from './RenderSprite.js';
@@ -18,16 +20,6 @@ import { type JQueryRenderElem, getRenderJQuery } from './_jqueryShim.js';
 // Local alias kept for the internal `getReadyText` template-cache
 // type; functionally equivalent to JQueryRenderElem.
 type JQueryDecoratorElem = JQueryRenderElem;
-
-interface UnderscoreI18nLike {
-  _(key: string): string;
-  toKSNum(n: number): string;
-  toTime(ms: number): string;
-}
-
-function getUnderscore(): UnderscoreI18nLike {
-  return globalThis._ as unknown as UnderscoreI18nLike;
-}
 
 // ── shared draw helper (reused by every decorator except Timer) ─────────────
 
@@ -115,21 +107,22 @@ let _textCollectCash: JQueryDecoratorElem | undefined;
 
 function getReadyText(mode: 'profile' | 'money' | 'gear'): JQueryDecoratorElem {
   const $ = getRenderJQuery('RenderDecorators');
-  const _u = getUnderscore();
   if (mode === 'money') {
     if (!_textCollectCash) {
-      _textCollectCash = $('<div class="DecoratorReadyText Cash">' + _u._('Cash up!') + '</div>');
+      _textCollectCash = $(
+        '<div class="DecoratorReadyText Cash">' + i18n.gettext('Cash up!') + '</div>'
+      );
     }
     return _textCollectCash;
   }
   if (mode === 'gear') {
     if (!_textCollectGear) {
-      _textCollectGear = $('<div class="DecoratorReadyText">' + _u._('Update!') + '</div>');
+      _textCollectGear = $('<div class="DecoratorReadyText">' + i18n.gettext('Update!') + '</div>');
     }
     return _textCollectGear;
   }
   if (!_textCollect) {
-    _textCollect = $('<div class="DecoratorReadyText">' + _u._('Collect!') + '</div>');
+    _textCollect = $('<div class="DecoratorReadyText">' + i18n.gettext('Collect!') + '</div>');
   }
   return _textCollect;
 }
@@ -410,7 +403,7 @@ export class RenderDecoratorTimer extends RenderSprite implements DecoratorBase 
   jdomelem3: JQueryDecoratorElem;
   domelem3: HTMLElement;
 
-  static readonly textReadyIn: () => string = () => getUnderscore()._('Ready in') + ' ';
+  static readonly textReadyIn: () => string = () => i18n.gettext('Ready in') + ' ';
 
   constructor(config: DecoratorTimerConfig = {}) {
     const $ = getRenderJQuery('RenderDecorators');
@@ -514,8 +507,7 @@ export class RenderDecoratorTimer extends RenderSprite implements DecoratorBase 
 
     // Add some ms to make Countdown shortly show 00:00
     if (!this.jdomelem3.hidden) {
-      const _u = getUnderscore();
-      this.jdomelem3.text(RenderDecoratorTimer.textReadyIn() + _u.toTime(this.remainTime + 800));
+      this.jdomelem3.text(RenderDecoratorTimer.textReadyIn() + toTime(this.remainTime + 800));
     }
 
     const canvas = this.domelem2;
@@ -591,12 +583,11 @@ export class RenderDecoratorAmount extends RenderSprite implements DecoratorBase
     this.jdomelem2.animate({ width: Math.round((a / 100) * 60) }, 600);
     if (a < 25) {
       this.jdomelem3.show();
-      const _u = getUnderscore();
       const dec = this.decoratedNode as unknown as
         | { gameNode?: { data?: { absoluteAmount?: number } } }
         | undefined;
       const absolute = dec?.gameNode?.data?.absoluteAmount ?? 0;
-      this.jdomelem3.text(_u.toKSNum(absolute));
+      this.jdomelem3.text(toKSNum(absolute));
     } else {
       this.jdomelem3.hide();
     }

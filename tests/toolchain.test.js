@@ -13,7 +13,6 @@ describe('vendor files', () => {
   const required = [
     'jquery.js',
     'jquery-migrate.js',
-    'underscore.js',
     'numeral.js',
     'numeral-de.js',
     'easeljs.js',
@@ -29,7 +28,8 @@ describe('vendor files', () => {
     });
   }
 
-  // The legacy AMD plumbing must not regress back into vendor/.
+  // The legacy AMD plumbing must not regress back into vendor/, plus
+  // underscore (replaced by scripts/dd-helpers.ts).
   const removed = [
     'requirejs.js',
     'almond.js',
@@ -37,6 +37,7 @@ describe('vendor files', () => {
     'tpl.js',
     'jquery-mobile.js',
     'native-console.js',
+    'underscore.js',
   ];
   for (const f of removed) {
     it(`vendor/${f} no longer exists`, () => {

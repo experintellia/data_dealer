@@ -1,20 +1,26 @@
 // Application root.  Wires LocalEngine handlers, the i18n layer, and
-// the Game/Render singletons.  Vendor libs ($, _, numeral, sprintf,
+// the Game/Render singletons.  Vendor libs ($, numeral, sprintf,
 // createjs) are read off globalThis at factory-body time — they are
 // loaded as plain `<script>` tags in index.html before this bundle
 // runs.  Their typed surfaces are declared once in types/env.d.ts.
+//
+// View templates are compiled by the in-tree `compileTemplate` helper
+// (scripts/dd-helpers.ts); the underscore vendor lib is no longer
+// loaded.
 
 import type { JQueryLike, JQueryStatic } from '../types/env.d.ts';
 import { getGame } from './Game.js';
 import LocalEngine from './LocalEngine.js';
 import { getRender } from './Render.js';
+import { compileTemplate, registerTemplateHelpers } from './dd-helpers.js';
 import i18n from './i18n.js';
 import setup from './setup.js';
 
 // All view sources are inlined at bundle time; templates are compiled
-// the first (and only) time the Application factory runs, when
-// vendor underscore is guaranteed to have set window._.  Doing it at
-// module-eval time would crash because `_` is not yet on globalThis.
+// the first (and only) time the Application factory runs.  The
+// in-tree `compileTemplate` is a ~30-line replacement for the legacy
+// `_.template(text, null, { variable: 'D' })` call; templates close
+// over the `_` namespace populated in scripts/dd-helpers.ts.
 const viewSources = import.meta.glob<string>('../views/*.html', {
   query: '?raw',
   import: 'default',
@@ -27,9 +33,7 @@ function compileTemplates(): Record<string, (data?: unknown) => string> {
     const segments = path.split('/');
     const name = segments[segments.length - 1];
     if (!name) continue;
-    // underscore 1.5.1's signature is `_.template(text, data, settings)`;
-    // pass null for data so we get back a precompiled function.
-    out[name] = _.template(viewSources[path] as string, null, { variable: 'D' });
+    out[name] = compileTemplate(viewSources[path] as string);
   }
   return out;
 }
@@ -184,51 +188,19 @@ const Application = function (): ApplicationApi {
     });
   }
 
-  // Extending Underscore with some helpers for easier templating.
-  _.mixin({
-    mixindone: function () {
-      return true;
-    },
-    game: function () {
-      // FIXME: only expose certain functions to _
-      if (app.game) {
-        return app.game;
-      }
-      return {};
-    },
-    numeral: numeral,
-    sprintf: sprintf,
-    renderView: renderView,
-    pad0: function (n: number, length: number) {
-      // Fastest implementation according to http://jsperf.com/ways-to-0-pad-a-number
-      const N = 10 ** length;
-      return n < N ? ('' + (N + n)).slice(1) : '' + n;
-    },
-    crlf2html: function (str: unknown) {
-      return String(str || '').replace(/\r?\n|\r/g, '<br>');
-    },
-    toKSNum: function (n: number) {
-      return _.numeral(n).format('0,0');
-    },
-    toTime: function (ms: number) {
-      const date = new Date(ms || 0);
-      if (ms >= 3600000) {
-        return (
-          _.pad0(date.getUTCHours(), 2) +
-          ':' +
-          _.pad0(date.getUTCMinutes(), 2) +
-          ':' +
-          _.pad0(date.getUTCSeconds(), 2)
-        );
-      }
-      return _.pad0(date.getUTCMinutes(), 2) + ':' + _.pad0(date.getUTCSeconds(), 2);
-    },
-    span: function (text: string, CSSClass?: string) {
-      const cls = CSSClass || 'highlight';
-      return '<span class="' + cls + '">' + text + '</span>';
-    },
+  // Late-bind the two template helpers that need a closure over the
+  // live Application instance: `_.renderView` (delegates back to
+  // this.renderView) and `_.game` (returns the running game root).
+  // The Render-side helpers (`_.RenderSprite`, `_.RenderAmount`)
+  // are registered from inside `getRender()`.  Every other entry on
+  // the `_` namespace is a stable function from dd-helpers.ts.
+  registerTemplateHelpers({
     _: i18n.gettext,
     __: i18n.ngettext,
+    renderView,
+    game: function () {
+      return app.game ?? {};
+    },
   });
 
   $(function () {

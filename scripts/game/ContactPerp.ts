@@ -9,6 +9,7 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { toKSNum } from '../dd-helpers.js';
 import { type GameNodeConfig } from './GameNode.js';
 import {
   type ChargeResult,
@@ -198,7 +199,7 @@ export class ContactPerp extends GamePerp {
               karma: { gestalt: data.result.karma_incident, dec: karma_dec },
             });
           }
-          deco.FXBling({ text: globalThis._.toKSNum(amount), extendClass: 'ProfileBling' });
+          deco.FXBling({ text: toKSNum(amount), extendClass: 'ProfileBling' });
           deco.FXSuck(function () {
             (gperp.renderNode as ContactRenderNodeLike | undefined)?.FXDataOut?.();
             delete gperp.renderReady;

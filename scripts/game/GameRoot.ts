@@ -19,6 +19,7 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { debounce, span, sprintf, toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
 import setup from '../setup.js';
 import { getTypeSettings } from '../type_settings.js';
@@ -1412,7 +1413,7 @@ export class GameRoot extends GameNode {
           n.says = i18n.gettext('Mark says:');
           const ntext = (tdata as { ntext?: string }).ntext ?? '';
           if (parentTypeData?.title) {
-            n.text = globalThis._.sprintf(ntext, globalThis._.span(parentTypeData.title));
+            n.text = sprintf(ntext, span(parentTypeData.title));
             eachByGestalt(parentType.gestalt ?? '', (v) => {
               if (v.renderNode) {
                 const sub = v as GameNode & NewItemsLike;
@@ -1424,10 +1425,7 @@ export class GameRoot extends GameNode {
               }
             });
           } else {
-            n.text = globalThis._.sprintf(
-              ntext,
-              globalThis._.span((tdata as { title?: string }).title ?? '')
-            );
+            n.text = sprintf(ntext, span((tdata as { title?: string }).title ?? ''));
           }
         });
         if (parentIsBuilt) this.cueNotification(n);
@@ -1490,7 +1488,7 @@ export class GameRoot extends GameNode {
           projectstext = projectstext + (project.data?.title ?? '') + sep;
         });
         n.says = i18n.gettext('Mark says:');
-        n.text = globalThis._.sprintf(reg.type_data?.ntext ?? '', globalThis._.span(projectstext));
+        n.text = sprintf(reg.type_data?.ntext ?? '', span(projectstext));
         // popup only if notification = true;
         if (reg.type_data?.notification) this.cueNotification(n);
       });
@@ -1870,10 +1868,10 @@ export class GameRoot extends GameNode {
       this.openGenericPopup({
         data: {
           title: i18n.gettext('sb_profiles title'),
-          subtitle: globalThis._.sprintf(
+          subtitle: sprintf(
             i18n.gettext('sb_profiles subtitle %s from %s profiles'),
-            globalThis._.span(globalThis._.toKSNum(this.profiles_value)),
-            globalThis._.span(globalThis._.toKSNum(this.profiles_max))
+            span(toKSNum(this.profiles_value)),
+            span(toKSNum(this.profiles_max))
           ),
           description: i18n.gettext('sb_profiles description'),
           mainsprites_class: 'Profiles',
@@ -1886,9 +1884,9 @@ export class GameRoot extends GameNode {
       this.openGenericPopup({
         data: {
           title: i18n.gettext('sb_cash title'),
-          subtitle: globalThis._.sprintf(
+          subtitle: sprintf(
             i18n.gettext('sb_cash subtitle <span class="highlight">$%s</span>'),
-            globalThis._.toKSNum(this.cash_value)
+            toKSNum(this.cash_value)
           ),
           description: i18n.gettext('sb_cash description'),
           mainsprites_class: 'Cash',
@@ -1901,10 +1899,10 @@ export class GameRoot extends GameNode {
       this.openGenericPopup({
         data: {
           title: i18n.gettext('sb_AP title'),
-          subtitle: globalThis._.sprintf(
+          subtitle: sprintf(
             i18n.gettext('sb_AP subtitle %s/%s'),
-            globalThis._.span(globalThis._.toKSNum(this.ap_value)),
-            globalThis._.span(globalThis._.toKSNum(this.xp_level.ap_max))
+            span(toKSNum(this.ap_value)),
+            span(toKSNum(this.xp_level.ap_max))
           ),
           description: i18n.gettext('sb_AP description'),
           mainsprites_class: 'AP',
@@ -1917,13 +1915,13 @@ export class GameRoot extends GameNode {
       this.openGenericPopup({
         data: {
           title: i18n.gettext('sb_XP title'),
-          subtitle: globalThis._.sprintf(
+          subtitle: sprintf(
             i18n.gettext('sb_XP subtitle Level %s'),
-            globalThis._.span(globalThis._.toKSNum(this.xp_level.number))
+            span(toKSNum(this.xp_level.number))
           ),
-          description: globalThis._.sprintf(
+          description: sprintf(
             i18n.gettext('sb_XP description %s XP until next level'),
-            globalThis._.span(globalThis._.toKSNum(this.xp_level.xp_max - this.xp_value + 1))
+            span(toKSNum(this.xp_level.xp_max - this.xp_value + 1))
           ),
           mainsprites_class: 'XP',
         },
@@ -2173,7 +2171,7 @@ export class GameRoot extends GameNode {
       $(window).off?.('resize.gameFit');
       $(window).on?.(
         'resize.gameFit',
-        (globalThis._.debounce as (fn: () => void, ms: number) => () => void)(() => {
+        debounce(() => {
           this.fitToWindow();
         }, 100)
       );
@@ -2189,7 +2187,7 @@ export class GameRoot extends GameNode {
       }
     ).ResizeObserver;
     if (menuDom && typeof RO === 'function') {
-      const refit = (globalThis._.debounce as (fn: () => void, ms: number) => () => void)(() => {
+      const refit = debounce(() => {
         this.fitToWindow();
       }, 50);
       new RO(refit).observe(menuDom);

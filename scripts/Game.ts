@@ -10,6 +10,7 @@
 //   - the `getGame()` accessor (memoised — one Game per page).
 
 import appModule from './app.js';
+import { shuffle } from './dd-helpers.js';
 import { GameNode } from './game/GameNode.js';
 import { setAniTicker } from './game/GamePerp.js';
 import { GameRoot, setAPTickerForGameRoot, setAniTickerForGameRoot } from './game/GameRoot.js';
@@ -65,9 +66,6 @@ interface GameApi {
   // `app.ts` debug-globals dump etc.).
   [key: string]: unknown;
 }
-
-const _underscore = (): { shuffle<T>(arr: T[]): T[] } =>
-  globalThis._ as unknown as { shuffle<T>(arr: T[]): T[] };
 
 const Game = (): GameApi => {
   const app = appModule.getApplication();
@@ -147,7 +145,7 @@ const Game = (): GameApi => {
           AniTicker.interval = Math.random() * 1500 + 5000;
           if (node) (node as GameNode & { AniTick?(): void }).AniTick?.();
           // only shuffle when all items were served (uses counter)
-          AniTicker.listeners.set = _underscore().shuffle(AniTicker.listeners.set);
+          AniTicker.listeners.set = shuffle(AniTicker.listeners.set);
           AniTicker.tick();
         }, this.interval);
       }

@@ -306,7 +306,7 @@ export default defineConfig({
         { src: 'LICENSE-CODE.txt', dest: '' },
         { src: 'LICENSE-ASSETS.txt', dest: '' },
         // Vendor libs are loaded as plain `<script>` tags from index.html
-        // and exposed as browser globals (window.jQuery, window._, …)
+        // and exposed as browser globals (window.jQuery, window.numeral, …)
         // the ESM bundle reads from globalThis.
         { src: 'vendor', dest: '' },
         // CSS files are minified per-file (esbuild) on the way into
