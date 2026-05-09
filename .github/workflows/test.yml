@@ -107,6 +107,12 @@ jobs:
         # Casual variant assets are pre-quantized in img-casual/ and
         # icon-casual.png; CI does not need pngquant/oxipng installed.
         # See README.md "Bundle variants" and `pnpm quantize-assets`.
+        #
+        # BUILD_RELEASE=1 on tag builds drops sourcemaps from the .xdc
+        # (vite.config.js: build.sourcemap = !isRelease).  PR / dispatch
+        # builds keep sourcemaps so testers can debug the artifact.
+        env:
+          BUILD_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') && '1' || '' }}
         run: pnpm build:all
 
       - name: Get .xdc bundle info
@@ -117,12 +123,21 @@ jobs:
           HQ_COUNT=$(unzip -l data-dealer-hq.xdc | tail -1 | awk '{print $2}')
           CASUAL_SIZE=$(du -h data-dealer-casual.xdc | cut -f1)
           CASUAL_COUNT=$(unzip -l data-dealer-casual.xdc | tail -1 | awk '{print $2}')
+          # JS bundle size: extracted byte count of scripts/esm-bundle.js
+          # inside the (already-built) HQ .xdc.  Variants share the same
+          # JS bundle, so HQ is sufficient; reading from the .xdc avoids
+          # leaving an unzipped dist/ around.
+          JS_BYTES=$(unzip -p data-dealer-hq.xdc scripts/esm-bundle.js | wc -c)
+          JS_SIZE=$(numfmt --to=iec --suffix=B "$JS_BYTES")
           {
             echo "hq_size=$HQ_SIZE"
             echo "hq_count=$HQ_COUNT"
             echo "casual_size=$CASUAL_SIZE"
             echo "casual_count=$CASUAL_COUNT"
+            echo "js_size=$JS_SIZE"
+            echo "js_bytes=$JS_BYTES"
           } >> "$GITHUB_OUTPUT"
+          echo "::notice title=Bundle size::scripts/esm-bundle.js = $JS_SIZE ($JS_BYTES bytes)"
 
       - name: Upload HQ .xdc artifact
         if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
@@ -159,6 +174,8 @@ jobs:
             quantizes sprite atlases to a 256-color palette (visually
             indistinguishable on cartoon art) for ~60% smaller bundle.
             Drop either file into Delta Chat to test.
+
+            **JS bundle:** `scripts/esm-bundle.js` = ${{ steps.xdc_info.outputs.js_size }} (${{ steps.xdc_info.outputs.js_bytes }} bytes), minified by esbuild and tree-shaken by Rollup. Sourcemap (`esm-bundle.js.map`) ships alongside in dev/test builds for in-app debugging — release tag builds (`BUILD_RELEASE=1`) strip it.
 
   playwright:
     name: Playwright e2e tests

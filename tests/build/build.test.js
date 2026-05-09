@@ -95,6 +95,26 @@ describe('dist/scripts/esm-bundle.js', () => {
     const bundle = readFileSync(join(root, 'dist', 'scripts', 'esm-bundle.js'), 'utf8');
     expect(bundle).not.toContain('define.amd');
   });
+
+  // Regression guard for #192: catch a future config edit that disables
+  // `build.minify`.  esbuild keeps one statement per line at module
+  // boundaries (so line count alone isn't useful), but it strips all
+  // intra-statement whitespace — average line length jumps from ~30
+  // chars (unminified, indented Rollup output) to several hundred.
+  it('is minified (long packed lines, no leading whitespace)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const bundle = readFileSync(join(root, 'dist', 'scripts', 'esm-bundle.js'), 'utf8');
+    const lines = bundle.split('\n');
+    const avgLineLen = bundle.length / lines.length;
+    expect(avgLineLen).toBeGreaterThan(100);
+  });
+
+  // Default builds (BUILD_RELEASE unset) emit a separate .map file; tag
+  // builds set BUILD_RELEASE=1 to drop it.  Local `pnpm test` always
+  // takes the dev/test branch, so the .map should be present.
+  it('ships a sourcemap for dev/test builds', () => {
+    expect(existsSync(join(root, 'dist', 'scripts', 'esm-bundle.js.map'))).toBe(true);
+  });
 });
 
 // Both variants ship the same files (manifest, icon, scripts, etc.) — the

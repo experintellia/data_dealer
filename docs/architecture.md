@@ -1,5 +1,34 @@
 # Architecture
 
+## Build pipeline
+
+`vite build` rolls every TypeScript module under `scripts/` (entry:
+`scripts/esm-entry.ts`) into a single iife at `dist/scripts/esm-bundle.js`.
+The legacy AMD layer is gone (#58); strict TS (#147) gives Rollup enough
+ESM signal to tree-shake unused exports.
+
+| Concern | Setting (`vite.config.js → build.*`) | Notes |
+|---|---|---|
+| Bundle shape | `rollupOptions.input = 'scripts/esm-entry.js'`, `output.format = 'iife'`, `output.name = '__DD'` | Single `<script defer>` in `index.html`. iife (not esm) so the .xdc loads without import-map plumbing. |
+| Minification | `minify: 'esbuild'` (explicit) | Vite's default; pinned so a future Vite major can't silently flip it off. |
+| Tree-shaking | Rollup default for ESM input | Verify after a bundle-affecting change: add an unused export to a small module, build, `unzip -p data-dealer-hq.xdc scripts/esm-bundle.js \| grep` — should be absent. |
+| Sourcemaps | `sourcemap: !isRelease` | `BUILD_RELEASE=1` env var (set by CI on tag builds) strips `.map` from the .xdc. Default builds keep them so PR-attached .xdc artifacts are debuggable. |
+| Asset inlining | `assetsInlineLimit: 4096` (explicit) | Files under 4 KB inline as base64; larger ones stay as separate dist files. |
+| CSS | Loaded via `<link>` tags in `index.html`, copied verbatim by `vite-plugin-static-copy` | Not bundle-processed by Vite. If a future task wants a single `dist/assets/style.[hash].css`, switch to `import`-ing the CSS from `esm-entry.ts` and remove the static-copy entries. |
+| Vendor libs | `vendor/*.js` shipped as separate files, loaded as plain `<script>` tags before the bundle (`index.html`) | Each lib attaches a browser global (`$`, `_`, `numeral`, `sprintf`, `createjs`, `Scroller`); the ESM bundle reads from `globalThis` via `scripts/webxdc-shim.ts` etc. Not rolled into the bundle — see #192 "Out of scope". |
+| Static data | `data/`, `i18n/`, `img/`, fonts copied via `vite-plugin-static-copy` | Runtime-loaded JSON (rulesets, i18n) stays as separate files; sprites and fonts likewise. |
+| `.xdc` packaging | `@webxdc/vite-plugins` `buildXDC` (last plugin) | Zips `dist/` to `data-dealer-{hq,casual}.xdc`. |
+
+CI (`.github/workflows/test.yml`) prints the post-build `scripts/esm-bundle.js`
+byte count on every PR / dispatch run and surfaces it in the sticky
+`xdc-artifact` comment alongside the .xdc downloads. Tag builds set
+`BUILD_RELEASE=1` so the released .xdc has no sourcemap.
+
+Background: filed in #192. Sequenced after #58 (AMD → ESM) and #147
+(strict TS) made real bundling possible; lands before the Phase 8 mobile
+work (#80) and the Preact dialog refactor so both have a clean baseline
+to compare against.
+
 ## Key frontend modules
 
 #### `scripts/app.js`
