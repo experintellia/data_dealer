@@ -20,7 +20,10 @@ import {
   getByType,
   getFirstId,
 } from './GameNode.js';
-import { type DoneFailChain, type RenderPopupLike } from './GamePerp.js';
+import { type RenderPopupLike } from './GamePerp.js';
+// `BuyPerpResult` lives on GamePerp where it's the canonical shape;
+// Database's BuyToken consumer reads the same fields the perp BuyPerp
+// flow consumes, so re-using it here drops a structural duplicate.
 import { type GameRoot } from './GameRoot.js';
 import { OrderedSet } from './OrderedSet.js';
 import { ProfileSet } from './ProfileSet.js';
@@ -112,7 +115,10 @@ interface TokenPerpLike extends GameNode {
   path?: string;
 }
 
-interface IntegrateResult {
+/** Result payload for `app.remote.integrateCollected(psid)`.  Exported
+ *  so `AppRemote`'s typed method signature in `scripts/app.ts` can pull
+ *  the shape via `import type` without circular runtime deps. */
+export interface IntegrateResult {
   game_values?: { profiles_value?: number; [key: string]: unknown };
   levelup?: boolean;
   missions?: unknown;
@@ -126,19 +132,6 @@ interface IntegrateResult {
       full_path?: string;
       instance_data?: { amount?: number; [key: string]: unknown };
     }>;
-  };
-  error?: number;
-}
-
-interface BuyPerpResult {
-  game_values?: Record<string, unknown>;
-  levelup?: boolean;
-  missions?: unknown;
-  node?: {
-    game_id?: string;
-    game_type?: string;
-    full_path?: string;
-    instance_data?: Record<string, unknown>;
   };
   error?: number;
 }
@@ -295,7 +288,7 @@ export class Database extends GameNode {
     if (!buyPerpFn) return;
     const Render = this.getRenderModule();
     const path = gnode.path || '';
-    const call = buyPerpFn(path, bgestalt) as unknown as DoneFailChain<BuyPerpResult>;
+    const call = buyPerpFn(path, bgestalt);
     call.done(function (data) {
       if (!data.result) {
         // Server Error
@@ -464,7 +457,7 @@ export class Database extends GameNode {
     if (!integrateFn) return;
     const Render = this.getRenderModule();
 
-    const call = integrateFn(psid) as unknown as DoneFailChain<IntegrateResult>;
+    const call = integrateFn(psid);
     call.done(function (data) {
       if (!data.result) {
         gnode.Error?.('The computer says NOOOO', data);

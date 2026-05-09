@@ -12,8 +12,6 @@ import appModule from '../app.js';
 import i18n from '../i18n.js';
 import { getByFirstId, getByType, getFirstId } from './GameNode.js';
 import {
-  type BuyPerpResult,
-  type DoneFailChain,
   GamePerp,
   type GameRootForPerp,
   type RenderNodeLike,
@@ -22,12 +20,11 @@ import {
 import { mergeData } from './mergeData.js';
 import { perpCtors } from './perpCtors.js';
 
-/** Database BuyPerp returns one extra field (`profile_set`) that the
- *  generic perp BuyPerp doesn't — the Database queues it after the
- *  city renders. */
-interface BuyCityResult extends BuyPerpResult {
-  profile_set?: { profile_set?: unknown; origin?: unknown; collect_id?: unknown };
-}
+// `BuyPerpResult` (in GamePerp.ts) now carries the optional
+// `profile_set` field that the Database BuyCity flow queues after the
+// city renders — the local `BuyCityResult` extension is no longer
+// needed and the `as unknown as DoneFailChain<…>` cast at the call
+// site below drops out with it.
 
 interface GameRootForDatabasePerp extends GameRootForPerp {
   renderPopup?: RenderPopupLike;
@@ -58,7 +55,7 @@ export class DatabasePerp extends GamePerp {
     const buyPerpFn = appModule.getApplication().remote.buyPerp;
     if (!buyPerpFn) return;
     const path = gnode.path || '';
-    const call = buyPerpFn(path, bgestalt) as unknown as DoneFailChain<BuyCityResult>;
+    const call = buyPerpFn(path, bgestalt);
     call.done(function (data) {
       if (!data.result) {
         gnode._serverError(data);

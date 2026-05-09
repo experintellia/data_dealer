@@ -11,8 +11,6 @@ import appModule from '../app.js';
 import { toKSNum } from '../dd-helpers.js';
 import { type GameNodeConfig } from './GameNode.js';
 import {
-  type ChargeResult,
-  type DoneFailChain,
   GamePerp,
   type GameRootForPerp,
   type RenderNodeLike,
@@ -44,15 +42,6 @@ interface ClientRenderNodeLike extends RenderNodeLike {
 interface TokenRef {
   gestalt: string;
   amount: number;
-}
-
-interface CollectResult {
-  result?: { cash: number; [k: string]: unknown };
-  error?: number;
-  game_values?: Record<string, unknown> & { karma_value?: number };
-  levelup?: boolean;
-  missions?: unknown;
-  karma_incident?: string;
 }
 
 interface GameRootForClientPerp extends GameRootForPerp {
@@ -175,13 +164,14 @@ export class ClientPerp extends GamePerp {
     const collectFn = appModule.getApplication().remote.collectPerp;
     if (!collectFn) return;
     const path = gperp.path || '';
-    const call = collectFn(path) as unknown as DoneFailChain<CollectResult>;
+    const call = collectFn(path);
     call
       .done(function (data) {
         // FIXME: It would be better if data.result was in a predefined
         // state to prevent testing for both, undefined _and_ null...
         if (data.result?.result) {
           const inner = data.result.result;
+          if (inner.cash === undefined) return;
           const amount = inner.cash;
           if (popup) popup.trigger('popup_close');
           groot.updateGameValues(
@@ -259,7 +249,7 @@ export class ClientPerp extends GamePerp {
     const chargeFn = appModule.getApplication().remote.chargePerp;
     if (!chargeFn) return;
     const path = gnode.path || '';
-    const call = chargeFn(path) as unknown as DoneFailChain<ChargeResult>;
+    const call = chargeFn(path);
     call
       .done(function (data) {
         if (!data.result) {

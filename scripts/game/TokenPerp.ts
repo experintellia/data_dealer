@@ -13,13 +13,7 @@ import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
 import { toKSNum } from '../dd-helpers.js';
 import { type GameNodeConfig, getByGestalt } from './GameNode.js';
-import {
-  type ChargeResult,
-  type DoneFailChain,
-  GamePerp,
-  type RenderNodeLike,
-  type RenderPopupLike,
-} from './GamePerp.js';
+import { GamePerp, type RenderNodeLike, type RenderPopupLike } from './GamePerp.js';
 import type { GameRoot } from './GameRoot.js';
 import { ProfileSet } from './ProfileSet.js';
 
@@ -59,14 +53,6 @@ interface TokenRenderNodeLike extends RenderNodeLike {
   cableAnimatedRemove?(target: unknown): void;
   cableAnimatedTo?(target: unknown, opts: Record<string, unknown>, cb?: () => void): CableLike;
   cableTo?(target: unknown, opts: Record<string, unknown>): void;
-}
-
-interface CollectResult {
-  result?: { token_upgraded_amount: number; [k: string]: unknown };
-  error?: number;
-  game_values?: Record<string, unknown>;
-  levelup?: boolean;
-  missions?: unknown;
 }
 
 interface NodeReadyPayload {
@@ -279,7 +265,7 @@ export class TokenPerp extends GamePerp {
     const chargeFn = appModule.getApplication().remote.chargePerp;
     if (!chargeFn) return;
     const path = gnode.path || '';
-    const call = chargeFn(path) as unknown as DoneFailChain<ChargeResult>;
+    const call = chargeFn(path);
     call
       .done(function (data) {
         if (!data.result) {
@@ -348,13 +334,14 @@ export class TokenPerp extends GamePerp {
     const collectFn = appModule.getApplication().remote.collectPerp;
     if (!collectFn) return;
     const path = gperp.path || '';
-    const call = collectFn(path) as unknown as DoneFailChain<CollectResult>;
+    const call = collectFn(path);
     call
       .done(function (data) {
         if (data.result?.result) {
           if (popup) popup.trigger('popup_close');
           // FIXME: compile for checkNotifications
           groot.getDatabase()?.compileSuperTokens();
+          if (data.result.result.token_upgraded_amount === undefined) return;
           gperp.setAmount(data.result.result.token_upgraded_amount);
           groot.updateGameValues(
             data.result.game_values || {},

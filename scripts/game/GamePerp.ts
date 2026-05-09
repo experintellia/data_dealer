@@ -88,6 +88,10 @@ export interface BuyPerpResult {
     full_path?: string;
     instance_data?: Record<string, unknown>;
   };
+  /** Database BuyPerp returns one extra field — the Database queues it
+   *  after the city renders.  Optional, ignored by non-Database
+   *  consumers. */
+  profile_set?: { profile_set?: unknown; origin?: unknown; collect_id?: unknown };
   error?: number;
 }
 
@@ -352,7 +356,7 @@ export class GamePerp extends GameNode {
     const buyPerpFn = remote.buyPerp;
     if (!buyPerpFn) return;
     const path = gnode.path || '';
-    const call = buyPerpFn(path, bgestalt) as unknown as DoneFailChain<BuyPerpResult>;
+    const call = buyPerpFn(path, bgestalt);
     call.done(function (data) {
       if (!data.result) {
         // Server Error
