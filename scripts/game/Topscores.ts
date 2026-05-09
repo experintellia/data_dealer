@@ -3,7 +3,6 @@
 // the Render API.  Extracted from scripts/Game.js's IIFE in PR 6 of
 // issue #147.
 
-import { type RenderApi } from '../Render.js';
 import * as bootMod from '../boot.js';
 import i18n from '../i18n.js';
 import {
@@ -23,17 +22,6 @@ interface TopscoreRenderNodeMenu {
   jdomelem?: {
     find?: (sel: string) => { addClass?: (c: string) => void };
   };
-}
-
-// Local view of GameRoot's surface used by Topscores — declared standalone
-// rather than as `extends GameNode` because GameNode types `renderMenu`
-// loosely (RenderNodeLike) for the base class's needs and this file needs
-// the narrower `addButton` shape.  The renderMenu property reuses the
-// MainMenu instance type from Render.ts (PR retired the local
-// `RenderMenuLike` triplicate).
-interface GameRootWithMenu {
-  renderMenu: Pick<InstanceType<RenderApi['MainMenu']>, 'addButton'>;
-  getTypeData(gestalt?: string): unknown;
 }
 
 export class Topscores extends GameNode {
@@ -59,7 +47,6 @@ export class Topscores extends GameNode {
 
   initTopscore(type: string | undefined): Topscore | undefined {
     if (type === undefined) return undefined;
-    const groot = this.GameRoot as unknown as GameRootWithMenu;
     const cfg: GameNodeConfig = {
       id: 'Topscore' + type,
       gestalt: 'topscore_' + type,
@@ -69,7 +56,7 @@ export class Topscores extends GameNode {
       ViewMap: getByFirstId('Topscores'),
       gameType: 'Topscore',
     };
-    const td = groot.getTypeData('Topscore') as Record<string, unknown> | undefined;
+    const td = this.GameRoot.getTypeData('Topscore') as Record<string, unknown> | undefined;
     if (td) cfg.data = td;
     const score = new Topscore(cfg);
     this.addChild(score);
@@ -86,8 +73,7 @@ export class Topscores extends GameNode {
   }
 
   override extendRender(): void {
-    const groot = this.GameRoot as unknown as GameRootWithMenu;
-    groot.renderMenu.addButton(i18n.gettext('Topscores'), this.id, this.states);
+    this.GameRoot.renderMenu?.addButton?.(i18n.gettext('Topscores'), this.id, this.states);
   }
 
   override extendEventHandlers(): void {
