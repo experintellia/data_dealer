@@ -16,13 +16,7 @@ import appModule from '../app.js';
 import { toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
 import { type GameNodeConfig } from './GameNode.js';
-import {
-  type ChargeResult,
-  type DoneFailChain,
-  GamePerp,
-  type RenderNodeLike,
-  type RenderPopupLike,
-} from './GamePerp.js';
+import { GamePerp, type RenderNodeLike, type RenderPopupLike } from './GamePerp.js';
 import { ProfileSet } from './ProfileSet.js';
 import { mergeData } from './mergeData.js';
 import { convertPowerupType, getPowerupTypeFromGestalt } from './powerupTypes.js';
@@ -67,28 +61,6 @@ interface ProjectRenderPopupLike extends RenderPopupLike {
   jdomelem?: JQueryElemLike;
   renderDataTab?(): void;
   renderPowerupSelectors?(pcat: string): void;
-}
-
-interface CollectResult {
-  result?: {
-    profile_set: { profiles_value: number; [k: string]: unknown };
-    origin: unknown;
-    collect_id: unknown;
-    [k: string]: unknown;
-  };
-  error?: number;
-  game_values?: Record<string, unknown> & { karma_value?: number };
-  levelup?: boolean;
-  missions?: unknown;
-  karma_incident?: string;
-}
-
-interface BuyPowerupResult {
-  error?: number;
-  game_values?: Record<string, unknown>;
-  levelup?: boolean;
-  missions?: unknown;
-  node?: { instance_data?: Record<string, unknown> };
 }
 
 interface PowerupRow {
@@ -292,7 +264,7 @@ export class ProjectPerp extends GamePerp {
     const buyFn = appModule.getApplication().remote.buyPowerup;
     if (!buyFn) return;
     const path = gnode.path || '';
-    const call = buyFn(path, bslot, bgestalt) as unknown as DoneFailChain<BuyPowerupResult>;
+    const call = buyFn(path, bslot, bgestalt);
     call
       .done(function (data) {
         if (!data.result) {
@@ -345,11 +317,7 @@ export class ProjectPerp extends GamePerp {
     const sellFn = appModule.getApplication().remote.sellPowerup;
     if (!sellFn) return;
     const path = gnode.path || '';
-    const call = sellFn(
-      path,
-      Number.parseInt(String(bslot), 10),
-      bgestalt
-    ) as unknown as DoneFailChain<BuyPowerupResult>;
+    const call = sellFn(path, Number.parseInt(String(bslot), 10), bgestalt);
     call
       .done(function (data) {
         if (!data.result) {
@@ -396,7 +364,7 @@ export class ProjectPerp extends GamePerp {
     const buyFn = appModule.getApplication().remote.buySlots;
     if (!buyFn) return;
     const path = gnode.path || '';
-    const call = buyFn(path, pcat, buyNum) as unknown as DoneFailChain<BuyPowerupResult>;
+    const call = buyFn(path, pcat, buyNum);
     call
       .done(function (data) {
         if (!data.result) {
@@ -535,7 +503,7 @@ export class ProjectPerp extends GamePerp {
     const chargeFn = appModule.getApplication().remote.chargePerp;
     if (!chargeFn) return;
     const path = gnode.path || '';
-    const call = chargeFn(path) as unknown as DoneFailChain<ChargeResult>;
+    const call = chargeFn(path);
     call
       .done(function (data) {
         if (!data.result) {
@@ -602,13 +570,14 @@ export class ProjectPerp extends GamePerp {
     const collectFn = appModule.getApplication().remote.collectPerp;
     if (!collectFn) return;
     const path = gperp.path || '';
-    const call = collectFn(path) as unknown as DoneFailChain<CollectResult>;
+    const call = collectFn(path);
     call
       .done(function (data) {
         // FIXME: It would be better if data.result was in a predefined
         // state to prevent testing for both, undefined _and_ null...
         if (data.result?.result) {
           const inner = data.result.result;
+          if (!inner.profile_set) return;
           const amount = inner.profile_set.profiles_value;
           if (popup) popup.trigger('popup_close');
           groot.updateGameValues(

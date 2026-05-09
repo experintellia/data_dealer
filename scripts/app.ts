@@ -13,7 +13,12 @@ import { getGame } from './Game.js';
 import LocalEngine from './LocalEngine.js';
 import { getRender } from './Render.js';
 import { compileTemplate, registerTemplateHelpers } from './dd-helpers.js';
+import type { IntegrateResult } from './game/Database.js';
+import type { BuyPerpResult, ChargeResult, DoneFailChain } from './game/GamePerp.js';
+import type { RecheckMissionsResult } from './game/Missions.js';
+import type { RankingResult } from './game/Topscore.js';
 import i18n from './i18n.js';
+import type { BuyPowerupResult, CollectResult } from './remote-types.js';
 import setup from './setup.js';
 
 // All view sources are inlined at bundle time; templates are compiled
@@ -38,10 +43,37 @@ function compileTemplates(): Record<string, (data?: unknown) => string> {
   return out;
 }
 
+// Each LocalEngine handler is wrapped to return a jQuery Deferred so the
+// legacy Game.js call sites can keep their .done()/.fail() chains.
+//
+// Known handlers are typed individually so consumers don't need to cast
+// `remote.foo() as unknown as DoneFailChain<FooResult>` — drops ~17
+// casts across `scripts/`.  All entries are optional because the
+// wrapping pass in `Application()` is dynamic (`Object.keys(LocalEngine)`),
+// so consumers must guard before calling — matching the prior shape
+// where every access was already nullable in practice.
+//
+// `getSessionLocale` / `loadGame` keep `JQueryLike`-style returns
+// because their consumers (`app.start()`, `GameRoot.continueStart`)
+// chain `.then(...)` — `JQueryLike` exposes `.then`, `DoneFailChain`
+// doesn't.  Future cleanup could collapse them once the GameRoot
+// boot path is rewritten.
 interface AppRemote {
-  // Each LocalEngine handler is wrapped to return a jQuery Deferred so the
-  // legacy Game.js call sites can keep their .done()/.fail() chains.
-  [name: string]: (...args: unknown[]) => JQueryLike;
+  recheckMissions?(): DoneFailChain<RecheckMissionsResult>;
+  chargePerp?(path: string): DoneFailChain<ChargeResult>;
+  collectPerp?(path: string): DoneFailChain<CollectResult>;
+  buyPerp?(path: string, gestalt: string): DoneFailChain<BuyPerpResult>;
+  buyPowerup?(
+    path: string,
+    slot: number | string,
+    gestalt: string
+  ): DoneFailChain<BuyPowerupResult>;
+  sellPowerup?(path: string, slot: number, gestalt: string): DoneFailChain<BuyPowerupResult>;
+  buySlots?(path: string, slotType: string, num: number | string): DoneFailChain<BuyPowerupResult>;
+  integrateCollected?(psid: string): DoneFailChain<IntegrateResult>;
+  getRanking?(type: string): DoneFailChain<RankingResult>;
+  getSessionLocale?(): JQueryLike;
+  loadGame?(): JQueryLike;
 }
 
 interface ApplicationApi {
@@ -74,9 +106,12 @@ const Application = function (): ApplicationApi {
   const templates = compileTemplates();
 
   // Here we store the stuff we might need throughout the whole application.
+  // `remote` is filled in below by the `Object.keys(LocalEngine).forEach`
+  // wrapping pass; AppRemote's entries are all optional so the empty
+  // object here is a valid starting state.
   const app: ApplicationApi = {
     debug: {},
-    remote: {},
+    remote: {} as AppRemote,
     loadViews,
     renderView,
     start,
@@ -119,13 +154,22 @@ const Application = function (): ApplicationApi {
     setPrngSeed: true,
   };
   const engineRecord = LocalEngine as unknown as Record<string, unknown>;
+  // Cast seam: every wrapped handler returns a jQuery Deferred at
+  // runtime, which structurally implements both `JQueryLike` and
+  // `DoneFailChain<unknown>` — but the two interfaces are declared
+  // separately, so TypeScript can't see they're the same thing.  The
+  // cast is local to this assignment and lets `AppRemote`'s typed
+  // method signatures (recheckMissions, chargePerp, …) bind cleanly,
+  // dropping ~17 `as unknown as DoneFailChain<…>` casts at consumer
+  // call sites.
   Object.keys(engineRecord).forEach(function (name) {
     if (INTERNAL_API[name]) return;
     const fn = engineRecord[name];
     if (typeof fn !== 'function') return;
-    app.remote[name] = function (...args: unknown[]): JQueryLike {
+    const wrapped = function (...args: unknown[]): JQueryLike {
       return $.when((fn as (...a: unknown[]) => unknown).apply(LocalEngine, args));
     };
+    (app.remote as Record<string, unknown>)[name] = wrapped;
   });
 
   function start(): JQueryLike {

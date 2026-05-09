@@ -7,7 +7,6 @@
 
 import appModule from '../app.js';
 import { GameNode } from './GameNode.js';
-import { type DoneFailChain } from './GamePerp.js';
 import { mergeData } from './mergeData.js';
 
 // app.remote handlers are wired up by app.start(); Topscore is only
@@ -24,7 +23,10 @@ interface RankingRow {
   self: boolean;
 }
 
-interface RankingResult {
+/** Result payload for `app.remote.getRanking(scoretype)`.  Exported so
+ *  `AppRemote`'s typed method signature in `scripts/app.ts` can pull
+ *  the shape via `import type` without circular runtime deps. */
+export interface RankingResult {
   top?: RankingRow[];
   user_rank?: number;
   user_in_top?: boolean;
@@ -70,7 +72,7 @@ export class Topscore extends GameNode {
     const gnode = this;
     const getRanking = appModule.getApplication().remote.getRanking;
     if (!getRanking) return;
-    const rankingCall = getRanking(t) as unknown as DoneFailChain<RankingResult>;
+    const rankingCall = getRanking(t);
     rankingCall
       .done(function (data) {
         if (data.result && data.result.error === undefined) {

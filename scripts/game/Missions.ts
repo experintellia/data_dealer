@@ -5,7 +5,6 @@
 import appModule from '../app.js';
 import i18n from '../i18n.js';
 import { GameNode, type GameNodeConfig, getByFirstId, getFirstId } from './GameNode.js';
-import { type DoneFailChain } from './GamePerp.js';
 import { Mission } from './Mission.js';
 import { OrderedSet } from './OrderedSet.js';
 
@@ -15,7 +14,10 @@ interface RawMissionsData {
   mission_goals?: Array<Record<string, unknown>>;
 }
 
-interface RecheckMissionsResult {
+/** Result payload for `app.remote.recheckMissions()`.  Exported so
+ *  `AppRemote`'s typed method signature in `scripts/app.ts` can pull
+ *  the shape via `import type` without circular runtime deps. */
+export interface RecheckMissionsResult {
   repaired?: boolean;
   game_values?: Record<string, unknown>;
   levelup?: boolean;
@@ -53,7 +55,7 @@ export class Missions extends GameNode {
       if (!params || !remote || !remote.recheckMissions) {
         return;
       }
-      const call = remote.recheckMissions() as unknown as DoneFailChain<RecheckMissionsResult>;
+      const call = remote.recheckMissions();
       call.done(function (data) {
         const r = data.result;
         if (!r || !r.repaired) return;
