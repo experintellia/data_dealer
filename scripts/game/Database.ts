@@ -2,8 +2,7 @@
 // (pending profilesets to integrate) and the integrated TokenPerps.
 // Extracted from scripts/Game.js's IIFE in PR 10 of issue #147.
 //
-// GameRoot's surface is narrowed via a local `GameRootForDatabase`
-// interface.  The dynamic `Game[node.game_type]` lookup is resolved via
+// The dynamic `Game[node.game_type]` lookup is resolved via
 // `perpCtors[name]` (typed direct map, PR 17 of issue #147); the
 // known-name `Game.TokenPerp` reference uses a direct import.
 
@@ -22,6 +21,7 @@ import {
   getFirstId,
 } from './GameNode.js';
 import { type RenderPopupLike } from './GamePerp.js';
+import { type GameRoot } from './GameRoot.js';
 import { OrderedSet } from './OrderedSet.js';
 import { ProfileSet } from './ProfileSet.js';
 import { TokenPerp } from './TokenPerp.js';
@@ -67,45 +67,6 @@ interface RenderNodeLike {
 
 // RenderPopupLike — re-imported from GamePerp.ts (canonical definition).
 // Was triplicated across Database / GameRoot / GameNode prior to this PR.
-
-/** GameRoot's surface this class touches.  Narrow forward-ref interface;
- *  will collapse when GameRoot is extracted to its own typed module. */
-interface GameRootForDatabase {
-  data: { status_icons?: unknown; [key: string]: unknown };
-  typeRegistry: Record<
-    string,
-    {
-      type_data: { is_buyable?: boolean; required_level?: number; [key: string]: unknown };
-      gestalt: string;
-      [key: string]: unknown;
-    }
-  >;
-  DBTokens: Record<string, number>;
-  DBTokensAbsolute: Record<string, number>;
-  ap_value: number;
-  profiles_value: number;
-  xp_level: { number: number; [key: string]: unknown };
-  renderMenu: RenderMenuLike;
-  renderNode?: RenderNodeLike;
-  getType(
-    gestalt?: string
-  ):
-    | { type_data?: Record<string, unknown>; game_type?: string; [key: string]: unknown }
-    | undefined;
-  getTypeData(gestalt?: string): Record<string, unknown> | undefined;
-  getDatabase(): Database;
-  setProfiles(value?: number, silent?: boolean): void;
-  updateGameValues(
-    gv: Record<string, unknown>,
-    levelup?: boolean,
-    missions?: unknown,
-    quiet?: boolean
-  ): void;
-  compileOriginTokens(nodes: unknown[]): void;
-  makeNotifications(data: Record<string, unknown>): void;
-  trigger(ev: string, args?: unknown[]): void;
-  updateGears?(): void;
-}
 
 /** Type entry as returned by GameRoot.getType — narrow shape Database
  *  pushes into ProvidedPerp.data.requiredTokens.  Game.js's typeRegistry
@@ -208,16 +169,15 @@ export class Database extends GameNode {
   }
 
   // ---------------------------------------------------------------------
-  // Typed accessors — consolidate the GameRoot / Render forward-ref casts
-  // into one site each.  PR #177 reviewer flagged the previous per-method
-  // `this.GameRoot as unknown as GameRootForDatabase` / `getRender() as
-  // unknown as { Popup: ... }` repetition.  All three accessors retire
-  // when GameRoot is extracted with a typed surface and Render.js is
-  // typed (the casts collapse to direct reads).
+  // Typed accessors — `groot` is a thin alias for `this.GameRoot` (typed
+  // as the real `GameRoot` class on `GameNode`); kept to avoid churning
+  // the many call sites that read `groot.foo`.  The Render-module
+  // forward-ref cast still lives in `getRenderModule` until Render.js
+  // is typed.
   // ---------------------------------------------------------------------
 
-  private get groot(): GameRootForDatabase {
-    return this.GameRoot as unknown as GameRootForDatabase;
+  private get groot(): GameRoot {
+    return this.GameRoot;
   }
 
   private get renderApi(): RenderNodeLike | undefined {
@@ -234,18 +194,23 @@ export class Database extends GameNode {
     this.data.providedPerps = [];
     this.data.buyToken_xp_level_min = 99999;
     const buyable = Object.values(groot.typeRegistry).filter((v) => {
-      if (v.type_data.is_buyable) {
-        const required = v.type_data.required_level ?? 99999;
+      const td = v.type_data as
+        | { is_buyable?: boolean; required_level?: number; [key: string]: unknown }
+        | undefined;
+      if (td?.is_buyable) {
+        const required = (td.required_level as number | undefined) ?? 99999;
         const current = this.data.buyToken_xp_level_min ?? 99999;
         this.data.buyToken_xp_level_min = required < current ? required : current;
       }
       return (
-        v.type_data.is_buyable && !Object.prototype.hasOwnProperty.call(groot.DBTokens, v.gestalt)
+        td?.is_buyable &&
+        v.gestalt !== undefined &&
+        !Object.prototype.hasOwnProperty.call(groot.DBTokens, v.gestalt)
       );
     });
     buyable.forEach((t) => {
       const provided: ProvidedPerp = {
-        gestalt: t.gestalt,
+        gestalt: t.gestalt ?? '',
         data: mergeData({}, groot.getTypeData(t.gestalt)) as ProvidedPerp['data'],
         locked: false,
       };
@@ -422,7 +387,7 @@ export class Database extends GameNode {
     const groot = this.groot;
     const Render = this.getRenderModule();
     // FIXME: name should be in data
-    groot.renderMenu.addButton(i18n.gettext('Database'), this.id, this.states);
+    groot.renderMenu?.addButton?.(i18n.gettext('Database'), this.id, this.states);
     this.compileSuperTokens();
     this.renderDBQueue = new Render.DBQueue({
       data: this.data,
@@ -671,8 +636,8 @@ export class Database extends GameNode {
     if (newbuyable.length) {
       groot.makeNotifications({ perps: newbuyable });
       const db = groot.getDatabase();
-      db.renderDBQueue?.render?.();
-      db.renderDBQueue?.jdomelem?.addClass?.('NewBuyable');
+      db?.renderDBQueue?.render?.();
+      db?.renderDBQueue?.jdomelem?.addClass?.('NewBuyable');
     }
   }
 
