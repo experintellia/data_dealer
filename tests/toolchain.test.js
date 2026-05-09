@@ -12,9 +12,6 @@ describe('vendor files', () => {
   // The libs index.html `<script>`-loads, in dependency order.
   const required = [
     'jquery.js',
-    'jquery-migrate.js',
-    'numeral.js',
-    'numeral-de.js',
     'easeljs.js',
     'tweenjs.js',
     'soundjs.js',
@@ -29,7 +26,8 @@ describe('vendor files', () => {
   }
 
   // The legacy AMD plumbing must not regress back into vendor/, plus
-  // underscore (replaced by scripts/dd-helpers.ts).
+  // underscore (replaced by scripts/dd-helpers.ts), plus jquery-migrate
+  // and numeral (replaced by Intl.NumberFormat in dd-helpers.ts).
   const removed = [
     'requirejs.js',
     'almond.js',
@@ -38,6 +36,9 @@ describe('vendor files', () => {
     'jquery-mobile.js',
     'native-console.js',
     'underscore.js',
+    'jquery-migrate.js',
+    'numeral.js',
+    'numeral-de.js',
   ];
   for (const f of removed) {
     it(`vendor/${f} no longer exists`, () => {

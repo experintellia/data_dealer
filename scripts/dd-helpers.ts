@@ -69,15 +69,6 @@ export function sprintf(template: string, ...subs: unknown[]): string {
   );
 }
 
-// Vendor numeral global passthrough — only referenced from the legacy
-// `_.numeral` template hook (none of the migrated templates use it
-// directly any more, but keeping the surface available is cheap).
-export function numeral(n: number): { format(fmt: string): string } {
-  return (
-    globalThis as unknown as { numeral: (n: number) => { format(fmt: string): string } }
-  ).numeral(n);
-}
-
 // ── shuffle / debounce — replaces the only two real underscore APIs ────────
 //   (`_.clone` was already inlined as a manual `slice()` in
 //    scripts/game/ProfileSet.ts.)
@@ -169,7 +160,6 @@ export interface TemplateHelpers {
   span: typeof span;
   crlf2html: typeof crlf2html;
   sprintf: typeof sprintf;
-  numeral: typeof numeral;
   each: typeof each;
   range: typeof range;
   contains: typeof contains;
@@ -202,7 +192,6 @@ export const templateHelpers: TemplateHelpers = {
   span,
   crlf2html,
   sprintf,
-  numeral,
   each,
   range,
   contains,
