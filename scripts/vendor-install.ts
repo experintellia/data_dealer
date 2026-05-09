@@ -15,6 +15,11 @@
 //   zynga-animate — no npm pkg; vendored verbatim
 //   zynga-scroller — no npm pkg; vendored from upstream + AMD wrapper
 //
+// `underscore@1.5.1` was removed; the project-local `scripts/dd-helpers.ts`
+// supplies the formatting helpers (toKSNum, sprintf, span, …), the tiny
+// `compileTemplate` replacement for `_.template`, and native swaps for
+// the shuffle/debounce/keys/clone uses sprinkled around the codebase.
+//
 // scripts/ modules are pure ESM, bundled via Vite into
 // scripts/esm-bundle.js; vendor libs ship as plain `<script>` tags
 // in index.html.  The legacy module loader, its text / tpl plug-ins,
@@ -59,7 +64,6 @@ run(
     'npm install --save-exact',
     'jquery',
     'jquery-migrate',
-    'underscore@1.5.1',
     'numeral@1.4.5',
     'easeljs',
     'tweenjs',
@@ -71,7 +75,6 @@ run(
 console.log('\nCopying to vendor/…');
 cp('jquery/dist/jquery.min.js', 'jquery.js');
 cp('jquery-migrate/dist/jquery-migrate.min.js', 'jquery-migrate.js');
-cp('underscore/underscore.js', 'underscore.js');
 cp('numeral/numeral.js', 'numeral.js');
 cp('numeral/languages/de-de.js', 'numeral-de.js');
 cp('easeljs/lib/easeljs.min.js', 'easeljs.js');

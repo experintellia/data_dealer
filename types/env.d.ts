@@ -35,18 +35,6 @@ export interface JQueryStatic {
   when(...args: unknown[]): JQueryLike;
 }
 
-export interface UnderscoreStatic {
-  template(text: string, data: unknown, settings: { variable: string }): (data?: unknown) => string;
-  mixin(mixins: Record<string, unknown>): void;
-  sprintf(template: string, ...subs: unknown[]): string;
-  span(text: string, cls?: string): string;
-  toKSNum(n: number): string;
-  numeral(n: number): { format(fmt: string): string };
-  pad0(n: number, length: number): string;
-  // Open-ended for the long tail of underscore methods used elsewhere.
-  [key: string]: unknown;
-}
-
 export type NumeralStatic = (n: number) => { format(fmt: string): string };
 
 export type SprintfFn = (template: string, ...subs: unknown[]) => string;
@@ -63,11 +51,10 @@ declare global {
   var webxdc: Webxdc<unknown> | undefined;
 
   // Vendor libs loaded via <script> tags before scripts/esm-bundle.js — see
-  // index.html.  Declared as bare globals so `_`, `$`, `numeral`, `sprintf`
+  // index.html.  Declared as bare globals so `$`, `numeral`, `sprintf`
   // resolve to the typed surfaces above without per-call-site casts.
   // jQuery / $ is a real `| undefined` because some test environments don't
   // load it; the others are present whenever this bundle runs.
-  var _: UnderscoreStatic;
   var jQuery: JQueryStatic | undefined;
   var $: JQueryStatic | undefined;
   var numeral: NumeralStatic;

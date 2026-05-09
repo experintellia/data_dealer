@@ -8,6 +8,7 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { toKSNum } from '../dd-helpers.js';
 import { type GameNodeConfig } from './GameNode.js';
 import {
   type ChargeResult,
@@ -189,7 +190,7 @@ export class ClientPerp extends GamePerp {
             data.result.missions
           );
           deco.FXBling({
-            text: `$${globalThis._.toKSNum(amount)}`,
+            text: `$${toKSNum(amount)}`,
             extendClass: 'MoneyBling',
             wait: 600,
           });

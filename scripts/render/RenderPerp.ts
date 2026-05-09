@@ -23,10 +23,6 @@ import { getRenderJQuery } from './_jqueryShim.js';
 export type PerpCableLike = RenderPerpCable;
 export type { PerpCableConfig };
 
-interface UnderscoreEachLike {
-  each<T>(list: T[] | Record<string, T>, fn: (item: T, key: number | string) => void): void;
-}
-
 // ── config shape ────────────────────────────────────────────────────────────
 
 export type PerpConfig = SpriteConfig & {
@@ -341,13 +337,12 @@ export class RenderPerp extends RenderSprite {
   }
 
   FXDataOut(cb?: () => void): number {
-    const _u = globalThis._ as unknown as UnderscoreEachLike;
     const cables = this.getCablesToOrigin();
     let duration = 500;
     let delay = 0;
-    _u.each(cables, (cable, k) => {
+    cables.forEach((cable, k) => {
       duration = cable.length * 2;
-      if ((k as number) === cables.length - 1) {
+      if (k === cables.length - 1) {
         const endPerp = cable.perpFrom;
         window.setTimeout(() => {
           cable.FXDataIn(() => {
@@ -369,13 +364,12 @@ export class RenderPerp extends RenderSprite {
 
   // TODO: Make Loop with FX Start/Stop options
   FXDataIn(cb?: () => void): number {
-    const _u = globalThis._ as unknown as UnderscoreEachLike;
     const cables = this.getCablesToOrigin().reverse();
     let duration = 500;
     let delay = 0;
-    _u.each(cables, (cable, k) => {
+    cables.forEach((cable, k) => {
       duration = cable.length * 2;
-      if ((k as number) === cables.length - 1) {
+      if (k === cables.length - 1) {
         window.setTimeout(() => {
           cable.FXDataOut(cb);
         }, delay);

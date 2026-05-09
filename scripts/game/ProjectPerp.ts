@@ -13,6 +13,7 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
 import { type GameNodeConfig } from './GameNode.js';
 import {
@@ -466,9 +467,7 @@ export class ProjectPerp extends GamePerp {
     if (!jpop) return;
     const jtab = jpop.find(`.PopupTab[data-tab="${pcat}"]`);
     const dataRec = (this.data || {}) as { powerups?: PowerupRow[]; slot_background?: unknown };
-    const renderView = (
-      globalThis._ as unknown as { renderView(name: string, ctx: unknown): string }
-    ).renderView;
+    const renderView = appModule.getApplication().renderView;
     if (!selling) {
       let slot = jtab.find(`.Powerup.free[data-button-data="${bslot}"]`);
       slot.removeAttr?.('data-subpop-id');
@@ -633,7 +632,7 @@ export class ProjectPerp extends GamePerp {
               karma: { gestalt: data.result.karma_incident, karma_value: karma_dec },
             });
           }
-          deco.FXBling({ text: globalThis._.toKSNum(amount), extendClass: 'ProfileBling' });
+          deco.FXBling({ text: toKSNum(amount), extendClass: 'ProfileBling' });
           deco.FXSuck(function () {
             (gperp.renderNode as ProjectRenderNodeLike | undefined)?.FXDataOut?.();
             delete gperp.renderReady;

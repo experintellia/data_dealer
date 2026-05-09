@@ -5,12 +5,9 @@
 // Pairs with RenderSprite as the two leaf visual primitives every
 // remaining Render class either is or extends.
 
+import { crlf2html } from '../dd-helpers.js';
 import { type NodeConfig, RenderNode } from './RenderNode.js';
 import { getRenderJQuery } from './_jqueryShim.js';
-
-interface UnderscoreCrlf {
-  crlf2html(text: string): string;
-}
 
 export type TextConfig = NodeConfig & {
   text?: string;
@@ -60,8 +57,7 @@ export class RenderText extends RenderNode {
     if (!t) {
       t = this.text;
     }
-    const _ = globalThis._ as unknown as UnderscoreCrlf;
-    t = _.crlf2html(t);
+    t = crlf2html(t);
     this.text = t;
     this.updateRenderProp();
     this.jdomelem.html(t);

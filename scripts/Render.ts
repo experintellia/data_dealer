@@ -11,14 +11,17 @@
 //   - one-time seam wirings for the modules that legitimately
 //     can't pull these vendor globals on their own
 //     (`applyRenderNodeFX`),
-//   - the underscore `_.mixin({ RenderAmount, RenderSprite })`
-//     template-helper registration,
+//   - the `registerTemplateHelpers({ RenderAmount, RenderSprite })`
+//     hook into scripts/dd-helpers.ts (the legacy `_.mixin` that
+//     used to attach these two template helpers onto vendor
+//     underscore — no longer loaded),
 //   - the publisher object that re-exports every Render* class /
 //     instance under its legacy unprefixed name (`Node` / `Sprite`
 //     / `ViewMap` / etc.) so external consumers and the
 //     publisher-introspecting devtools stamp keep working
 //     unchanged.
 
+import { registerTemplateHelpers } from './dd-helpers.js';
 import { RenderButtonInline } from './render/RenderButtonInline.js';
 import { RenderCable, RenderPerpCable } from './render/RenderCables.js';
 import { RenderCircle } from './render/RenderCircle.js';
@@ -67,10 +70,6 @@ interface CreateJSGlobal {
   Ticker: unknown;
   Tween: unknown;
   Ease: unknown;
-}
-
-interface UnderscoreMixinLike {
-  mixin(mixins: Record<string, unknown>): void;
 }
 
 // ── publisher API surface ──────────────────────────────────────────────────
@@ -144,10 +143,9 @@ function Render(): RenderApi {
     Ease: Ease as Parameters<typeof applyRenderNodeFX>[0]['Ease'],
   });
 
-  // ── underscore mixins (template-helper registration) ─────────────────────
+  // ── template-helper registration ─────────────────────────────────────────
 
-  const _u = globalThis._ as unknown as UnderscoreMixinLike;
-  _u.mixin({
+  registerTemplateHelpers({
     RenderAmount: renderAmountHtml,
     RenderSprite: renderSpriteHtml,
   });

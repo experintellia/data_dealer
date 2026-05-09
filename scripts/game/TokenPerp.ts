@@ -11,6 +11,7 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { toKSNum } from '../dd-helpers.js';
 import { type GameNodeConfig, getByGestalt } from './GameNode.js';
 import {
   type ChargeResult,
@@ -403,7 +404,7 @@ export class TokenPerp extends GamePerp {
             }
           });
           // FIXME when previous was 0 there's something wrong here...
-          const text = `+${globalThis._.toKSNum(dataRec.absoluteInc ?? 0)}`;
+          const text = `+${toKSNum(dataRec.absoluteInc ?? 0)}`;
           window.setTimeout(function () {
             (gperp.renderNode as TokenRenderNodeLike | undefined)?.FXSpinner?.(
               { text, duration: wait },

@@ -9,6 +9,7 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
 import {
   GameNode,
@@ -607,12 +608,11 @@ export class Database extends GameNode {
         }
       });
 
-      const _ = globalThis._;
       let delay = 250;
       let wait = 0;
       update_tokens.forEach((t) => {
         wait = wait + delay;
-        const text = '+' + _.toKSNum((t.data.absoluteInc as number) || 0);
+        const text = '+' + toKSNum((t.data.absoluteInc as number) || 0);
         window.setTimeout(function () {
           if (t.renderNode) {
             (t.renderNode as RenderNodeLike).FXWheee?.({ psid: psid, isnew: false, text: text });
@@ -625,7 +625,7 @@ export class Database extends GameNode {
       }
       new_tokens.forEach((t) => {
         wait = wait + delay;
-        const text = '+' + _.toKSNum((t.data.absoluteInc as number) || 0);
+        const text = '+' + toKSNum((t.data.absoluteInc as number) || 0);
         window.setTimeout(function () {
           t.render();
           const trn = t.renderNode as RenderNodeLike | undefined;

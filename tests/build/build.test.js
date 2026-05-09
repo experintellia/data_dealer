@@ -32,7 +32,6 @@ describe('dist/ structure', () => {
     'index.html',
     'scripts/esm-bundle.js',
     'vendor/jquery.js',
-    'vendor/underscore.js',
     'vendor/easeljs.js',
     'vendor/sprintf.js',
     'css/dd.css',
@@ -58,6 +57,8 @@ describe('dist/ structure', () => {
     'vendor/jquery-mobile.js',
     'vendor/almond.js',
     'vendor/native-console.js',
+    // Underscore is now replaced by scripts/dd-helpers.ts.
+    'vendor/underscore.js',
   ];
 
   for (const f of removed) {
@@ -73,7 +74,7 @@ describe('dist/index.html', () => {
     const html = readFileSync(join(root, 'dist', 'index.html'), 'utf8');
     expect(html).toContain('scripts/esm-bundle.js');
     expect(html).toContain('vendor/jquery.js');
-    expect(html).toContain('vendor/underscore.js');
+    expect(html).not.toContain('vendor/underscore.js');
     expect(html).not.toContain('vendor/requirejs.js');
     expect(html).not.toContain('require.config');
   });

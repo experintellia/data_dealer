@@ -4,12 +4,13 @@
 // no jQuery dependency, which means it is safe to evaluate eagerly inside
 // the esm-bundle IIFE before vendor libs have loaded.
 //
-// Underscore is still required for ngettext's _.sprintf / _.toKSNum
-// helpers (registered as mixins by app.ts), so those calls read `_` from
-// globalThis at call time — long after vendor/underscore.js has loaded.
+// ngettext interpolates the count via sprintf + toKSNum from the
+// project-local helper module (formerly mixed onto `_` by app.ts);
+// these are plain ESM imports now.
 
 import deAT from '../i18n/de_AT.json' with { type: 'json' };
 import enUS from '../i18n/en_US.json' with { type: 'json' };
+import { sprintf, toKSNum } from './dd-helpers.js';
 import setup from './setup.js';
 
 /** Union of all known translation keys derived directly from the canonical locale file. */
@@ -76,13 +77,13 @@ const i18n: I18nApi = {
       if (Array.isArray(message) && message.length > 0) {
         const arr = message as readonly (string | null | undefined)[];
         const text = amount === 1 ? arr[1] : arr[2];
-        if (text) return _.sprintf(text, _.toKSNum(amount));
+        if (text) return sprintf(text, toKSNum(amount));
       }
       console.warn('No %s translation available for msgid "%s"', locale, msgid);
     } else {
       console.warn('No language file available for locale %s (msgid "%s")', locale, msgid);
     }
-    return _.sprintf(amount === 1 ? msgid : msgidPlural, _.toKSNum(amount));
+    return sprintf(amount === 1 ? msgid : msgidPlural, toKSNum(amount));
   },
 };
 

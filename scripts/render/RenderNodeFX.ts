@@ -21,6 +21,7 @@
 //     subclass-touch points (`DecoratorAmount`, `gameNode.GameRoot`,
 //     `userClickAbsPos`, `renderBlings`, `spinner`).
 
+import { toKSNum } from '../dd-helpers.js';
 import { RenderNode } from './RenderNode.js';
 import { RenderSprite, type SpriteConfig } from './RenderSprite.js';
 import { RenderText, type TextConfig } from './RenderText.js';
@@ -736,7 +737,6 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
   };
 
   proto.FXKarmaBling = function (this: RenderNode, karma_points: number, cb?: () => void): void {
-    const _u = globalThis._;
     const nodePos = this.getCenterPosition();
     nodePos.x += 130;
     nodePos.y = 100;
@@ -756,7 +756,7 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
     bling.FXWaitCue(0);
     bling.FXSimpleCue({ scaleX: 0, scaleY: 0, rotate: 720, opacity: 0 }, 0, 'linear', () => {
       bling.FXBling({
-        text: '+' + (_u.toKSNum(karma_points) as string),
+        text: '+' + toKSNum(karma_points),
         wait: 600,
         dur: 1300,
         extendClass: 'KarmaUpBling',
@@ -967,7 +967,6 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
 
   proto.FXBlingQueue = function (this: RenderNode, config?: FXBlingConfig, cb?: () => void): void {
     // Topleft Blings for DBQueue
-    const _u = globalThis._ as unknown as { keys(o: object): string[]; toKSNum(n: number): string };
     const cfg = config ?? ({ text: '' } as FXBlingConfig);
     const gameNode = this.gameNode as unknown as { GameRoot: FXGameRootLike } | undefined;
     if (!gameNode) return;
@@ -983,7 +982,7 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
     }
     const bling = new RenderText({
       x: nodePos.x,
-      y: nodePos.y + 40 + (_u.keys(node.renderBlings) as string[]).length * 32,
+      y: nodePos.y + 40 + Object.keys(node.renderBlings).length * 32,
       z: 1000,
       scaleX: 0,
       scaleY: 0,
