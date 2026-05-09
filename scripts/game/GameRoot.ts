@@ -92,6 +92,7 @@ interface RenderRootLike {
   // FX hooks driven by makeNotifications.  All optional; the Stage
   // owns the implementations (Render.js).
   FXMissionComplete?(): void;
+  FXMissionGoalComplete?(): void;
   FXLevelUpBling?(level: number | true): void;
   FXKarmaBling?(amount: number): void;
   FXNoCash?(): void;
