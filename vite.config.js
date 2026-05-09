@@ -1,7 +1,16 @@
-import { cpSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildXDC } from '@webxdc/vite-plugins';
-import { build, defineConfig } from 'vite';
+import { build, defineConfig, transformWithEsbuild } from 'vite';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 // 'hq' (default): ship the canonical sources as-is — bit-exact lossless
@@ -55,6 +64,77 @@ function swapInCasualAssets() {
       );
     },
   };
+}
+
+// Strip whitespace from runtime-loaded JSON (rulesets in data/, locale
+// catalogs in i18n/).  These files are copied verbatim by
+// vite-plugin-static-copy from the source-tree pretty-printed originals;
+// inside the .xdc the indentation is dead bytes — JSON.parse / stringify
+// cuts ~38% (1.24 MB → 770 kB on the current ruleset corpus) with no
+// runtime semantics change.
+//
+// Order in plugins[] matters: this must run AFTER viteStaticCopy (so
+// the files exist in dist/) and BEFORE buildXDC zips dist/.
+function minifyStaticJson() {
+  const targets = ['dist/data', 'dist/i18n'];
+  const root = fileURLToPath(new URL('.', import.meta.url));
+
+  function walkJson(dir) {
+    const out = [];
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name);
+      if (statSync(full).isDirectory()) out.push(...walkJson(full));
+      else if (name.endsWith('.json')) out.push(full);
+    }
+    return out;
+  }
+
+  return {
+    name: 'minify-static-json',
+    apply: 'build',
+    closeBundle() {
+      let totalSaved = 0;
+      let fileCount = 0;
+      for (const rel of targets) {
+        const dir = join(root, rel);
+        if (!existsSync(dir)) continue;
+        for (const f of walkJson(dir)) {
+          const original = readFileSync(f, 'utf-8');
+          // Re-stringify without whitespace.  Throws on malformed JSON
+          // — we want that: a bad ruleset should fail the build, not
+          // silently ship.
+          const compact = JSON.stringify(JSON.parse(original));
+          if (compact.length < original.length) {
+            writeFileSync(f, compact);
+            totalSaved += original.length - compact.length;
+            fileCount++;
+          }
+        }
+      }
+      if (fileCount > 0) {
+        const kb = (totalSaved / 1024).toFixed(1);
+        console.log(
+          `[minify-static-json] compacted ${fileCount} file${fileCount === 1 ? '' : 's'}, saved ${kb} kB`
+        );
+      }
+    },
+  };
+}
+
+// vite-plugin-static-copy `transform` callback: minify CSS via Vite's
+// re-exported esbuild.  Each of dd.css / Render.css / Statusbar.css /
+// MainMenu.css is rewritten in place; the four files stay separate so
+// the existing `<link>` cascade order in index.html keeps working
+// without index.html or scripts/esm-entry.ts changes.  Bundling the
+// four into a single style.[hash].css would save another ~2 kB of
+// per-file overhead but force an index.html rewrite — out of scope.
+async function minifyCssTransform(src) {
+  const text = typeof src === 'string' ? src : src.toString('utf-8');
+  const result = await transformWithEsbuild(text, 'inline.css', {
+    loader: 'css',
+    minify: true,
+  });
+  return result.code;
 }
 
 // Serve the @webxdc/vite-plugins simulator with an explicit Content-Type so
@@ -229,7 +309,14 @@ export default defineConfig({
         // and exposed as browser globals (window.jQuery, window._, …)
         // the ESM bundle reads from globalThis.
         { src: 'vendor', dest: '' },
-        { src: 'css', dest: '' },
+        // CSS files are minified per-file (esbuild) on the way into
+        // dist/, but kept as four separate files matching the four
+        // `<link>` tags in index.html — preserving cascade order
+        // without touching index.html or scripts/esm-entry.ts.
+        // The glob matches `css/*.css`; with `dest: ''` the relative
+        // path (css/foo.css) lands at dist/css/foo.css, exactly where
+        // index.html's `./css/foo.css` references resolve.
+        { src: 'css/*.css', dest: '', transform: minifyCssTransform },
         { src: 'img', dest: '' },
         // Ship only the fonts referenced from CSS; BowlbyOne.ttf and
         // BowlbyOneSC.ttf are unused (the .woff is loaded instead).
@@ -245,6 +332,7 @@ export default defineConfig({
       ],
     }),
     swapInCasualAssets(),
+    minifyStaticJson(),
     buildXDC({ inDir: 'dist', outDir: '.', outFileName: `data-dealer-${variant}.xdc` }),
   ],
 });
