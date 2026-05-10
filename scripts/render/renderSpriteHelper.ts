@@ -54,7 +54,9 @@ export function renderSpriteHtml(config: SpriteHelperConfig | undefined, frame?:
     'background-image': 'url(' + setup.imagePathPrefix + frameSrc + ')',
   });
   const map = frameMap[activeFrame];
-  if (!map) return '';
+  if (!map || typeof map.x !== 'number' || typeof map.y !== 'number') {
+    return '';
+  }
   jdomelem.width(map.width);
   jdomelem.height(map.height);
   if (map.pivotx && map.pivoty) {
