@@ -581,17 +581,15 @@ export class RenderDecoratorAmount extends RenderSprite implements DecoratorBase
 
   setAmount(amount?: number): void {
     const a = amount ?? this.amount;
-    /* FIXME: TURN THIS ON/OFF FOR DEMO BEHAVIOUR */
     this.jdomelem2.animate({ width: Math.round((a / 100) * 60) }, 600);
-    if (a < 25) {
+    const dec = this.decoratedNode;
+    const inc = (dec?.gameNode?.data?.absoluteInc as number | undefined) ?? 0;
+    if (inc > 0) {
+      this.jdomelem3.text(toKSNum(inc));
       this.jdomelem3.show();
-      const dec = this.decoratedNode;
-      const absolute = (dec?.gameNode?.data?.absoluteAmount as number | undefined) ?? 0;
-      this.jdomelem3.text(toKSNum(absolute));
     } else {
       this.jdomelem3.hide();
     }
-    /* END FIXME */
   }
 
   override onAddInit(): void {

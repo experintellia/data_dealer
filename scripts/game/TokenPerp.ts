@@ -99,13 +99,16 @@ export class TokenPerp extends GamePerp {
       absoluteIncPerc?: number;
     };
     const absoluteAmount = (groot.profiles_value * amount) / 100;
-    // FIXME: previousAbsoluteAmount is only correct for newly-set tokens;
-    // game-load path leaves it at 0.
-    dataRec.previousAbsoluteAmount = dataRec.absoluteAmount ?? 0;
+    // The first call after construction is the load/seed path, not a
+    // collection event — seed `previousAbsoluteAmount` to the current
+    // absolute so `absoluteInc` is 0 on load and only reflects real
+    // deltas from subsequent integration ticks.
+    const previousAbsoluteAmount = dataRec.absoluteAmount ?? absoluteAmount;
+    dataRec.previousAbsoluteAmount = previousAbsoluteAmount;
     dataRec.absoluteAmount = absoluteAmount;
     this.amount = amount;
     dataRec.amount = amount;
-    dataRec.absoluteInc = absoluteAmount - (dataRec.previousAbsoluteAmount ?? 0);
+    dataRec.absoluteInc = absoluteAmount - previousAbsoluteAmount;
     dataRec.absoluteIncPerc =
       absoluteAmount === 0 ? 0 : (100 / absoluteAmount) * dataRec.absoluteInc;
     if (this.gestalt !== undefined) {
