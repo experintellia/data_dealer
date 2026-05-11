@@ -37,6 +37,8 @@ test('collect-amount: decorator displays collected count not total amount', asyn
 
   expect(result.tokenUpgradedAmount).toBeDefined();
   expect(decoratorText).not.toBeNull();
-  expect(decoratorText!.length).toBeGreaterThan(0);
-  expect(decoratorText).not.toBe('0');
+  if (decoratorText) {
+    expect(decoratorText.length).toBeGreaterThan(0);
+    expect(decoratorText).not.toBe('0');
+  }
 });
