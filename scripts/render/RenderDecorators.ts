@@ -586,8 +586,8 @@ export class RenderDecoratorAmount extends RenderSprite implements DecoratorBase
     if (a < 25) {
       this.jdomelem3.show();
       const dec = this.decoratedNode;
-      const absolute = (dec?.gameNode?.data?.absoluteAmount as number | undefined) ?? 0;
-      this.jdomelem3.text(toKSNum(absolute));
+      const absoluteInc = (dec?.gameNode?.data?.absoluteInc as number | undefined) ?? 0;
+      this.jdomelem3.text(toKSNum(absoluteInc));
     } else {
       this.jdomelem3.hide();
     }
