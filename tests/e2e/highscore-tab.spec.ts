@@ -7,6 +7,8 @@
 
 import { expect, test } from '@playwright/test';
 
+const GAME_CONTAINER = '[data-testid="game-container"]';
+
 test('highscore tab: HIGHSCORE button appears in main menu', async ({ page }) => {
   const jsErrors: string[] = [];
   page.on('console', (msg) => {
@@ -20,22 +22,20 @@ test('highscore tab: HIGHSCORE button appears in main menu', async ({ page }) =>
 
   await page.goto('/?devtools=1');
 
-  // Wait for game to load
-  await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
+  await expect(page.locator(GAME_CONTAINER)).toBeVisible({
     timeout: 50_000,
   });
 
-  // Dismiss the language picker if it appears — it intercepts clicks on the
-  // menu buttons below it. Picking EN persists the locale and reloads the page.
+  // Dismiss the language picker — it intercepts clicks on the menu buttons below it.
+  // Picking EN persists the locale and reloads the page.
   const langOverlay = page.locator('.LangSelectOverlay');
   if (await langOverlay.isVisible().catch(() => false)) {
     await langOverlay.locator('.lang-pick[data-locale="en"]').click();
-    await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
+    await expect(page.locator(GAME_CONTAINER)).toBeVisible({
       timeout: 50_000,
     });
   }
 
-  // Check that Highscore button exists by looking for mm-tab (translated to "Highscore" in German)
   const highscoreButton = page
     .locator('.mm-tab')
     .filter({ hasText: /Highscore/ })
@@ -43,16 +43,10 @@ test('highscore tab: HIGHSCORE button appears in main menu', async ({ page }) =>
 
   await expect(highscoreButton).toBeVisible();
 
-  // Click the Highscore button
   await highscoreButton.click();
 
-  // Wait for topscores view to appear
-  await page.waitForTimeout(500);
-
-  // Check for JS errors
-  expect(jsErrors, `JS errors when opening Highscore tab: ${jsErrors.join(' | ')}`).toHaveLength(0);
-
-  // Verify topscores view is now visible (should have TopscorePerp elements)
   const topscoresView = page.locator('.TopscorePerp').first();
-  await expect(topscoresView).toBeVisible();
+  await expect(topscoresView).toBeVisible({ timeout: 10_000 });
+
+  expect(jsErrors, `JS errors when opening Highscore tab: ${jsErrors.join(' | ')}`).toHaveLength(0);
 });
