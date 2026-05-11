@@ -421,10 +421,12 @@ export class RenderDBQueue extends RenderNode {
 
     node.on('mousedown touchstart', (e) => {
       const offset = jq.offset();
-      node.userClickAbsPos = {
-        x: (e.pageX ?? 0) - offset.left,
-        y: (e.pageY ?? 0) - offset.top,
-      };
+      if (offset) {
+        node.userClickAbsPos = {
+          x: (e.pageX ?? 0) - offset.left,
+          y: (e.pageY ?? 0) - offset.top,
+        };
+      }
     });
   }
 
@@ -883,18 +885,22 @@ export class RenderPopup extends RenderNode {
 
     node.on('mousemove', (e) => {
       const offset = jq.offset();
-      node.userAbsPos = {
-        x: (e.pageX ?? 0) - offset.left,
-        y: (e.pageY ?? 0) - offset.top,
-      };
+      if (offset) {
+        node.userAbsPos = {
+          x: (e.pageX ?? 0) - offset.left,
+          y: (e.pageY ?? 0) - offset.top,
+        };
+      }
     });
 
     node.on('mousedown touchstart', (e) => {
       const offset = jq.offset();
-      node.userClickAbsPos = {
-        x: (e.pageX ?? 0) - offset.left,
-        y: (e.pageY ?? 0) - offset.top,
-      };
+      if (offset) {
+        node.userClickAbsPos = {
+          x: (e.pageX ?? 0) - offset.left,
+          y: (e.pageY ?? 0) - offset.top,
+        };
+      }
     });
 
     // FIXME DEBUG example implementation on how to change active popup on state change events
