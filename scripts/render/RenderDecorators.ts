@@ -26,11 +26,16 @@ type JQueryDecoratorElem = JQueryRenderElem;
 function decoratorDraw(node: RenderNode & DecoratorBase): void {
   if (node.hidden) return;
   if (!node.decoratedNode) return;
+  const decorPos = node.decoratedNode.getPosition();
+  const offsetToParent = node.offsetToParent;
+  // Guard against undefined position or offset values
+  if (!decorPos || decorPos.x === undefined || decorPos.y === undefined) return;
+  if (!offsetToParent || offsetToParent.x === undefined || offsetToParent.y === undefined) return;
   node.setSize(node.getSize());
   node.setTransform(node.getTransform());
   node.setPosition({
-    x: node.decoratedNode.getPosition().x + node.offsetToParent.x,
-    y: node.decoratedNode.getPosition().y + node.offsetToParent.y,
+    x: decorPos.x + offsetToParent.x,
+    y: decorPos.y + offsetToParent.y,
   });
   node.setOpacity(node.opacity);
 }

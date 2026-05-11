@@ -151,8 +151,15 @@ export class RenderCable extends RenderNode {
       offset = 4;
     }
     const p = this.getPoints();
-    this.domelem.width = this.width = Math.abs(p.p1.x - p.p5.x) + this.offsetX * 2;
-    this.domelem.height = this.height = Math.abs(p.p1.y - p.p5.y) + this.offsetY * 2;
+    const domelem = this.domelem;
+    if (domelem instanceof HTMLCanvasElement) {
+      const width = Math.abs(p.p1.x - p.p5.x) + this.offsetX * 2;
+      const height = Math.abs(p.p1.y - p.p5.y) + this.offsetY * 2;
+      domelem.width = width;
+      domelem.height = height;
+      this.width = width;
+      this.height = height;
+    }
     const cx = p.p1.x < p.p5.x ? p.p1.x : p.p5.x;
     const cy = p.p1.y < p.p5.y ? p.p1.y : p.p5.y;
 

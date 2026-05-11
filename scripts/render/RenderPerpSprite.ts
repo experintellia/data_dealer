@@ -32,7 +32,7 @@ export class RenderPerpSprite extends RenderSprite {
           offsetY: number;
         })
       | undefined;
-    if (parent) {
+    if (parent && parent.frameMap && parent.frameMap.normal) {
       parent.perpSprite = this;
       // Set position to parent pivot — fill in any missing
       // pivotx/pivoty entries from the parent's `normal` frame.

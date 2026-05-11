@@ -223,7 +223,11 @@ export class RenderNode {
     const target = this as unknown as Record<string, unknown>;
     for (const key in attrs) {
       if (Object.prototype.hasOwnProperty.call(attrs, key)) {
-        target[key] = attrs[key];
+        const value = attrs[key];
+        // Don't set undefined values — they shadow prototype defaults
+        if (value !== undefined) {
+          target[key] = value;
+        }
       }
     }
   }
