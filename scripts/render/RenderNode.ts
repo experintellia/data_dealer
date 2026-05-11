@@ -227,6 +227,18 @@ export class RenderNode {
         // Don't set undefined values — they shadow prototype defaults
         if (value !== undefined) {
           target[key] = value;
+        } else if (
+          key === 'x' ||
+          key === 'y' ||
+          key === 'frameMap' ||
+          key === 'width' ||
+          key === 'height'
+        ) {
+          console.log('[setAttrs] skipping undefined:', {
+            key,
+            id: (target as any).id,
+            currentValue: target[key],
+          });
         }
       }
     }
@@ -326,7 +338,16 @@ export class RenderNode {
   }
 
   getPosition(): { x: number; y: number } {
-    return { x: this.x, y: this.y };
+    const result = { x: this.x, y: this.y };
+    if (this.x === undefined || this.y === undefined) {
+      console.warn('[getPosition] undefined x/y:', {
+        id: this.id,
+        x: this.x,
+        y: this.y,
+        result,
+      });
+    }
+    return result;
   }
 
   getTopLeftPosition(): { x: number; y: number } {
@@ -594,10 +615,28 @@ export class RenderNode {
   }
 
   draw(): void {
-    this.setSize(this.getSize());
-    this.setTransform(this.getTransform());
-    this.setPosition(this.getPosition());
-    this.setOpacity(this.opacity);
+    console.log('[RenderNode.draw]', {
+      id: this.id,
+      x: this.x,
+      y: this.y,
+      width: this.width,
+      height: this.height,
+    });
+    try {
+      const size = this.getSize();
+      console.log('[draw] getSize:', size);
+      this.setSize(size);
+      const transform = this.getTransform();
+      console.log('[draw] getTransform:', transform);
+      this.setTransform(transform);
+      const pos = this.getPosition();
+      console.log('[draw] getPosition:', pos);
+      this.setPosition(pos);
+      this.setOpacity(this.opacity);
+    } catch (e) {
+      console.error('[draw] error:', e, 'stack:', e instanceof Error ? e.stack : '');
+      throw e;
+    }
   }
 
   tick(): void {

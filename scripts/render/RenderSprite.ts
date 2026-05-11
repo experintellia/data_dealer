@@ -50,13 +50,23 @@ export class RenderSprite extends RenderNode {
     // frameSrc / frameMap / frame from `config` (when present).  Apply
     // the legacy `frame || 'normal'` fallback explicitly.
     // Ensure frameMap falls back to the prototype default if not set.
+    console.log('[RenderSprite] constructor:', {
+      frameMap: this.frameMap,
+      frameMapType: typeof this.frameMap,
+      normal: this.frameMap?.normal,
+      frame: config.frame ?? 'normal',
+    });
     if (!this.frameMap || typeof this.frameMap !== 'object' || !this.frameMap.normal) {
+      console.log('[RenderSprite] frameMap invalid, using prototype default');
       this.frameMap = RenderSprite.prototype.frameMap;
     }
     this.frame = config.frame ?? 'normal';
     this.setFrameSrc(this.frameSrc);
+    console.log('[RenderSprite] calling setFrame with frame:', this.frame);
     this.setFrame(this.frame);
+    console.log('[RenderSprite] setFrame done, calling draw');
     this.draw();
+    console.log('[RenderSprite] draw done');
   }
 
   setFrameSrc(src: string | undefined): void {
@@ -70,14 +80,19 @@ export class RenderSprite extends RenderNode {
   }
 
   setFrame(frame: string): void {
+    console.log('[setFrame] frame:', frame, 'frameMap:', this.frameMap);
     if (!this.frameMap || typeof this.frameMap !== 'object') {
+      console.log('[setFrame] frameMap invalid, returning');
       return;
     }
     if (!Object.prototype.hasOwnProperty.call(this.frameMap, frame)) {
+      console.log('[setFrame] frame not in frameMap, returning');
       return;
     }
     const map = this.frameMap[frame];
+    console.log('[setFrame] map:', map);
     if (!map || typeof map !== 'object') {
+      console.log('[setFrame] map invalid, returning');
       return;
     }
     if (
@@ -86,6 +101,13 @@ export class RenderSprite extends RenderNode {
       typeof map.width !== 'number' ||
       typeof map.height !== 'number'
     ) {
+      console.log('[setFrame] map properties invalid:', {
+        'map.x': map.x,
+        'typeof map.x': typeof map.x,
+        'map.y': map.y,
+        'map.width': map.width,
+        'map.height': map.height,
+      });
       return;
     }
     this.frame = frame;
@@ -94,7 +116,10 @@ export class RenderSprite extends RenderNode {
     if (map.pivotx && map.pivoty) {
       this.setOffset({ x: map.pivotx, y: map.pivoty });
     }
+    console.log('[setFrame] setting backgroundPosition: -' + map.x + 'px -' + map.y + 'px');
     this.domelem.style.backgroundPosition = -map.x + 'px ' + -map.y + 'px';
+    console.log('[setFrame] calling draw');
     this.draw();
+    console.log('[setFrame] done');
   }
 }
