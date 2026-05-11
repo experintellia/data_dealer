@@ -25,12 +25,31 @@ type JQueryDecoratorElem = JQueryRenderElem;
 
 function decoratorDraw(node: RenderNode & DecoratorBase): void {
   if (node.hidden) return;
-  if (!node.decoratedNode) return;
+  if (!node.decoratedNode) {
+    console.log('[decoratorDraw] no decoratedNode for:', node.id);
+    return;
+  }
+  const decorPos = node.decoratedNode.getPosition();
+  const offsetToParent = node.offsetToParent;
+  console.log('[decoratorDraw]', {
+    nodeId: node.id,
+    decoratedNodeId: node.decoratedNode.id,
+    decorPos,
+    offsetToParent,
+  });
+  if (!decorPos || decorPos.x === undefined || decorPos.y === undefined) {
+    console.error('[decoratorDraw] invalid decorPos:', decorPos);
+    return;
+  }
+  if (!offsetToParent || offsetToParent.x === undefined || offsetToParent.y === undefined) {
+    console.error('[decoratorDraw] invalid offsetToParent:', offsetToParent);
+    return;
+  }
   node.setSize(node.getSize());
   node.setTransform(node.getTransform());
   node.setPosition({
-    x: node.decoratedNode.getPosition().x + node.offsetToParent.x,
-    y: node.decoratedNode.getPosition().y + node.offsetToParent.y,
+    x: decorPos.x + offsetToParent.x,
+    y: decorPos.y + offsetToParent.y,
   });
   node.setOpacity(node.opacity);
 }
