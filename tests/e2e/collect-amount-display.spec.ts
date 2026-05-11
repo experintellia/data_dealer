@@ -22,16 +22,14 @@ test('token-collection: decorator-amount renders without errors', async ({ page 
       await eng.buyPerp('Imperium', 'token003');
       await eng.chargePerp('Imperium.token003');
       // Collect should not throw
-      const result = await eng.collectPerp('Imperium.token003');
+      await eng.collectPerp('Imperium.token003');
       return {
         success: true,
-        hasResult: !!result?.result?.result,
         error: null,
       };
     } catch (error) {
       return {
         success: false,
-        hasResult: false,
         error: (error as Error)?.message ?? String(error),
       };
     }
