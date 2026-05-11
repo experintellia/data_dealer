@@ -1213,9 +1213,6 @@ export class RenderTopscorePerp extends RenderNode {
     if (this.hidden) {
       this.hide();
     }
-    this.setSize(this.getSize());
-    this.setTransform(this.getTransform());
-    this.setPosition(this.getPosition());
     this.setOpacity(this.opacity);
   }
 
