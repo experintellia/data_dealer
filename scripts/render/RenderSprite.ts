@@ -80,8 +80,12 @@ export class RenderSprite extends RenderNode {
     if (!map || typeof map !== 'object') {
       return;
     }
-    if (typeof map.x !== 'number' || typeof map.y !== 'number' ||
-        typeof map.width !== 'number' || typeof map.height !== 'number') {
+    if (
+      typeof map.x !== 'number' ||
+      typeof map.y !== 'number' ||
+      typeof map.width !== 'number' ||
+      typeof map.height !== 'number'
+    ) {
       return;
     }
     this.frame = frame;
