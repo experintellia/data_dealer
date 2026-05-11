@@ -50,7 +50,7 @@ export class RenderSprite extends RenderNode {
     // frameSrc / frameMap / frame from `config` (when present).  Apply
     // the legacy `frame || 'normal'` fallback explicitly.
     // Ensure frameMap falls back to the prototype default if not set.
-    if (!this.frameMap || typeof this.frameMap !== 'object') {
+    if (!this.frameMap || typeof this.frameMap !== 'object' || !this.frameMap.normal) {
       this.frameMap = RenderSprite.prototype.frameMap;
     }
     this.frame = config.frame ?? 'normal';
@@ -70,11 +70,18 @@ export class RenderSprite extends RenderNode {
   }
 
   setFrame(frame: string): void {
-    if (!this.frameMap || !Object.prototype.hasOwnProperty.call(this.frameMap, frame)) {
+    if (!this.frameMap || typeof this.frameMap !== 'object') {
+      return;
+    }
+    if (!Object.prototype.hasOwnProperty.call(this.frameMap, frame)) {
       return;
     }
     const map = this.frameMap[frame];
-    if (!map || typeof map.x !== 'number' || typeof map.y !== 'number') {
+    if (!map || typeof map !== 'object') {
+      return;
+    }
+    if (typeof map.x !== 'number' || typeof map.y !== 'number' ||
+        typeof map.width !== 'number' || typeof map.height !== 'number') {
       return;
     }
     this.frame = frame;
