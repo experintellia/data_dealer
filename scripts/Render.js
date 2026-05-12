@@ -497,6 +497,16 @@ var Render = function () {
       }
     },
     tick: function () {
+      // Audit bug #10: skip the reschedule when there's nothing to tick
+      // (no listeners) or the document is hidden. `addListener` resumes
+      // it when work shows up, and the visibilitychange listener below
+      // resumes it when the tab becomes visible again.
+      var hidden = typeof document !== 'undefined' && document && document.hidden;
+      var idle = !this.listeners || this.listeners.set.length === 0;
+      this.timeout = undefined;
+      if (hidden || idle) {
+        return;
+      }
       this.listeners.each(function (node) {
         node.tick();
       });
@@ -506,6 +516,10 @@ var Render = function () {
     },
     addListener: function (node) {
       this.listeners.add(node);
+      // Resume ticking if we were idle.
+      if (!this.timeout) {
+        this.start();
+      }
     },
     removeListener: function (node) {
       this.listeners.remove(node);
@@ -516,6 +530,13 @@ var Render = function () {
     },
   };
   SlowTicker.listeners = new Set();
+  if (typeof document !== 'undefined' && document && document.addEventListener) {
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) {
+        SlowTicker.start();
+      }
+    });
+  }
   SlowTicker.start();
 
   /////////////////////////////
@@ -597,6 +618,23 @@ var Render = function () {
     // Remove Node from all references and remove Domobject
     Ticker.removeListener(this);
     SlowTicker.removeListener(this);
+    // Audit bug #6: clear any live tweens targeting this node so a
+    // disposed node is not pinned by an in-flight tween. createjs
+    // Tween is bound at the top of the factory.
+    if (Tween && typeof Tween.removeTweens === 'function') {
+      Tween.removeTweens(this);
+    }
+    // Audit bug #7: dragDelay / cancelClickTimeout setTimeout ids are
+    // never cleared, so a node removed mid-press would still fire its
+    // delayed drag-start or click-cancel handlers against a dead node.
+    if (this.dragDelay) {
+      window.clearTimeout(this.dragDelay);
+      this.dragDelay = undefined;
+    }
+    if (this.cancelClickTimeout) {
+      window.clearTimeout(this.cancelClickTimeout);
+      this.cancelClickTimeout = undefined;
+    }
     if (this.decoratedNode) {
       this.decoratedNode.decorators.remove(this);
     }
@@ -1529,7 +1567,7 @@ var Render = function () {
     //'75%':{'transform':'s1.1'},
     //'100%':{'transform':'s1'}
     //},150);
-    this.FXSimpleCue({ scaleX: 1.1, sacaleY: 1 }, 37);
+    this.FXSimpleCue({ scaleX: 1.1, scaleY: 1 }, 37);
     this.FXSimpleCue({ scaleX: 1, scaleY: 1.1 }, 37);
     this.FXSimpleCue({ scaleX: 1.1, scaleY: 1.1 }, 37);
     this.FXSimpleCue({ scaleX: 1, scaleY: 1 }, 37);
@@ -1557,15 +1595,15 @@ var Render = function () {
   Node.prototype.FXPuff = function (cb) {
     var node = this;
     //node.FXSimple({offsetX:42,offsetY:68,scaleX:1.5,scaleY:1.5,opacity:0},250,'easeOut',cb);
+    // Removal is driven by the Tween onComplete only; the previous
+    // setTimeout fallback (audit bug #5) raced the tween callback and
+    // could double-remove the node.
     node.FXSimple({ scaleX: 1.5, scaleY: 1.5, opacity: 0 }, 250, 'easeOut', function () {
       if (cb) {
         cb();
       }
-    });
-    // make shure it really gets removed (callbacks seem to be unstable)
-    window.setTimeout(function () {
       node.remove();
-    }, 350);
+    });
   };
 
   Node.prototype.FXArise = function (cb) {
@@ -2260,12 +2298,13 @@ var Render = function () {
 
   Sprite.prototype.setFrameSrc = function (src) {
     // Set the Framemap source
-    if (!this.frameSrc) {
+    if (!src) {
       return;
     }
+    this.frameSrc = src;
     this.spriteSrc = src;
     this.css({
-      'background-image': 'url(' + setup.imagePathPrefix + this.frameSrc + ')',
+      'background-image': 'url(' + setup.imagePathPrefix + src + ')',
     });
   };
 
@@ -2309,7 +2348,7 @@ var Render = function () {
     this.frame = config.frame || 'normal';
     this.clickable = config.clickable || true;
     this.detectCollisions = true;
-    this.draggable = config.draggable || true;
+    this.draggable = config.draggable ?? true;
     this.cables = config.cables || new Set();
     this.perpSprite = config.perpSprite || undefined;
     this.jdomelem = $("<div class='Perp'></div>");
@@ -4043,76 +4082,71 @@ var Render = function () {
       node.scroller.doTouchEnd(e.timeStamp);
     });
 
-    node.domelem.addEventListener(
-      'touchstart',
-      function (e) {
-        // Don't react if initial down happens on a form element
-        if (
-          e.touches[0] &&
-          e.touches[0].target &&
-          e.touches[0].target.tagName.match(/input|textarea|select/i)
-        ) {
-          return;
-        }
-        var touch = e.touches[0];
-        var parentOffset = node.parentNode.jdomelem.offset();
-        // Mirror mousedown's userAbsPos so the double-tap zoom handler works
-        // on pure-touch devices where mousedown never fires.
-        node.userAbsPos = {
-          x: touch.pageX - parentOffset.left,
-          y: touch.pageY - parentOffset.top,
-        };
-        // Record initial finger distance so non-iOS browsers (which don't
-        // emit GestureEvent.scale) can derive a pinch ratio in touchmove.
-        if (e.touches.length === 2) {
-          var dx = e.touches[0].pageX - e.touches[1].pageX;
-          var dy = e.touches[0].pageY - e.touches[1].pageY;
-          node._pinchStartDist = Math.sqrt(dx * dx + dy * dy) || null;
-        } else {
-          node._pinchStartDist = null;
-        }
-        node.scroller.doTouchStart(e.touches, e.timeStamp);
-        e.preventDefault();
-      },
-      { passive: false }
-    );
+    // Audit bug #9: store handler references on the node so the override
+    // of `remove()` below can detach them. Previously these were anonymous
+    // inline literals that lingered on the DOM element forever.
+    node._onTouchStart = function (e) {
+      // Don't react if initial down happens on a form element
+      if (
+        e.touches[0] &&
+        e.touches[0].target &&
+        e.touches[0].target.tagName.match(/input|textarea|select/i)
+      ) {
+        return;
+      }
+      var touch = e.touches[0];
+      var parentOffset = node.parentNode.jdomelem.offset();
+      // Mirror mousedown's userAbsPos so the double-tap zoom handler works
+      // on pure-touch devices where mousedown never fires.
+      node.userAbsPos = {
+        x: touch.pageX - parentOffset.left,
+        y: touch.pageY - parentOffset.top,
+      };
+      // Record initial finger distance so non-iOS browsers (which don't
+      // emit GestureEvent.scale) can derive a pinch ratio in touchmove.
+      if (e.touches.length === 2) {
+        var dx = e.touches[0].pageX - e.touches[1].pageX;
+        var dy = e.touches[0].pageY - e.touches[1].pageY;
+        node._pinchStartDist = Math.sqrt(dx * dx + dy * dy) || null;
+      } else {
+        node._pinchStartDist = null;
+      }
+      node.scroller.doTouchStart(e.touches, e.timeStamp);
+      e.preventDefault();
+    };
+    node.domelem.addEventListener('touchstart', node._onTouchStart, {
+      passive: false,
+    });
 
-    node.useDragHandler.domelem.addEventListener(
-      'touchmove',
-      function (e) {
-        // The Scroller expects an absolute pinch scale relative to touchstart
-        // (iOS Safari supplies this as e.scale). Other engines don't, so
-        // derive it from the two-finger distance ratio when needed.
-        var scale = e.scale;
-        if (scale == null && e.touches.length === 2) {
-          var dx = e.touches[0].pageX - e.touches[1].pageX;
-          var dy = e.touches[0].pageY - e.touches[1].pageY;
-          var dist = Math.sqrt(dx * dx + dy * dy);
-          if (node._pinchStartDist) {
-            scale = dist / node._pinchStartDist;
-          }
+    node._onTouchMove = function (e) {
+      // The Scroller expects an absolute pinch scale relative to touchstart
+      // (iOS Safari supplies this as e.scale). Other engines don't, so
+      // derive it from the two-finger distance ratio when needed.
+      var scale = e.scale;
+      if (scale == null && e.touches.length === 2) {
+        var dx = e.touches[0].pageX - e.touches[1].pageX;
+        var dy = e.touches[0].pageY - e.touches[1].pageY;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (node._pinchStartDist) {
+          scale = dist / node._pinchStartDist;
         }
-        node.scroller.doTouchMove(e.touches, e.timeStamp, scale);
-        e.preventDefault();
-      },
-      { passive: false }
-    );
+      }
+      node.scroller.doTouchMove(e.touches, e.timeStamp, scale);
+      e.preventDefault();
+    };
+    node.useDragHandler.domelem.addEventListener('touchmove', node._onTouchMove, {
+      passive: false,
+    });
 
-    node.useDragHandler.domelem.addEventListener(
-      'touchend',
-      function (e) {
-        node.scroller.doTouchEnd(e.timeStamp);
-      },
-      false
-    );
+    node._onTouchEnd = function (e) {
+      node.scroller.doTouchEnd(e.timeStamp);
+    };
+    node.useDragHandler.domelem.addEventListener('touchend', node._onTouchEnd, false);
 
-    node.useDragHandler.domelem.addEventListener(
-      'touchcancel',
-      function (e) {
-        node.scroller.doTouchEnd(e.timeStamp);
-      },
-      false
-    );
+    node._onTouchCancel = function (e) {
+      node.scroller.doTouchEnd(e.timeStamp);
+    };
+    node.useDragHandler.domelem.addEventListener('touchcancel', node._onTouchCancel, false);
 
     // Mouse-wheel zoom: continuous and smoothly tweened. We accumulate
     // wheel deltas into a target zoom level and let a single rAF loop
@@ -4146,36 +4180,60 @@ var Render = function () {
         node._wheelZoomRaf = requestAnimationFrame(stepTowardTarget);
       }
     };
-    node.domelem.addEventListener(
-      'wheel',
-      function (e) {
-        e.preventDefault();
-        var offset = node.jdomelem.offset();
-        // Normalize across deltaMode (pixel/line/page) and clamp so a
-        // single trackpad fling never multiplies zoom by more than ~1.5x.
-        // Per-pixel base is intentionally tiny — a typical wheel notch
-        // (~100px) ends up around ~10% zoom, so the change feels
-        // continuous rather than stepped like the +/- buttons.
-        var unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
-        var delta = Math.max(-400, Math.min(400, e.deltaY * unit));
-        var factor = 0.999 ** delta;
-        var opts = node.scroller.options;
-        var base =
-          node._wheelZoomTarget != null
-            ? node._wheelZoomTarget
-            : node.scroller.__zoomLevel || node.zoomScale || 1;
-        var target = Math.max(opts.minZoom, Math.min(opts.maxZoom, base * factor));
-        node._wheelZoomTarget = target;
-        node._wheelZoomOrigin = {
-          x: e.pageX - offset.left,
-          y: e.pageY - offset.top,
-        };
-        if (!node._wheelZoomRaf) {
-          node._wheelZoomRaf = requestAnimationFrame(stepTowardTarget);
-        }
-      },
-      { passive: false }
-    );
+    node._onWheel = function (e) {
+      e.preventDefault();
+      var offset = node.jdomelem.offset();
+      // Normalize across deltaMode (pixel/line/page) and clamp so a
+      // single trackpad fling never multiplies zoom by more than ~1.5x.
+      // Per-pixel base is intentionally tiny — a typical wheel notch
+      // (~100px) ends up around ~10% zoom, so the change feels
+      // continuous rather than stepped like the +/- buttons.
+      var unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+      var delta = Math.max(-400, Math.min(400, e.deltaY * unit));
+      var factor = 0.999 ** delta;
+      var opts = node.scroller.options;
+      var base =
+        node._wheelZoomTarget != null
+          ? node._wheelZoomTarget
+          : node.scroller.__zoomLevel || node.zoomScale || 1;
+      var target = Math.max(opts.minZoom, Math.min(opts.maxZoom, base * factor));
+      node._wheelZoomTarget = target;
+      node._wheelZoomOrigin = {
+        x: e.pageX - offset.left,
+        y: e.pageY - offset.top,
+      };
+      if (!node._wheelZoomRaf) {
+        node._wheelZoomRaf = requestAnimationFrame(stepTowardTarget);
+      }
+    };
+    node.domelem.addEventListener('wheel', node._onWheel, { passive: false });
+  };
+
+  // Audit bug #9: detach the native touch/wheel listeners installed in
+  // initScroller(). Without this, every ViewMap teardown leaked four
+  // touch handlers plus the wheel handler.
+  ViewMap.prototype.remove = function () {
+    if (this._onTouchStart && this.domelem) {
+      this.domelem.removeEventListener('touchstart', this._onTouchStart);
+    }
+    if (this._onWheel && this.domelem) {
+      this.domelem.removeEventListener('wheel', this._onWheel);
+    }
+    if (this.useDragHandler && this.useDragHandler.domelem) {
+      var dhDom = this.useDragHandler.domelem;
+      if (this._onTouchMove) dhDom.removeEventListener('touchmove', this._onTouchMove);
+      if (this._onTouchEnd) dhDom.removeEventListener('touchend', this._onTouchEnd);
+      if (this._onTouchCancel) dhDom.removeEventListener('touchcancel', this._onTouchCancel);
+    }
+    if (this.dragHandler && typeof this.dragHandler.dispose === 'function') {
+      this.dragHandler.dispose();
+    }
+    this._onTouchStart = undefined;
+    this._onTouchMove = undefined;
+    this._onTouchEnd = undefined;
+    this._onTouchCancel = undefined;
+    this._onWheel = undefined;
+    Node.prototype.remove.call(this);
   };
 
   ViewMap.prototype.scrollTo = function (pos, dur) {
@@ -5260,7 +5318,10 @@ var Render = function () {
     // uncomment below to reset lastTab
     //popup.templateData.lastTab = undefined;
     // Transitionend test
-    popup.jdomelem.on(
+    // Audit bug #8: use jQuery `.one(...)` so a popup that is closed
+    // twice does not double-bind the transitionend handler and call
+    // `remove()` against an already-removed node.
+    popup.jdomelem.one(
       'otransitionend MSTransitionEnd transitionend webkitTransitionEnd',
       function (e) {
         popup.remove();
