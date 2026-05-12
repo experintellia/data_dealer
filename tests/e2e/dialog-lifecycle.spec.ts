@@ -1233,3 +1233,382 @@ test.describe('Section J — in-popup action handlers', () => {
       .toBeGreaterThan(initialProfiles);
   });
 });
+
+// ── Section K: pagination ────────────────────────────────────────────────
+//
+// Several popups paginate their list of items (5 per page in
+// popup_karma / popup_agent / popup_pusher / popup_proxy, 12 in
+// popup_profileset).  The page-state machinery is a single delegated
+// handler in scripts/render/RenderTopLevelUI.ts:857-890: click
+// .PopupPageArrowR → next page becomes visible, prev arrow shown,
+// next arrow hidden on the last page.  The Preact port has to mirror
+// that exactly — pin it now so the regression surfaces here.
+//
+// Karma popup is the easiest fixture: providedKarma has all 10
+// karmalauters from the ruleset (always > 5 so always paginated).
+
+test.describe('Section K — pagination arrows', () => {
+  test('Karma popup pagination flips pages and toggles arrow visibility', async ({ page }) => {
+    await bootGame(page);
+    await openStatusPopup(page, 'karma');
+
+    // Initial state: page 0 visible, .PopupPageArrowL hidden, R visible.
+    const initial = await page.evaluate(() => {
+      const root = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
+      if (!root) return null;
+      const pagination = root.querySelector<HTMLElement>('.Pagination');
+      if (!pagination) return null;
+      const pages = Array.from(pagination.querySelectorAll<HTMLElement>('.PopupPage'));
+      const visiblePages = pages.filter((p) => !p.classList.contains('hidden'));
+      const arrowL = pagination.querySelector<HTMLElement>('.PopupPageArrowL');
+      const arrowR = pagination.querySelector<HTMLElement>('.PopupPageArrowR');
+      return {
+        pageCount: pages.length,
+        activePageId: visiblePages[0]?.getAttribute('data-page-id'),
+        arrowLHidden: arrowL?.classList.contains('hidden') ?? null,
+        arrowRHidden: arrowR?.classList.contains('hidden') ?? null,
+      };
+    });
+    expect(initial).not.toBeNull();
+    expect(initial?.pageCount).toBeGreaterThan(1);
+    expect(initial?.activePageId).toBe('0');
+    expect(initial?.arrowLHidden).toBe(true);
+    expect(initial?.arrowRHidden).toBe(false);
+
+    // Click the right arrow → page 1 visible, both arrows visible (or
+    // arrowR hidden if there are only 2 pages and we're on the last one).
+    await page
+      .locator('.PopupContainer.lockOn .Pagination .PopupPageArrowR')
+      .first()
+      .click({ force: true });
+
+    const afterNext = await page.evaluate(() => {
+      const root = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
+      const pagination = root?.querySelector<HTMLElement>('.Pagination');
+      const pages = Array.from(pagination?.querySelectorAll<HTMLElement>('.PopupPage') ?? []);
+      const visiblePages = pages.filter((p) => !p.classList.contains('hidden'));
+      const arrowL = pagination?.querySelector<HTMLElement>('.PopupPageArrowL');
+      return {
+        activePageId: visiblePages[0]?.getAttribute('data-page-id'),
+        arrowLHidden: arrowL?.classList.contains('hidden') ?? null,
+      };
+    });
+    expect(afterNext.activePageId).toBe('1');
+    // Going forward always reveals the left arrow.
+    expect(afterNext.arrowLHidden).toBe(false);
+
+    // Click the left arrow → back to page 0, arrowL hidden again.
+    await page
+      .locator('.PopupContainer.lockOn .Pagination .PopupPageArrowL')
+      .first()
+      .click({ force: true });
+
+    const afterPrev = await page.evaluate(() => {
+      const root = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
+      const pagination = root?.querySelector<HTMLElement>('.Pagination');
+      const visiblePages = Array.from(
+        pagination?.querySelectorAll<HTMLElement>('.PopupPage') ?? []
+      ).filter((p) => !p.classList.contains('hidden'));
+      const arrowL = pagination?.querySelector<HTMLElement>('.PopupPageArrowL');
+      return {
+        activePageId: visiblePages[0]?.getAttribute('data-page-id'),
+        arrowLHidden: arrowL?.classList.contains('hidden') ?? null,
+      };
+    });
+    expect(afterPrev.activePageId).toBe('0');
+    expect(afterPrev.arrowLHidden).toBe(true);
+
+    // Cleanup.
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.renderPopup?.trigger('popup_close');
+    });
+  });
+
+  test('Karma popup pagination hides the right arrow on the last page', async ({ page }) => {
+    // Walk forward until arrowR becomes hidden — the handler logic at
+    // RenderTopLevelUI.ts:879 only hides arrowR when index === len, so
+    // missing that branch is a real bug that only shows up at the end
+    // of the page list.
+    await bootGame(page);
+    await openStatusPopup(page, 'karma');
+
+    const pageCount = await page.evaluate(() => {
+      const root = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
+      return root?.querySelectorAll('.Pagination .PopupPage').length ?? 0;
+    });
+    expect(pageCount).toBeGreaterThan(1);
+
+    for (let i = 1; i < pageCount; i++) {
+      await page
+        .locator('.PopupContainer.lockOn .Pagination .PopupPageArrowR')
+        .first()
+        .click({ force: true });
+    }
+
+    const onLast = await page.evaluate(() => {
+      const root = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
+      const pagination = root?.querySelector<HTMLElement>('.Pagination');
+      const arrowR = pagination?.querySelector<HTMLElement>('.PopupPageArrowR');
+      const arrowL = pagination?.querySelector<HTMLElement>('.PopupPageArrowL');
+      return {
+        arrowRHidden: arrowR?.classList.contains('hidden') ?? null,
+        arrowLHidden: arrowL?.classList.contains('hidden') ?? null,
+      };
+    });
+    expect(onLast.arrowRHidden).toBe(true);
+    expect(onLast.arrowLHidden).toBe(false);
+
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.renderPopup?.trigger('popup_close');
+    });
+  });
+});
+
+// ── Section L: ChargeButton / CollectButton on contact/client ─────────────
+//
+// popup_contact + popup_client expose Charge → Collect button flows through
+// the popup event bus (GameNode.initPopupEvents lines 699 + 703):
+//   popup.trigger('button_click.ChargeButton') → ContactPerp.Charge() →
+//     engine.chargePerp → markTimer
+//   popup.trigger('button_click.CollectButton') → ContactPerp.collect() →
+//     engine.collectPerp → db queue cue
+// Section H drives the engine directly; this section pins the popup → button
+// → action chain that the Preact port must reproduce.
+
+test.describe('Section L — Contact/Client Charge & Collect button handlers', () => {
+  test('ChargeButton on a Contact popup starts the charge cycle', async ({ page }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ContactPerp',
+      gestalt: 'contact035',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupBody',
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupBody')).toBeVisible({ timeout: 3_000 });
+
+    const cashBefore = await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      return groot.cash_value;
+    });
+
+    // Fire the same event the popup's button click delegator emits.  The
+    // handler at GameNode.ts:699 routes to ContactPerp.Charge() which calls
+    // engine.chargePerp and, on success, triggers popup_close.
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      const gnode = groot.getById('contact035');
+      gnode.renderPopup.trigger('button_click.ChargeButton');
+    });
+
+    // contact035 charge_cost is 60 — cash should drop by exactly that.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const groot = (window as any).__dd?._app?.game;
+            return groot.cash_value;
+          }),
+        { timeout: 3_000 }
+      )
+      .toBe(cashBefore - 60);
+
+    // The gnode should now be in chargeRunning state.
+    const states = await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      return groot.getById('contact035')?.states;
+    });
+    expect(states?.chargeRunning).toBe(true);
+  });
+
+  test('CollectButton on a Contact popup queues a profileset after charge ready', async ({
+    page,
+  }) => {
+    // Drive: buy → reload → charge via popup event → advance clock → fire
+    // the node_ready document event (the engine's wall-clock setTimeout
+    // would do this on its own, but advancing the injectable clock alone
+    // doesn't trigger it — see collect-icon-after-charge.spec.ts:104-119
+    // for the same dance) → open popup → CollectButton via event.
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ContactPerp',
+      gestalt: 'contact035',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupBody',
+    });
+
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.getById('contact035').renderPopup.trigger('button_click.ChargeButton');
+    });
+    // Wait for charge to start (popup closes automatically on success).
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const groot = (window as any).__dd?._app?.game;
+            return !!groot.getById('contact035')?.states?.chargeRunning;
+          }),
+        { timeout: 3_000 }
+      )
+      .toBe(true);
+
+    // Advance clock past charge_time + fire node_ready (same recipe as
+    // collect-icon-after-charge.spec.ts).
+    await page.evaluate(() => {
+      const w = window as any;
+      w.__dd.advanceNow(31_000);
+      const $ = w.jQuery || w.$;
+      $(document).trigger('node_ready', [
+        {
+          id: 'contact035',
+          type: 'ContactPerp',
+          path: 'Imperium.contact035',
+          result: { amount: 100 },
+        },
+      ]);
+    });
+    await expect(page.locator('[data-testid="dd-collect-ready"]')).toBeVisible({ timeout: 2_000 });
+
+    // Open the popup again now that the gnode is ready, then fire
+    // CollectButton via the popup event bus.
+    const dbQueueLenBefore = await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      return groot.getDatabase()?.queue?.set?.length ?? 0;
+    });
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      const gnode = groot.getById('contact035');
+      gnode.openPopup();
+      // .Charge & .collect read gnode.renderPopup, which openPopup just set.
+      gnode.renderPopup.trigger('button_click.CollectButton');
+    });
+
+    // collect() queues a profileset into the Database — db.queue.set length
+    // should grow.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const groot = (window as any).__dd?._app?.game;
+            return groot.getDatabase()?.queue?.set?.length ?? 0;
+          }),
+        { timeout: 5_000 }
+      )
+      .toBeGreaterThan(dbQueueLenBefore);
+  });
+});
+
+// ── Section M: Subpop close + simple TokenPerp dismissal ─────────────────
+//
+// Two small contract pins missing from earlier sections:
+//   1. SubpopClose (the X inside a subpop): clicking it must remove the
+//      .open class from the subpop without closing the parent popup.
+//   2. Simple (non-Super) TokenPerp popup: popup_token.html has an isSuper
+//      branch.  Section D tests the SuperToken layout via a synthesised
+//      contained_tokens list; we never tested the simple-token branch
+//      where the only button is the Close MainButton.
+
+test.describe('Section M — Subpop close + simple TokenPerp', () => {
+  test('SubpopClose dismisses the BuySlots subpop while keeping the parent open', async ({
+    page,
+  }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ProjectPerp',
+      gestalt: 'project001',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupMenu',
+      boost: { cash: 5_000, xp_level: 2, xp_value: 20 },
+    });
+    await page.evaluate(() => {
+      const game = (window as any).__dd?._app?.game;
+      const gnode = game.getById('project001');
+      gnode.fetchPowerups(function () {
+        gnode.compilePowerups();
+        gnode.compileProfileSet?.();
+        if (gnode.renderPopup) gnode.updatePopup();
+      });
+    });
+
+    await page
+      .locator('.PopupContainer.lockOn .PopupMenuButton[data-tab="UpgradePowerup"]')
+      .first()
+      .click({ force: true });
+
+    // Open the BuySlots subpop by clicking a locked slot.
+    await page
+      .locator(
+        '.PopupContainer.lockOn .PopupTab[data-tab="UpgradePowerup"] .Powerup[data-subpop-id="buyslots"]'
+      )
+      .first()
+      .click({ force: true });
+    const subpop = page
+      .locator('.PopupContainer.lockOn .Subpop[data-subpop-id="buyslots"].open')
+      .first();
+    await expect(subpop).toBeVisible({ timeout: 2_000 });
+
+    // Click the SubpopClose X.  The handler at RenderTopLevelUI.ts:822
+    // strips .open from the subpop and clears .hasPopup from the parent
+    // .PopupTab, but the parent popup itself stays mounted.
+    await subpop.locator('.SubpopClose').first().click({ force: true });
+
+    // Subpop is no longer .open; parent popup still has lockOn.
+    await expect(
+      page.locator('.PopupContainer.lockOn .Subpop[data-subpop-id="buyslots"].open')
+    ).toHaveCount(0, { timeout: 2_000 });
+    await expect(page.locator('.PopupContainer.lockOn .PopupMenu')).toBeVisible();
+
+    await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupMenu', 'x');
+  });
+
+  test('Simple (non-Super) TokenPerp popup MainButton dismisses', async ({ page }) => {
+    // popup_token.html has two layouts driven by `isSuper =
+    // data.contained_tokens.length`.  Section D's TokenPerp test opens
+    // the SuperToken branch with a stubbed contained_tokens.  Here we
+    // open the simple branch (empty contained_tokens) where the only
+    // button is .Button[data-button-id="MainButton"] = Close.
+    await bootGame(page);
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      const td = groot.getTypeData('token001');
+      if (!td) throw new Error('token001 missing from ruleset');
+      const data = Object.assign({}, td, {
+        absoluteAmount: 0,
+        contained_tokens: [],
+        knowledge_text: td.knowledge_text || '%s profiles',
+      });
+      groot.openGenericPopup({ data, template: 'popup_token.html' });
+    });
+    const body = page.locator('.PopupBody.TokenPerp:not(.SuperToken)').first();
+    await expect(body).toBeVisible({ timeout: 3_000 });
+    // Dismiss via the popup's MainButton (the Close button rendered only
+    // in the simple branch).
+    await body.locator('.Button[data-button-id="MainButton"]').first().click({ force: true });
+    await expect(body).toBeHidden({ timeout: 3_000 });
+  });
+});
+
+// ── Section N: dead-code audit ───────────────────────────────────────────
+//
+// Three buttons / handlers reachable from the spec are dead code in the
+// current codebase.  Document them here so a phase 2 / 3 refactor doesn't
+// silently re-introduce a regression by carrying them over to Preact
+// without verifying they're actually fired.
+//
+// - ResetButton (data-button-id="ResetButton", data-testid="dd-reset-game-button")
+//   appears in popup_user_data.html's Debug tab.  No listener anywhere in
+//   scripts/.  Engine has no resetGame export by design (the webxdc-native
+//   reset is to re-share the .xdc; see scripts/LocalEngine.ts:10).  No
+//   test added because there is nothing to assert beyond DOM presence.
+//
+// - button_click.RefreshButton listener exists at GameNode.ts:807 but no
+//   template uses data-button-id="RefreshButton".  Dead handler.
+//
+// - button_click.UpgradeButton listener exists at GameNode.ts:787 (calls
+//   gnode.Charge) but no template uses data-button-id="UpgradeButton".
+//   Dead handler.
+//
+// If a phase 2 follow-up reintroduces any of these as a real affordance,
+// add a test alongside the new template / handler.
