@@ -45,7 +45,7 @@ const i18n: I18nApi = {
   setLocale(l: string): I18nApi {
     locale = l || locale;
     setup.locale = locale;
-    setup.localeShort = locale.substr(0, 2);
+    setup.localeShort = locale.slice(0, 2);
     return i18n;
   },
 
