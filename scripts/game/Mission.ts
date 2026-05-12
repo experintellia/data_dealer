@@ -129,7 +129,12 @@ export class Mission extends GameNode {
       groot.setState('tutorial_active', true);
       // TODO: check each step for completion and delete everything before.
       let steps = this.data.tutorial.slice();
-      let deletefrom = 0;
+      // `deletefrom` is the index of the *last completed* tutorial step.
+      // Sentinel -1 means "no step completed yet" so `slice(deletefrom + 1)`
+      // still yields the full list. Pre-fix this was initialised to 0 and
+      // sliced as `slice(deletefrom)`, which kept the completed step at
+      // the head of the remaining tutorial (off-by-one).
+      let deletefrom = -1;
       steps.forEach((step, k) => {
         if (step.buyPerp && Object.prototype.hasOwnProperty.call(groot.IPerps, step.buyPerp)) {
           deletefrom = k;
@@ -139,7 +144,7 @@ export class Mission extends GameNode {
           step.nodelay = true;
         }
       });
-      steps = steps.slice(deletefrom);
+      steps = steps.slice(deletefrom + 1);
       groot.makeNotifications({ tutorial: steps });
       return true;
     }
