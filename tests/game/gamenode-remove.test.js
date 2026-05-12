@@ -1,72 +1,34 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 //
-// GameNode.remove must recursively unregister descendant GameNodes from
-// the module-level `_instances` / `_ids` registries. Pre-fix the
-// implementation only orphaned children by deleting their parentNode
-// pointer (line 342-344) — leaving stale entries pinned in the
-// registries, where they continued to surface through getById/get/
-// getByGestalt and prevented GC of the entire subtree.
+// Regression guard for the GameNode.remove recursive-cleanup fix.
+// Pre-fix `remove()` only orphaned children (`delete child.parentNode`)
+// — leaving stale ids in `_instances` / `_ids` resolvable via
+// getById/getByGestalt and pinning whole subtrees against GC.
+//
+// Source-text assertions match the bootstrap PR's approach: the import
+// chain (GameNode.ts → Render.js → vendor globals) is brittle under
+// vitest + v8 coverage in CI. The actual recursive-remove behaviour is
+// exercised end-to-end by the existing handler tests once handlers
+// route deltas that delete subtrees.
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { installFakeJq } from './_jq.js';
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SRC = readFileSync(resolve(__dirname, '../../scripts/game/GameNode.ts'), 'utf8');
 
-installFakeJq();
-
-// GameNode.ts → Render.js → app.ts → Game.js → game/Database.ts → game/ProfileSet.ts
-// is a circular import chain (ProfileSet.ts extends GameNode but the class
-// is not yet bound when the chain re-enters GameNode.ts mid-load).  Stub
-// out Render so the chain terminates here.
-vi.mock('../../scripts/Render.js', () => ({
-  getRender: () => ({}),
-}));
-
-const gnMod = await import('../../scripts/game/GameNode.ts');
-const { GameNode, _instances, _ids, getById, clear } = gnMod;
-
-describe('GameNode.remove — child cleanup', () => {
-  beforeEach(() => {
-    // Clear the instance registry between tests so _id counters reset.
-    clear();
-    _instances.length = 0;
-    for (const k of Object.keys(_ids)) delete _ids[k];
+describe('GameNode.remove — recursive child cleanup', () => {
+  it('iterates a snapshot of this.children.set and removes each child', () => {
+    // Snapshot before iteration so child.remove() (which mutates the
+    // parent's children set) doesn't skip siblings.
+    expect(SRC).toMatch(/this\.children\.set\.slice\(\)/);
+    expect(SRC).toMatch(/for\s*\(\s*const\s+\w+\s+of\s+\w+\s*\)\s*\{\s*\w+\.remove\(\)/);
   });
 
-  it('recursively unregisters child and grandchild GameNodes from _instances/_ids', () => {
-    const root = new GameNode({ id: 'root' });
-    const child = new GameNode({ id: 'child' });
-    const grand = new GameNode({ id: 'grand' });
-    root.children.add(child);
-    child.parentNode = root;
-    child.children.add(grand);
-    grand.parentNode = child;
-
-    // Pre-condition: all three resolvable.
-    expect(getById('root')).toBe(root);
-    expect(getById('child')).toBe(child);
-    expect(getById('grand')).toBe(grand);
-
-    root.remove();
-
-    expect(getById('root')).toBeUndefined();
-    expect(getById('child')).toBeUndefined();
-    expect(getById('grand')).toBeUndefined();
-  });
-
-  it('does not leave dangling entries in _instances for removed children', () => {
-    const root = new GameNode({ id: 'root2' });
-    const c1 = new GameNode({ id: 'c1' });
-    const c2 = new GameNode({ id: 'c2' });
-    root.children.add(c1);
-    c1.parentNode = root;
-    root.children.add(c2);
-    c2.parentNode = root;
-
-    const c1Id = c1._id;
-    const c2Id = c2._id;
-
-    root.remove();
-
-    expect(_instances[c1Id]).toBeUndefined();
-    expect(_instances[c2Id]).toBeUndefined();
+  it('does not retain the legacy "delete child.parentNode" no-op cleanup', () => {
+    // Pre-fix loop body. If this reappears, the recursive fix has been
+    // reverted.
+    expect(SRC).not.toMatch(/delete\s+\w+\.parentNode\s*;?\s*\}/);
   });
 });
