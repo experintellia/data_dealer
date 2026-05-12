@@ -2424,7 +2424,7 @@ export function collectPerp(
     newGv = Object.assign({}, newGv, {
       cash_value: (ms.game_values.cash_value || 0) + cashGain,
     });
-    innerResult = { cash: newGv.cash_value };
+    innerResult = { cash: cashGain };
   } else if (gameType === 'TokenPerp') {
     var tpIdata: NodeInstanceData = node.instance_data || {};
     var prevAmount = typeof tpIdata.amount === 'number' ? tpIdata.amount : 0;

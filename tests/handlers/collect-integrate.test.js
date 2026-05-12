@@ -273,7 +273,7 @@ describe('collectPerp — ClientPerp', () => {
   beforeEach(() => setOverride(FIXED_NOW));
   afterEach(() => clearOverride());
 
-  it('returns cash (new cash_value) in result.result', async () => {
+  it('returns the cash gain in result.result.cash and the new total in game_values.cash_value', async () => {
     setState(
       mkState({
         nodes: [mkNode('ClientPerp', PATH)],
@@ -283,7 +283,7 @@ describe('collectPerp — ClientPerp', () => {
     );
 
     const { result } = await collectPerp(PATH);
-    expect(result.result.cash).toBe(400);
+    expect(result.result.cash).toBe(100);
     expect(result.game_values.cash_value).toBe(400);
   });
 
