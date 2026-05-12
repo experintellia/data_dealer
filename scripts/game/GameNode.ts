@@ -371,6 +371,12 @@ export class GameNode {
       // against GC.  Snapshot the array first because each child.remove()
       // would otherwise mutate `this.children` (via parentNode.children
       // .remove(this)) while we iterate.
+      //
+      // Ordering invariant: child.remove() runs while `this.parentNode`
+      // and `this.renderNode` are still set on the parent.  Subclass
+      // overrides that depend on parent state during their own teardown
+      // (currently only Topscores' subscribePeersChanged cleanup, which
+      // touches no parent fields) must keep working under this contract.
       const snapshot = this.children.set.slice();
       for (const child of snapshot) {
         child.remove();
