@@ -364,9 +364,17 @@ export class GameNode {
       this.parentNode.children.remove(this);
     }
     if (this.children) {
-      this.children.each((child) => {
-        delete child.parentNode;
-      });
+      // Recursively remove descendants so they're unregistered from the
+      // module-level _instances / _ids registries.  Pre-fix the loop only
+      // orphaned children (`delete child.parentNode`), leaving stale ids
+      // resolvable via getById/getByGestalt and pinning whole subtrees
+      // against GC.  Snapshot the array first because each child.remove()
+      // would otherwise mutate `this.children` (via parentNode.children
+      // .remove(this)) while we iterate.
+      const snapshot = this.children.set.slice();
+      for (const child of snapshot) {
+        child.remove();
+      }
     }
     if (this.renderNode) {
       this.renderNode.remove();
