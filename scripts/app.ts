@@ -152,6 +152,7 @@ const Application = function (): ApplicationApi {
     setSendDelta: true,
     setSendAchievement: true,
     setPrngSeed: true,
+    resetPrngSeed: true,
   };
   const engineRecord = LocalEngine as unknown as Record<string, unknown>;
   // Cast seam: every wrapped handler returns a jQuery Deferred at

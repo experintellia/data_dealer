@@ -2343,10 +2343,38 @@ function _scheduleChargeReady(chargeEnd: number, path: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// PRNG — Mulberry32, seeded for deterministic tests.
-// Call setPrngSeed(n) before any handler invocation that uses RNG.
+// PRNG — Mulberry32. Two seeding modes:
+//   - setPrngSeed(n)            — explicit constant for deterministic tests.
+//   - resetPrngSeed(addr?)      — derive seed from (addr || webxdc.selfAddr)
+//                                 mixed with Date.now() so two peers booting
+//                                 in the same millisecond pick disjoint
+//                                 streams (collision regression for
+//                                 _generateId).
+// The historical default `0xdeadbeef` constant is no longer used; production
+// boot wires resetPrngSeed() once selfAddr is known.
 // ---------------------------------------------------------------------------
-var _prngSeed = 0xdeadbeef;
+// `null` means "lazy-init on first _rng()" from selfAddr + Date.now().
+var _prngSeed: number | null = null;
+
+function _deriveBootSeed(addr: string): number {
+  // Mix the address hash with the millisecond clock so peers booting at the
+  // same wall-clock instant with different addresses still pick disjoint
+  // PRNG streams. djb2 is reused from the charge-jitter path for consistency.
+  var addrHash = addr ? _djb2(addr) : 0;
+  var now = Date.now() >>> 0;
+  // XOR the high 16 bits of the hash with the low half of now to spread
+  // entropy across the seed word; final `>>> 0` keeps it in uint32 range.
+  return (addrHash ^ now ^ (addrHash << 16)) >>> 0;
+}
+
+function _ensurePrngSeeded(): void {
+  if (_prngSeed != null) return;
+  var addr =
+    typeof webxdc !== 'undefined' && webxdc
+      ? webxdc.selfAddr || ''
+      : '';
+  _prngSeed = _deriveBootSeed(addr);
+}
 
 /**
  * Seed the deterministic PRNG used for charge-amount jitter.
@@ -2356,10 +2384,35 @@ export function setPrngSeed(seed: number): void {
   _prngSeed = seed >>> 0;
 }
 
+/**
+ * Re-seed the PRNG from (addr || webxdc.selfAddr) mixed with Date.now().
+ *
+ * Production callers (boot wiring) invoke this once `selfAddr` is known so
+ * each peer's `_generateId` stream is unique. Tests can call it to simulate
+ * a "fresh boot for peer X" without relying on the legacy constant seed.
+ *
+ * Passing no argument also clears the seed back to lazy-init, so the next
+ * `_rng()` call re-reads `webxdc.selfAddr` (useful for tests that swap
+ * `globalThis.webxdc` between boots).
+ */
+export function resetPrngSeed(addr?: string): void {
+  if (typeof addr === 'string' && addr) {
+    _prngSeed = _deriveBootSeed(addr);
+    return;
+  }
+  // Defer to the lazy initialiser so `webxdc.selfAddr` is re-read on demand.
+  _prngSeed = null;
+}
+
 function _rng(): number {
-  _prngSeed = (_prngSeed + 0x6d2b79f5) | 0;
-  var t = Math.imul(_prngSeed ^ (_prngSeed >>> 15), 1 | _prngSeed);
+  _ensurePrngSeeded();
+  // _ensurePrngSeeded guarantees `_prngSeed` is a number at this point;
+  // the local binding lets TS narrow without sprinkling non-null assertions.
+  var s = _prngSeed as number;
+  s = (s + 0x6d2b79f5) | 0;
+  var t = Math.imul(s ^ (s >>> 15), 1 | s);
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  _prngSeed = s;
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
@@ -2974,6 +3027,7 @@ var LocalEngine = Object.assign(
     setSendDelta: setSendDelta,
     setSendAchievement: setSendAchievement,
     setPrngSeed: setPrngSeed,
+    resetPrngSeed: resetPrngSeed,
   },
   _stubHandlers
 );
