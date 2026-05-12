@@ -499,9 +499,6 @@ export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameRe
   // legacy code that didn't seed goals). This is the prerequisite for
   // mission progression: empty goals → progression handlers no-op.
   var seededState = _seedMissionGoals(mat.state);
-  // Repair instance_data.tokens for any ProjectPerp carrying active
-  // upgrades — covers legacy saves and historical-delta replay where the
-  // buyPowerup result landed before the upgrade-tokens merge existed.
   seededState = _repairUpgradeTokens(seededState);
   setState(seededState);
 
@@ -1030,13 +1027,11 @@ function _computeModifiers(perpTypeData: PerpTypeData, powerups: PowerupDef[]): 
   return { charge_cost: chargeCost, collect_amount: collectAmount, collect_risk: collectRisk };
 }
 
-// Merge an UpgradePowerup's tokens into the base venture tokens. Each
-// active upgrade lifts the per-gestalt `amount` to the upgrade's value
-// when it exceeds the current amount — base venture tokens for
-// upgrade-gated data points start at 0, so without this merge those
-// points stay locked (lockAmountZero) even after the upgrade is bought.
-// Overlapping upgrades take the maximum so toggling one upgrade off does
-// not silently un-unlock a token still provided by another.
+// Venture base tokens carry amount=0 for upgrade-gated data points; the
+// ProfileSet popup renders them greyed via lockAmountZero. Each active
+// upgrade lifts per-gestalt amounts to the upgrade's value; overlapping
+// upgrades take the max so removing one upgrade doesn't un-unlock a token
+// still provided by another.
 function _computeUpgradeTokens(perpTypeData: PerpTypeData, powerups: PowerupDef[]): TokenSpec[] {
   var merged: TokenSpec[] = (perpTypeData.tokens || []).map((t) => Object.assign({}, t));
   var byGestalt: Record<string, TokenSpec> = {};
@@ -1069,14 +1064,9 @@ function _computeUpgradeTokens(perpTypeData: PerpTypeData, powerups: PowerupDef[
   return merged;
 }
 
-// Walks every node carrying active powerups and re-merges its
-// instance_data.tokens via _computeUpgradeTokens. This is the cold-start
-// counterpart to buyPowerup/sellPowerup: legacy saves (and any historical
-// delta replay) that landed before the buy/sell paths merged upgrade
-// tokens still carry amount=0 for upgrade-gated tokens, so the data tab
-// would render greyed out after a reload. Only nodes whose merged tokens
-// actually differ are rewritten so untouched nodes keep their reference
-// identity for downstream change-detection.
+// Cold-start fixup for state where instance_data.tokens was persisted
+// without the upgrade merge (legacy saves, replayed historical deltas).
+// Reference identity is preserved for nodes whose tokens already match.
 function _repairUpgradeTokens(state: LocalState): LocalState {
   var nodes = state.nodes || [];
   var changed = false;
@@ -1084,9 +1074,7 @@ function _repairUpgradeTokens(state: LocalState): LocalState {
     var idata = (n.instance_data || {}) as NodeInstanceData;
     var powerups = idata.powerups;
     if (!powerups || !powerups.length) return n;
-    var ft = n.full_type || '';
-    var colon = ft.indexOf(':');
-    var perpGestalt = colon >= 0 ? ft.slice(colon + 1) : n.gestalt || '';
+    var perpGestalt = _gestaltFrom(n.full_type) || n.gestalt || '';
     var perpTypeDef = _getRuleset().perps[perpGestalt];
     var perpTypeData = perpTypeDef && perpTypeDef.type_data;
     if (!perpTypeData || !perpTypeData.tokens || !perpTypeData.tokens.length) return n;
