@@ -1026,6 +1026,45 @@ function _computeModifiers(perpTypeData: PerpTypeData, powerups: PowerupDef[]): 
   return { charge_cost: chargeCost, collect_amount: collectAmount, collect_risk: collectRisk };
 }
 
+// Merge an UpgradePowerup's tokens into the base venture tokens. Each
+// active upgrade lifts the per-gestalt `amount` to the upgrade's value
+// when it exceeds the current amount — base venture tokens for
+// upgrade-gated data points start at 0, so without this merge those
+// points stay locked (lockAmountZero) even after the upgrade is bought.
+// Overlapping upgrades take the maximum so toggling one upgrade off does
+// not silently un-unlock a token still provided by another.
+function _computeUpgradeTokens(perpTypeData: PerpTypeData, powerups: PowerupDef[]): TokenSpec[] {
+  var merged: TokenSpec[] = (perpTypeData.tokens || []).map((t) => Object.assign({}, t));
+  var byGestalt: Record<string, TokenSpec> = {};
+  for (var i = 0; i < merged.length; i++) {
+    var bt = merged[i];
+    if (bt && bt.gestalt) byGestalt[bt.gestalt] = bt;
+  }
+  var ruleset = _getRuleset();
+  for (var p = 0; p < powerups.length; p++) {
+    var pu = powerups[p];
+    if (!pu || !pu.gestalt) continue;
+    var puDef = ruleset.powerups[pu.gestalt];
+    var puTokens: TokenSpec[] =
+      (puDef && puDef.type_data && (puDef.type_data as { tokens?: TokenSpec[] }).tokens) || [];
+    for (var t = 0; t < puTokens.length; t++) {
+      var ut = puTokens[t];
+      if (!ut || !ut.gestalt) continue;
+      var added = ut.amount || 0;
+      var slot = byGestalt[ut.gestalt];
+      if (slot) {
+        var existing = slot.amount || 0;
+        if (added > existing) slot.amount = added;
+      } else {
+        var clone: TokenSpec = Object.assign({}, ut);
+        merged.push(clone);
+        byGestalt[ut.gestalt] = clone;
+      }
+    }
+  }
+  return merged;
+}
+
 function _getLevelByXP(xp: number): number {
   var levels = _getRuleset().levels;
   for (var i = 0; i < levels.length; i++) {
@@ -1116,7 +1155,7 @@ export function buyPowerup(
     charge_cost: mods.charge_cost,
     collect_amount: mods.collect_amount,
     collect_risk: mods.collect_risk,
-    tokens: perpTypeData.tokens || [],
+    tokens: _computeUpgradeTokens(perpTypeData, newPowerups),
   });
 
   var newXp = (state.game_values.xp_value || 0) + (perpTypeData.xp_inc || 1);
@@ -1231,7 +1270,7 @@ export function sellPowerup(
     charge_cost: mods.charge_cost,
     collect_amount: mods.collect_amount,
     collect_risk: mods.collect_risk,
-    tokens: perpTypeData.tokens || [],
+    tokens: _computeUpgradeTokens(perpTypeData, newPowerups),
   });
 
   var newXp = (state.game_values.xp_value || 0) + 1;
