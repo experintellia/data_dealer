@@ -18,12 +18,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // without widening the global $ type for tsc.
 import { installFakeJq } from './_jq.js';
 
-// vi.mock is hoisted: cut the GameNode → Render.js → app.ts ↔ Game.js
-// chain that v8 coverage instrumentation can reorder enough to break
-// `class GamePerp extends GameNode` (see missions-init.test.js).
+// vi.mock is hoisted: cut the app.js → Game.js → game/* fan-out so the
+// only thing that loads transitively is Mission.ts → GameNode.ts.
+// Without these stubs the full game/ family (GamePerp, Database, Imperium,
+// ProfileSet, Topscore, …) evaluates at module load; under v8 coverage
+// instrumentation the eval order can shift just enough that one of those
+// GamePerp-derived classes binds before GameNode finishes initialising,
+// throwing "Class extends value undefined is not a constructor or null".
 vi.mock('../../scripts/Render.js', () => ({
   getRender: () => ({}),
   default: { getRender: () => ({}) },
+}));
+vi.mock('../../scripts/app.js', () => ({
+  default: { remote: {}, debug: {} },
 }));
 
 installFakeJq();

@@ -23,6 +23,9 @@ vi.mock('../../scripts/Render.js', () => ({
   getRender: () => ({}),
   default: { getRender: () => ({}) },
 }));
+vi.mock('../../scripts/app.js', () => ({
+  default: { remote: {}, debug: {} },
+}));
 
 installFakeJq();
 
