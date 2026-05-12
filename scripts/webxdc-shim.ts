@@ -19,14 +19,34 @@ import type { ReceivedStatusUpdate, SendingStatusUpdate } from '@webxdc/types';
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      _updates = JSON.parse(stored);
+      try {
+        _updates = JSON.parse(stored);
+      } catch (parseErr) {
+        // Malformed payload (truncated, hand-edited, schema drift) — drop
+        // the history rather than crash, but make the loss observable so a
+        // dev notices instead of silently restarting from an empty queue.
+        console.warn(
+          '[webxdc-shim] failed to parse stored updates; dropping history:',
+          parseErr
+        );
+        _updates = [];
+      }
     }
-  } catch (_) {}
+  } catch (storageErr) {
+    // localStorage access threw (quota, private browsing, disabled). Degrade
+    // to a fresh in-memory queue; log so the dev sees why replay is empty.
+    console.warn('[webxdc-shim] localStorage read failed:', storageErr);
+  }
 
   function _persist(): void {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(_updates));
-    } catch (_) {}
+    } catch (storageErr) {
+      // Write failures are non-fatal (state still works in-memory for the
+      // session), but a silent drop here means a page reload loses progress —
+      // surface the cause via console.warn.
+      console.warn('[webxdc-shim] localStorage write failed:', storageErr);
+    }
   }
 
   // Cast via `any` — this is a minimal dev scaffold, not a full Webxdc
