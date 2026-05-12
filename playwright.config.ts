@@ -11,7 +11,7 @@ const chromiumExecutablePath = existsSync(LOCAL_CHROMIUM) ? LOCAL_CHROMIUM : und
 // Defaults to 'hq' to preserve historical behaviour; CI sets BUILD_VARIANT
 // explicitly to exercise both variants on every push.  Validate early so a
 // typo fails fast instead of being silently treated as 'hq' by vite.config.js.
-const BUILD_VARIANT = process.env.BUILD_VARIANT || 'hq';
+const BUILD_VARIANT = process.env.BUILD_VARIANT ?? 'hq';
 if (BUILD_VARIANT !== 'hq' && BUILD_VARIANT !== 'casual') {
   throw new Error(`BUILD_VARIANT must be 'hq' or 'casual', got '${BUILD_VARIANT}'`);
 }
