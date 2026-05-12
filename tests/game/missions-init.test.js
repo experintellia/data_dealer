@@ -9,8 +9,20 @@
 // on every reload from a state where the player had not actually
 // completed every mission.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { installFakeJq } from './_jq.js';
+
+// vi.mock calls are hoisted by vitest. GameNode.ts → Render.js drags the
+// whole render factory chain (app.ts ↔ Render.js ↔ Game.js) through every
+// game-class import. Under v8 coverage instrumentation the eval order can
+// shift enough that `class GamePerp extends GameNode` evaluates while
+// GameNode's module is still being defined, throwing
+// "Class extends value undefined is not a constructor or null". Stubbing
+// Render.js here keeps the import graph small and deterministic.
+vi.mock('../../scripts/Render.js', () => ({
+  getRender: () => ({}),
+  default: { getRender: () => ({}) },
+}));
 
 installFakeJq();
 

@@ -18,6 +18,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // without widening the global $ type for tsc.
 import { installFakeJq } from './_jq.js';
 
+// vi.mock is hoisted: cut the GameNode → Render.js → app.ts ↔ Game.js
+// chain that v8 coverage instrumentation can reorder enough to break
+// `class GamePerp extends GameNode` (see missions-init.test.js).
+vi.mock('../../scripts/Render.js', () => ({
+  getRender: () => ({}),
+  default: { getRender: () => ({}) },
+}));
+
 installFakeJq();
 
 const { Mission } = await import('../../scripts/game/Mission.ts');
