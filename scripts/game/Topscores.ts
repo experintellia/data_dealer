@@ -32,6 +32,10 @@ export class Topscores extends GameNode {
   declare children: OrderedSet<Topscore>;
   ViewMap?: Topscores;
   queue?: OrderedSet<unknown>;
+  /** Unsubscribe handle returned by `bootMod.subscribePeersChanged()` in
+   *  extendEventHandlers; invoked from remove() so the listener doesn't
+   *  outlive the GameNode (see audit bug #8). */
+  private _peersUnsub?: () => void;
 
   constructor(config?: GameNodeConfig) {
     // The legacy constructor stamped these *before* calling init() so that
@@ -116,12 +120,25 @@ export class Topscores extends GameNode {
       score.fetchScore();
     });
 
-    // Live leaderboard refresh on every state.peers ref change.
-    // Topscores lives for the page lifetime; the unsubscribe is dropped.
+    // Live leaderboard refresh on every state.peers ref change.  Persist
+    // the unsubscribe handle so remove() can detach the listener — pre-fix
+    // the handle was dropped on the floor, leaking the listener if the
+    // Topscores node was ever torn down (tests, view teardown, etc.).
     if (bootMod && typeof bootMod.subscribePeersChanged === 'function') {
-      bootMod.subscribePeersChanged(function () {
+      this._peersUnsub = bootMod.subscribePeersChanged(function () {
         gnode.updateScores();
       });
     }
+  }
+
+  override remove(): void {
+    if (this._peersUnsub) {
+      try {
+        this._peersUnsub();
+      } finally {
+        delete this._peersUnsub;
+      }
+    }
+    super.remove();
   }
 }
