@@ -8,9 +8,13 @@ import { boot, getBootPromise, getReplayProgress } from './boot.js';
 // In Node (vitest, SSR) there is no DOM and no vendor globals — skip
 // the whole UI hand-off so the module is import-safe without jsdom.
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-  if (typeof webxdc !== 'undefined') {
-    boot();
-  }
+  // Always invoke boot() — `boot()` itself handles the `webxdc === undefined`
+  // case by seeding freshState('') and skipping setUpdateListener. Skipping
+  // boot here used to leave `_currentState` null, so the very first
+  // getState() call from getSessionLocale (during continueStart) threw with
+  // a cryptic "called before boot()" error. See audit fix in
+  // claude/audit-fix-bootstrap.
+  boot();
 
   const $ = jQuery ?? globalThis.$;
   if (!$) throw new Error('bootstrap.ts: jQuery global not found');
