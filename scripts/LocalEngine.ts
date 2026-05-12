@@ -499,6 +499,10 @@ export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameRe
   // legacy code that didn't seed goals). This is the prerequisite for
   // mission progression: empty goals → progression handlers no-op.
   var seededState = _seedMissionGoals(mat.state);
+  // Repair instance_data.tokens for any ProjectPerp carrying active
+  // upgrades — covers legacy saves and historical-delta replay where the
+  // buyPowerup result landed before the upgrade-tokens merge existed.
+  seededState = _repairUpgradeTokens(seededState);
   setState(seededState);
 
   // Persist as a recheckMissions delta so the repair lands in durable
@@ -1063,6 +1067,55 @@ function _computeUpgradeTokens(perpTypeData: PerpTypeData, powerups: PowerupDef[
     }
   }
   return merged;
+}
+
+// Walks every node carrying active powerups and re-merges its
+// instance_data.tokens via _computeUpgradeTokens. This is the cold-start
+// counterpart to buyPowerup/sellPowerup: legacy saves (and any historical
+// delta replay) that landed before the buy/sell paths merged upgrade
+// tokens still carry amount=0 for upgrade-gated tokens, so the data tab
+// would render greyed out after a reload. Only nodes whose merged tokens
+// actually differ are rewritten so untouched nodes keep their reference
+// identity for downstream change-detection.
+function _repairUpgradeTokens(state: LocalState): LocalState {
+  var nodes = state.nodes || [];
+  var changed = false;
+  var newNodes = nodes.map(function (n) {
+    var idata = (n.instance_data || {}) as NodeInstanceData;
+    var powerups = idata.powerups;
+    if (!powerups || !powerups.length) return n;
+    var ft = n.full_type || '';
+    var colon = ft.indexOf(':');
+    var perpGestalt = colon >= 0 ? ft.slice(colon + 1) : n.gestalt || '';
+    var perpTypeDef = _getRuleset().perps[perpGestalt];
+    var perpTypeData = perpTypeDef && perpTypeDef.type_data;
+    if (!perpTypeData || !perpTypeData.tokens || !perpTypeData.tokens.length) return n;
+    var merged = _computeUpgradeTokens(perpTypeData, powerups);
+    var existing = idata.tokens || [];
+    if (_tokensEqual(existing, merged)) return n;
+    changed = true;
+    return Object.assign({}, n, {
+      instance_data: Object.assign({}, idata, { tokens: merged }),
+    });
+  });
+  if (!changed) return state;
+  return Object.assign({}, state, { nodes: newNodes });
+}
+
+function _tokensEqual(a: TokenSpec[], b: TokenSpec[]): boolean {
+  if (a.length !== b.length) return false;
+  var aByGestalt: Record<string, number> = {};
+  for (var i = 0; i < a.length; i++) {
+    var ta = a[i];
+    if (ta && ta.gestalt) aByGestalt[ta.gestalt] = ta.amount || 0;
+  }
+  for (var j = 0; j < b.length; j++) {
+    var tb = b[j];
+    if (!tb || !tb.gestalt) continue;
+    if (!Object.prototype.hasOwnProperty.call(aByGestalt, tb.gestalt)) return false;
+    if (aByGestalt[tb.gestalt] !== (tb.amount || 0)) return false;
+  }
+  return true;
 }
 
 function _getLevelByXP(xp: number): number {

@@ -18,9 +18,10 @@
  * amounts back to the base venture defaults (0 for upgrade-gated tokens).
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { buyPowerup, sellPowerup } from '../../scripts/LocalEngine.js';
+import { buyPowerup, loadGame, sellPowerup } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { clearOverride, setOverride } from '../../scripts/clock.js';
+import { applyDelta } from '../../scripts/state.js';
 import { FIXED_NOW, mkState } from './_fixtures.js';
 
 // project009 = "Preventive checkup" (ruleset_3.en.json:7531)
@@ -130,6 +131,123 @@ describe('buyPowerup — upgrade tokens unlock venture data points', () => {
     await buyPowerup(PROJECT_PATH, 0, 'upgrade073');
     const node = getState().nodes[0];
     expect(findToken(node.instance_data.tokens, 'token125').amount).toBe(100);
+  });
+});
+
+describe('loadGame — repairs upgrade tokens on cold start', () => {
+  // Simulates a legacy save written before this fix existed: the player
+  // already owns Blood test (upgrade073 in slot 0) but instance_data.tokens
+  // still carries the unmerged base venture catalogue with amount: 0 for
+  // upgrade-gated tokens. Without a repair pass on load, the data tab
+  // stays greyed out forever — buyPowerup only runs when the player
+  // actively buys.
+  function legacySeededState() {
+    const legacyTokens = [
+      { gestalt: 'token001', amount: 100, full_type: 'TokenPerp:token001' },
+      { gestalt: 'token018', amount: 0, full_type: 'TokenPerp:token018' },
+      { gestalt: 'token053', amount: 0, full_type: 'TokenPerp:token053' },
+      { gestalt: 'token125', amount: 0, full_type: 'TokenPerp:token125' },
+    ];
+    const node = Object.assign({}, PROJECT_NODE, {
+      instance_data: {
+        powerups: [{ slot: 0, gestalt: 'upgrade073', full_type: 'UpgradePowerup:upgrade073' }],
+        tokens: legacyTokens,
+      },
+    });
+    return mkState({
+      nodes: [node],
+      game_values: { cash_value: 5000 },
+      // Mark as "not a new game" so loadGame doesn't hit the new-game branch.
+      node_counter: 5,
+    });
+  }
+
+  it('cold-load with buggy stored tokens restores upgrade token amounts', async () => {
+    setState(legacySeededState());
+
+    // Sanity: pre-load state mirrors the bug — token018/053/125 stuck at 0.
+    const before = getState().nodes[0].instance_data.tokens;
+    expect(findToken(before, 'token018').amount).toBe(0);
+    expect(findToken(before, 'token125').amount).toBe(0);
+
+    await loadGame();
+
+    const after = getState().nodes[0].instance_data.tokens;
+    expect(findToken(after, 'token018').amount).toBe(25);
+    expect(findToken(after, 'token053').amount).toBe(25);
+    expect(findToken(after, 'token125').amount).toBe(100);
+    // Always-on base token stays put.
+    expect(findToken(after, 'token001').amount).toBe(100);
+  });
+
+  it('leaves nodes without powerups untouched on cold load', async () => {
+    const noPowerupsNode = Object.assign({}, PROJECT_NODE, {
+      instance_data: {
+        powerups: [],
+        tokens: [{ gestalt: 'token001', amount: 100, full_type: 'TokenPerp:token001' }],
+      },
+    });
+    setState(mkState({ nodes: [noPowerupsNode], node_counter: 5 }));
+    const before = getState().nodes[0].instance_data.tokens;
+
+    await loadGame();
+
+    const after = getState().nodes[0].instance_data.tokens;
+    expect(after).toEqual(before);
+  });
+
+  it('cold-load is idempotent — running loadGame twice gives the same tokens', async () => {
+    setState(legacySeededState());
+    await loadGame();
+    const first = getState().nodes[0].instance_data.tokens.map((t) => ({
+      gestalt: t.gestalt,
+      amount: t.amount,
+    }));
+
+    await loadGame();
+    const second = getState().nodes[0].instance_data.tokens.map((t) => ({
+      gestalt: t.gestalt,
+      amount: t.amount,
+    }));
+
+    expect(second).toEqual(first);
+  });
+
+  it('replaying a buyPowerup delta then loadGame yields correctly merged tokens', async () => {
+    // Simulate a peer / cold reload: applyDelta directly with a legacy-shaped
+    // result whose instance_data.tokens are unmerged. loadGame must repair.
+    setState(projectState());
+    const buggyDelta = {
+      kind: 'delta',
+      addr: 'test@local',
+      ts: FIXED_NOW,
+      op: 'buyPowerup',
+      args: [PROJECT_PATH, 0, 'upgrade073'],
+      result: {
+        node: {
+          full_path: PROJECT_PATH,
+          instance_data: {
+            powerups: [{ slot: 0, gestalt: 'upgrade073', full_type: 'UpgradePowerup:upgrade073' }],
+            // Legacy: only base venture tokens, no upgrade merge.
+            tokens: [
+              { gestalt: 'token001', amount: 100, full_type: 'TokenPerp:token001' },
+              { gestalt: 'token018', amount: 0, full_type: 'TokenPerp:token018' },
+              { gestalt: 'token125', amount: 0, full_type: 'TokenPerp:token125' },
+            ],
+          },
+        },
+        game_values: {},
+      },
+    };
+    setState(applyDelta(getState(), buggyDelta));
+    // Confirm the bug landed in state.
+    expect(findToken(getState().nodes[0].instance_data.tokens, 'token125').amount).toBe(0);
+
+    await loadGame();
+
+    const after = getState().nodes[0].instance_data.tokens;
+    expect(findToken(after, 'token018').amount).toBe(25);
+    expect(findToken(after, 'token125').amount).toBe(100);
   });
 });
 
