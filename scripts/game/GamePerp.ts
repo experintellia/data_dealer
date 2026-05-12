@@ -16,6 +16,7 @@ import i18n from '../i18n.js';
 import { GameNode, getAllByGestalt, getByFirstId, getFirstId } from './GameNode.js';
 import { mergeData } from './mergeData.js';
 import { lookupPerpClass } from './perpRegistry.js';
+import { computeBuyPerpSpawnPos } from './spawnPosition.js';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -414,24 +415,21 @@ export class GamePerp extends GameNode {
         data: { contained_tokens?: unknown[]; provided_perps?: string[]; [key: string]: unknown };
       };
       gnode.addChild(perp);
-      // FIXME: fishy but works?
       const gnodeRn = gnode.renderNode as RenderNodeLike | undefined;
       const parentRn = gnode.parentNode?.renderNode as RenderNodeLike | undefined;
-      if (gnodeRn && parentRn) {
-        const vector = parentRn.getVectorTo?.(gnodeRn);
-        // Golden ratio.
-        if (!placePos && vector) {
-          const calced = gnodeRn.getVectorPos?.(vector, 0.61803398875);
-          if (calced) {
-            placePos = calced;
-            perp.renderData.config.placeRandom = placePos;
-            perp.renderData.config.placeParentRadius = 320;
-          }
-        }
+      const parentPos = gnodeRn?.getPosition?.();
+      if (parentPos) {
+        const spawn = computeBuyPerpSpawnPos({
+          explicitPos: placePos,
+          parentPos,
+          grandparentPos: parentRn?.getPosition?.(),
+        });
+        placePos = spawn.pos;
+        perp.renderData.config.placeRandom = spawn.pos;
+        perp.renderData.config.placeParentRadius = spawn.parentRadius;
+      } else if (placePos) {
+        perp.renderData.config.placeRandom = placePos;
       }
-
-      if (placePos) perp.renderData.config.placeRandom = placePos;
-      perp.renderData.config.placeParentRadius = 0;
       perp.renderData.config.hidden = true;
 
       perp.render();
