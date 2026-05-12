@@ -1612,3 +1612,131 @@ test.describe('Section M — Subpop close + simple TokenPerp', () => {
 //
 // If a phase 2 follow-up reintroduces any of these as a real affordance,
 // add a test alongside the new template / handler.
+
+// ── Section O: OKButton + PowerupBuySlotsButton (audit follow-up) ────────
+//
+// Two follow-ups from a second-pass audit:
+//   1. `data-button-id="OKButton"` shares its close handler with
+//      `.SubpopClose` (RenderTopLevelUI.ts:824 binds both with one rule).
+//      Section M tests the .SubpopClose class path; we pin the OKButton
+//      attribute path here so a Preact port that splits the two
+//      selectors regresses against this test, not at runtime.
+//   2. `button_click.PowerupBuySlotsButton` (GameNode.ts:746) actually
+//      executes a slot purchase via ProjectPerp.BuySlots → engine.buySlots.
+//      Section H's BuySlots test exercises the +/− controls inside the
+//      subpop; here we drive the purchase button itself and verify the
+//      new slot lands in state.
+
+test.describe('Section O — OKButton + PowerupBuySlotsButton', () => {
+  test('OKButton on a subpop has the same close effect as .SubpopClose', async ({ page }) => {
+    // We can't lean on subpop_token / subpop_token_upgrade in a fresh
+    // game (no integrated tokens yet), so we drive the contract directly:
+    // mount a Subpop[data-subpop-id="OKButtonTest"] inside the open
+    // status popup and click its .Button[data-button-id="OKButton"].
+    // The delegated handler at RenderTopLevelUI.ts:822-839 should strip
+    // .open from the subpop without closing the parent.
+    await bootGame(page);
+    await openStatusPopup(page, 'Cash');
+
+    await page.evaluate(() => {
+      const tab = document.querySelector<HTMLElement>('.PopupContainer.lockOn .PopupBody');
+      if (!tab) throw new Error('popup body not mounted');
+      // Wrap the status popup body in a fake PopupTab + SubpopContainer
+      // so the delegated handler's `.parents('.PopupTab')` traversal
+      // resolves the same way it would inside a real subpop host.
+      const fakeHost = document.createElement('div');
+      fakeHost.className = 'PopupTab';
+      fakeHost.innerHTML = `
+        <div class="SubpopContainer open">
+          <div class="Subpop open" data-subpop-id="OKButtonTest" data-testid="okbutton-fake-subpop">
+            <div class="Button" data-button-id="OKButton" data-testid="okbutton-trigger">OK</div>
+          </div>
+        </div>
+      `;
+      tab.appendChild(fakeHost);
+    });
+
+    const subpop = page.locator('[data-testid="okbutton-fake-subpop"]');
+    await expect(subpop).toHaveClass(/open/);
+
+    await page.locator('[data-testid="okbutton-trigger"]').click({ force: true });
+
+    // Handler must remove .open from the subpop; the parent popup remains.
+    await expect(subpop).not.toHaveClass(/open/, { timeout: 2_000 });
+    await expect(page.locator('.PopupContainer.lockOn .PopupBody.Status')).toBeVisible();
+
+    // Cleanup.
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.renderPopup?.trigger('popup_close');
+    });
+  });
+
+  test('PowerupBuySlotsButton purchases extra upgrade slots and updates engine state', async ({
+    page,
+  }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ProjectPerp',
+      gestalt: 'project001',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupMenu',
+      // Slot prices scale; give plenty of headroom.
+      boost: { cash: 20_000, xp_level: 2, xp_value: 20 },
+    });
+    await page.evaluate(() => {
+      const game = (window as any).__dd?._app?.game;
+      const gnode = game.getById('project001');
+      gnode.fetchPowerups(function () {
+        gnode.compilePowerups();
+        gnode.compileProfileSet?.();
+        if (gnode.renderPopup) gnode.updatePopup();
+      });
+    });
+
+    const slotsBefore = await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      const gnode = groot.getById('project001');
+      return (gnode.data?.upgrade_slots ?? 0) as number;
+    });
+
+    // Fire the same event the Buy-N-slots button delegator emits.  The
+    // gestalt format mirrors the template:
+    // data-button-gestalt="buyslots:<pkey>", data-button-data="<num>".
+    // ProjectPerp.BuySlots routes to engine.buySlots, which appends `num`
+    // to the perp's upgrade_slots counter.
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      const gnode = groot.getById('project001');
+      gnode.renderPopup.trigger('button_click.PowerupBuySlotsButton', [
+        'buyslots:UpgradePowerup',
+        1,
+      ]);
+    });
+
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const groot = (window as any).__dd?._app?.game;
+            const gnode = groot.getById('project001');
+            return (gnode.data?.upgrade_slots ?? 0) as number;
+          }),
+        { timeout: 3_000 }
+      )
+      .toBe(slotsBefore + 1);
+
+    // Engine state must reflect the new slot count too.
+    const persisted = await page.evaluate(async () => {
+      const boot = await new Promise<any>((res, rej) =>
+        (window as any).require(['boot'], res, rej)
+      );
+      const state = boot.getState();
+      const node = (state.nodes || []).find((n: any) => n.full_path === 'Imperium.project001');
+      return node?.instance_data?.upgrade_slots;
+    });
+    expect(persisted).toBe(slotsBefore + 1);
+
+    await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupMenu', 'x');
+  });
+});
