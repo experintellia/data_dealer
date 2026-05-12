@@ -350,6 +350,29 @@ var Render = function () {
       e.stopPropagation();
       dm.dragend(e);
     });
+
+    // Audit bug #1: the drag state machine had no recovery paths. If a
+    // pointer was released outside the window, or the user alt-tabbed
+    // away mid-drag, `dragging` stayed `true` forever and every node in
+    // `listeners` kept its `dragging` flag set. The handlers below
+    // funnel pointercancel / window blur / tab-hide visibilitychange
+    // into the same `dragend` path used by mouseup/touchend, and are
+    // stored as refs so dispose() can detach them.
+    dm._recoverHandler = function (e) {
+      dm.dragend(e);
+    };
+    dm._visibilityHandler = function (e) {
+      if (typeof document !== 'undefined' && document && document.hidden) {
+        dm.dragend(e);
+      }
+    };
+    if (typeof window !== 'undefined' && window.addEventListener) {
+      window.addEventListener('pointercancel', dm._recoverHandler);
+      window.addEventListener('blur', dm._recoverHandler);
+    }
+    if (typeof document !== 'undefined' && document && document.addEventListener) {
+      document.addEventListener('visibilitychange', dm._visibilityHandler);
+    }
     this.on('mousemove touchmove', function (e) {
       if (!dm.dragging) {
         return;
@@ -405,6 +428,29 @@ var Render = function () {
           */
       }
     });
+  };
+
+  // Audit bug #1: counterpart to the pointercancel / blur / visibilitychange
+  // listeners installed in init(). Callers that own a DragHandler should
+  // call dispose() before dropping the reference so the global listeners
+  // don't pin the handler.
+  DragHandler.prototype.dispose = function () {
+    if (typeof window !== 'undefined' && window.removeEventListener) {
+      if (this._recoverHandler) {
+        window.removeEventListener('pointercancel', this._recoverHandler);
+        window.removeEventListener('blur', this._recoverHandler);
+      }
+    }
+    if (
+      typeof document !== 'undefined' &&
+      document &&
+      document.removeEventListener &&
+      this._visibilityHandler
+    ) {
+      document.removeEventListener('visibilitychange', this._visibilityHandler);
+    }
+    this._recoverHandler = undefined;
+    this._visibilityHandler = undefined;
   };
 
   ///////////////////////////////////////////
