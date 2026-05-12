@@ -14,15 +14,11 @@
  * for each db_queue entry via `_generateId()`.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  collectPerp,
-  setSendDelta,
-  resetPrngSeed,
-} from '../../scripts/LocalEngine.js';
+import { collectPerp, resetPrngSeed, setSendDelta } from '../../scripts/LocalEngine.js';
 import { setState } from '../../scripts/boot.js';
-import { setOverride, clearOverride } from '../../scripts/clock.js';
-import { freshState } from '../../scripts/state.js';
+import { clearOverride, setOverride } from '../../scripts/clock.js';
 import { materialize } from '../../scripts/materializer.js';
+import { freshState } from '../../scripts/state.js';
 import { FIXED_NOW, mkChargingEntry, mkGv, mkNode } from './_fixtures.js';
 
 const COLLECT_DUR = 120_000;

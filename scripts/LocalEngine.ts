@@ -2369,10 +2369,7 @@ function _deriveBootSeed(addr: string): number {
 
 function _ensurePrngSeeded(): void {
   if (_prngSeed != null) return;
-  var addr =
-    typeof webxdc !== 'undefined' && webxdc
-      ? webxdc.selfAddr || ''
-      : '';
+  var addr = typeof webxdc !== 'undefined' && webxdc ? webxdc.selfAddr || '' : '';
   _prngSeed = _deriveBootSeed(addr);
 }
 

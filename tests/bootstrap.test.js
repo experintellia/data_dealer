@@ -45,15 +45,19 @@ describe('bootstrap — webxdc-absent boot regression', () => {
         return fakeJq();
       },
     });
-    fakeJq.when = (...args) => ({
-      then(cb) {
-        cb(...args);
-        return fakeJq();
-      },
-      fail() {
-        return fakeJq();
-      },
-    });
+    fakeJq.when = (...args) => {
+      const deferred = {
+        // biome-ignore lint/suspicious/noThenProperty: jQuery Deferred surface requires .then
+        then(cb) {
+          cb(...args);
+          return fakeJq();
+        },
+        fail() {
+          return fakeJq();
+        },
+      };
+      return deferred;
+    };
 
     globalThis.window = {};
     globalThis.document = {
