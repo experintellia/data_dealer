@@ -43,13 +43,13 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       err && typeof err === 'object' && 'message' in err
         ? String((err as { message?: unknown }).message)
         : String(err || '');
-    $('#loadertext').html(
-      'Sorry, the Game failed to start.<br>' +
-        '<small style="opacity:.7">' +
-        message +
-        (detail ? ': ' + detail : '') +
-        '</small>'
-    );
+    // Set the headline via .html() so the <br> renders, then set the detail
+    // line via the <small> child's textContent so any attacker-influenced
+    // `err.message` contents are treated as a literal string, not parsed as
+    // HTML.
+    $('#loadertext').html('Sorry, the Game failed to start.<br><small style="opacity:.7"></small>');
+    const smallEl = document.querySelector('#loadertext small');
+    if (smallEl) smallEl.textContent = message + (detail ? ': ' + detail : '');
   };
 
   const continueStart = (): void => {
