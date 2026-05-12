@@ -385,7 +385,19 @@ function triggerAchievement(
 // This is the only place outside the listener that calls setState — it IS the
 // listener-equivalent for environments without webxdc.
 function _persistDelta(delta: Delta): void {
-  if (_sendDelta) _sendDelta(delta);
+  // `_sendDelta` is the test-only sink installed by `setSendDelta`. When set,
+  // it is mutually exclusive with the production `webxdc.sendUpdate` path:
+  // if a real shim is also wired, its listener would echo the delta back
+  // through applyDelta, double-mutating state. Tests that need to observe the
+  // post-echo state call applyDelta on the captured delta themselves (see
+  // tests/handlers/listener-echo.test.js). State still advances locally via
+  // the synchronous setState below so handlers see a consistent post-mutation
+  // view, matching the listener-echo behaviour of the production engine.
+  if (_sendDelta) {
+    _sendDelta(delta);
+    setState(applyDelta(getState(), delta));
+    return;
+  }
   if (typeof webxdc !== 'undefined' && webxdc) {
     webxdc.sendUpdate({ payload: delta }, '');
   } else {
