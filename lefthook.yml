@@ -3,3 +3,13 @@ pre-commit:
     biome:
       glob: "*.{js,ts,css}"
       run: pnpm exec biome check --no-errors-on-unmatched {staged_files}
+
+# Heavier checks run on push only — typecheck + unit tests would slow
+# down every commit, but at the push boundary they catch regressions
+# before they reach CI.
+pre-push:
+  commands:
+    typecheck:
+      run: pnpm typecheck
+    test:
+      run: pnpm test
