@@ -25,8 +25,16 @@ import type { ReceivedStatusUpdate, SendingStatusUpdate } from '@webxdc/types';
         // Malformed payload (truncated, hand-edited, schema drift) — drop
         // the history rather than crash, but make the loss observable so a
         // dev notices instead of silently restarting from an empty queue.
+        // Also remove the malformed key so the next reload doesn't replay
+        // the same warning until a successful _persist() overwrites it.
         console.warn('[webxdc-shim] failed to parse stored updates; dropping history:', parseErr);
         _updates = [];
+        try {
+          localStorage.removeItem(STORAGE_KEY);
+        } catch (_) {
+          /* removal failure is non-fatal — the next successful _persist
+             will overwrite the malformed payload anyway. */
+        }
       }
     }
   } catch (storageErr) {

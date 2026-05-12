@@ -323,6 +323,12 @@ let _sendDelta: DeltaSender | null = null;
 /**
  * Inject the delta persistence function (tests use this to capture deltas).
  * In production, boot.js wires this to webxdc.sendUpdate via the listener.
+ *
+ * NOTE: when `_sendDelta` is set, `_persistDelta` short-circuits and does
+ * NOT call `webxdc.sendUpdate` even if a real webxdc shim is also wired up.
+ * This prevents double-mutation (spy + shim listener echo) but it means
+ * any test that needs to assert "the listener round-trips a real delta"
+ * must NOT install the spy. Use the real shim alone in those cases.
  */
 export function setSendDelta(fn: DeltaSender): void {
   _sendDelta = fn;
@@ -2362,9 +2368,31 @@ function _deriveBootSeed(addr: string): number {
   // PRNG streams. djb2 is reused from the charge-jitter path for consistency.
   var addrHash = addr ? _djb2(addr) : 0;
   var now = Date.now() >>> 0;
+  // Empty-addr fallback (selfAddr not yet known, or running in a webxdc-less
+  // node): mix in a single word from crypto.getRandomValues so two peers
+  // booting in the same millisecond without an addr still pick disjoint
+  // streams. Falls back to 0 (i.e. pure Date.now()) if crypto is unavailable.
+  var entropy = 0;
+  if (!addr) {
+    try {
+      var g = globalThis as unknown as {
+        crypto?: { getRandomValues?: (a: Uint32Array) => Uint32Array };
+      };
+      if (g.crypto && typeof g.crypto.getRandomValues === 'function') {
+        var buf = new Uint32Array(1);
+        g.crypto.getRandomValues(buf);
+        // buf[0] is `number | undefined` under noUncheckedIndexedAccess —
+        // narrow with ?? before bit-or-coercing back to int32.
+        entropy = (buf[0] ?? 0) | 0;
+      }
+    } catch (_) {
+      /* crypto unavailable (older runtime, locked-down sandbox) — fall back
+         to pure Date.now() entropy. */
+    }
+  }
   // XOR the high 16 bits of the hash with the low half of now to spread
   // entropy across the seed word; final `>>> 0` keeps it in uint32 range.
-  return (addrHash ^ now ^ (addrHash << 16)) >>> 0;
+  return (addrHash ^ now ^ (addrHash << 16) ^ entropy) >>> 0;
 }
 
 function _ensurePrngSeeded(): void {
@@ -2382,15 +2410,19 @@ export function setPrngSeed(seed: number): void {
 }
 
 /**
- * Re-seed the PRNG from (addr || webxdc.selfAddr) mixed with Date.now().
+ * @internal — test / boot wiring only. Re-seed the PRNG from
+ * (addr || webxdc.selfAddr) mixed with Date.now() + crypto entropy.
  *
- * Production callers (boot wiring) invoke this once `selfAddr` is known so
- * each peer's `_generateId` stream is unique. Tests can call it to simulate
- * a "fresh boot for peer X" without relying on the legacy constant seed.
+ * Production callers invoke this once `selfAddr` is known so each peer's
+ * `_generateId` stream is unique. Tests can call it to simulate a "fresh
+ * boot for peer X" without relying on the legacy constant seed.
  *
  * Passing no argument also clears the seed back to lazy-init, so the next
  * `_rng()` call re-reads `webxdc.selfAddr` (useful for tests that swap
  * `globalThis.webxdc` between boots).
+ *
+ * NOT intended for game-logic callers — handlers must not influence the
+ * stream beyond their existing `setPrngSeed` deterministic-replay use.
  */
 export function resetPrngSeed(addr?: string): void {
   if (typeof addr === 'string' && addr) {
