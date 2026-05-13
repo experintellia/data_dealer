@@ -579,9 +579,7 @@ export class RenderViewMap extends RenderNode {
     ): void => {
       target.addEventListener(type, listener, options);
       this._nativeListeners.push(
-        options === undefined
-          ? { target, type, listener }
-          : { target, type, listener, options }
+        options === undefined ? { target, type, listener } : { target, type, listener, options }
       );
     };
 

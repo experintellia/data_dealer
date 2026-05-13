@@ -27,7 +27,7 @@ const NODE_SRC = readSrc('RenderNode.ts');
 const TICKER_SRC = readSrc('RenderSlowTicker.ts');
 const VIEWS_SRC = readSrc('RenderViews.ts');
 
-const removeBodyMatch = NODE_SRC.match(/\n  remove\(\)\s*:\s*void\s*\{[\s\S]*?\n  \}/);
+const removeBodyMatch = NODE_SRC.match(/\n {2}remove\(\)\s*:\s*void\s*\{[\s\S]*?\n {2}\}/);
 const REMOVE_BODY = removeBodyMatch ? removeBodyMatch[0] : '';
 
 describe('RenderNode.remove — tween + timer cleanup', () => {
@@ -88,7 +88,7 @@ describe('RenderViewMap.remove — native listener teardown', () => {
   });
 
   it('overrides remove() and detaches every tracked listener before super.remove()', () => {
-    const m = VIEWS_SRC.match(/override\s+remove\s*\(\)\s*:\s*void\s*\{[\s\S]*?\n  \}/);
+    const m = VIEWS_SRC.match(/override\s+remove\s*\(\)\s*:\s*void\s*\{[\s\S]*?\n {2}\}/);
     expect(m, 'ViewMap remove() override must exist').toBeTruthy();
     const body = m[0];
     expect(body).toMatch(/removeEventListener/);
