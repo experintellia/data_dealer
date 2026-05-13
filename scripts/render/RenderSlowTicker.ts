@@ -24,6 +24,14 @@ const _listeners = new OrderedSet<TickerListener>();
 let _timeout: number | undefined;
 
 function tick(): void {
+  _timeout = undefined;
+  // Skip work and the reschedule when there's nothing to tick (no
+  // listeners) or the tab is hidden. `addListener` and the
+  // visibilitychange handler below resume the loop when work shows up.
+  const hidden = typeof document !== 'undefined' && document.hidden;
+  if (hidden || _listeners.set.length === 0) {
+    return;
+  }
   _listeners.each((node) => {
     node.tick();
   });
@@ -47,10 +55,23 @@ function stop(): void {
 
 function addListener(node: TickerListener): void {
   _listeners.add(node);
+  // Resume ticking if we were idle (listeners had been empty or tab
+  // hidden when the previous tick early-returned).
+  if (_timeout === undefined) {
+    start();
+  }
 }
 
 function removeListener(node: TickerListener): void {
   _listeners.remove(node);
+}
+
+// Resume ticking when the tab becomes visible again. start()'s own
+// guard plus the addListener guard above make this idempotent.
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && _timeout === undefined) start();
+  });
 }
 
 // Keep the public surface identical to the legacy IIFE-local

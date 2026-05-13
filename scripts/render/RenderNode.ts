@@ -246,6 +246,25 @@ export class RenderNode {
   remove(): void {
     tickerRemoveListener(this);
     RenderSlowTicker.removeListener(this);
+    // Clear any live tween targeting this node so the disposed instance
+    // is not pinned by an in-flight tween (and so a tween that fires
+    // after remove() doesn't mutate detached fields).
+    const cjTween = (globalThis as { createjs?: { Tween?: { removeTweens?(t: object): void } } })
+      .createjs?.Tween;
+    if (cjTween && typeof cjTween.removeTweens === 'function') {
+      cjTween.removeTweens(this);
+    }
+    // dragDelay / cancelClickTimeout setTimeout ids are otherwise never
+    // cleared, so a node removed mid-press would still fire its delayed
+    // drag-start or click-cancel against a dead node.
+    if (this.dragDelay !== undefined) {
+      window.clearTimeout(this.dragDelay);
+      this.dragDelay = undefined;
+    }
+    if (this.cancelClickTimeout !== undefined) {
+      window.clearTimeout(this.cancelClickTimeout);
+      this.cancelClickTimeout = undefined;
+    }
     if (this.decoratedNode) {
       this.decoratedNode.decorators.remove(this);
     }
