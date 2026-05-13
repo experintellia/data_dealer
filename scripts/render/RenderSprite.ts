@@ -60,12 +60,17 @@ export class RenderSprite extends RenderNode {
   }
 
   setFrameSrc(src: string | undefined): void {
-    if (!this.frameSrc) {
+    // Pre-fix this guarded on `this.frameSrc` and then used `this.frameSrc`
+    // to build the URL — so the `src` argument was effectively ignored
+    // (both existing callers happened to pass `this.frameSrc` already).
+    // Honour the argument so future callers can swap the sprite source.
+    if (!src) {
       return;
     }
+    this.frameSrc = src;
     this.spriteSrc = src;
     this.css({
-      'background-image': 'url(' + setup.imagePathPrefix + this.frameSrc + ')',
+      'background-image': 'url(' + setup.imagePathPrefix + src + ')',
     });
   }
 
