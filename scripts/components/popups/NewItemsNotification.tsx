@@ -1,11 +1,6 @@
-// New-items notification — Preact port of `views/notification.html`
-// + the `notification_item.html` partial (issue #80 phase 2 tier 2).
-// Used by the `data.perps` and `data.powerups` branches of
-// `GameRoot.makeNotifications` (level-up unlocks, project upgrade
-// unlocks).  Dismissed via the OK MainButton — the jQuery delegated
-// handler in `RenderTopLevelUI.ts` fires `button_click.MainButton`,
-// which the popup-events init in `GameNode.initPopupEvents` translates
-// into `popup_close`.
+// Drives the `data.perps` and `data.powerups` notification branches
+// in `GameRoot.makeNotifications` (level-up unlocks, project upgrade
+// unlocks).
 
 import type { JSX } from 'preact';
 import i18n from '../../i18n.js';

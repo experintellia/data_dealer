@@ -1,29 +1,23 @@
-// Minimal Preact-native dialog manager for phase 2 of issue #80.
-//
-// One active dialog at a time.  Mounts the active dialog's component
-// tree into a designated `.PopupContainer` DOM node (the existing
-// `popupContainerDomelem` of the active view), wraps it in the same
-// `<div class="Popup">` shell the legacy `RenderPopup` produced, and
-// manages the `.lockOn` / extend-class CSS so the existing
-// `css/Render.css` rules keep working unmodified.
-//
-// Co-exists with `Render.Popup` during the phase 2 transition:
-//   - Tier 1 / 2 Preact-ported dialogs (status info, level-up, new
-//     items, tutorial / story / simplemessage) open via `openDialog`.
-//   - Tier 3+ legacy templates (mission popups, popup_karma, perp
-//     popups) continue to open via `Render.Popup` + the Underscore.js
-//     template flow.
-//   - Both systems mount into the same `popupContainerDomelem`, so
-//     only one is visible at a time.  Opening a new Preact dialog
-//     while one is already active closes the existing one first.
-//
-// The handle returned by `openDialog` exposes the
-// `.trigger(event)` / `.open` / `.close()` / `.render()` surface that
-// pre-Preact code paths (e.g., `GameRoot.handleBoughtKarma`
-// force-closing a karma incident popup) read off `this.renderPopup`
-// / `this.notificationPopup`.
+// Preact dialog manager for phase 2 of issue #80.  One active dialog
+// at a time, mounted into the active view's `popupContainerDomelem`
+// inside a `<div class="Popup">` shell, with `.lockOn` + extend-class
+// CSS that matches the legacy `RenderPopup` so `css/Render.css` keeps
+// working unmodified.  Co-exists with `Render.Popup` during the
+// transition: opening a new Preact dialog while another (legacy or
+// Preact) is already active closes the existing one first.
 
 import { type ComponentChildren, type ComponentType, h, render } from 'preact';
+
+/** Extend-class values accepted by `openDialog`.  Each is a CSS hook
+ *  in `css/Render.css` (`.PopupContainer.lockOn.<class>`). */
+export type ExtendClass = 'Tutorial' | 'Alert' | 'NewItems' | 'LevelUp' | 'Mission';
+
+/** Minimal `addClass` / `removeClass` surface (jQuery-shaped) used by
+ *  the FX-feedback `trigger` events. */
+interface FXClassTarget {
+  addClass(s: string): unknown;
+  removeClass(s: string): unknown;
+}
 
 /** Minimal jQuery surface used to replicate the legacy SubpopClose
  *  handler when running inside a Preact-managed dialog. */
@@ -34,33 +28,31 @@ interface JQueryLikeForSubpop {
   length: number;
 }
 
-/** What `GameRoot.renderPopup` / `.notificationPopup` looked like
- *  before phase 2.  Pre-Preact callers use this surface to trigger
- *  popup_close, render hooks, and FX feedback on the open popup. */
+/** Compatibility-shaped handle returned by `openDialog`.  Pre-Preact
+ *  callers read it off `groot.renderPopup` / `groot.notificationPopup`
+ *  via the same `.trigger(event)` / `.open` / `.close()` surface the
+ *  legacy `RenderPopup` exposes. */
 export interface PreactDialogHandle {
-  /** `false` once close has run; matches the legacy `RenderPopup.open` flag. */
   readonly open: boolean;
   trigger(event: string, args?: unknown[]): void;
   render(): void;
   close(): void;
+  /** Last button the player clicked.  Set externally (phase-1 test
+   *  contract; tier 5+ buy-button code) — read by `no_cash` /
+   *  `no_AP` / `error` triggers. */
+  lastButton?: FXClassTarget;
 }
 
 export interface OpenDialogOptions<P> {
-  /** Component to render as the dialog body.  Receives `props` plus an
-   *  injected `onClose` callback. */
   component: ComponentType<P & { onClose: () => void }>;
-  /** Props passed through to the component.  Snapshot data — the
-   *  manager does not re-render. */
   props: P;
-  /** The `.PopupContainer` DOM node to mount into.  Caller picks the
-   *  active view's container (`groot.renderNode.popupContainerDomelem`). */
+  /** Active view's `popupContainerDomelem`. */
   container: HTMLElement;
-  /** Optional extra class added alongside `lockOn` (matches the legacy
-   *  `extendClass` config field: `Tutorial`, `Alert`, `NewItems`,
-   *  `LevelUp`, `Mission`). */
+  /** Optional extra class — typically one of `ExtendClass`, but kept as
+   *  `string` so legacy call sites and forward extensions don't need to
+   *  thread the literal type through every config. */
   extendClass?: string;
-  /** Fires once after the dialog has been removed from the DOM.  Used
-   *  by the notification queue to advance to the next cue. */
+  /** Fires once the dialog has been removed from the DOM. */
   onAfterClose?: () => void;
 }
 
@@ -72,21 +64,15 @@ interface ActiveDialog {
 
 let active: ActiveDialog | null = null;
 
-/** Open a dialog.  If one is already open it's closed first.  Returns
- *  a handle whose `.trigger('popup_close')` (etc.) matches the legacy
- *  `RenderPopup` surface so pre-Preact callers don't need to change. */
 export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
   if (active) active.handle.close();
 
   let isOpen = true;
 
-  // Container click handler: backdrop close + subpop dismiss.
-  // Subpop logic duplicates the legacy `.SubpopClose, .Button
-  // [data-button-id="OKButton"]` delegated handler at
-  // `RenderTopLevelUI.ts:816` — that handler is bound to the legacy
-  // RenderPopup's jdomelem, so it does not fire for Preact-managed
-  // popups.  Both implementations go away in tier 8 when subpops
-  // become their own Preact components.
+  // Subpop block below duplicates `RenderTopLevelUI.ts:816` (the legacy
+  // jQuery delegated handler on RenderPopup's jdomelem doesn't fire on
+  // Preact popups).  Both go away in tier-8 when subpops become Preact
+  // components.
   const handleInteraction = (e: Event): void => {
     if (e.target === opts.container) {
       close();
@@ -128,9 +114,7 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
     opts.onAfterClose?.();
   };
 
-  const handle: PreactDialogHandle & {
-    lastButton?: { addClass(s: string): unknown; removeClass(s: string): unknown };
-  } = {
+  const handle: PreactDialogHandle = {
     get open() {
       return isOpen;
     },
@@ -139,10 +123,6 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
         close();
         return;
       }
-      // FX feedback events — `no_cash` / `no_AP` / `error` — mirror the
-      // legacy `RenderPopup` handler that adds `.disabled <event>` to
-      // `lastButton` (the last `.Button` the player clicked).  Phase-1
-      // contract: tests prime `popup.lastButton` then fire the trigger.
       if (event === 'no_cash' || event === 'no_AP' || event === 'error') {
         const cls = event === 'error' ? 'ERROR' : event;
         const lastButton = handle.lastButton;
@@ -153,9 +133,8 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
       }
     },
     render(): void {
-      // No-op: Preact dialogs use snapshot props captured at openDialog
-      // time.  Components that need to react to engine data changes
-      // should manage their own state via hooks.
+      // Snapshot props captured at open time; tier 5+ stateful
+      // components should manage their own re-renders via hooks.
     },
     close,
   };
@@ -165,11 +144,6 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
   opts.container.classList.add('lockOn');
   if (opts.extendClass) opts.container.classList.add(opts.extendClass);
 
-  // Mount: `<div class="Popup"><userComponent onClose={...}/></div>`
-  // mirrors the legacy `RenderPopup` jdomelem so CSS selectors like
-  // `.PopupContainer .Popup` keep matching.  No `stopPropagation` on
-  // the wrapper — clicks bubble up to `handleInteraction`, which only
-  // acts on backdrop hits and subpop close affordances.
   const body = h(opts.component, { ...opts.props, onClose: close });
   const wrapped = h('div', { class: 'Popup' }, body as ComponentChildren);
   render(wrapped, opts.container);

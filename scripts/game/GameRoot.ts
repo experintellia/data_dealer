@@ -1349,12 +1349,11 @@ export class GameRoot extends GameNode {
     if (this.notificationPopup) return undefined;
 
     // Phase 2 (issue #80) — tier 2 cues set `config.component` /
-    // `config.props` instead of `template`; route them through the
-    // Preact dialog manager.  Mirrors the legacy lifecycle: `delay`
-    // before the popup appears, `delayScript` for scripted events,
-    // `nonblocking` for auto-close.  A stub handle holds the
-    // `notificationPopup` slot synchronously so concurrent cues
-    // can't double-open while we wait for the delay.
+    // `config.props` and route through the dialog manager.  The
+    // stub handle holds the `notificationPopup` slot synchronously
+    // (mirroring the legacy code that constructs `Render.Popup`
+    // before the `delay` setTimeout) so concurrent cues can't
+    // double-open in the window before the manager mounts.
     if (config.component) {
       const drainOnClose = (): void => {
         this.uncueNotification(notification);
@@ -1362,25 +1361,29 @@ export class GameRoot extends GameNode {
         if (next) this.openNotification(next);
       };
 
-      let cancelled = false;
+      let isOpen = true;
       let liveHandle: PreactDialogHandle | undefined;
 
+      const closeFromStub = (): void => {
+        if (!isOpen) return;
+        isOpen = false;
+        if (liveHandle) {
+          liveHandle.close();
+          return;
+        }
+        delete this.notificationPopup;
+        drainOnClose();
+      };
+
       const stub: PreactDialogHandle = {
-        open: true,
-        trigger: (event: string): void => {
-          if (event !== 'popup_close' && event !== 'popup_cancel') return;
-          if (liveHandle) {
-            liveHandle.close();
-          } else if (!cancelled) {
-            cancelled = true;
-            delete this.notificationPopup;
-            drainOnClose();
-          }
+        get open() {
+          return isOpen;
         },
-        render: (): void => {},
-        close: (): void => {
-          stub.trigger('popup_close');
+        trigger(event: string) {
+          if (event === 'popup_close' || event === 'popup_cancel') closeFromStub();
         },
+        render() {},
+        close: closeFromStub,
       };
       this.notificationPopup = stub as unknown as NonNullable<typeof this.notificationPopup>;
 
@@ -1389,7 +1392,7 @@ export class GameRoot extends GameNode {
       }, config.delayScript ?? 0);
 
       window.setTimeout(() => {
-        if (cancelled) return;
+        if (!isOpen) return;
         delete this.notificationPopup;
         liveHandle = this.openPreactDialog(
           config.component as ComponentType<Record<string, unknown> & { onClose: () => void }>,
@@ -1400,7 +1403,12 @@ export class GameRoot extends GameNode {
             onAfterClose: drainOnClose,
           }
         );
-        if (liveHandle && notification.nonblocking) {
+        if (!liveHandle) {
+          isOpen = false;
+          drainOnClose();
+          return;
+        }
+        if (notification.nonblocking) {
           window.setTimeout(() => liveHandle?.close(), notification.nonblocking);
         }
       }, config.delay ?? 0);
@@ -1470,6 +1478,32 @@ export class GameRoot extends GameNode {
   makeNotifications(data: MakeNotificationsPayload): void {
     const speed = setup.debug ? 0 : 1;
 
+    // Project only the perp fields `NewItemsNotification` actually
+    // reads, so the cue closure (which lives in `NotificationQueue`
+    // until drained) doesn't pin the full `type_data` object.
+    const wireNewItemsCue = (n: Notification): void => {
+      const pdata = (n.perp?.data ?? {}) as {
+        popup_sprite?: unknown;
+        title?: string;
+        subtitle?: string;
+        description?: string;
+      };
+      (n.config as NotificationConfig).component = NewItemsNotification;
+      (n.config as NotificationConfig).props = {
+        title: n.title,
+        says: n.says,
+        textHtml: n.text,
+        perp: {
+          data: {
+            popup_sprite: pdata.popup_sprite,
+            title: pdata.title,
+            subtitle: pdata.subtitle,
+            description: pdata.description,
+          },
+        },
+      };
+    };
+
     if (data.mission_complete && this.Missions) {
       const mission = this.Missions.getMission(data.mission_complete);
       const n: Notification = mergeData({}, mission.data) as Notification;
@@ -1508,12 +1542,8 @@ export class GameRoot extends GameNode {
       }
     }
     if (data.levelup) {
-      // Snapshot the levelled-up values at cue time — the popup opens
-      // up to `delay` ms after this point and the levelup.html legacy
-      // template read live `_.game().xp_level.*` on render, which gave
-      // identical numbers because xp_level is set synchronously before
-      // makeNotifications.  We capture the same numbers up front so
-      // the Preact component is pure.
+      // Snapshot xp_level at cue time so the component is pure — the
+      // popup opens `delay` ms later and xp_level may have drifted.
       const xpLevel = this.xp_level.number;
       const xpToNext = this.xp_level.xp_max - this.xp_value;
       const apMax = this.xp_level.ap_max;
@@ -1574,13 +1604,7 @@ export class GameRoot extends GameNode {
           }
         });
         if (parentIsBuilt) {
-          (n.config as NotificationConfig).component = NewItemsNotification;
-          (n.config as NotificationConfig).props = {
-            title: n.title,
-            says: n.says,
-            textHtml: n.text,
-            perp: n.perp as { data?: Record<string, unknown> } | undefined,
-          };
+          wireNewItemsCue(n);
           this.cueNotification(n);
         }
       });
@@ -1643,13 +1667,7 @@ export class GameRoot extends GameNode {
         });
         n.says = i18n.gettext('Mark says:');
         n.text = sprintf(reg.type_data?.ntext ?? '', span(projectstext));
-        (n.config as NotificationConfig).component = NewItemsNotification;
-        (n.config as NotificationConfig).props = {
-          title: n.title,
-          says: n.says,
-          textHtml: n.text,
-          perp: n.perp as { data?: Record<string, unknown> } | undefined,
-        };
+        wireNewItemsCue(n);
         // popup only if notification = true;
         if (reg.type_data?.notification) this.cueNotification(n);
       });

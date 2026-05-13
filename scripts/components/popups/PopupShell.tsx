@@ -24,10 +24,7 @@ export interface PopupShellProps {
   buttonLabel: string;
   /** Subtitle + description, etc. — rendered between title and buttons. */
   children?: ComponentChildren;
-  /**
-   * Framework-injected by the dialog manager — closes the popup.  All
-   * close affordances (.PopupClose X, MainButton) call this.
-   */
+  /** Framework-injected by the dialog manager. */
   onClose: () => void;
 }
 
