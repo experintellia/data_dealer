@@ -19,6 +19,7 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { mountCashStatusPopup } from '../components/popups/CashStatusPopup.js';
 import { debounce, span, sprintf, toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
 import setup from '../setup.js';
@@ -1888,17 +1889,27 @@ export class GameRoot extends GameNode {
     });
 
     this.on('click_status.Cash', () => {
+      const title = i18n.gettext('sb_cash title');
+      const subtitleHtml = sprintf(
+        i18n.gettext('sb_cash subtitle <span class="highlight">$%s</span>'),
+        toKSNum(this.cash_value)
+      );
+      const description = i18n.gettext('sb_cash description');
+      const buttonLabel = i18n.gettext('Close');
       this.openGenericPopup({
         data: {
-          title: i18n.gettext('sb_cash title'),
-          subtitle: sprintf(
-            i18n.gettext('sb_cash subtitle <span class="highlight">$%s</span>'),
-            toKSNum(this.cash_value)
-          ),
-          description: i18n.gettext('sb_cash description'),
+          title,
+          subtitle: subtitleHtml,
+          description,
           mainsprites_class: 'Cash',
         },
-        template: 'popup_status.html',
+        preactRender: (container) =>
+          mountCashStatusPopup(container, {
+            title,
+            subtitleHtml,
+            description,
+            buttonLabel,
+          }),
       });
     });
 

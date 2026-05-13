@@ -53,5 +53,8 @@
       "email": "pascale@elaxa.ch"
     }
   ],
-  "license": "GPL-3.0-or-later"
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "preact": "^10.29.1"
+  }
 }
