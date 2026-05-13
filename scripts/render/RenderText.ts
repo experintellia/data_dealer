@@ -17,6 +17,7 @@ export type TextConfig = NodeConfig & {
 export class RenderText extends RenderNode {
   declare text: string;
   declare textAlign: string;
+  private _remeasureScheduled = false;
 
   static {
     RenderText.prototype.text = '';
@@ -62,18 +63,39 @@ export class RenderText extends RenderNode {
     this.updateRenderProp();
     this.jdomelem.html(t);
     this.updateSize();
-    const newOffset = { x: 0, y: 0 };
-    const width = this.jdomelem.width() ?? 200;
-    if (this.textAlign === 'center') {
-      newOffset.x = Math.round(width / 2);
-    } else if (this.textAlign === 'right') {
-      newOffset.x = width;
+    const w = this.width;
+    this.setOffset({
+      x: this.textAlign === 'center' ? Math.round(w / 2) : this.textAlign === 'right' ? w : 0,
+      y: 0,
+    });
+    // When inserted under a display:none ancestor (e.g. an inactive
+    // Stage), offsetWidth is 0 and the surrounding setSize then locks
+    // the inline CSS to width:0px — the centering offset can never
+    // recover on its own.  Retry on rAF until the layout fires.
+    const el = this.domelem as HTMLElement;
+    if (el.offsetWidth === 0 && t.length > 0 && !this._remeasureScheduled) {
+      this._remeasureScheduled = true;
+      const retry = (): void => {
+        if (!this.domelem.isConnected) return;
+        el.style.width = 'auto';
+        el.style.height = 'auto';
+        if (el.offsetWidth === 0) {
+          requestAnimationFrame(retry);
+          return;
+        }
+        this._remeasureScheduled = false;
+        this.updateText();
+        this.draw();
+      };
+      requestAnimationFrame(retry);
     }
-    this.setOffset(newOffset);
   }
 
   updateSize(): void {
-    this.width = this.jdomelem.width() ?? 200;
+    // offsetWidth (the rendered content box) rather than jQuery.width(),
+    // which just echoes back a previously-locked CSS width.
+    const el = this.domelem as HTMLElement;
+    this.width = el.offsetWidth || el.scrollWidth || 200;
   }
 
   /** Note the legacy double-`s` typo: `ssetSize`.  Preserved here
