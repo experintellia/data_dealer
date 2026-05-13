@@ -2349,54 +2349,14 @@ function _scheduleChargeReady(chargeEnd: number, path: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// PRNG — Mulberry32. Seeded lazily on first _rng() call from
-// webxdc.selfAddr + Date.now() + crypto entropy via `_ensurePrngSeeded`
-// below; two peers booting in the same millisecond pick disjoint streams
-// (collision regression for _generateId, replacing the legacy
-// `0xdeadbeef` constant). Tests that need deterministic replay call
-// `setPrngSeed(n)` explicitly with a constant.
+// PRNG — Mulberry32. Default seed is the historical `0xdeadbeef`; tests
+// that need deterministic replay call `setPrngSeed(n)` with an explicit
+// constant. Cross-peer ID predictability is not a concern here: every
+// peer owns its own state.nodes_charging slot and the `_generateId`
+// output is prefixed with `Date.now()`, so the PRNG only disambiguates
+// within the same millisecond.
 // ---------------------------------------------------------------------------
-// `null` means "lazy-init on first _rng()" from selfAddr + Date.now().
-var _prngSeed: number | null = null;
-
-function _deriveBootSeed(addr: string): number {
-  // Mix the address hash with the millisecond clock so peers booting at the
-  // same wall-clock instant with different addresses still pick disjoint
-  // PRNG streams. djb2 is reused from the charge-jitter path for consistency.
-  var addrHash = addr ? _djb2(addr) : 0;
-  var now = Date.now() >>> 0;
-  // Empty-addr fallback (selfAddr not yet known, or running in a webxdc-less
-  // node): mix in a single word from crypto.getRandomValues so two peers
-  // booting in the same millisecond without an addr still pick disjoint
-  // streams. Falls back to 0 (i.e. pure Date.now()) if crypto is unavailable.
-  var entropy = 0;
-  if (!addr) {
-    try {
-      var g = globalThis as unknown as {
-        crypto?: { getRandomValues?: (a: Uint32Array) => Uint32Array };
-      };
-      if (g.crypto && typeof g.crypto.getRandomValues === 'function') {
-        var buf = new Uint32Array(1);
-        g.crypto.getRandomValues(buf);
-        // buf[0] is `number | undefined` under noUncheckedIndexedAccess —
-        // narrow with ?? before bit-or-coercing back to int32.
-        entropy = (buf[0] ?? 0) | 0;
-      }
-    } catch (_) {
-      /* crypto unavailable (older runtime, locked-down sandbox) — fall back
-         to pure Date.now() entropy. */
-    }
-  }
-  // XOR the high 16 bits of the hash with the low half of now to spread
-  // entropy across the seed word; final `>>> 0` keeps it in uint32 range.
-  return (addrHash ^ now ^ (addrHash << 16) ^ entropy) >>> 0;
-}
-
-function _ensurePrngSeeded(): void {
-  if (_prngSeed != null) return;
-  var addr = typeof webxdc !== 'undefined' && webxdc ? webxdc.selfAddr || '' : '';
-  _prngSeed = _deriveBootSeed(addr);
-}
+var _prngSeed = 0xdeadbeef;
 
 /**
  * Seed the deterministic PRNG used for charge-amount jitter.
@@ -2407,10 +2367,7 @@ export function setPrngSeed(seed: number): void {
 }
 
 function _rng(): number {
-  _ensurePrngSeeded();
-  // _ensurePrngSeeded guarantees `_prngSeed` is a number at this point;
-  // the local binding lets TS narrow without sprinkling non-null assertions.
-  var s = _prngSeed as number;
+  var s = _prngSeed;
   s = (s + 0x6d2b79f5) | 0;
   var t = Math.imul(s ^ (s >>> 15), 1 | s);
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
