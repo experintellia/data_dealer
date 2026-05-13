@@ -22,24 +22,16 @@ import type { ReceivedStatusUpdate, SendingStatusUpdate } from '@webxdc/types';
       try {
         _updates = JSON.parse(stored);
       } catch (parseErr) {
-        // Malformed payload (truncated, hand-edited, schema drift) — drop
-        // the history rather than crash, but make the loss observable so a
-        // dev notices instead of silently restarting from an empty queue.
-        // Also remove the malformed key so the next reload doesn't replay
-        // the same warning until a successful _persist() overwrites it.
-        console.warn('[webxdc-shim] failed to parse stored updates; dropping history:', parseErr);
+        console.warn('[webxdc-shim] dropping malformed stored updates:', parseErr);
         _updates = [];
         try {
           localStorage.removeItem(STORAGE_KEY);
         } catch (_) {
-          /* removal failure is non-fatal — the next successful _persist
-             will overwrite the malformed payload anyway. */
+          /* non-fatal — next successful _persist overwrites it. */
         }
       }
     }
   } catch (storageErr) {
-    // localStorage access threw (quota, private browsing, disabled). Degrade
-    // to a fresh in-memory queue; log so the dev sees why replay is empty.
     console.warn('[webxdc-shim] localStorage read failed:', storageErr);
   }
 
@@ -47,9 +39,6 @@ import type { ReceivedStatusUpdate, SendingStatusUpdate } from '@webxdc/types';
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(_updates));
     } catch (storageErr) {
-      // Write failures are non-fatal (state still works in-memory for the
-      // session), but a silent drop here means a page reload loses progress —
-      // surface the cause via console.warn.
       console.warn('[webxdc-shim] localStorage write failed:', storageErr);
     }
   }

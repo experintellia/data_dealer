@@ -8,12 +8,8 @@ import { boot, getBootPromise, getReplayProgress } from './boot.js';
 // In Node (vitest, SSR) there is no DOM and no vendor globals — skip
 // the whole UI hand-off so the module is import-safe without jsdom.
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-  // Always invoke boot() — `boot()` itself handles the `webxdc === undefined`
-  // case by seeding freshState('') and skipping setUpdateListener. Skipping
-  // boot here used to leave `_currentState` null, so the very first
-  // getState() call from getSessionLocale (during continueStart) threw with
-  // a cryptic "called before boot()" error. See audit fix in
-  // claude/audit-fix-bootstrap.
+  // boot() handles the no-webxdc case itself; skipping it here left
+  // _currentState null and crashed the first getState() call.
   boot();
 
   const $ = jQuery ?? globalThis.$;
@@ -47,13 +43,10 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       err && typeof err === 'object' && 'message' in err
         ? String((err as { message?: unknown }).message)
         : String(err || '');
-    // Set the headline via .html() so the <br> renders, then set the detail
-    // line via the <small> child's textContent so any attacker-influenced
-    // `err.message` contents are treated as a literal string, not parsed as
-    // HTML.
+    // Headline via .html() so the <br> renders; detail via .text() so
+    // attacker-influenced err.message is escaped.
     $('#loadertext').html('Sorry, the Game failed to start.<br><small style="opacity:.7"></small>');
-    const smallEl = document.querySelector('#loadertext small');
-    if (smallEl) smallEl.textContent = message + (detail ? ': ' + detail : '');
+    $('#loadertext small').text(message + (detail ? ': ' + detail : ''));
   };
 
   const continueStart = (): void => {

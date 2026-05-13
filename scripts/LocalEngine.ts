@@ -321,14 +321,9 @@ function _isProvidable(
 let _sendDelta: DeltaSender | null = null;
 
 /**
- * Inject the delta persistence function (tests use this to capture deltas).
- * In production, boot.js wires this to webxdc.sendUpdate via the listener.
- *
- * NOTE: when `_sendDelta` is set, `_persistDelta` short-circuits and does
- * NOT call `webxdc.sendUpdate` even if a real webxdc shim is also wired up.
- * This prevents double-mutation (spy + shim listener echo) but it means
- * any test that needs to assert "the listener round-trips a real delta"
- * must NOT install the spy. Use the real shim alone in those cases.
+ * Inject the test-only delta sink. When set, `_persistDelta` short-circuits
+ * and does NOT call `webxdc.sendUpdate`, so tests asserting the real
+ * listener round-trip must leave the spy unset.
  */
 export function setSendDelta(fn: DeltaSender): void {
   _sendDelta = fn;
@@ -391,14 +386,9 @@ function triggerAchievement(
 // This is the only place outside the listener that calls setState — it IS the
 // listener-equivalent for environments without webxdc.
 function _persistDelta(delta: Delta): void {
-  // `_sendDelta` is the test-only sink installed by `setSendDelta`. When set,
-  // it is mutually exclusive with the production `webxdc.sendUpdate` path:
-  // if a real shim is also wired, its listener would echo the delta back
-  // through applyDelta, double-mutating state. Tests that need to observe the
-  // post-echo state call applyDelta on the captured delta themselves (see
-  // tests/handlers/listener-echo.test.js). State still advances locally via
-  // the synchronous setState below so handlers see a consistent post-mutation
-  // view, matching the listener-echo behaviour of the production engine.
+  // Test sink and webxdc.sendUpdate are mutually exclusive (otherwise the
+  // shim's listener echo double-mutates state). We still advance state
+  // synchronously so handlers see the post-mutation view.
   if (_sendDelta) {
     _sendDelta(delta);
     setState(applyDelta(getState(), delta));
@@ -2349,12 +2339,8 @@ function _scheduleChargeReady(chargeEnd: number, path: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// PRNG — Mulberry32. Default seed is the historical `0xdeadbeef`; tests
-// that need deterministic replay call `setPrngSeed(n)` with an explicit
-// constant. Cross-peer ID predictability is not a concern here: every
-// peer owns its own state.nodes_charging slot and the `_generateId`
-// output is prefixed with `Date.now()`, so the PRNG only disambiguates
-// within the same millisecond.
+// PRNG — Mulberry32, seeded for deterministic tests.
+// Call setPrngSeed(n) before any handler invocation that uses RNG.
 // ---------------------------------------------------------------------------
 var _prngSeed = 0xdeadbeef;
 
@@ -2367,11 +2353,9 @@ export function setPrngSeed(seed: number): void {
 }
 
 function _rng(): number {
-  var s = _prngSeed;
-  s = (s + 0x6d2b79f5) | 0;
-  var t = Math.imul(s ^ (s >>> 15), 1 | s);
+  _prngSeed = (_prngSeed + 0x6d2b79f5) | 0;
+  var t = Math.imul(_prngSeed ^ (_prngSeed >>> 15), 1 | _prngSeed);
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  _prngSeed = s;
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
