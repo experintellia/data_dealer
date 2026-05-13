@@ -2349,15 +2349,12 @@ function _scheduleChargeReady(chargeEnd: number, path: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// PRNG — Mulberry32. Two seeding modes:
-//   - setPrngSeed(n)            — explicit constant for deterministic tests.
-//   - resetPrngSeed(addr?)      — derive seed from (addr || webxdc.selfAddr)
-//                                 mixed with Date.now() so two peers booting
-//                                 in the same millisecond pick disjoint
-//                                 streams (collision regression for
-//                                 _generateId).
-// The historical default `0xdeadbeef` constant is no longer used; production
-// boot wires resetPrngSeed() once selfAddr is known.
+// PRNG — Mulberry32. Seeded lazily on first _rng() call from
+// webxdc.selfAddr + Date.now() + crypto entropy via `_ensurePrngSeeded`
+// below; two peers booting in the same millisecond pick disjoint streams
+// (collision regression for _generateId, replacing the legacy
+// `0xdeadbeef` constant). Tests that need deterministic replay call
+// `setPrngSeed(n)` explicitly with a constant.
 // ---------------------------------------------------------------------------
 // `null` means "lazy-init on first _rng()" from selfAddr + Date.now().
 var _prngSeed: number | null = null;
@@ -2407,30 +2404,6 @@ function _ensurePrngSeeded(): void {
  */
 export function setPrngSeed(seed: number): void {
   _prngSeed = seed >>> 0;
-}
-
-/**
- * @internal — test / boot wiring only. Re-seed the PRNG from
- * (addr || webxdc.selfAddr) mixed with Date.now() + crypto entropy.
- *
- * Production callers invoke this once `selfAddr` is known so each peer's
- * `_generateId` stream is unique. Tests can call it to simulate a "fresh
- * boot for peer X" without relying on the legacy constant seed.
- *
- * Passing no argument also clears the seed back to lazy-init, so the next
- * `_rng()` call re-reads `webxdc.selfAddr` (useful for tests that swap
- * `globalThis.webxdc` between boots).
- *
- * NOT intended for game-logic callers — handlers must not influence the
- * stream beyond their existing `setPrngSeed` deterministic-replay use.
- */
-export function resetPrngSeed(addr?: string): void {
-  if (typeof addr === 'string' && addr) {
-    _prngSeed = _deriveBootSeed(addr);
-    return;
-  }
-  // Defer to the lazy initialiser so `webxdc.selfAddr` is re-read on demand.
-  _prngSeed = null;
 }
 
 function _rng(): number {
@@ -3056,7 +3029,6 @@ var LocalEngine = Object.assign(
     setSendDelta: setSendDelta,
     setSendAchievement: setSendAchievement,
     setPrngSeed: setPrngSeed,
-    resetPrngSeed: resetPrngSeed,
   },
   _stubHandlers
 );
