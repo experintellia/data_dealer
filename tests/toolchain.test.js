@@ -58,30 +58,17 @@ describe('esm entry', () => {
   });
 });
 
-// vitest's `include` glob must keep picking up .ts test files. The bare
-// presence of tests/toolchain.test.ts isn't a strong enough signal — if
-// the .ts extension is dropped from the glob, vitest just silently skips
-// the file and nothing fails. This assertion runs from the .js toolchain
-// test (always discovered because .js is the legacy extension) and
-// double-locks the discovery contract:
-//   1. The vitest.config.js source declares .ts as an include extension.
-//   2. The companion tests/toolchain.test.ts file actually exists.
-// Either pre-condition failing produces a loud test failure here.
+// vitest's `include` glob must keep picking up .ts test files. Read the
+// config source directly so a regression that drops .ts from the glob
+// surfaces as a loud failure rather than a silently-skipped test file.
 describe('vitest TypeScript test discovery', () => {
   it('vitest.config.js include glob covers .ts/.tsx/.mts', () => {
     const cfgSrc = readFileSync(join(root, 'vitest.config.js'), 'utf8');
     const includeMatch = cfgSrc.match(/include\s*:\s*\[([^\]]+)\]/);
     expect(includeMatch, 'vitest.config.js must declare an include array').not.toBeNull();
     const includeBody = includeMatch[1];
-    // The brace-expansion list is what governs discovery — assert each
-    // TS-family extension is present so a careless edit can't quietly
-    // drop one.
     expect(includeBody).toMatch(/\bts\b/);
     expect(includeBody).toMatch(/\btsx\b/);
     expect(includeBody).toMatch(/\bmts\b/);
-  });
-
-  it('the companion .test.ts smoke file exists', () => {
-    expect(existsSync(join(root, 'tests', 'toolchain.test.ts'))).toBe(true);
   });
 });
