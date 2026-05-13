@@ -60,12 +60,15 @@ export class RenderSprite extends RenderNode {
   }
 
   setFrameSrc(src: string | undefined): void {
-    if (!this.frameSrc) {
+    // Honour the `src` arg; previously guarded on and read `this.frameSrc`,
+    // which silently ignored the argument.
+    if (!src) {
       return;
     }
+    this.frameSrc = src;
     this.spriteSrc = src;
     this.css({
-      'background-image': 'url(' + setup.imagePathPrefix + this.frameSrc + ')',
+      'background-image': 'url(' + setup.imagePathPrefix + src + ')',
     });
   }
 

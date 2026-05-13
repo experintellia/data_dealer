@@ -79,7 +79,8 @@ export class RenderPerp extends RenderSprite {
       // collapses to `true` always; preserved verbatim.
       clickable: true,
       detectCollisions: true,
-      draggable: config.draggable || true,
+      // `??` so an explicit `draggable: false` survives.
+      draggable: config.draggable ?? true,
       cables: cables as unknown as RenderNode['cables'],
       perpSprite: perpSpriteInstance,
       jdomelem: jdomelem,
