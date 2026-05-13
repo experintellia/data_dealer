@@ -19,7 +19,7 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
-import { mountCashStatusPopup } from '../components/popups/CashStatusPopup.js';
+import { mountStatusPopup } from '../components/popups/StatusPopup.js';
 import { debounce, span, sprintf, toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
 import setup from '../setup.js';
@@ -1872,78 +1872,79 @@ export class GameRoot extends GameNode {
       });
     });
 
-    this.on('click_status.Profiles', () => {
+    // Status info popups (Profiles / Cash / AP / XP) — Preact port of
+    // views/popup_status.html (issue #80 phase 2, tier 1).  Each call
+    // computes title / subtitle / description HTML eagerly so the
+    // Preact component receives plain props and the popup body matches
+    // what the Underscore.js template would have rendered.
+    const openStatusInfoPopup = (props: {
+      spriteClass: 'Profiles' | 'Cash' | 'AP' | 'XP';
+      title: string;
+      subtitleHtml: string;
+      descriptionHtml: string;
+    }) => {
+      const buttonLabel = i18n.gettext('Close');
       this.openGenericPopup({
         data: {
-          title: i18n.gettext('sb_profiles title'),
-          subtitle: sprintf(
-            i18n.gettext('sb_profiles subtitle %s from %s profiles'),
-            span(toKSNum(this.profiles_value)),
-            span(toKSNum(this.profiles_max))
-          ),
-          description: i18n.gettext('sb_profiles description'),
-          mainsprites_class: 'Profiles',
+          title: props.title,
+          subtitle: props.subtitleHtml,
+          description: props.descriptionHtml,
+          mainsprites_class: props.spriteClass,
         },
-        template: 'popup_status.html',
+        preactRender: (container) => mountStatusPopup(container, { ...props, buttonLabel }),
+      });
+    };
+
+    this.on('click_status.Profiles', () => {
+      openStatusInfoPopup({
+        spriteClass: 'Profiles',
+        title: i18n.gettext('sb_profiles title'),
+        subtitleHtml: sprintf(
+          i18n.gettext('sb_profiles subtitle %s from %s profiles'),
+          span(toKSNum(this.profiles_value)),
+          span(toKSNum(this.profiles_max))
+        ),
+        descriptionHtml: i18n.gettext('sb_profiles description'),
       });
     });
 
     this.on('click_status.Cash', () => {
-      const title = i18n.gettext('sb_cash title');
-      const subtitleHtml = sprintf(
-        i18n.gettext('sb_cash subtitle <span class="highlight">$%s</span>'),
-        toKSNum(this.cash_value)
-      );
-      const description = i18n.gettext('sb_cash description');
-      const buttonLabel = i18n.gettext('Close');
-      this.openGenericPopup({
-        data: {
-          title,
-          subtitle: subtitleHtml,
-          description,
-          mainsprites_class: 'Cash',
-        },
-        preactRender: (container) =>
-          mountCashStatusPopup(container, {
-            title,
-            subtitleHtml,
-            description,
-            buttonLabel,
-          }),
+      openStatusInfoPopup({
+        spriteClass: 'Cash',
+        title: i18n.gettext('sb_cash title'),
+        subtitleHtml: sprintf(
+          i18n.gettext('sb_cash subtitle <span class="highlight">$%s</span>'),
+          toKSNum(this.cash_value)
+        ),
+        descriptionHtml: i18n.gettext('sb_cash description'),
       });
     });
 
     this.on('click_status.AP', () => {
-      this.openGenericPopup({
-        data: {
-          title: i18n.gettext('sb_AP title'),
-          subtitle: sprintf(
-            i18n.gettext('sb_AP subtitle %s/%s'),
-            span(toKSNum(this.ap_value)),
-            span(toKSNum(this.xp_level.ap_max))
-          ),
-          description: i18n.gettext('sb_AP description'),
-          mainsprites_class: 'AP',
-        },
-        template: 'popup_status.html',
+      openStatusInfoPopup({
+        spriteClass: 'AP',
+        title: i18n.gettext('sb_AP title'),
+        subtitleHtml: sprintf(
+          i18n.gettext('sb_AP subtitle %s/%s'),
+          span(toKSNum(this.ap_value)),
+          span(toKSNum(this.xp_level.ap_max))
+        ),
+        descriptionHtml: i18n.gettext('sb_AP description'),
       });
     });
 
     this.on('click_status.XP', () => {
-      this.openGenericPopup({
-        data: {
-          title: i18n.gettext('sb_XP title'),
-          subtitle: sprintf(
-            i18n.gettext('sb_XP subtitle Level %s'),
-            span(toKSNum(this.xp_level.number))
-          ),
-          description: sprintf(
-            i18n.gettext('sb_XP description %s XP until next level'),
-            span(toKSNum(this.xp_level.xp_max - this.xp_value + 1))
-          ),
-          mainsprites_class: 'XP',
-        },
-        template: 'popup_status.html',
+      openStatusInfoPopup({
+        spriteClass: 'XP',
+        title: i18n.gettext('sb_XP title'),
+        subtitleHtml: sprintf(
+          i18n.gettext('sb_XP subtitle Level %s'),
+          span(toKSNum(this.xp_level.number))
+        ),
+        descriptionHtml: sprintf(
+          i18n.gettext('sb_XP description %s XP until next level'),
+          span(toKSNum(this.xp_level.xp_max - this.xp_value + 1))
+        ),
       });
     });
 
