@@ -22,11 +22,11 @@ const DRAG_SRC = readRenderSrc('RenderDragHandler.ts');
 const VIEWS_SRC = readRenderSrc('RenderViews.ts');
 const POPUP_SRC = readRenderSrc('RenderTopLevelUI.ts');
 
-const INIT_BODY = DRAG_SRC.match(/init\(\)\s*:\s*void\s*\{[\s\S]*?\n  \}/)?.[0] ?? '';
-const DISPOSE_BODY = DRAG_SRC.match(/dispose\(\)\s*:\s*void\s*\{[\s\S]*?\n  \}/)?.[0] ?? '';
+const INIT_BODY = DRAG_SRC.match(/init\(\)\s*:\s*void\s*\{[\s\S]*?\n {2}\}/)?.[0] ?? '';
+const DISPOSE_BODY = DRAG_SRC.match(/dispose\(\)\s*:\s*void\s*\{[\s\S]*?\n {2}\}/)?.[0] ?? '';
 const VIEW_REMOVE_BODY =
-  VIEWS_SRC.match(/override\s+remove\s*\(\)\s*:\s*void\s*\{[\s\S]*?\n  \}/)?.[0] ?? '';
-const CLOSE_BODY = POPUP_SRC.match(/close\(cb\?[\s\S]*?\n  \}/)?.[0] ?? '';
+  VIEWS_SRC.match(/override\s+remove\s*\(\)\s*:\s*void\s*\{[\s\S]*?\n {2}\}/)?.[0] ?? '';
+const CLOSE_BODY = POPUP_SRC.match(/close\(cb\?[\s\S]*?\n {2}\}/)?.[0] ?? '';
 
 describe('RenderDragHandler — recovery handlers', () => {
   it('init() body is locatable', () => {
