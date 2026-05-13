@@ -15,80 +15,61 @@
  * runtime tests. Manual smoke-test still required for the drag flow
  * (alt-tab mid-drag, touch cancel, etc) — see PR description.
  */
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { readRenderSrc } from './_helpers.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const RENDER_DIR = resolve(__dirname, '../../scripts/render');
-const readSrc = (file) => readFileSync(resolve(RENDER_DIR, file), 'utf8');
+const DRAG_SRC = readRenderSrc('RenderDragHandler.ts');
+const VIEWS_SRC = readRenderSrc('RenderViews.ts');
+const POPUP_SRC = readRenderSrc('RenderTopLevelUI.ts');
 
-const DRAG_SRC = readSrc('RenderDragHandler.ts');
-const VIEWS_SRC = readSrc('RenderViews.ts');
-const POPUP_SRC = readSrc('RenderTopLevelUI.ts');
+const INIT_BODY = DRAG_SRC.match(/init\(\)\s*:\s*void\s*\{[\s\S]*?\n  \}/)?.[0] ?? '';
+const DISPOSE_BODY = DRAG_SRC.match(/dispose\(\)\s*:\s*void\s*\{[\s\S]*?\n  \}/)?.[0] ?? '';
+const VIEW_REMOVE_BODY =
+  VIEWS_SRC.match(/override\s+remove\s*\(\)\s*:\s*void\s*\{[\s\S]*?\n  \}/)?.[0] ?? '';
+const CLOSE_BODY = POPUP_SRC.match(/close\(cb\?[\s\S]*?\n  \}/)?.[0] ?? '';
 
 describe('RenderDragHandler — recovery handlers', () => {
-  it('init() registers pointercancel, blur, and visibilitychange', () => {
-    const m = DRAG_SRC.match(/init\(\)\s*:\s*void\s*\{[\s\S]*?\n  \}/);
-    expect(m, 'init() body must be locatable').toBeTruthy();
-    const body = m[0];
-    expect(body).toMatch(/['"]pointercancel['"]/);
-    expect(body).toMatch(/['"]blur['"]/);
-    expect(body).toMatch(/['"]visibilitychange['"]/);
+  it('init() body is locatable', () => {
+    expect(INIT_BODY).not.toBe('');
   });
 
-  it('recovery handlers funnel into dragend when dragging', () => {
-    // The recover closure should call this.dragend(...) only if
-    // this.dragging is currently true (idempotent against the normal
-    // mouseup/touchend fire).
+  it('registers pointercancel, blur, and visibilitychange', () => {
+    expect(INIT_BODY).toMatch(/['"]pointercancel['"]/);
+    expect(INIT_BODY).toMatch(/['"]blur['"]/);
+    expect(INIT_BODY).toMatch(/['"]visibilitychange['"]/);
+  });
+
+  it('recovery handlers funnel into dragend only when dragging', () => {
     expect(DRAG_SRC).toMatch(/if\s*\(\s*this\.dragging\s*\)\s*this\.dragend/);
   });
 
-  it('exports a dispose() that detaches every recovery handler', () => {
-    const m = DRAG_SRC.match(/dispose\(\)\s*:\s*void\s*\{[\s\S]*?\n  \}/);
-    expect(m, 'dispose() body must be locatable').toBeTruthy();
-    expect(m[0]).toMatch(/removeEventListener/);
+  it('dispose() detaches every recovery handler', () => {
+    expect(DISPOSE_BODY).not.toBe('');
+    expect(DISPOSE_BODY).toMatch(/removeEventListener/);
   });
 });
 
 describe('RenderViewMap.remove — disposes the dragHandler', () => {
   it('calls dragHandler.dispose() before super.remove()', () => {
-    const m = VIEWS_SRC.match(/override\s+remove\s*\(\)\s*:\s*void\s*\{[\s\S]*?\n  \}/);
-    expect(m).toBeTruthy();
-    const body = m[0];
-    expect(body).toMatch(/this\.dragHandler\??\.dispose\??\(\)/);
-    // dispose must precede super.remove so the parent teardown sees
-    // the detached state.
-    const disposeIdx = body.indexOf('dispose(');
-    const superIdx = body.indexOf('super.remove');
+    expect(VIEW_REMOVE_BODY).toMatch(/this\.dragHandler\??\.dispose\??\(\)/);
+    const disposeIdx = VIEW_REMOVE_BODY.indexOf('dispose(');
+    const superIdx = VIEW_REMOVE_BODY.indexOf('super.remove');
     expect(disposeIdx).toBeGreaterThan(-1);
     expect(superIdx).toBeGreaterThan(disposeIdx);
   });
 });
 
 describe('RenderPopup.close — one-shot transitionend', () => {
-  it('detaches the transitionend handler and clears the fallback timer', () => {
-    const m = POPUP_SRC.match(/close\(cb\?[\s\S]*?\n  \}/);
-    expect(m, 'close() body must be locatable').toBeTruthy();
-    const body = m[0];
-    // .off() with the handler ref must appear inside the close body.
-    expect(body).toMatch(/jq\.off\(/);
-    // The fallback timer must be tracked so the early-firing path can
-    // clear it.
-    expect(body).toMatch(/clearTimeout\s*\(\s*removeFallback/);
+  it('close() body is locatable', () => {
+    expect(CLOSE_BODY).not.toBe('');
   });
 
-  it('no longer leaves the transitionend handler unbound', () => {
-    // Pre-fix the close() called jq.on('transitionend', () => this.remove())
-    // with no matching jq.off. Catch any future revert that drops the
-    // unbind logic.
-    const m = POPUP_SRC.match(/close\(cb\?[\s\S]*?\n  \}/);
-    const body = m[0];
-    const hasOn = /jq\.on\(\s*TRANSITION_EVENTS/.test(body) || /jq\.on\(/.test(body);
-    const hasOff = /jq\.off\(/.test(body);
-    expect(hasOn && hasOff, 'close() must both bind AND unbind the transitionend handler').toBe(
-      true
-    );
+  it('binds AND unbinds the transitionend handler', () => {
+    expect(CLOSE_BODY).toMatch(/jq\.on\(/);
+    expect(CLOSE_BODY).toMatch(/jq\.off\(/);
+  });
+
+  it('clears the fallback timer when the early path fires', () => {
+    expect(CLOSE_BODY).toMatch(/clearTimeout\s*\(\s*removeFallback/);
   });
 });

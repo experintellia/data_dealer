@@ -6,6 +6,11 @@
 
 import { OrderedSet } from '../game/OrderedSet.js';
 
+// Module-load DOM-availability probes; both values are fixed for the
+// lifetime of this realm.
+const HAS_WINDOW = typeof window !== 'undefined';
+const HAS_DOC = typeof document !== 'undefined';
+
 interface PointerLike {
   pageX: number;
   pageY: number;
@@ -67,10 +72,7 @@ export class RenderDragHandler {
   dragStartPos: { x: number; y: number };
   dragMovePos: { x: number; y: number };
   collisionNodes: OrderedSet<DraggableNode>;
-  // Native recovery handlers attached in `init()`. Stored so `dispose()`
-  // can detach them — without this, releasing the pointer outside the
-  // canvas / alt-tabbing / receiving a system gesture cancellation
-  // would never fire `mouseup`/`touchend` and the drag stays stuck.
+  // Stored so `dispose()` can detach the recovery listeners init() attaches.
   private _recoveryHandlers: Array<{ target: EventTarget; type: string; listener: EventListener }> =
     [];
 
@@ -126,10 +128,10 @@ export class RenderDragHandler {
     this.dragVector.y = (this.dragMovePos.y - this.dragStartPos.y) * this.scale;
   }
 
-  dragend(_e: DragEventLike): void {
-    // Idempotent: the recovery handlers below and the regular
-    // mouseup/touchend path can both funnel into here for the same
-    // gesture. The for-loop and flag flip are safe to repeat.
+  // Idempotent — recovery handlers in init() may call this for the same
+  // gesture as the regular mouseup/touchend path; the empty-listeners
+  // loop and flag flip are safe to repeat.
+  dragend(_e?: DragEventLike): void {
     this.state = 'stopped';
     for (const node of this.listeners) {
       node.dragging = false;
@@ -290,32 +292,32 @@ export class RenderDragHandler {
   }
 
   init(): void {
+    // Guard against accidental re-init (constructor is the only current
+    // caller, but the recovery listeners would double up otherwise).
+    if (this._recoveryHandlers.length > 0) return;
     this.on('mouseup touchend', (e) => {
       e.preventDefault();
       e.stopPropagation();
       this.dragend(e);
     });
-    // Recovery: releasing the pointer outside the canvas, an OS gesture
-    // cancellation, alt-tabbing, or tab-hide all skip `mouseup`/
-    // `touchend`. Funnel them into the same `dragend` path so the drag
-    // state can't get stuck. `dragend` is idempotent against the normal
-    // release fire-twice case.
+    // Releasing the pointer outside the canvas, an OS gesture cancellation,
+    // alt-tabbing, or tab-hide all skip `mouseup`/`touchend` — funnel them
+    // through the same dragend path so the drag can't get stuck.
     const recover = (): void => {
-      if (this.dragging) this.dragend({} as DragEventLike);
-    };
-    const onVisibility = (): void => {
-      if (document.hidden) recover();
+      if (this.dragging) this.dragend();
     };
     const addRecovery = (target: EventTarget, type: string, listener: EventListener): void => {
       target.addEventListener(type, listener);
       this._recoveryHandlers.push({ target, type, listener });
     };
-    if (typeof window !== 'undefined') {
+    if (HAS_WINDOW) {
       addRecovery(window, 'pointercancel', recover);
       addRecovery(window, 'blur', recover);
     }
-    if (typeof document !== 'undefined') {
-      addRecovery(document, 'visibilitychange', onVisibility);
+    if (HAS_DOC) {
+      addRecovery(document, 'visibilitychange', () => {
+        if (document.hidden) recover();
+      });
     }
     this.on('mousemove touchmove', (e) => {
       if (!this.dragging) {
