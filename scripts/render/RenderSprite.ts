@@ -50,7 +50,7 @@ export class RenderSprite extends RenderNode {
     // frameSrc / frameMap / frame from `config` (when present).  Apply
     // the legacy `frame || 'normal'` fallback explicitly.
     // Ensure frameMap falls back to the prototype default if not set.
-    if (!this.frameMap || typeof this.frameMap !== 'object' || !this.frameMap.normal) {
+    if (!this.frameMap || typeof this.frameMap !== 'object') {
       this.frameMap = RenderSprite.prototype.frameMap;
     }
     this.frame = config.frame ?? 'normal';
