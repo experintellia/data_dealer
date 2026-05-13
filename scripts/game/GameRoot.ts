@@ -378,6 +378,10 @@ function _preventDefaultFile(e: unknown): void {
 function _showLangPicker(canDismiss: boolean): void {
   const $ = globalThis.$;
   if (!$) return;
+  // Touch devices fire both `touchend` and a synthesized `click` for the
+  // same tap on the toggle, so the event handler can request the picker
+  // twice in quick succession.  Bail if an overlay is already mounted.
+  if (document.querySelector('.LangSelectOverlay')) return;
   const $overlay = $(
     '<div class="LangSelectOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;">' +
       '<div class="LangPickerBox" style="background:#BFE7F5;border:3px solid #009FD9;border-radius:12px;padding:24px 32px;text-align:center;box-shadow:3px 3px 0px #009FD9,3px 3px 8px rgba(0,0,0,0.5);">' +
