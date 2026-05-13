@@ -188,9 +188,14 @@ function bundleEsmDev() {
             },
           },
         });
-        const out = (Array.isArray(result) ? result[0] : result).output.find(
-          (o) => o.fileName === 'esm-bundle.js'
+        // `result` is RolldownOutput | RolldownWatcher in Vite 8's types; we
+        // never pass `watch`, so it's always the output shape — cast through
+        // `any` so checkJs accepts the `.output` access without taking a hard
+        // dep on the Rolldown types (transitive, not in package.json).
+        const settled = /** @type {{ output: { fileName: string, code?: string }[] }} */ (
+          /** @type {any} */ (Array.isArray(result) ? result[0] : result)
         );
+        const out = settled.output.find((o) => o.fileName === 'esm-bundle.js');
         bundleSrc = out ? out.code : null;
       } finally {
         buildPromise = null;

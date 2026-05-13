@@ -7,6 +7,15 @@ import { defineConfig, devices } from '@playwright/test';
 const LOCAL_CHROMIUM = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const chromiumExecutablePath = existsSync(LOCAL_CHROMIUM) ? LOCAL_CHROMIUM : undefined;
 
+// Variant the dev server (and therefore the e2e run) builds against.
+// Defaults to 'hq' to preserve historical behaviour; CI sets BUILD_VARIANT
+// explicitly to exercise both variants on every push.  Validate early so a
+// typo fails fast instead of being silently treated as 'hq' by vite.config.js.
+const BUILD_VARIANT = process.env.BUILD_VARIANT ?? 'hq';
+if (BUILD_VARIANT !== 'hq' && BUILD_VARIANT !== 'casual') {
+  throw new Error(`BUILD_VARIANT must be 'hq' or 'casual', got '${BUILD_VARIANT}'`);
+}
+
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
@@ -44,5 +53,11 @@ export default defineConfig({
     timeout: 60_000,
     stdout: 'ignore',
     stderr: 'pipe',
+    // Propagate the variant so vite picks it up (vite.config.js reads
+    // process.env.BUILD_VARIANT at config time).  CI runs the suite twice
+    // — once per variant — to keep both code paths exercised.
+    env: {
+      BUILD_VARIANT,
+    },
   },
 });
