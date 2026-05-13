@@ -109,7 +109,14 @@ export class Missions extends GameNode {
     if (raw_data.mission_goals) {
       this.updateMissionGoals(raw_data.mission_goals);
     }
-    if (active_missions.length) {
+    // Only walk active_missions when the server actually handed us a list.
+    // Pre-fix, a falsy/empty `active_missions` (undefined or []) hit an
+    // unguarded else-branch that flagged *every* loaded mission complete,
+    // which on every reload re-fired spurious mission_complete state
+    // events for missions the player had not finished. The server uses
+    // a non-empty list of completed-mission gestalts to encode "all
+    // done"; an empty list simply means "nothing to mark active here".
+    if (Array.isArray(raw_data.active_missions) && active_missions.length) {
       active_missions.forEach((gestalt) => {
         const active_mission = this.getMission(gestalt);
         if (active_mission instanceof Mission) {
@@ -119,12 +126,6 @@ export class Missions extends GameNode {
             m.setState('active', false);
           });
         }
-      });
-    } else {
-      // FIXME: all missions done, process all missions
-      Object.values(this.Missions).forEach((mission) => {
-        mission.setState('complete', true);
-        mission.setState('active', false);
       });
     }
     this.checkProjectGoals();

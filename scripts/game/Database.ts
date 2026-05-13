@@ -599,7 +599,15 @@ export class Database extends GameNode {
       // finally remove the ProfileSet GameNode
       gnode.queue.remove(ps);
       ps.remove();
-      groot.updateGameValues(gv, r.levelup === true, r.missions);
+      // The earlier `updateGameValues(gv, …, true)` call (above, silent)
+      // already applied game_values and ran Missions.updateMissions for
+      // goal/tick refresh. Calling it again here re-ran updateMissions —
+      // which in turn re-fired `FXMissionGoalComplete` per completed goal
+      // and re-cued mission `profile_set` rewards via getDatabase().cue,
+      // duplicating both the FX and the reward queue. Remove the second
+      // call; setProfiles() below still refreshes the status bar from
+      // current state. (Bug #2 in code audit; no test feasible — full
+      // mergeCued path requires booting Render/Popup.)
       groot.setProfiles();
       window.setTimeout(function () {
         triggerQueue.forEach((t) => {

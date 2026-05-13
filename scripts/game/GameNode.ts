@@ -364,9 +364,23 @@ export class GameNode {
       this.parentNode.children.remove(this);
     }
     if (this.children) {
-      this.children.each((child) => {
-        delete child.parentNode;
-      });
+      // Recursively remove descendants so they're unregistered from the
+      // module-level _instances / _ids registries.  Pre-fix the loop only
+      // orphaned children (`delete child.parentNode`), leaving stale ids
+      // resolvable via getById/getByGestalt and pinning whole subtrees
+      // against GC.  Snapshot the array first because each child.remove()
+      // would otherwise mutate `this.children` (via parentNode.children
+      // .remove(this)) while we iterate.
+      //
+      // Ordering invariant: child.remove() runs while `this.parentNode`
+      // and `this.renderNode` are still set on the parent.  Subclass
+      // overrides that depend on parent state during their own teardown
+      // (currently only Topscores' subscribePeersChanged cleanup, which
+      // touches no parent fields) must keep working under this contract.
+      const snapshot = this.children.set.slice();
+      for (const child of snapshot) {
+        child.remove();
+      }
     }
     if (this.renderNode) {
       this.renderNode.remove();
