@@ -658,6 +658,11 @@ export class GameNode {
     states?: Record<string, boolean>;
     template?: string;
     extendClass?: string;
+    // Phase 2 (issue #80): when set, the popup body is rendered by a
+    // Preact component instead of an Underscore.js template.  Mutually
+    // exclusive with `template` — if `preactRender` is passed, the
+    // template fallback ('popup.html') is suppressed.
+    preactRender?: (container: HTMLElement, popup: RenderPopupLike) => void;
   }): RenderPopupLike {
     const gnode = config.gnode || this;
     const groot = this.GameRoot as unknown as GameRootForGameNode;
@@ -673,10 +678,13 @@ export class GameNode {
     const Render = getRender() as Pick<RenderApi, 'Popup'>;
     const popup = new Render.Popup({
       gameNode: this,
-      template: config.template || 'popup.html',
+      // Skip the template default when Preact owns the body; render()
+      // branches on `preactRender` before reading `template`.
+      template: config.preactRender ? '' : config.template || 'popup.html',
       extendClass: config.extendClass || '',
       templateData: gnode.popupTemplateData,
       popupContainer: this,
+      preactRender: config.preactRender,
     } as unknown as ConstructorParameters<RenderApi['Popup']>[0]) as unknown as RenderPopupLike;
     this.renderPopup = popup;
 

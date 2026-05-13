@@ -175,6 +175,10 @@ function bundleEsmDev() {
           configFile: false,
           root: process.cwd(),
           logLevel: 'error',
+          esbuild: {
+            jsx: 'automatic',
+            jsxImportSource: 'preact',
+          },
           build: {
             write: false,
             emptyOutDir: false,
@@ -253,6 +257,17 @@ function bundleEsmDev() {
 export default defineConfig({
   root: '.',
   publicDir: false,
+
+  // JSX → Preact via esbuild's automatic runtime (`preact/jsx-runtime`).
+  // Using esbuild config instead of `@preact/preset-vite` because the .xdc
+  // bundle is built by an inline `build()` call (see `bundleEsmDev` above
+  // and the `rollupOptions` in `build` below) with `configFile: false`,
+  // which doesn't pick up plugins from this config.  HMR / debug-name
+  // niceties from the preset aren't needed in the webxdc target anyway.
+  esbuild: {
+    jsx: 'automatic',
+    jsxImportSource: 'preact',
+  },
 
   server: {
     port: 3000,

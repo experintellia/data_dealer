@@ -19,6 +19,10 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { mountAPStatusPopup } from '../components/popups/APStatusPopup.js';
+import { mountCashStatusPopup } from '../components/popups/CashStatusPopup.js';
+import { mountProfilesStatusPopup } from '../components/popups/ProfilesStatusPopup.js';
+import { mountXPStatusPopup } from '../components/popups/XPStatusPopup.js';
 import { debounce, span, sprintf, toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
 import setup from '../setup.js';
@@ -1871,68 +1875,49 @@ export class GameRoot extends GameNode {
       });
     });
 
+    // Status info popups (Profiles / Cash / AP / XP) — Preact port of
+    // views/popup_status.html (issue #80 phase 2, tier 1).  Each component
+    // owns its own i18n + formatting; call sites just hand over the raw
+    // engine scalars they need.
     this.on('click_status.Profiles', () => {
       this.openGenericPopup({
-        data: {
-          title: i18n.gettext('sb_profiles title'),
-          subtitle: sprintf(
-            i18n.gettext('sb_profiles subtitle %s from %s profiles'),
-            span(toKSNum(this.profiles_value)),
-            span(toKSNum(this.profiles_max))
-          ),
-          description: i18n.gettext('sb_profiles description'),
-          mainsprites_class: 'Profiles',
-        },
-        template: 'popup_status.html',
+        data: { mainsprites_class: 'Profiles' },
+        preactRender: (container) =>
+          mountProfilesStatusPopup(container, {
+            profilesValue: this.profiles_value,
+            profilesMax: this.profiles_max,
+          }),
       });
     });
 
     this.on('click_status.Cash', () => {
       this.openGenericPopup({
-        data: {
-          title: i18n.gettext('sb_cash title'),
-          subtitle: sprintf(
-            i18n.gettext('sb_cash subtitle <span class="highlight">$%s</span>'),
-            toKSNum(this.cash_value)
-          ),
-          description: i18n.gettext('sb_cash description'),
-          mainsprites_class: 'Cash',
-        },
-        template: 'popup_status.html',
+        data: { mainsprites_class: 'Cash' },
+        preactRender: (container) =>
+          mountCashStatusPopup(container, { cashValue: this.cash_value }),
       });
     });
 
     this.on('click_status.AP', () => {
       this.openGenericPopup({
-        data: {
-          title: i18n.gettext('sb_AP title'),
-          subtitle: sprintf(
-            i18n.gettext('sb_AP subtitle %s/%s'),
-            span(toKSNum(this.ap_value)),
-            span(toKSNum(this.xp_level.ap_max))
-          ),
-          description: i18n.gettext('sb_AP description'),
-          mainsprites_class: 'AP',
-        },
-        template: 'popup_status.html',
+        data: { mainsprites_class: 'AP' },
+        preactRender: (container) =>
+          mountAPStatusPopup(container, {
+            apValue: this.ap_value,
+            apMax: this.xp_level.ap_max,
+          }),
       });
     });
 
     this.on('click_status.XP', () => {
       this.openGenericPopup({
-        data: {
-          title: i18n.gettext('sb_XP title'),
-          subtitle: sprintf(
-            i18n.gettext('sb_XP subtitle Level %s'),
-            span(toKSNum(this.xp_level.number))
-          ),
-          description: sprintf(
-            i18n.gettext('sb_XP description %s XP until next level'),
-            span(toKSNum(this.xp_level.xp_max - this.xp_value + 1))
-          ),
-          mainsprites_class: 'XP',
-        },
-        template: 'popup_status.html',
+        data: { mainsprites_class: 'XP' },
+        preactRender: (container) =>
+          mountXPStatusPopup(container, {
+            xpLevel: this.xp_level.number,
+            xpValue: this.xp_value,
+            xpMax: this.xp_level.xp_max,
+          }),
       });
     });
 
