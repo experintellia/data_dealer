@@ -67,6 +67,12 @@ export class RenderDragHandler {
   dragStartPos: { x: number; y: number };
   dragMovePos: { x: number; y: number };
   collisionNodes: OrderedSet<DraggableNode>;
+  // Native recovery handlers attached in `init()`. Stored so `dispose()`
+  // can detach them — without this, releasing the pointer outside the
+  // canvas / alt-tabbing / receiving a system gesture cancellation
+  // would never fire `mouseup`/`touchend` and the drag stays stuck.
+  private _recoveryHandlers: Array<{ target: EventTarget; type: string; listener: EventListener }> =
+    [];
 
   constructor() {
     const $ = globalThis.jQuery ?? globalThis.$;
@@ -121,6 +127,9 @@ export class RenderDragHandler {
   }
 
   dragend(_e: DragEventLike): void {
+    // Idempotent: the recovery handlers below and the regular
+    // mouseup/touchend path can both funnel into here for the same
+    // gesture. The for-loop and flag flip are safe to repeat.
     this.state = 'stopped';
     for (const node of this.listeners) {
       node.dragging = false;
@@ -286,6 +295,28 @@ export class RenderDragHandler {
       e.stopPropagation();
       this.dragend(e);
     });
+    // Recovery: releasing the pointer outside the canvas, an OS gesture
+    // cancellation, alt-tabbing, or tab-hide all skip `mouseup`/
+    // `touchend`. Funnel them into the same `dragend` path so the drag
+    // state can't get stuck. `dragend` is idempotent against the normal
+    // release fire-twice case.
+    const recover = (): void => {
+      if (this.dragging) this.dragend({} as DragEventLike);
+    };
+    const onVisibility = (): void => {
+      if (document.hidden) recover();
+    };
+    const addRecovery = (target: EventTarget, type: string, listener: EventListener): void => {
+      target.addEventListener(type, listener);
+      this._recoveryHandlers.push({ target, type, listener });
+    };
+    if (typeof window !== 'undefined') {
+      addRecovery(window, 'pointercancel', recover);
+      addRecovery(window, 'blur', recover);
+    }
+    if (typeof document !== 'undefined') {
+      addRecovery(document, 'visibilitychange', onVisibility);
+    }
     this.on('mousemove touchmove', (e) => {
       if (!this.dragging) {
         return;
@@ -324,6 +355,13 @@ export class RenderDragHandler {
         node.moveTo(clipped);
       }
     });
+  }
+
+  dispose(): void {
+    for (const h of this._recoveryHandlers) {
+      h.target.removeEventListener(h.type, h.listener);
+    }
+    this._recoveryHandlers.length = 0;
   }
 
   private static _touchFrom(e: DragEventLike): PointerLike | undefined {
