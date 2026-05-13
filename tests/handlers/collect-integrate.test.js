@@ -364,6 +364,111 @@ describe('collectPerp — TokenPerp', () => {
 
 // ── Failure paths ────────────────────────────────────────────────────────────
 
+// ── AP cost (regression: collecting money/profiles must consume energy) ─────
+//
+// Pre-fix, collectPerp incremented xp_value but never touched ap_snapshot,
+// so the visible AP bar didn't budge after a collect even though every
+// {Client,Contact,Project,Token}Perp.collect() in the UI pre-checks
+// `groot.ap_value < 1` and refuses below threshold. Engine-side parity
+// with chargePerp and integrateCollected: each collect costs 1 AP.
+
+describe('collectPerp — AP cost', () => {
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => clearOverride());
+
+  it('ClientPerp: decrements ap_snapshot by 1', async () => {
+    const PATH = 'Imperium.City.Pusher0.client001';
+    setState(
+      mkState({
+        nodes: [mkNode('ClientPerp', PATH)],
+        nodes_collect: [{ path: PATH, result: { amount: 100 } }],
+        game_values: mkGv({ ap_snapshot: 5, ap_max: 6 }),
+      })
+    );
+
+    const { result } = await collectPerp(PATH);
+    expect(result.error).toBeUndefined();
+    expect(result.game_values.ap_snapshot).toBe(4);
+  });
+
+  it('ContactPerp: decrements ap_snapshot by 1', async () => {
+    const PATH = 'Imperium.City.Agent0.contact001';
+    setState(
+      mkState({
+        nodes: [mkNode('ContactPerp', PATH)],
+        nodes_collect: [{ path: PATH, result: { amount: 5 } }],
+        game_values: mkGv({ ap_snapshot: 5, ap_max: 6 }),
+      })
+    );
+
+    const { result } = await collectPerp(PATH);
+    expect(result.error).toBeUndefined();
+    expect(result.game_values.ap_snapshot).toBe(4);
+  });
+
+  it('ProjectPerp: decrements ap_snapshot by 1', async () => {
+    const PATH = 'Imperium.City.Agent0.project001';
+    setState(
+      mkState({
+        nodes: [mkNode('ProjectPerp', PATH)],
+        nodes_collect: [{ path: PATH, result: { amount: 5 } }],
+        game_values: mkGv({ ap_snapshot: 5, ap_max: 6 }),
+      })
+    );
+
+    const { result } = await collectPerp(PATH);
+    expect(result.error).toBeUndefined();
+    expect(result.game_values.ap_snapshot).toBe(4);
+  });
+
+  it('TokenPerp: decrements ap_snapshot by 1', async () => {
+    const PATH = 'Imperium.Database.token001';
+    setState(
+      mkState({
+        nodes: [mkNode('TokenPerp', PATH, { amount: 0 })],
+        nodes_collect: [{ path: PATH, result: { amount: 2 } }],
+        game_values: mkGv({ ap_snapshot: 5, ap_max: 6 }),
+      })
+    );
+
+    const { result } = await collectPerp(PATH);
+    expect(result.error).toBeUndefined();
+    expect(result.game_values.ap_snapshot).toBe(4);
+  });
+
+  it('returns error 4 when ap_snapshot is 0 (no AP)', async () => {
+    const PATH = 'Imperium.City.Pusher0.client001';
+    setState(
+      mkState({
+        nodes: [mkNode('ClientPerp', PATH)],
+        nodes_collect: [{ path: PATH, result: { amount: 100 } }],
+        game_values: mkGv({ ap_snapshot: 0, ap_max: 6 }),
+      })
+    );
+
+    const data = await collectPerp(PATH);
+    expect(data.result.error).toBe(4);
+  });
+
+  it('error path: state is untouched when AP is insufficient', async () => {
+    const PATH = 'Imperium.City.Pusher0.client001';
+    setState(
+      mkState({
+        nodes: [mkNode('ClientPerp', PATH)],
+        nodes_collect: [{ path: PATH, result: { amount: 100 } }],
+        game_values: mkGv({ ap_snapshot: 0, ap_max: 6, cash_value: 300 }),
+      })
+    );
+
+    await collectPerp(PATH);
+    const s = getState();
+    // No cash gained, no nodes_collect entry consumed, no XP awarded.
+    expect(s.game_values.cash_value).toBe(300);
+    expect(s.nodes_collect).toHaveLength(1);
+    expect(s.game_values.xp_value).toBe(5);
+  });
+});
+
 describe('collectPerp — failure paths', () => {
   beforeEach(() => setOverride(FIXED_NOW));
   afterEach(() => clearOverride());
@@ -739,10 +844,12 @@ describe('collectPerp — level-up refills ap_snapshot to the new ap_max', () =>
     setState(
       mkState({
         // xp_value=10 + xp_inc=1 (contact001) = 11 → level 2.
+        // ap_snapshot=1 so the per-collect AP cost can be paid; the
+        // level-up refill then overrides it to ap_max=8.
         game_values: Object.assign({}, mkGv(), {
           xp_value: 10,
           xp_level: 1,
-          ap_snapshot: 0,
+          ap_snapshot: 1,
           ap_max: 6,
         }),
         nodes: [
@@ -2877,7 +2984,7 @@ describe('collectPerp — level-up refills AP to new ap_max', () => {
     expect(data.result.game_values.ap_snapshot).toBe(8); // level 2 ap_max
   });
 
-  it('ap_snapshot is NOT decremented when level-up occurs (override, not cost subtract)', async () => {
+  it('level-up refill overrides the AP cost — full ap_max after crossing threshold', async () => {
     setState(
       mkState({
         game_values: mkGv({ xp_value: 10, xp_level: 1, ap_snapshot: 3, ap_max: 6 }),
@@ -2887,13 +2994,13 @@ describe('collectPerp — level-up refills AP to new ap_max', () => {
     );
 
     const data = await collectPerp(PATH);
-    // ap_snapshot must be the new ap_max (8), not the old value (3)
+    // ap_snapshot must be the new ap_max (8), not the post-cost value (2)
     // and not anything derived by subtracting from 3.
     expect(data.result.game_values.ap_snapshot).toBeGreaterThan(3);
     expect(data.result.game_values.ap_snapshot).toBe(8);
   });
 
-  it('no level-up: ap_snapshot is unchanged when XP stays within same level', async () => {
+  it('no level-up: ap_snapshot decrements by 1 (per-collect AP cost)', async () => {
     setState(
       mkState({
         game_values: mkGv({ xp_value: 5, xp_level: 1, ap_snapshot: 3, ap_max: 6 }),
@@ -2903,9 +3010,10 @@ describe('collectPerp — level-up refills AP to new ap_max', () => {
     );
 
     const data = await collectPerp(PATH);
-    // contact001 xp_inc=1: 5+1=6 → still level 1 (xp_max=10)
+    // contact001 xp_inc=1: 5+1=6 → still level 1 (xp_max=10).
+    // No level-up refill, so the per-collect cost stands: 3 → 2.
     expect(data.result.levelup).toBe(false);
-    expect(data.result.game_values.ap_snapshot).toBe(3); // unchanged
+    expect(data.result.game_values.ap_snapshot).toBe(2);
   });
 });
 

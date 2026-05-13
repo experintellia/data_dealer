@@ -2408,6 +2408,7 @@ function _handleKarmaIncident(gv: GameValues, ruleset: Ruleset): KarmaIncident |
  *   1 — path not in nodes_collect (not ready / hasn't charged)
  *   2 — node not found in state.nodes
  *   3 — unknown game_type
+ *   4 — insufficient AP (parity with chargePerp / integrateCollected)
  */
 interface DbEntry {
   origin: string;
@@ -2427,9 +2428,19 @@ export function collectPerp(
   var now = clockNow();
   var ruleset = _getRuleset();
 
-  // Materialise time-based progression before testing readiness.
+  // Materialise time-based progression before testing readiness. Reading
+  // ap_snapshot after materialize ensures AP regen ticks accumulated since
+  // the last handler call are visible — without this the engine could refuse
+  // a collect that the UI's APTicker shows as affordable.
   var mat = materialize(state, now);
   var ms = mat.state;
+
+  // Each collect costs 1 AP (parity with chargePerp / integrateCollected).
+  // The UI pre-checks ap_value < 1 in {Client,Contact,Project,Token}Perp.collect
+  // and shows FXNoAP; the engine still guards as defence-in-depth.
+  if (((ms.game_values && ms.game_values.ap_snapshot) || 0) < 1) {
+    return Promise.resolve({ result: { error: 4 } });
+  }
 
   var collectEntry: { path: string; result?: { amount?: number } } | null = null;
   for (var i = 0; i < ms.nodes_collect.length; i++) {
@@ -2470,6 +2481,7 @@ export function collectPerp(
   });
   var newGv: GameValues = Object.assign({}, ms.game_values, {
     xp_value: (ms.game_values.xp_value || 0) + xpGain,
+    ap_snapshot: Math.max(0, (ms.game_values.ap_snapshot || 0) - 1),
   });
 
   var innerResult: Record<string, unknown>;
