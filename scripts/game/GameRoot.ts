@@ -21,7 +21,10 @@ import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
 import { mountAPStatusPopup } from '../components/popups/APStatusPopup.js';
 import { mountCashStatusPopup } from '../components/popups/CashStatusPopup.js';
+import { mountLevelUpNotification } from '../components/popups/LevelUpNotification.js';
+import { mountNewItemsNotification } from '../components/popups/NewItemsNotification.js';
 import { mountProfilesStatusPopup } from '../components/popups/ProfilesStatusPopup.js';
+import { mountTutorialNotification } from '../components/popups/TutorialNotification.js';
 import { mountXPStatusPopup } from '../components/popups/XPStatusPopup.js';
 import { debounce, span, sprintf, toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
@@ -308,6 +311,13 @@ interface Notification {
 
 interface NotificationConfig {
   template?: string;
+  /**
+   * Phase 2 (issue #80) Preact replacement for `template`.  When set,
+   * `openNotification` skips the `notification.html` default and the
+   * Render.Popup body is mounted by this callback (see
+   * `RenderPopup.preactRender` in RenderTopLevelUI.ts).
+   */
+  preactRender?: (container: HTMLElement, popup: unknown) => void;
   extendClass?: string;
   delay?: number;
   delayScript?: number;
@@ -1297,7 +1307,12 @@ export class GameRoot extends GameNode {
       groot: this,
     };
 
-    config.template = config.template || 'notification.html';
+    // Every notification cue must now provide either a `template`
+    // (the remaining tier-3+ paths: popup_mission*, popup_karma) or
+    // a `preactRender` callback (tier 2 — levelup / new items /
+    // tutorial / story / simplemessage).  The old `notification.html`
+    // default was deleted alongside its Preact port — leaving the
+    // fallback would point at a missing file.
     config.templateData = popupTemplateData;
     config.popupContainer = this;
 
@@ -1388,10 +1403,20 @@ export class GameRoot extends GameNode {
       }
     }
     if (data.levelup) {
+      // Snapshot the levelled-up values at cue time — the popup opens
+      // up to `delay` ms after this point and the levelup.html legacy
+      // template read live `_.game().xp_level.*` on render, which gave
+      // identical numbers because xp_level is set synchronously before
+      // makeNotifications.  We capture the same numbers up front so
+      // the Preact component is pure.
+      const xpLevel = this.xp_level.number;
+      const xpToNext = this.xp_level.xp_max - this.xp_value;
+      const apMax = this.xp_level.ap_max;
       const n: Notification = {
         game_type: 'LevelUp',
         config: {
-          template: 'levelup.html',
+          preactRender: (container) =>
+            mountLevelUpNotification(container as HTMLElement, { xpLevel, xpToNext, apMax }),
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 1200,
@@ -1443,7 +1468,16 @@ export class GameRoot extends GameNode {
             n.text = sprintf(ntext, span((tdata as { title?: string }).title ?? ''));
           }
         });
-        if (parentIsBuilt) this.cueNotification(n);
+        if (parentIsBuilt) {
+          (n.config as NotificationConfig).preactRender = (container) =>
+            mountNewItemsNotification(container as HTMLElement, {
+              title: n.title,
+              says: n.says,
+              textHtml: n.text,
+              perp: n.perp as { data?: Record<string, unknown> } | undefined,
+            });
+          this.cueNotification(n);
+        }
       });
     }
     // Powerup Notifications.  FIXME same as `data.perps`.
@@ -1504,6 +1538,13 @@ export class GameRoot extends GameNode {
         });
         n.says = i18n.gettext('Mark says:');
         n.text = sprintf(reg.type_data?.ntext ?? '', span(projectstext));
+        (n.config as NotificationConfig).preactRender = (container) =>
+          mountNewItemsNotification(container as HTMLElement, {
+            title: n.title,
+            says: n.says,
+            textHtml: n.text,
+            perp: n.perp as { data?: Record<string, unknown> } | undefined,
+          });
         // popup only if notification = true;
         if (reg.type_data?.notification) this.cueNotification(n);
       });
@@ -1526,13 +1567,19 @@ export class GameRoot extends GameNode {
 
     // Simplemessage
     if (data.simplemessage) {
+      const description = data.simplemessage.text;
+      const says = i18n.gettext('Mark says:');
       this.cueNotification({
         game_type: 'Story',
         button: i18n.gettext('Next'),
-        description: data.simplemessage.text,
-        says: i18n.gettext('Mark says:'),
+        description,
+        says,
         config: {
-          template: 'notification_tutorial.html',
+          preactRender: (container) =>
+            mountTutorialNotification(container as HTMLElement, {
+              says,
+              descriptionHtml: description,
+            }),
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 0,
@@ -1543,11 +1590,13 @@ export class GameRoot extends GameNode {
     // Tutorials and Missions
     if (data.story && data.storyPerp) {
       const storyPerp = data.storyPerp;
+      const description = data.story.text;
+      const says = i18n.gettext('Mark says:');
       this.cueNotification({
         game_type: 'Story',
         button: i18n.gettext('Next'),
-        description: data.story.text,
-        says: i18n.gettext('Mark says:'),
+        description,
+        says,
         scriptedEvents: [
           () => {
             const viewMapId = storyPerp.ViewMap?.id;
@@ -1558,7 +1607,11 @@ export class GameRoot extends GameNode {
           },
         ],
         config: {
-          template: 'notification_tutorial.html',
+          preactRender: (container) =>
+            mountTutorialNotification(container as HTMLElement, {
+              says,
+              descriptionHtml: description,
+            }),
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 0,
@@ -1570,8 +1623,14 @@ export class GameRoot extends GameNode {
         const n: Notification = tutorial;
         n.button = i18n.gettext('Next');
         n.says = i18n.gettext('Mark says:');
+        const description = (n.description ?? '') as string;
+        const says = n.says;
         n.config = {
-          template: 'notification_tutorial.html',
+          preactRender: (container) =>
+            mountTutorialNotification(container as HTMLElement, {
+              says,
+              descriptionHtml: description,
+            }),
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 600 * speed,
