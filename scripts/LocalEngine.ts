@@ -1115,13 +1115,27 @@ function _tokensEqual(a: TokenSpec[], b: TokenSpec[]): boolean {
 }
 
 function _getLevelByXP(xp: number): number {
+  // Ruleset levels are defined with a gap between consecutive ranges
+  // (L1: 0–10, L2: 11–30, …). A player whose xp lands exactly on a
+  // level's `xp_max` would otherwise stay on the lower level until the
+  // next +1 XP pushed them past the gap into the next `xp_min`. That's
+  // visible as "10/10" sitting at level 1 with no levelup notification.
+  //
+  // Treat `xp_max` as the promotion threshold: walk high-to-low and
+  // return the first level whose `xp_min` is reached, but if xp has
+  // already met or passed that level's `xp_max` AND a higher level
+  // exists, return the higher level instead.
   var levels = _getRuleset().levels;
-  for (var i = 0; i < levels.length; i++) {
+  for (var i = levels.length - 1; i >= 0; i--) {
     var lvl = levels[i];
-    if (lvl && xp >= lvl.xp_min && xp <= lvl.xp_max) return lvl.number;
+    if (lvl && xp >= lvl.xp_min) {
+      var next = levels[i + 1];
+      if (next && xp >= lvl.xp_max) return next.number;
+      return lvl.number;
+    }
   }
-  var last = levels[levels.length - 1];
-  return last ? last.number : 1;
+  var first = levels[0];
+  return first ? first.number : 1;
 }
 
 function _checkLevelup(currentLevel: number, newXp: number): boolean {
