@@ -36,7 +36,6 @@
 // PR #221 (RenderSprite/RenderText) and PR #223 (RenderStage); the
 // reviewer flagged it as worth a header-level note.
 
-import { render as preactRenderInto } from 'preact';
 import appModule from '../app.js';
 import { span, sprintf, toKSNum, toTime } from '../dd-helpers.js';
 import i18n from '../i18n.js';
@@ -508,12 +507,6 @@ export type PopupConfig = NodeConfig & {
   popupContainer?: PopupContainerLike;
   extendClass?: string;
   placeBottom?: boolean;
-  // Phase 2 (issue #80): when set, `render()` mounts a Preact component
-  // into `jdomelem` instead of running the Underscore.js template flow.
-  // Existing jQuery delegated handlers on the popup body (.PopupClose,
-  // .Button, .PopupMenuButton, …) still fire — Preact only owns the DOM
-  // _content_, the event seam is unchanged.
-  preactRender?: (container: HTMLElement, popup: RenderPopup) => void;
 };
 
 export interface PopupTemplateData {
@@ -535,9 +528,6 @@ export class RenderPopup extends RenderNode {
   declare placeBottom: boolean | undefined;
   declare lastButton: JQueryUIElem | undefined;
   declare userAbsPos: { x: number; y: number } | undefined;
-  declare preactRender: ((container: HTMLElement, popup: RenderPopup) => void) | undefined;
-  /** Guards `popup_close` from binding the Preact unmount more than once. */
-  preactCleanupBound = false;
 
   declare template: string;
 
@@ -924,32 +914,6 @@ export class RenderPopup extends RenderNode {
 
   render(): void {
     const jq = this.jdomelem;
-    if (this.preactRender) {
-      // Preact-rendered popup body — Preact owns the container's DOM,
-      // so we deliberately skip the `jq.empty()` step the legacy
-      // template path uses.  Lifecycle notes:
-      //   - In practice this method is called exactly once for popups
-      //     (no `tick()` override, no external re-render path).
-      //   - The `preactRender` callback typically closes over snapshot
-      //     props captured at popup construction time, so calling it
-      //     again would re-mount with the same data — it is NOT a
-      //     reactive seam.  For dialogs that need to re-render on
-      //     engine data changes (most of tier 5+), the component
-      //     should manage its own state via hooks rather than relying
-      //     on the seam being called again.
-      //   - On `popup_close` we call `preact.render(null, container)`
-      //     to unmount the component tree so `useEffect` cleanups
-      //     (subscriptions, timers, listeners) run.  Bound once per
-      //     popup instance; guarded by `preactCleanupBound`.
-      this.preactRender(jq[0], this);
-      if (!this.preactCleanupBound) {
-        this.preactCleanupBound = true;
-        this.on('popup_close', () => {
-          preactRenderInto(null, jq[0]);
-        });
-      }
-      return;
-    }
     jq.empty();
     const html = getApp().renderView(this.template, this.templateData);
     jq.append(html);

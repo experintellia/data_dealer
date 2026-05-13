@@ -17,15 +17,17 @@
 // `GameRoot.prototype.X = function () {...}` assignments in Game.js
 // for now; later PRs in the wave migrate them one batch at a time.
 
+import type { ComponentType } from 'preact';
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
-import { mountAPStatusPopup } from '../components/popups/APStatusPopup.js';
-import { mountCashStatusPopup } from '../components/popups/CashStatusPopup.js';
-import { mountLevelUpNotification } from '../components/popups/LevelUpNotification.js';
-import { mountNewItemsNotification } from '../components/popups/NewItemsNotification.js';
-import { mountProfilesStatusPopup } from '../components/popups/ProfilesStatusPopup.js';
-import { mountTutorialNotification } from '../components/popups/TutorialNotification.js';
-import { mountXPStatusPopup } from '../components/popups/XPStatusPopup.js';
+import { APStatusPopup } from '../components/popups/APStatusPopup.js';
+import { CashStatusPopup } from '../components/popups/CashStatusPopup.js';
+import { LevelUpNotification } from '../components/popups/LevelUpNotification.js';
+import { NewItemsNotification } from '../components/popups/NewItemsNotification.js';
+import { ProfilesStatusPopup } from '../components/popups/ProfilesStatusPopup.js';
+import { TutorialNotification } from '../components/popups/TutorialNotification.js';
+import { XPStatusPopup } from '../components/popups/XPStatusPopup.js';
+import { type PreactDialogHandle, openDialog } from '../components/popups/dialogManager.js';
 import { debounce, span, sprintf, toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
 import setup from '../setup.js';
@@ -312,12 +314,16 @@ interface Notification {
 interface NotificationConfig {
   template?: string;
   /**
-   * Phase 2 (issue #80) Preact replacement for `template`.  When set,
-   * `openNotification` skips the `notification.html` default and the
-   * Render.Popup body is mounted by this callback (see
-   * `RenderPopup.preactRender` in RenderTopLevelUI.ts).
+   * Phase 2 (issue #80) Preact replacement for `template`.  When
+   * `component` is set, `openNotification` routes the cue through the
+   * Preact dialog manager (`dialogManager.openDialog`) instead of
+   * constructing a `Render.Popup` with an Underscore.js template.
+   * The framework injects an `onClose: () => void` prop into the
+   * component on render — components declare it on their props type.
    */
-  preactRender?: (container: HTMLElement, popup: unknown) => void;
+  component?: ComponentType<any>;
+  /** Props for `component`, snapshotted at cue time. */
+  props?: Record<string, unknown>;
   extendClass?: string;
   delay?: number;
   delayScript?: number;
@@ -1296,9 +1302,111 @@ export class GameRoot extends GameNode {
     });
   }
 
+  /** Open a Preact dialog through the phase-2 `dialogManager`.  Wires
+   *  the resulting handle into `this.renderPopup` (or `notificationPopup`
+   *  when `slot: 'notification'`) so legacy callers that do
+   *  `groot.renderPopup.trigger('popup_close')` still find a compatible
+   *  handle to drive.  Clears that slot automatically on close. */
+  openPreactDialog<P extends Record<string, unknown>>(
+    component: ComponentType<P & { onClose: () => void }>,
+    props: P,
+    options: {
+      extendClass?: string;
+      slot?: 'popup' | 'notification';
+      onAfterClose?: () => void;
+    } = {}
+  ): PreactDialogHandle | undefined {
+    const containerJq = (
+      this.renderNode as { popupContainerDomelem?: { 0?: HTMLElement } } | undefined
+    )?.popupContainerDomelem;
+    const container = containerJq?.[0];
+    if (!container) return undefined;
+    const slot = options.slot ?? 'popup';
+    const handle = openDialog<P>({
+      component,
+      props,
+      container,
+      ...(options.extendClass !== undefined && { extendClass: options.extendClass }),
+      onAfterClose: () => {
+        if (slot === 'notification') {
+          delete this.notificationPopup;
+        } else {
+          delete this.renderPopup;
+        }
+        options.onAfterClose?.();
+      },
+    });
+    if (slot === 'notification') {
+      this.notificationPopup = handle as unknown as NonNullable<typeof this.notificationPopup>;
+    } else {
+      this.renderPopup = handle as unknown as NonNullable<typeof this.renderPopup>;
+    }
+    return handle;
+  }
+
   openNotification(notification: Notification): RenderPopupLike | undefined {
     const config = (notification.config ?? {}) as NotificationConfig;
     if (this.notificationPopup) return undefined;
+
+    // Phase 2 (issue #80) — tier 2 cues set `config.component` /
+    // `config.props` instead of `template`; route them through the
+    // Preact dialog manager.  Mirrors the legacy lifecycle: `delay`
+    // before the popup appears, `delayScript` for scripted events,
+    // `nonblocking` for auto-close.  A stub handle holds the
+    // `notificationPopup` slot synchronously so concurrent cues
+    // can't double-open while we wait for the delay.
+    if (config.component) {
+      const drainOnClose = (): void => {
+        this.uncueNotification(notification);
+        const next = this.NotificationQueue[0];
+        if (next) this.openNotification(next);
+      };
+
+      let cancelled = false;
+      let liveHandle: PreactDialogHandle | undefined;
+
+      const stub: PreactDialogHandle = {
+        open: true,
+        trigger: (event: string): void => {
+          if (event !== 'popup_close' && event !== 'popup_cancel') return;
+          if (liveHandle) {
+            liveHandle.close();
+          } else if (!cancelled) {
+            cancelled = true;
+            delete this.notificationPopup;
+            drainOnClose();
+          }
+        },
+        render: (): void => {},
+        close: (): void => {
+          stub.trigger('popup_close');
+        },
+      };
+      this.notificationPopup = stub as unknown as NonNullable<typeof this.notificationPopup>;
+
+      window.setTimeout(() => {
+        notification.scriptedEvents?.forEach((s) => s());
+      }, config.delayScript ?? 0);
+
+      window.setTimeout(() => {
+        if (cancelled) return;
+        delete this.notificationPopup;
+        liveHandle = this.openPreactDialog(
+          config.component as ComponentType<Record<string, unknown> & { onClose: () => void }>,
+          config.props ?? {},
+          {
+            ...(config.extendClass !== undefined && { extendClass: config.extendClass }),
+            slot: 'notification',
+            onAfterClose: drainOnClose,
+          }
+        );
+        if (liveHandle && notification.nonblocking) {
+          window.setTimeout(() => liveHandle?.close(), notification.nonblocking);
+        }
+      }, config.delay ?? 0);
+
+      return undefined;
+    }
 
     const popupTemplateData: Record<string, unknown> = {
       status_icons: this.data.status_icons,
@@ -1307,12 +1415,9 @@ export class GameRoot extends GameNode {
       groot: this,
     };
 
-    // Every notification cue must now provide either a `template`
-    // (the remaining tier-3+ paths: popup_mission*, popup_karma) or
-    // a `preactRender` callback (tier 2 — levelup / new items /
-    // tutorial / story / simplemessage).  The old `notification.html`
-    // default was deleted alongside its Preact port — leaving the
-    // fallback would point at a missing file.
+    // Legacy template path — remaining tier-3+ notification cues
+    // (mission popups, popup_karma) still flow through `Render.Popup`
+    // + the Underscore.js template.
     config.templateData = popupTemplateData;
     config.popupContainer = this;
 
@@ -1415,8 +1520,8 @@ export class GameRoot extends GameNode {
       const n: Notification = {
         game_type: 'LevelUp',
         config: {
-          preactRender: (container) =>
-            mountLevelUpNotification(container as HTMLElement, { xpLevel, xpToNext, apMax }),
+          component: LevelUpNotification,
+          props: { xpLevel, xpToNext, apMax },
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 1200,
@@ -1469,13 +1574,13 @@ export class GameRoot extends GameNode {
           }
         });
         if (parentIsBuilt) {
-          (n.config as NotificationConfig).preactRender = (container) =>
-            mountNewItemsNotification(container as HTMLElement, {
-              title: n.title,
-              says: n.says,
-              textHtml: n.text,
-              perp: n.perp as { data?: Record<string, unknown> } | undefined,
-            });
+          (n.config as NotificationConfig).component = NewItemsNotification;
+          (n.config as NotificationConfig).props = {
+            title: n.title,
+            says: n.says,
+            textHtml: n.text,
+            perp: n.perp as { data?: Record<string, unknown> } | undefined,
+          };
           this.cueNotification(n);
         }
       });
@@ -1538,13 +1643,13 @@ export class GameRoot extends GameNode {
         });
         n.says = i18n.gettext('Mark says:');
         n.text = sprintf(reg.type_data?.ntext ?? '', span(projectstext));
-        (n.config as NotificationConfig).preactRender = (container) =>
-          mountNewItemsNotification(container as HTMLElement, {
-            title: n.title,
-            says: n.says,
-            textHtml: n.text,
-            perp: n.perp as { data?: Record<string, unknown> } | undefined,
-          });
+        (n.config as NotificationConfig).component = NewItemsNotification;
+        (n.config as NotificationConfig).props = {
+          title: n.title,
+          says: n.says,
+          textHtml: n.text,
+          perp: n.perp as { data?: Record<string, unknown> } | undefined,
+        };
         // popup only if notification = true;
         if (reg.type_data?.notification) this.cueNotification(n);
       });
@@ -1575,11 +1680,8 @@ export class GameRoot extends GameNode {
         description,
         says,
         config: {
-          preactRender: (container) =>
-            mountTutorialNotification(container as HTMLElement, {
-              says,
-              descriptionHtml: description,
-            }),
+          component: TutorialNotification,
+          props: { says, descriptionHtml: description },
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 0,
@@ -1607,11 +1709,8 @@ export class GameRoot extends GameNode {
           },
         ],
         config: {
-          preactRender: (container) =>
-            mountTutorialNotification(container as HTMLElement, {
-              says,
-              descriptionHtml: description,
-            }),
+          component: TutorialNotification,
+          props: { says, descriptionHtml: description },
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 0,
@@ -1626,11 +1725,8 @@ export class GameRoot extends GameNode {
         const description = (n.description ?? '') as string;
         const says = n.says;
         n.config = {
-          preactRender: (container) =>
-            mountTutorialNotification(container as HTMLElement, {
-              says,
-              descriptionHtml: description,
-            }),
+          component: TutorialNotification,
+          props: { says, descriptionHtml: description },
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 600 * speed,
@@ -1939,48 +2035,32 @@ export class GameRoot extends GameNode {
     });
 
     // Status info popups (Profiles / Cash / AP / XP) — Preact port of
-    // views/popup_status.html (issue #80 phase 2, tier 1).  Each component
-    // owns its own i18n + formatting; call sites just hand over the raw
-    // engine scalars they need.
+    // views/popup_status.html (issue #80 phase 2, tier 1).  Each
+    // component owns its own i18n + formatting; call sites just hand
+    // over the raw engine scalars they need.
     this.on('click_status.Profiles', () => {
-      this.openGenericPopup({
-        data: { mainsprites_class: 'Profiles' },
-        preactRender: (container) =>
-          mountProfilesStatusPopup(container, {
-            profilesValue: this.profiles_value,
-            profilesMax: this.profiles_max,
-          }),
+      this.openPreactDialog(ProfilesStatusPopup, {
+        profilesValue: this.profiles_value,
+        profilesMax: this.profiles_max,
       });
     });
 
     this.on('click_status.Cash', () => {
-      this.openGenericPopup({
-        data: { mainsprites_class: 'Cash' },
-        preactRender: (container) =>
-          mountCashStatusPopup(container, { cashValue: this.cash_value }),
-      });
+      this.openPreactDialog(CashStatusPopup, { cashValue: this.cash_value });
     });
 
     this.on('click_status.AP', () => {
-      this.openGenericPopup({
-        data: { mainsprites_class: 'AP' },
-        preactRender: (container) =>
-          mountAPStatusPopup(container, {
-            apValue: this.ap_value,
-            apMax: this.xp_level.ap_max,
-          }),
+      this.openPreactDialog(APStatusPopup, {
+        apValue: this.ap_value,
+        apMax: this.xp_level.ap_max,
       });
     });
 
     this.on('click_status.XP', () => {
-      this.openGenericPopup({
-        data: { mainsprites_class: 'XP' },
-        preactRender: (container) =>
-          mountXPStatusPopup(container, {
-            xpLevel: this.xp_level.number,
-            xpValue: this.xp_value,
-            xpMax: this.xp_level.xp_max,
-          }),
+      this.openPreactDialog(XPStatusPopup, {
+        xpLevel: this.xp_level.number,
+        xpValue: this.xp_value,
+        xpMax: this.xp_level.xp_max,
       });
     });
 

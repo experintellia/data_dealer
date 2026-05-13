@@ -7,7 +7,7 @@
 // which the popup-events init in `GameNode.initPopupEvents` translates
 // into `popup_close`.
 
-import { render } from 'preact';
+import type { JSX } from 'preact';
 import i18n from '../../i18n.js';
 import { type SpriteHelperConfig, renderSpriteHtml } from '../../render/renderSpriteHelper.js';
 
@@ -31,6 +31,8 @@ export interface NewItemsNotificationProps {
   textHtml?: string | undefined;
   /** Optional perp to render in the `notification_item.html` slot. */
   perp?: NewItemsPerp | undefined;
+  /** Framework-injected by the dialog manager. */
+  onClose: () => void;
 }
 
 function NotificationItem({ perp }: { perp: NewItemsPerp }) {
@@ -49,12 +51,25 @@ function NotificationItem({ perp }: { perp: NewItemsPerp }) {
   );
 }
 
-export function NewItemsNotification({ title, says, textHtml, perp }: NewItemsNotificationProps) {
+export function NewItemsNotification({
+  title,
+  says,
+  textHtml,
+  perp,
+  onClose,
+}: NewItemsNotificationProps) {
   const speaker = says ?? i18n.gettext('Mark says:');
+  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
+    e.stopPropagation();
+    onClose();
+  };
   return (
     <div class="PopupBody NotificationBody">
       <div class="NotificationHeader">
-        <div class="PopupClose">X</div>
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+        <div class="PopupClose" onClick={close}>
+          X
+        </div>
         <div class="NotificationTitle">{title}</div>
       </div>
       <div class="NotificationContent">
@@ -65,7 +80,8 @@ export function NewItemsNotification({ title, says, textHtml, perp }: NewItemsNo
           {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
           <div class="NotificationText" dangerouslySetInnerHTML={{ __html: textHtml ?? '' }} />
           <div class="PopupButtons NotificationButtons">
-            <div class="Button" data-button-id="MainButton">
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+            <div class="Button" data-button-id="MainButton" onClick={close}>
               {i18n.gettext('OK')}
             </div>
           </div>
@@ -73,11 +89,4 @@ export function NewItemsNotification({ title, says, textHtml, perp }: NewItemsNo
       </div>
     </div>
   );
-}
-
-export function mountNewItemsNotification(
-  container: HTMLElement,
-  props: NewItemsNotificationProps
-): void {
-  render(<NewItemsNotification {...props} />, container);
 }

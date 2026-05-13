@@ -1,11 +1,13 @@
 // Shared chrome for popups that follow the
 // `PopupBody > PopupHeader { close, logo, title, [body], buttons }`
 // shape — used by the four status-bar info popups so far, scalable to
-// the other simple-info dialogs in tier 2+ (issue #80 phase 2).  Click
-// handling stays on the `RenderPopup` jQuery delegated handlers in
-// RenderTopLevelUI.ts; this component only owns the DOM _content_.
+// the other simple-info dialogs in tier 2+ (issue #80 phase 2).
+//
+// All close-paths fire `onClose` (received via the dialog manager's
+// framework-injected prop) and call `stopPropagation` so the
+// dialog-manager backdrop click handler doesn't double-fire.
 
-import type { ComponentChildren } from 'preact';
+import type { ComponentChildren, JSX } from 'preact';
 
 export interface PopupShellProps {
   /**
@@ -22,6 +24,11 @@ export interface PopupShellProps {
   buttonLabel: string;
   /** Subtitle + description, etc. — rendered between title and buttons. */
   children?: ComponentChildren;
+  /**
+   * Framework-injected by the dialog manager — closes the popup.  All
+   * close affordances (.PopupClose X, MainButton) call this.
+   */
+  onClose: () => void;
 }
 
 export function PopupShell({
@@ -30,18 +37,27 @@ export function PopupShell({
   title,
   buttonLabel,
   children,
+  onClose,
 }: PopupShellProps) {
+  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
+    e.stopPropagation();
+    onClose();
+  };
   return (
     <div class={bodyClass ? `PopupBody ${bodyClass}` : 'PopupBody'}>
       <div class="PopupHeader">
-        <div class="PopupClose">X</div>
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure (div + .Button class), keyboard support is a separate phase 3 a11y pass */}
+        <div class="PopupClose" onClick={close}>
+          X
+        </div>
         <div class="PopupLogo">
           <div class={`MainSpritesPopup ${spriteClass}`} />
         </div>
         <div class="PopupTitle">{title}</div>
         {children}
         <div class="PopupButtons">
-          <div class="Button" data-button-id="MainButton">
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure (div + .Button class), keyboard support is a separate phase 3 a11y pass */}
+          <div class="Button" data-button-id="MainButton" onClick={close}>
             {buttonLabel}
           </div>
         </div>

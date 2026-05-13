@@ -3,7 +3,6 @@
 // dismissed by tapping anywhere (jQuery handler in RenderTopLevelUI.ts
 // `if (node.extendClass === 'Tutorial')`).
 
-import { render } from 'preact';
 import { sprintf, toKSNum } from '../../dd-helpers.js';
 import i18n from '../../i18n.js';
 
@@ -14,9 +13,16 @@ export interface LevelUpNotificationProps {
   xpToNext: number;
   /** AP cap that the new level unlocked. */
   apMax: number;
+  /** Framework-injected by the dialog manager. */
+  onClose: () => void;
 }
 
-export function LevelUpNotification({ xpLevel, xpToNext, apMax }: LevelUpNotificationProps) {
+export function LevelUpNotification({
+  xpLevel,
+  xpToNext,
+  apMax,
+  onClose,
+}: LevelUpNotificationProps) {
   const says = i18n.gettext('Mark says:');
   const text = sprintf(
     i18n.gettext('levelup level %s! %s XP to level %s. %s energy'),
@@ -26,7 +32,8 @@ export function LevelUpNotification({ xpLevel, xpToNext, apMax }: LevelUpNotific
     toKSNum(apMax)
   );
   return (
-    <div class="PopupBody TutorialBody">
+    // biome-ignore lint/a11y/useKeyWithClickEvents: tutorial-class popup is tap-to-advance UX; keyboard support is a separate a11y pass
+    <div class="PopupBody TutorialBody" onClick={onClose}>
       <div class="TutorialContent">
         <div class="NotificationBubble">
           <div class="NotificationAvatar" />
@@ -37,11 +44,4 @@ export function LevelUpNotification({ xpLevel, xpToNext, apMax }: LevelUpNotific
       </div>
     </div>
   );
-}
-
-export function mountLevelUpNotification(
-  container: HTMLElement,
-  props: LevelUpNotificationProps
-): void {
-  render(<LevelUpNotification {...props} />, container);
 }

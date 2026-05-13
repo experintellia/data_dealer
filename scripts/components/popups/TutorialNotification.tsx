@@ -3,7 +3,6 @@
 // buttons; tutorial-class popup is dismissed by tapping anywhere
 // (jQuery handler in RenderTopLevelUI.ts).
 
-import { render } from 'preact';
 import i18n from '../../i18n.js';
 
 export interface TutorialNotificationProps {
@@ -14,12 +13,22 @@ export interface TutorialNotificationProps {
    * HTML); ruleset tutorial entries can embed spans / highlights.
    */
   descriptionHtml: string;
+  /** Framework-injected by the dialog manager. */
+  onClose: () => void;
 }
 
-export function TutorialNotification({ says, descriptionHtml }: TutorialNotificationProps) {
+export function TutorialNotification({
+  says,
+  descriptionHtml,
+  onClose,
+}: TutorialNotificationProps) {
   const speaker = says ?? i18n.gettext('Mark says:');
+  // Tap anywhere on the body advances the tutorial — matches the
+  // legacy `extendClass === 'Tutorial'` jQuery handler in
+  // `RenderTopLevelUI.initBaseUI`.
   return (
-    <div class="PopupBody TutorialBody">
+    // biome-ignore lint/a11y/useKeyWithClickEvents: tutorial-class popup is tap-to-advance UX; keyboard support is a separate a11y pass
+    <div class="PopupBody TutorialBody" onClick={onClose}>
       <div class="TutorialContent">
         <div class="NotificationBubble">
           <div class="NotificationAvatar" />
@@ -31,11 +40,4 @@ export function TutorialNotification({ says, descriptionHtml }: TutorialNotifica
       </div>
     </div>
   );
-}
-
-export function mountTutorialNotification(
-  container: HTMLElement,
-  props: TutorialNotificationProps
-): void {
-  render(<TutorialNotification {...props} />, container);
 }
