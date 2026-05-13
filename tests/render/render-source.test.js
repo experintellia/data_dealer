@@ -55,12 +55,25 @@ describe('Render.js audit fixes', () => {
     });
   });
 
-  describe('FXPuff — single removal path (bug #5)', () => {
-    it('does not double-remove via both Tween callback and setTimeout', () => {
+  describe('FXPuff — safe double-removal via _removed guard (bug #5)', () => {
+    it('keeps the 350ms setTimeout fallback so a swallowed onComplete still cleans up', () => {
       const m = RENDER_SRC.match(/Node\.prototype\.FXPuff\s*=\s*function[\s\S]*?\n\s*\};/);
       expect(m, 'FXPuff body should match').toBeTruthy();
-      // The raw setTimeout(node.remove, 350) fallback must be gone.
-      expect(m[0]).not.toMatch(/window\.setTimeout\([\s\S]*?node\.remove\(\)[\s\S]*?350\)/);
+      // The legacy comment ("callbacks seem to be unstable") flagged a
+      // real risk: an interrupting tween could swallow onComplete. We
+      // keep the setTimeout safety net (PR #273 review follow-up) — the
+      // race with the tween callback is now safe because
+      // Node.prototype.remove is idempotent via `_removed`.
+      expect(m[0]).toMatch(/window\.setTimeout\([\s\S]*?node\.remove\(\)[\s\S]*?350\s*\)/);
+    });
+
+    it('Node.prototype.remove is idempotent (early-return on _removed flag)', () => {
+      // Idempotency guard added in PR #273 review follow-up so the
+      // FXPuff tween callback + setTimeout fallback race is safe.
+      const m = RENDER_SRC.match(/Node\.prototype\.remove\s*=\s*function[\s\S]*?\n\s*\};/);
+      expect(m, 'Node.prototype.remove should match').toBeTruthy();
+      expect(m[0]).toMatch(/if\s*\(\s*this\._removed\s*\)\s*return/);
+      expect(m[0]).toMatch(/this\._removed\s*=\s*true/);
     });
   });
 

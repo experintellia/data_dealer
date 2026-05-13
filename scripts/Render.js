@@ -171,6 +171,13 @@ var Render = function () {
   };
 
   DragHandler.prototype.dragend = function (e) {
+    // Idempotent: the recovery handlers (pointercancel / window blur /
+    // visibilitychange-to-hidden) and the regular mouseup/touchend path
+    // can both funnel a "drag finished" event for the same gesture if,
+    // e.g., a touchcancel arrives just before touchend. Calling dragend
+    // a second time is a no-op — `this.listeners` was emptied on the
+    // first call and the for-loop runs zero iterations. The `dragging`
+    // flag flip is unconditional but harmless when already false.
     this.state = 'stopped';
 
     for (var i = 0; i < this.listeners.length; i++) {
@@ -578,7 +585,12 @@ var Render = function () {
   SlowTicker.listeners = new Set();
   if (typeof document !== 'undefined' && document && document.addEventListener) {
     document.addEventListener('visibilitychange', function () {
-      if (!document.hidden) {
+      // Resume only if the tab is becoming visible AND we have no timer
+      // queued. `start()` itself is idempotent via the same `!this.timeout`
+      // check, so this is defence-in-depth: if someone later changes
+      // start() to skip the guard, the visibilitychange handler still
+      // won't double-schedule.
+      if (!document.hidden && !SlowTicker.timeout) {
         SlowTicker.start();
       }
     });
@@ -661,6 +673,15 @@ var Render = function () {
   };
 
   Node.prototype.remove = function () {
+    // Idempotency guard: FXPuff / FXKatsching keep a `setTimeout` fallback
+    // around the tween onComplete callback so a swallowed or interrupted
+    // callback can't leak the node. Calling remove() twice without this
+    // guard would still mostly work (most cleanup is `if (this.xxx)`-
+    // gated and self-clearing), but Tween.removeTweens(this) and the
+    // removeListener calls would no-op on dead state and any subclass
+    // override that isn't idempotent would silently corrupt.
+    if (this._removed) return;
+    this._removed = true;
     // Remove Node from all references and remove Domobject
     Ticker.removeListener(this);
     SlowTicker.removeListener(this);
@@ -1641,15 +1662,22 @@ var Render = function () {
   Node.prototype.FXPuff = function (cb) {
     var node = this;
     //node.FXSimple({offsetX:42,offsetY:68,scaleX:1.5,scaleY:1.5,opacity:0},250,'easeOut',cb);
-    // Removal is driven by the Tween onComplete only; the previous
-    // setTimeout fallback (audit bug #5) raced the tween callback and
-    // could double-remove the node.
+    // Removal is driven by the Tween onComplete — the legacy comment
+    // ("callbacks seem to be unstable") flagged a real risk: if an
+    // interrupting tween swallows our onComplete, the node would leak.
+    // We keep a 350ms setTimeout fallback (longer than the tween's
+    // 250ms) so the puffed node always disappears. Node.prototype.remove
+    // is idempotent via its `_removed` flag, so the race between the
+    // tween callback and the fallback is safe.
     node.FXSimple({ scaleX: 1.5, scaleY: 1.5, opacity: 0 }, 250, 'easeOut', function () {
       if (cb) {
         cb();
       }
       node.remove();
     });
+    window.setTimeout(function () {
+      node.remove();
+    }, 350);
   };
 
   Node.prototype.FXArise = function (cb) {
