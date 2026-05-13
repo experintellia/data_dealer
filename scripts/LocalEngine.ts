@@ -321,8 +321,9 @@ function _isProvidable(
 let _sendDelta: DeltaSender | null = null;
 
 /**
- * Inject the delta persistence function (tests use this to capture deltas).
- * In production, boot.js wires this to webxdc.sendUpdate via the listener.
+ * Inject the test-only delta sink. When set, `_persistDelta` short-circuits
+ * and does NOT call `webxdc.sendUpdate`, so tests asserting the real
+ * listener round-trip must leave the spy unset.
  */
 export function setSendDelta(fn: DeltaSender): void {
   _sendDelta = fn;
@@ -385,7 +386,14 @@ function triggerAchievement(
 // This is the only place outside the listener that calls setState — it IS the
 // listener-equivalent for environments without webxdc.
 function _persistDelta(delta: Delta): void {
-  if (_sendDelta) _sendDelta(delta);
+  // Test sink and webxdc.sendUpdate are mutually exclusive (otherwise the
+  // shim's listener echo double-mutates state). We still advance state
+  // synchronously so handlers see the post-mutation view.
+  if (_sendDelta) {
+    _sendDelta(delta);
+    setState(applyDelta(getState(), delta));
+    return;
+  }
   if (typeof webxdc !== 'undefined' && webxdc) {
     webxdc.sendUpdate({ payload: delta }, '');
   } else {

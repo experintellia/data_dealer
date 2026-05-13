@@ -19,14 +19,28 @@ import type { ReceivedStatusUpdate, SendingStatusUpdate } from '@webxdc/types';
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      _updates = JSON.parse(stored);
+      try {
+        _updates = JSON.parse(stored);
+      } catch (parseErr) {
+        console.warn('[webxdc-shim] dropping malformed stored updates:', parseErr);
+        _updates = [];
+        try {
+          localStorage.removeItem(STORAGE_KEY);
+        } catch (_) {
+          /* non-fatal — next successful _persist overwrites it. */
+        }
+      }
     }
-  } catch (_) {}
+  } catch (storageErr) {
+    console.warn('[webxdc-shim] localStorage read failed:', storageErr);
+  }
 
   function _persist(): void {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(_updates));
-    } catch (_) {}
+    } catch (storageErr) {
+      console.warn('[webxdc-shim] localStorage write failed:', storageErr);
+    }
   }
 
   // Cast via `any` — this is a minimal dev scaffold, not a full Webxdc

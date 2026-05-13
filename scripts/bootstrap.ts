@@ -8,9 +8,9 @@ import { boot, getBootPromise, getReplayProgress } from './boot.js';
 // In Node (vitest, SSR) there is no DOM and no vendor globals — skip
 // the whole UI hand-off so the module is import-safe without jsdom.
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-  if (typeof webxdc !== 'undefined') {
-    boot();
-  }
+  // boot() handles the no-webxdc case itself; skipping it here left
+  // _currentState null and crashed the first getState() call.
+  boot();
 
   const $ = jQuery ?? globalThis.$;
   if (!$) throw new Error('bootstrap.ts: jQuery global not found');
@@ -43,13 +43,10 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       err && typeof err === 'object' && 'message' in err
         ? String((err as { message?: unknown }).message)
         : String(err || '');
-    $('#loadertext').html(
-      'Sorry, the Game failed to start.<br>' +
-        '<small style="opacity:.7">' +
-        message +
-        (detail ? ': ' + detail : '') +
-        '</small>'
-    );
+    // Headline via .html() so the <br> renders; detail via .text() so
+    // attacker-influenced err.message is escaped.
+    $('#loadertext').html('Sorry, the Game failed to start.<br><small style="opacity:.7"></small>');
+    $('#loadertext small').text(message + (detail ? ': ' + detail : ''));
   };
 
   const continueStart = (): void => {
