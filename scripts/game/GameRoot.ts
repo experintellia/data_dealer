@@ -1178,7 +1178,7 @@ export class GameRoot extends GameNode {
     if (num !== undefined && num > this.xp_value) {
       this.xp_value = num;
     }
-    if (this.xp_value > this.xp_level.xp_max) {
+    if (this.xp_value >= this.xp_level.xp_max) {
       this.setLevel(this.getLevelByXP(this.xp_value).number);
     }
     if (this.xp_value < this.xp_level.xp_min) {
