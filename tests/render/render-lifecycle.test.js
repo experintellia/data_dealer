@@ -21,9 +21,11 @@ import { describe, expect, it } from 'vitest';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RENDER_DIR = resolve(__dirname, '../../scripts/render');
-const NODE_SRC = readFileSync(resolve(RENDER_DIR, 'RenderNode.ts'), 'utf8');
-const TICKER_SRC = readFileSync(resolve(RENDER_DIR, 'RenderSlowTicker.ts'), 'utf8');
-const VIEWS_SRC = readFileSync(resolve(RENDER_DIR, 'RenderViews.ts'), 'utf8');
+const readSrc = (file) => readFileSync(resolve(RENDER_DIR, file), 'utf8');
+
+const NODE_SRC = readSrc('RenderNode.ts');
+const TICKER_SRC = readSrc('RenderSlowTicker.ts');
+const VIEWS_SRC = readSrc('RenderViews.ts');
 
 const removeBodyMatch = NODE_SRC.match(/\n  remove\(\)\s*:\s*void\s*\{[\s\S]*?\n  \}/);
 const REMOVE_BODY = removeBodyMatch ? removeBodyMatch[0] : '';

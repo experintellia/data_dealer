@@ -569,9 +569,8 @@ export class RenderViewMap extends RenderNode {
       });
     }
 
-    // Track every native addEventListener so `remove()` can detach them
-    // — anonymous handlers would otherwise pin this ViewMap closure
-    // (and its scroller) in memory across map teardown.
+    // Funnel every native addEventListener through here so `remove()`
+    // can detach them (see `_nativeListeners` field).
     const addNative = (
       target: EventTarget,
       type: string,
@@ -796,10 +795,6 @@ export class RenderViewMap extends RenderNode {
   }
 
   override remove(): void {
-    // Detach the native listeners registered by initScroller against
-    // `this.domelem` and the drag-handler's domelem. Their handler
-    // closures capture `this` and the scroller, so leaving them in
-    // place would pin the entire ViewMap subtree.
     for (const entry of this._nativeListeners) {
       entry.target.removeEventListener(entry.type, entry.listener, entry.options);
     }
