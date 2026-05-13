@@ -21,6 +21,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PERP_SRC = readFileSync(resolve(__dirname, '../../scripts/render/RenderPerp.ts'), 'utf8');
 const SPRITE_SRC = readFileSync(resolve(__dirname, '../../scripts/render/RenderSprite.ts'), 'utf8');
 
+const setFrameSrcMatch = SPRITE_SRC.match(
+  /setFrameSrc\s*\([^)]*\)\s*:\s*void\s*\{[\s\S]*?\n\s\s\}/
+);
+const SET_FRAME_SRC_BODY = setFrameSrcMatch ? setFrameSrcMatch[0] : '';
+
 describe('RenderPerp — draggable nullish-coalesce', () => {
   it('uses `??` so an explicit draggable:false is preserved', () => {
     expect(PERP_SRC).toMatch(/draggable\s*:\s*config\.draggable\s*\?\?\s*true/);
@@ -29,29 +34,21 @@ describe('RenderPerp — draggable nullish-coalesce', () => {
 });
 
 describe('RenderSprite.setFrameSrc — honours the src argument', () => {
-  it('returns early on falsy `src`, not on `this.frameSrc`', () => {
-    // Extract the setFrameSrc body to bound the assertions.
-    const m = SPRITE_SRC.match(/setFrameSrc\s*\([^)]*\)\s*:\s*void\s*\{[\s\S]*?\n\s\s\}/);
-    expect(m, 'setFrameSrc body should match').toBeTruthy();
-    const body = m[0];
+  it('extracts a setFrameSrc body to assert against', () => {
+    expect(setFrameSrcMatch, 'setFrameSrc body must be locatable').toBeTruthy();
+  });
 
-    // Early-return is now on the argument, not the field.
-    expect(body).toMatch(/if\s*\(\s*!\s*src\s*\)/);
-    expect(body).not.toMatch(/if\s*\(\s*!\s*this\.frameSrc\s*\)/);
+  it('returns early on falsy `src`, not on `this.frameSrc`', () => {
+    expect(SET_FRAME_SRC_BODY).toMatch(/if\s*\(\s*!\s*src\s*\)/);
+    expect(SET_FRAME_SRC_BODY).not.toMatch(/if\s*\(\s*!\s*this\.frameSrc\s*\)/);
   });
 
   it('builds the background-image URL from `src`, not `this.frameSrc`', () => {
-    const m = SPRITE_SRC.match(/setFrameSrc\s*\([^)]*\)\s*:\s*void\s*\{[\s\S]*?\n\s\s\}/);
-    expect(m).toBeTruthy();
-    const body = m[0];
-
-    expect(body).toMatch(/imagePathPrefix\s*\+\s*src/);
-    expect(body).not.toMatch(/imagePathPrefix\s*\+\s*this\.frameSrc/);
+    expect(SET_FRAME_SRC_BODY).toMatch(/imagePathPrefix\s*\+\s*src/);
+    expect(SET_FRAME_SRC_BODY).not.toMatch(/imagePathPrefix\s*\+\s*this\.frameSrc/);
   });
 
   it('writes `src` back into `this.frameSrc` so subsequent reads see it', () => {
-    const m = SPRITE_SRC.match(/setFrameSrc\s*\([^)]*\)\s*:\s*void\s*\{[\s\S]*?\n\s\s\}/);
-    expect(m).toBeTruthy();
-    expect(m[0]).toMatch(/this\.frameSrc\s*=\s*src/);
+    expect(SET_FRAME_SRC_BODY).toMatch(/this\.frameSrc\s*=\s*src/);
   });
 });

@@ -60,10 +60,8 @@ export class RenderSprite extends RenderNode {
   }
 
   setFrameSrc(src: string | undefined): void {
-    // Pre-fix this guarded on `this.frameSrc` and then used `this.frameSrc`
-    // to build the URL — so the `src` argument was effectively ignored
-    // (both existing callers happened to pass `this.frameSrc` already).
-    // Honour the argument so future callers can swap the sprite source.
+    // Honour the `src` arg; previously guarded on and read `this.frameSrc`,
+    // which silently ignored the argument.
     if (!src) {
       return;
     }
