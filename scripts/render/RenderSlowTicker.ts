@@ -22,18 +22,28 @@ const _frameRate = 120;
 // `RenderNodeLike` constraint anyway.
 const _listeners = new OrderedSet<TickerListener>();
 let _timeout: number | undefined;
+// Probe for DOM globals once at module load; `document` and `window`
+// either exist for the whole lifetime of this realm or not at all.
+const _hasDocument = typeof document !== 'undefined';
+const _hasWindow = typeof window !== 'undefined';
 
 function tick(): void {
+  _timeout = undefined;
+  // Skip work + reschedule when no listeners or tab hidden; addListener
+  // and the visibilitychange handler below resume on wake.
+  if ((_hasDocument && document.hidden) || _listeners.length === 0) {
+    return;
+  }
   _listeners.each((node) => {
     node.tick();
   });
-  if (typeof window !== 'undefined') {
+  if (_hasWindow) {
     _timeout = window.setTimeout(tick, _frameRate);
   }
 }
 
 function start(): void {
-  if (_timeout === undefined && typeof window !== 'undefined') {
+  if (_timeout === undefined && _hasWindow) {
     tick();
   }
 }
@@ -47,10 +57,20 @@ function stop(): void {
 
 function addListener(node: TickerListener): void {
   _listeners.add(node);
+  // Resume if we were idle (empty listeners or hidden tab on prev tick).
+  if (_timeout === undefined) {
+    start();
+  }
 }
 
 function removeListener(node: TickerListener): void {
   _listeners.remove(node);
+}
+
+if (_hasDocument && typeof document.addEventListener === 'function') {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && _timeout === undefined) start();
+  });
 }
 
 // Keep the public surface identical to the legacy IIFE-local

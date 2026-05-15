@@ -287,6 +287,16 @@ export class RenderViewMap extends RenderNode {
   _wheelZoomOrigin: { x: number; y: number } | null = null;
   _wheelZoomRaf = 0;
   _cancelWheelZoom: () => void = () => undefined;
+  // Native listeners registered in `initScroller` against `this.domelem`
+  // and the drag handler's domelem; tracked so `remove()` can detach
+  // them. Otherwise the anonymous handler closures pinned the whole
+  // ViewMap in memory after teardown.
+  _nativeListeners: Array<{
+    target: EventTarget;
+    type: string;
+    listener: EventListener;
+    options?: AddEventListenerOptions | boolean;
+  }> = [];
 
   constructor(config: ViewMapConfig = {}) {
     const $ = getRenderJQuery('RenderViews');
@@ -559,7 +569,22 @@ export class RenderViewMap extends RenderNode {
       });
     }
 
-    this.domelem.addEventListener(
+    // Funnel every native addEventListener through here so `remove()`
+    // can detach them (see `_nativeListeners` field).
+    const addNative = (
+      target: EventTarget,
+      type: string,
+      listener: EventListener,
+      options?: AddEventListenerOptions | boolean
+    ): void => {
+      target.addEventListener(type, listener, options);
+      this._nativeListeners.push(
+        options === undefined ? { target, type, listener } : { target, type, listener, options }
+      );
+    };
+
+    addNative(
+      this.domelem,
       'touchstart',
       (e) => {
         const touchEvt = e as TouchEvent;
@@ -602,7 +627,8 @@ export class RenderViewMap extends RenderNode {
 
     if (this.useDragHandler) {
       const dragDom = this.useDragHandler.domelem as Window;
-      dragDom.addEventListener(
+      addNative(
+        dragDom,
         'touchmove',
         (e) => {
           const touchEvt = e as TouchEvent & { scale?: number };
@@ -628,14 +654,16 @@ export class RenderViewMap extends RenderNode {
         },
         { passive: false }
       );
-      dragDom.addEventListener(
+      addNative(
+        dragDom,
         'touchend',
         (e) => {
           scroller.doTouchEnd((e as TouchEvent).timeStamp);
         },
         false
       );
-      dragDom.addEventListener(
+      addNative(
+        dragDom,
         'touchcancel',
         (e) => {
           scroller.doTouchEnd((e as TouchEvent).timeStamp);
@@ -672,7 +700,8 @@ export class RenderViewMap extends RenderNode {
         this._wheelZoomRaf = requestAnimationFrame(stepTowardTarget);
       }
     };
-    this.domelem.addEventListener(
+    addNative(
+      this.domelem,
       'wheel',
       (e) => {
         const wheelEvt = e as WheelEvent;
@@ -761,6 +790,14 @@ export class RenderViewMap extends RenderNode {
 
   FXHide(): void {
     this.jdomelem.removeClass('active');
+  }
+
+  override remove(): void {
+    for (const entry of this._nativeListeners) {
+      entry.target.removeEventListener(entry.type, entry.listener, entry.options);
+    }
+    this._nativeListeners.length = 0;
+    super.remove();
   }
 }
 

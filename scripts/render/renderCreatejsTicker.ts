@@ -22,8 +22,13 @@ interface CreateJSTickerLike {
   useRAF: boolean;
 }
 
+interface CreateJSTweenLike {
+  removeTweens(target: object): void;
+}
+
 interface CreateJSGlobal {
   Ticker: CreateJSTickerLike;
+  Tween?: CreateJSTweenLike;
 }
 
 let _ticker: CreateJSTickerLike | undefined;
@@ -78,6 +83,17 @@ export function tickerRemoveListener(obj: object): void {
 
 export function tickerSetFPS(fps: number): void {
   resolveTicker().setFPS?.(fps);
+}
+
+/**
+ * Lazy-resolve `globalThis.createjs.Tween` (same pattern as resolveTicker).
+ * Returns undefined when CreateJS isn't loaded — callers (e.g. RenderNode
+ * .remove() during a Node-side teardown) should treat the absent case as a
+ * no-op rather than throwing.
+ */
+export function resolveTween(): CreateJSTweenLike | undefined {
+  const cj = (globalThis as { createjs?: CreateJSGlobal }).createjs;
+  return cj?.Tween;
 }
 
 export function tickerSetUseRAF(useRAF: boolean): void {

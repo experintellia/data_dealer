@@ -12,7 +12,7 @@ import { OrderedSet } from '../game/OrderedSet.js';
 import { RenderSet } from './RenderSet.js';
 import { RenderSlowTicker } from './RenderSlowTicker.js';
 import { type JQueryRenderElem, type JQueryRenderEvent, getRenderJQuery } from './_jqueryShim.js';
-import { tickerRemoveListener } from './renderCreatejsTicker.js';
+import { resolveTween, tickerRemoveListener } from './renderCreatejsTicker.js';
 import { nodeCount, registerNode, unregisterNode } from './renderRegistry.js';
 
 // ── DOM / jQuery surface that Node touches ──────────────────────────────────
@@ -246,6 +246,20 @@ export class RenderNode {
   remove(): void {
     tickerRemoveListener(this);
     RenderSlowTicker.removeListener(this);
+    // Drop any live tween targeting this node so the disposed instance
+    // isn't pinned, and so a tween firing after remove() can't mutate
+    // detached fields.
+    resolveTween()?.removeTweens(this);
+    // dragDelay / cancelClickTimeout would otherwise fire their delayed
+    // drag-start / click-cancel against a dead node.
+    if (this.dragDelay !== undefined) {
+      window.clearTimeout(this.dragDelay);
+      this.dragDelay = undefined;
+    }
+    if (this.cancelClickTimeout !== undefined) {
+      window.clearTimeout(this.cancelClickTimeout);
+      this.cancelClickTimeout = undefined;
+    }
     if (this.decoratedNode) {
       this.decoratedNode.decorators.remove(this);
     }
