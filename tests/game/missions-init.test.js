@@ -62,9 +62,9 @@ describe('Missions.initMissions — empty-tab regression fix', () => {
     // A goals-aggregation pass keyed by mission gestalt, followed by a
     // setState('complete', true) for missions whose goals are all done.
     expect(INIT_BODY).toMatch(/raw_data\.mission_goals/);
-    expect(INIT_BODY).toMatch(/goalsByMission/);
+    expect(INIT_BODY).toMatch(/allGoalsDone/);
     expect(INIT_BODY).toMatch(
-      /goalsByMission[\s\S]{0,300}setState\(\s*['"]complete['"]\s*,\s*true\s*\)/
+      /allGoalsDone[\s\S]{0,300}setState\(\s*['"]complete['"]\s*,\s*true\s*\)/
     );
   });
 
@@ -73,7 +73,7 @@ describe('Missions.initMissions — empty-tab regression fix', () => {
     // nested inside the `if (Array.isArray(...) && ....length)` block.
     const guardIdx = INIT_BODY.indexOf('Array.isArray');
     const guardClose = INIT_BODY.indexOf('\n    }', guardIdx);
-    const goalsIdx = INIT_BODY.indexOf('goalsByMission');
+    const goalsIdx = INIT_BODY.indexOf('allGoalsDone');
     expect(guardIdx).toBeGreaterThan(-1);
     expect(goalsIdx).toBeGreaterThan(guardClose);
   });
