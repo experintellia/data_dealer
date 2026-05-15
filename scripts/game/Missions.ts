@@ -143,7 +143,11 @@ export class Missions extends GameNode {
       allGoalsDone.set(g.mission, prev === undefined ? done : prev && done);
     }
     for (const mission of Object.values(this.Missions)) {
-      if (mission.gestalt && allGoalsDone.get(mission.gestalt) === true && !mission.states.complete) {
+      if (
+        mission.gestalt &&
+        allGoalsDone.get(mission.gestalt) === true &&
+        !mission.states.complete
+      ) {
         mission.setState('complete', true);
         mission.setState('active', false);
       }
