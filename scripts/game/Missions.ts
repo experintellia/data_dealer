@@ -109,13 +109,12 @@ export class Missions extends GameNode {
     if (raw_data.mission_goals) {
       this.updateMissionGoals(raw_data.mission_goals);
     }
-    // Only walk active_missions when the server actually handed us a list.
-    // Pre-fix, a falsy/empty `active_missions` (undefined or []) hit an
-    // unguarded else-branch that flagged *every* loaded mission complete,
-    // which on every reload re-fired spurious mission_complete state
-    // events for missions the player had not finished. The server uses
-    // a non-empty list of completed-mission gestalts to encode "all
-    // done"; an empty list simply means "nothing to mark active here".
+    // Walk active_missions when the server handed us a non-empty list:
+    // mark each active and its required-mission ancestors complete.
+    // Pre-fix, a falsy/empty `active_missions` hit an unguarded
+    // else-branch that flagged *every* loaded mission complete (even
+    // ones never started), re-firing spurious mission_complete events
+    // on every reload.
     if (Array.isArray(raw_data.active_missions) && active_missions.length) {
       active_missions.forEach((gestalt) => {
         const active_mission = this.getMission(gestalt);
@@ -127,6 +126,30 @@ export class Missions extends GameNode {
           });
         }
       });
+    }
+    // Independently, restore the `complete` flag for any mission whose
+    // goals are all done. Without this, a player who finished every
+    // available mission (the producer then emits `active_missions: []`)
+    // would see an EMPTY mission tab on reload — getVisibleMissions()
+    // needs active||complete, and the active-walk above sets neither
+    // when the list is empty. Deriving from goals is the correct source
+    // of truth and (unlike the old blanket else-branch) never marks a
+    // never-started mission complete, so it doesn't reintroduce the
+    // spurious-event bug.
+    const goalsByMission = new Map<string, boolean>();
+    for (const g of raw_data.mission_goals || []) {
+      const mg = g as { mission?: string; complete?: boolean };
+      if (typeof mg.mission !== 'string') continue;
+      const prev = goalsByMission.get(mg.mission);
+      const done = mg.complete === true;
+      goalsByMission.set(mg.mission, prev === undefined ? done : prev && done);
+    }
+    for (const mission of Object.values(this.Missions)) {
+      const allGoalsDone = mission.gestalt ? goalsByMission.get(mission.gestalt) : undefined;
+      if (allGoalsDone === true && !mission.states.complete) {
+        mission.setState('complete', true);
+        mission.setState('active', false);
+      }
     }
     this.checkProjectGoals();
   }
