@@ -1,7 +1,5 @@
-// Level-up celebration notification — Preact port of `views/levelup.html`
-// (issue #80 phase 2 tier 2).  No buttons; the tutorial-class popup is
-// dismissed by tapping anywhere (jQuery handler in RenderTopLevelUI.ts
-// `if (node.extendClass === 'Tutorial')`).
+// Level-up celebration notification.  No buttons; dismissed by
+// tapping anywhere (the body's own `onClick={onClose}`).
 
 import { sprintf, toKSNum } from '../../dd-helpers.js';
 import i18n from '../../i18n.js';

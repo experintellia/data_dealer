@@ -1,7 +1,5 @@
-// Tutorial / story / simplemessage notifications — Preact port of
-// `views/notification_tutorial.html` (issue #80 phase 2 tier 2).  No
-// buttons; tutorial-class popup is dismissed by tapping anywhere
-// (jQuery handler in RenderTopLevelUI.ts).
+// Tutorial / story / simplemessage notifications.  No buttons;
+// dismissed by tapping anywhere (the body's own `onClick={onClose}`).
 
 import i18n from '../../i18n.js';
 
@@ -23,9 +21,7 @@ export function TutorialNotification({
   onClose,
 }: TutorialNotificationProps) {
   const speaker = says ?? i18n.gettext('Mark says:');
-  // Tap anywhere on the body advances the tutorial — matches the
-  // legacy `extendClass === 'Tutorial'` jQuery handler in
-  // `RenderTopLevelUI.initBaseUI`.
+  // Tap anywhere on the body advances the tutorial.
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: tutorial-class popup is tap-to-advance UX; keyboard support is a separate a11y pass
     <div class="PopupBody TutorialBody" onClick={onClose}>

@@ -52,6 +52,9 @@ export interface OpenDialogOptions<P> {
    *  `string` so legacy call sites and forward extensions don't need to
    *  thread the literal type through every config. */
   extendClass?: string;
+  /** Dock the dialog at the bottom of the viewport instead of centred
+   *  (legacy `RenderPopup.placeBottom` — Tutorial / Story / LevelUp). */
+  placeBottom?: boolean;
   /** Fires once the dialog has been removed from the DOM. */
   onAfterClose?: () => void;
 }
@@ -108,7 +111,7 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
     opts.container.removeEventListener('click', handleInteraction);
     opts.container.removeEventListener('touchend', handleInteraction);
     render(null, opts.container);
-    opts.container.classList.remove('lockOn');
+    opts.container.classList.remove('lockOn', 'PopupPreact', 'PopupPreactBottom');
     if (opts.extendClass) opts.container.classList.remove(opts.extendClass);
     active = null;
     opts.onAfterClose?.();
@@ -141,7 +144,8 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
 
   opts.container.addEventListener('click', handleInteraction);
   opts.container.addEventListener('touchend', handleInteraction);
-  opts.container.classList.add('lockOn');
+  opts.container.classList.add('lockOn', 'PopupPreact');
+  if (opts.placeBottom) opts.container.classList.add('PopupPreactBottom');
   if (opts.extendClass) opts.container.classList.add(opts.extendClass);
 
   const body = h(opts.component, { ...opts.props, onClose: close });

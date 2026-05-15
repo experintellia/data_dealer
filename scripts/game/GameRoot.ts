@@ -1312,6 +1312,7 @@ export class GameRoot extends GameNode {
     props: P,
     options: {
       extendClass?: string;
+      placeBottom?: boolean;
       slot?: 'popup' | 'notification';
       onAfterClose?: () => void;
     } = {}
@@ -1327,6 +1328,7 @@ export class GameRoot extends GameNode {
       props,
       container,
       ...(options.extendClass !== undefined && { extendClass: options.extendClass }),
+      ...(options.placeBottom !== undefined && { placeBottom: options.placeBottom }),
       onAfterClose: () => {
         if (slot === 'notification') {
           delete this.notificationPopup;
@@ -1388,6 +1390,10 @@ export class GameRoot extends GameNode {
       this.notificationPopup = stub as unknown as NonNullable<typeof this.notificationPopup>;
 
       window.setTimeout(() => {
+        // Skip if the cue was dismissed during the delay window —
+        // story tutorials' scripted events pan the camera, which
+        // would jump to a perp for a popup the player already closed.
+        if (!isOpen) return;
         notification.scriptedEvents?.forEach((s) => s());
       }, config.delayScript ?? 0);
 
@@ -1399,6 +1405,7 @@ export class GameRoot extends GameNode {
           config.props ?? {},
           {
             ...(config.extendClass !== undefined && { extendClass: config.extendClass }),
+            ...(config.placeBottom !== undefined && { placeBottom: config.placeBottom }),
             slot: 'notification',
             onAfterClose: drainOnClose,
           }

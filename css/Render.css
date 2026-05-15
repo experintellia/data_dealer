@@ -372,6 +372,22 @@
   -moz-transition: background 0.15s linear, visibility 0.15s linear, box-shadow 0.15s;
   -webkit-transition: background 0.15s linear, visibility 0.15s linear, box-shadow 0.15s;
 }
+/* Phase 2 (#80): Preact-managed dialogs are plain DOM with no
+   RenderNode transform, so the legacy JS-computed translate3d that
+   centred the .Popup no longer applies.  Flex-centre them inside the
+   full-screen container; .PopupPreactBottom docks at the bottom
+   (legacy `placeBottom` — Tutorial / Story / LevelUp cues). */
+.PopupContainer.lockOn.PopupPreact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.PopupContainer.lockOn.PopupPreact.PopupPreactBottom {
+  align-items: flex-end;
+  padding-bottom: 32px;
+  box-sizing: border-box;
+}
+
 
 /* `.MainMenuLogo` is shared between the main-menu header and the
  * About popup (views/popup_user_data.html), so its sprite-image rule
