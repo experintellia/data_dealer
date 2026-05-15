@@ -14,18 +14,12 @@
  * Scroller globals, no real DOM), so these are pattern guards rather
  * than runtime tests.
  */
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { readRenderSrc } from './_helpers.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const RENDER_DIR = resolve(__dirname, '../../scripts/render');
-const readSrc = (file) => readFileSync(resolve(RENDER_DIR, file), 'utf8');
-
-const NODE_SRC = readSrc('RenderNode.ts');
-const TICKER_SRC = readSrc('RenderSlowTicker.ts');
-const VIEWS_SRC = readSrc('RenderViews.ts');
+const NODE_SRC = readRenderSrc('RenderNode.ts');
+const TICKER_SRC = readRenderSrc('RenderSlowTicker.ts');
+const VIEWS_SRC = readRenderSrc('RenderViews.ts');
 
 const removeBodyMatch = NODE_SRC.match(/\n {2}remove\(\)\s*:\s*void\s*\{[\s\S]*?\n {2}\}/);
 const REMOVE_BODY = removeBodyMatch ? removeBodyMatch[0] : '';

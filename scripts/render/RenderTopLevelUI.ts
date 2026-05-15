@@ -1008,12 +1008,21 @@ export class RenderPopup extends RenderNode {
   close(cb?: () => void): void {
     this.open = false;
     const jq = this.jdomelem;
-    jq.on('otransitionend MSTransitionEnd transitionend webkitTransitionEnd', () => {
+    // One-shot transitionend → remove, with a 500ms safety net for when
+    // the transition doesn't fire (off-DOM, display:none, etc).
+    // Whichever runs first clears the other so remove() is called once.
+    const TRANSITION_EVENTS = 'otransitionend MSTransitionEnd transitionend webkitTransitionEnd';
+    let removeFallback: number | undefined;
+    const finish = (): void => {
+      jq.off(TRANSITION_EVENTS, finish);
+      if (removeFallback !== undefined) {
+        window.clearTimeout(removeFallback);
+        removeFallback = undefined;
+      }
       this.remove();
-    });
-    window.setTimeout(() => {
-      this.remove();
-    }, 500);
+    };
+    jq.on(TRANSITION_EVENTS, finish);
+    removeFallback = window.setTimeout(finish, 500);
     window.setTimeout(() => {
       if (cb) cb();
     }, 250);

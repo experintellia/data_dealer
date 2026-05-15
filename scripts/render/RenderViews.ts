@@ -797,6 +797,7 @@ export class RenderViewMap extends RenderNode {
       entry.target.removeEventListener(entry.type, entry.listener, entry.options);
     }
     this._nativeListeners.length = 0;
+    this.dragHandler?.dispose();
     super.remove();
   }
 }

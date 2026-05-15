@@ -48,6 +48,7 @@ interface DragHandlerLike {
     newPos: { x: number; y: number }
   ): { x: number; y: number; coll: boolean };
   testCollisions(node: RenderNode, newPos: { x: number; y: number }): boolean;
+  dispose(): void;
 }
 
 interface CableLike {
