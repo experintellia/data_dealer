@@ -8,10 +8,10 @@ import { type SpriteHelperConfig, renderSpriteHtml } from '../../render/renderSp
 
 export interface NewItemsPerp {
   data?: {
-    popup_sprite?: SpriteHelperConfig;
-    title?: string;
-    subtitle?: string;
-    description?: string;
+    popup_sprite?: SpriteHelperConfig | undefined;
+    title?: string | undefined;
+    subtitle?: string | undefined;
+    description?: string | undefined;
   };
 }
 

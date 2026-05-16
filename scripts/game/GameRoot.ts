@@ -22,14 +22,13 @@ import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
 import { APStatusPopup } from '../components/popups/APStatusPopup.js';
 import { CashStatusPopup } from '../components/popups/CashStatusPopup.js';
-import { LevelUpNotification } from '../components/popups/LevelUpNotification.js';
-import { NewItemsNotification } from '../components/popups/NewItemsNotification.js';
 import { ProfilesStatusPopup } from '../components/popups/ProfilesStatusPopup.js';
-import { TutorialNotification } from '../components/popups/TutorialNotification.js';
 import { XPStatusPopup } from '../components/popups/XPStatusPopup.js';
 import { type PreactDialogHandle, openDialog } from '../components/popups/dialogManager.js';
+import { type DialogSpec, resolveDialog } from '../components/popups/dialogRegistry.js';
 import { debounce, span, sprintf, toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
+import type { SpriteHelperConfig } from '../render/renderSpriteHelper.js';
 import setup from '../setup.js';
 import { getTypeSettings } from '../type_settings.js';
 import webxdcIdentity from '../webxdc-identity.js';
@@ -58,6 +57,7 @@ import { Missions } from './Missions.js';
 import { Topscore } from './Topscore.js';
 import { Topscores } from './Topscores.js';
 import { mergeData } from './mergeData.js';
+import { buildMissionPopupProps } from './missionView.js';
 import { perpCtors } from './perpCtors.js';
 
 // ---------------------------------------------------------------------------
@@ -314,16 +314,15 @@ interface Notification {
 interface NotificationConfig {
   template?: string;
   /**
-   * Phase 2 (issue #80) Preact replacement for `template`.  When
-   * `component` is set, `openNotification` routes the cue through the
-   * Preact dialog manager (`dialogManager.openDialog`) instead of
-   * constructing a `Render.Popup` with an Underscore.js template.
-   * The framework injects an `onClose: () => void` prop into the
-   * component on render — components declare it on their props type.
+   * Phase 2 (issue #80) Preact replacement for `template`.  When set,
+   * `openNotification` resolves the spec via `resolveDialog` and routes
+   * the cue through the Preact dialog manager instead of constructing a
+   * `Render.Popup` with an Underscore.js template.  The `DialogSpec`
+   * union type-checks each cue's props against its component, so a
+   * prop rename surfaces a compile error here rather than silently
+   * breaking the popup.
    */
-  component?: ComponentType<any>;
-  /** Props for `component`, snapshotted at cue time. */
-  props?: Record<string, unknown>;
+  dialog?: DialogSpec;
   extendClass?: string;
   delay?: number;
   delayScript?: number;
@@ -1350,14 +1349,27 @@ export class GameRoot extends GameNode {
     const config = (notification.config ?? {}) as NotificationConfig;
     if (this.notificationPopup) return undefined;
 
-    // Phase 2 (issue #80) — tier 2 cues set `config.component` /
-    // `config.props` and route through the dialog manager.  The
-    // stub handle holds the `notificationPopup` slot synchronously
-    // (mirroring the legacy code that constructs `Render.Popup`
-    // before the `delay` setTimeout) so concurrent cues can't
-    // double-open in the window before the manager mounts.
-    if (config.component) {
+    // Phase 2 (issue #80) — tier 2+ cues carry a typed `config.dialog`
+    // spec and route through the dialog manager.  The stub handle
+    // holds the `notificationPopup` slot synchronously (mirroring the
+    // legacy code that constructs `Render.Popup` before the `delay`
+    // setTimeout) so concurrent cues can't double-open in the window
+    // before the manager mounts.
+    if (config.dialog) {
+      const resolved = resolveDialog(config.dialog);
       const drainOnClose = (): void => {
+        // Mission briefings persist their dismissal so the popup
+        // doesn't re-queue on webxdc replay.  The legacy template
+        // path did this via `popup.notificationMission` →
+        // `GameNode.initPopupEvents` popup_close; the Preact path has
+        // no initPopupEvents, so fire the op here instead.
+        const missionGestalt = notification.mission_active_gestalt;
+        if (missionGestalt) {
+          const remote = appModule.getApplication().remote as {
+            dismissMissionBriefing?(g: string): unknown;
+          };
+          remote.dismissMissionBriefing?.(missionGestalt);
+        }
         this.uncueNotification(notification);
         const next = this.NotificationQueue[0];
         if (next) this.openNotification(next);
@@ -1401,8 +1413,8 @@ export class GameRoot extends GameNode {
         if (!isOpen) return;
         delete this.notificationPopup;
         liveHandle = this.openPreactDialog(
-          config.component as ComponentType<Record<string, unknown> & { onClose: () => void }>,
-          config.props ?? {},
+          resolved.component as ComponentType<Record<string, unknown> & { onClose: () => void }>,
+          resolved.props,
           {
             ...(config.extendClass !== undefined && { extendClass: config.extendClass }),
             ...(config.placeBottom !== undefined && { placeBottom: config.placeBottom }),
@@ -1490,22 +1502,24 @@ export class GameRoot extends GameNode {
     // until drained) doesn't pin the full `type_data` object.
     const wireNewItemsCue = (n: Notification): void => {
       const pdata = (n.perp?.data ?? {}) as {
-        popup_sprite?: unknown;
+        popup_sprite?: SpriteHelperConfig;
         title?: string;
         subtitle?: string;
         description?: string;
       };
-      (n.config as NotificationConfig).component = NewItemsNotification;
-      (n.config as NotificationConfig).props = {
-        title: n.title,
-        says: n.says,
-        textHtml: n.text,
-        perp: {
-          data: {
-            popup_sprite: pdata.popup_sprite,
-            title: pdata.title,
-            subtitle: pdata.subtitle,
-            description: pdata.description,
+      (n.config as NotificationConfig).dialog = {
+        variant: 'newItems',
+        props: {
+          title: n.title,
+          says: n.says,
+          textHtml: n.text,
+          perp: {
+            data: {
+              popup_sprite: pdata.popup_sprite,
+              title: pdata.title,
+              subtitle: pdata.subtitle,
+              description: pdata.description,
+            },
           },
         },
       };
@@ -1513,12 +1527,23 @@ export class GameRoot extends GameNode {
 
     if (data.mission_complete && this.Missions) {
       const mission = this.Missions.getMission(data.mission_complete);
+      const mdata = (mission.data ?? {}) as Record<string, unknown>;
       const n: Notification = mergeData({}, mission.data) as Notification;
       n.game_type = 'MissionComplete';
       n.mission_decorator = i18n.gettext('Mission complete!');
       n.states = mission.states;
       n.config = {
-        template: 'popup_mission_complete.html',
+        dialog: {
+          variant: 'missionComplete',
+          props: buildMissionPopupProps({
+            data: mdata,
+            states: mission.states,
+            decorator: i18n.gettext('Mission complete!'),
+            variant: 'complete',
+            getType: (g) => this.getType(g),
+            getTypeData: (g) => this.getTypeData(g),
+          }),
+        },
         extendClass: 'Mission',
         delay: 2500,
         delayScript: 1000,
@@ -1538,13 +1563,27 @@ export class GameRoot extends GameNode {
       const seenBriefings = this.raw_data?.mission_briefings_seen ?? {};
       if (!seenBriefings[data.mission_active]) {
         const mission = this.Missions.getMission(data.mission_active);
+        const mdata = (mission.data ?? {}) as Record<string, unknown>;
         const n: Notification = mergeData({}, mission.data) as Notification;
         n.game_type = 'MissionNew';
         n.states = mission.states;
         n.mission_decorator = i18n.gettext('New Mission!');
         n.mission = mission;
         n.mission_active_gestalt = data.mission_active;
-        n.config = { template: 'popup_mission.html', extendClass: 'Mission' };
+        n.config = {
+          dialog: {
+            variant: 'missionBriefing',
+            props: buildMissionPopupProps({
+              data: mdata,
+              states: mission.states,
+              decorator: i18n.gettext('New Mission!'),
+              variant: 'briefing',
+              getType: (g) => this.getType(g),
+              getTypeData: (g) => this.getTypeData(g),
+            }),
+          },
+          extendClass: 'Mission',
+        };
         this.cueNotification(n);
       }
     }
@@ -1557,8 +1596,7 @@ export class GameRoot extends GameNode {
       const n: Notification = {
         game_type: 'LevelUp',
         config: {
-          component: LevelUpNotification,
-          props: { xpLevel, xpToNext, apMax },
+          dialog: { variant: 'levelup', props: { xpLevel, xpToNext, apMax } },
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 1200,
@@ -1705,8 +1743,7 @@ export class GameRoot extends GameNode {
         description,
         says,
         config: {
-          component: TutorialNotification,
-          props: { says, descriptionHtml: description },
+          dialog: { variant: 'tutorial', props: { says, descriptionHtml: description } },
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 0,
@@ -1734,8 +1771,7 @@ export class GameRoot extends GameNode {
           },
         ],
         config: {
-          component: TutorialNotification,
-          props: { says, descriptionHtml: description },
+          dialog: { variant: 'tutorial', props: { says, descriptionHtml: description } },
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 0,
@@ -1750,8 +1786,7 @@ export class GameRoot extends GameNode {
         const description = (n.description ?? '') as string;
         const says = n.says;
         n.config = {
-          component: TutorialNotification,
-          props: { says, descriptionHtml: description },
+          dialog: { variant: 'tutorial', props: { says, descriptionHtml: description } },
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 600 * speed,
