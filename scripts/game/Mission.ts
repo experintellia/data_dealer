@@ -2,7 +2,9 @@
 // ViewTab.  Extracted from scripts/Game.js's IIFE in PR 7 of issue #147.
 
 import appModule from '../app.js';
+import { MissionPopup } from '../components/popups/MissionPopup.js';
 import { GameNode } from './GameNode.js';
+import { buildMissionPopupProps } from './missionView.js';
 
 interface MissionRenderNode {
   render?(): void;
@@ -46,7 +48,6 @@ export class Mission extends GameNode {
   // the base class's `gestalt?: string` to required so handlers below can
   // pass it to APIs typed `string` without `!== undefined` guards.
   declare gestalt: string;
-  popupTemplate = 'popup_mission.html';
 
   getBranch(_gestalt?: string): Mission[] {
     const mroot = this.parentNode as MissionsParent | undefined;
@@ -108,12 +109,19 @@ export class Mission extends GameNode {
   }
 
   openMissionPopup(): void {
-    this.GameRoot.openGenericPopup({
+    const groot = this.GameRoot;
+    // Direct open (clicking a mission card) — no `mission_decorator`
+    // (the legacy openGenericPopup passed none, so the template
+    // rendered it empty).
+    const props = buildMissionPopupProps({
+      data: this.data as Record<string, unknown>,
       states: this.states,
-      data: this.data,
-      template: 'popup_mission.html',
-      extendClass: 'Mission',
+      decorator: '',
+      variant: 'briefing',
+      getType: (g) => groot.getType(g),
+      getTypeData: (g) => groot.getTypeData(g),
     });
+    groot.openPreactDialog(MissionPopup, props, { extendClass: 'Mission' });
   }
 
   checkTutorial(): boolean {
