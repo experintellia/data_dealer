@@ -22,7 +22,9 @@ export function LevelUpNotification({
   onClose,
 }: LevelUpNotificationProps) {
   const says = i18n.gettext('Mark says:');
-  const text = sprintf(
+  // Legacy template rendered this as `<%= text %>` (raw HTML); the
+  // levelup i18n catalog string embeds spans (Level / XP / energy).
+  const textHtml = sprintf(
     i18n.gettext('levelup level %s! %s XP to level %s. %s energy'),
     toKSNum(xpLevel),
     toKSNum(xpToNext),
@@ -36,7 +38,8 @@ export function LevelUpNotification({
         <div class="NotificationBubble">
           <div class="NotificationAvatar" />
           <div class="NotificationSays">{says}</div>
-          <div class="NotificationText">{text}</div>
+          {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
+          <div class="NotificationText" dangerouslySetInnerHTML={{ __html: textHtml }} />
           <div class="TutorialTapHint">tap anywhere to continue</div>
         </div>
       </div>
