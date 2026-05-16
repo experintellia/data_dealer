@@ -507,12 +507,6 @@ export type PopupConfig = NodeConfig & {
   popupContainer?: PopupContainerLike;
   extendClass?: string;
   placeBottom?: boolean;
-  // Phase 2 (issue #80): when set, `render()` mounts a Preact component
-  // into `jdomelem` instead of running the Underscore.js template flow.
-  // Existing jQuery delegated handlers on the popup body (.PopupClose,
-  // .Button, .PopupMenuButton, …) still fire — Preact only owns the DOM
-  // _content_, the event seam is unchanged.
-  preactRender?: (container: HTMLElement, popup: RenderPopup) => void;
 };
 
 export interface PopupTemplateData {
@@ -534,7 +528,6 @@ export class RenderPopup extends RenderNode {
   declare placeBottom: boolean | undefined;
   declare lastButton: JQueryUIElem | undefined;
   declare userAbsPos: { x: number; y: number } | undefined;
-  declare preactRender: ((container: HTMLElement, popup: RenderPopup) => void) | undefined;
 
   declare template: string;
 
@@ -921,13 +914,6 @@ export class RenderPopup extends RenderNode {
 
   render(): void {
     const jq = this.jdomelem;
-    if (this.preactRender) {
-      // Preact-rendered popup body — Preact's own diffing owns the
-      // container, so we don't `jq.empty()` on re-render; calling the
-      // callback again is idempotent (preact/render mounts or diffs).
-      this.preactRender(jq[0], this);
-      return;
-    }
     jq.empty();
     const html = getApp().renderView(this.template, this.templateData);
     jq.append(html);

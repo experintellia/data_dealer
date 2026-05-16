@@ -17,12 +17,17 @@
 // `GameRoot.prototype.X = function () {...}` assignments in Game.js
 // for now; later PRs in the wave migrate them one batch at a time.
 
+import type { ComponentType } from 'preact';
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
-import { mountAPStatusPopup } from '../components/popups/APStatusPopup.js';
-import { mountCashStatusPopup } from '../components/popups/CashStatusPopup.js';
-import { mountProfilesStatusPopup } from '../components/popups/ProfilesStatusPopup.js';
-import { mountXPStatusPopup } from '../components/popups/XPStatusPopup.js';
+import { APStatusPopup } from '../components/popups/APStatusPopup.js';
+import { CashStatusPopup } from '../components/popups/CashStatusPopup.js';
+import { LevelUpNotification } from '../components/popups/LevelUpNotification.js';
+import { NewItemsNotification } from '../components/popups/NewItemsNotification.js';
+import { ProfilesStatusPopup } from '../components/popups/ProfilesStatusPopup.js';
+import { TutorialNotification } from '../components/popups/TutorialNotification.js';
+import { XPStatusPopup } from '../components/popups/XPStatusPopup.js';
+import { type PreactDialogHandle, openDialog } from '../components/popups/dialogManager.js';
 import { debounce, span, sprintf, toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
 import setup from '../setup.js';
@@ -308,6 +313,17 @@ interface Notification {
 
 interface NotificationConfig {
   template?: string;
+  /**
+   * Phase 2 (issue #80) Preact replacement for `template`.  When
+   * `component` is set, `openNotification` routes the cue through the
+   * Preact dialog manager (`dialogManager.openDialog`) instead of
+   * constructing a `Render.Popup` with an Underscore.js template.
+   * The framework injects an `onClose: () => void` prop into the
+   * component on render — components declare it on their props type.
+   */
+  component?: ComponentType<any>;
+  /** Props for `component`, snapshotted at cue time. */
+  props?: Record<string, unknown>;
   extendClass?: string;
   delay?: number;
   delayScript?: number;
@@ -1286,9 +1302,126 @@ export class GameRoot extends GameNode {
     });
   }
 
+  /** Open a Preact dialog through the phase-2 `dialogManager`.  Wires
+   *  the resulting handle into `this.renderPopup` (or `notificationPopup`
+   *  when `slot: 'notification'`) so legacy callers that do
+   *  `groot.renderPopup.trigger('popup_close')` still find a compatible
+   *  handle to drive.  Clears that slot automatically on close. */
+  openPreactDialog<P extends Record<string, unknown>>(
+    component: ComponentType<P & { onClose: () => void }>,
+    props: P,
+    options: {
+      extendClass?: string;
+      placeBottom?: boolean;
+      slot?: 'popup' | 'notification';
+      onAfterClose?: () => void;
+    } = {}
+  ): PreactDialogHandle | undefined {
+    const containerJq = (
+      this.renderNode as { popupContainerDomelem?: { 0?: HTMLElement } } | undefined
+    )?.popupContainerDomelem;
+    const container = containerJq?.[0];
+    if (!container) return undefined;
+    const slot = options.slot ?? 'popup';
+    const handle = openDialog<P>({
+      component,
+      props,
+      container,
+      ...(options.extendClass !== undefined && { extendClass: options.extendClass }),
+      ...(options.placeBottom !== undefined && { placeBottom: options.placeBottom }),
+      onAfterClose: () => {
+        if (slot === 'notification') {
+          delete this.notificationPopup;
+        } else {
+          delete this.renderPopup;
+        }
+        options.onAfterClose?.();
+      },
+    });
+    if (slot === 'notification') {
+      this.notificationPopup = handle as unknown as NonNullable<typeof this.notificationPopup>;
+    } else {
+      this.renderPopup = handle as unknown as NonNullable<typeof this.renderPopup>;
+    }
+    return handle;
+  }
+
   openNotification(notification: Notification): RenderPopupLike | undefined {
     const config = (notification.config ?? {}) as NotificationConfig;
     if (this.notificationPopup) return undefined;
+
+    // Phase 2 (issue #80) — tier 2 cues set `config.component` /
+    // `config.props` and route through the dialog manager.  The
+    // stub handle holds the `notificationPopup` slot synchronously
+    // (mirroring the legacy code that constructs `Render.Popup`
+    // before the `delay` setTimeout) so concurrent cues can't
+    // double-open in the window before the manager mounts.
+    if (config.component) {
+      const drainOnClose = (): void => {
+        this.uncueNotification(notification);
+        const next = this.NotificationQueue[0];
+        if (next) this.openNotification(next);
+      };
+
+      let isOpen = true;
+      let liveHandle: PreactDialogHandle | undefined;
+
+      const closeFromStub = (): void => {
+        if (!isOpen) return;
+        isOpen = false;
+        if (liveHandle) {
+          liveHandle.close();
+          return;
+        }
+        delete this.notificationPopup;
+        drainOnClose();
+      };
+
+      const stub: PreactDialogHandle = {
+        get open() {
+          return isOpen;
+        },
+        trigger(event: string) {
+          if (event === 'popup_close' || event === 'popup_cancel') closeFromStub();
+        },
+        render() {},
+        close: closeFromStub,
+      };
+      this.notificationPopup = stub as unknown as NonNullable<typeof this.notificationPopup>;
+
+      window.setTimeout(() => {
+        // Skip if the cue was dismissed during the delay window —
+        // story tutorials' scripted events pan the camera, which
+        // would jump to a perp for a popup the player already closed.
+        if (!isOpen) return;
+        notification.scriptedEvents?.forEach((s) => s());
+      }, config.delayScript ?? 0);
+
+      window.setTimeout(() => {
+        if (!isOpen) return;
+        delete this.notificationPopup;
+        liveHandle = this.openPreactDialog(
+          config.component as ComponentType<Record<string, unknown> & { onClose: () => void }>,
+          config.props ?? {},
+          {
+            ...(config.extendClass !== undefined && { extendClass: config.extendClass }),
+            ...(config.placeBottom !== undefined && { placeBottom: config.placeBottom }),
+            slot: 'notification',
+            onAfterClose: drainOnClose,
+          }
+        );
+        if (!liveHandle) {
+          isOpen = false;
+          drainOnClose();
+          return;
+        }
+        if (notification.nonblocking) {
+          window.setTimeout(() => liveHandle?.close(), notification.nonblocking);
+        }
+      }, config.delay ?? 0);
+
+      return undefined;
+    }
 
     const popupTemplateData: Record<string, unknown> = {
       status_icons: this.data.status_icons,
@@ -1297,7 +1430,9 @@ export class GameRoot extends GameNode {
       groot: this,
     };
 
-    config.template = config.template || 'notification.html';
+    // Legacy template path — remaining tier-3+ notification cues
+    // (mission popups, popup_karma) still flow through `Render.Popup`
+    // + the Underscore.js template.
     config.templateData = popupTemplateData;
     config.popupContainer = this;
 
@@ -1350,6 +1485,32 @@ export class GameRoot extends GameNode {
   makeNotifications(data: MakeNotificationsPayload): void {
     const speed = setup.debug ? 0 : 1;
 
+    // Project only the perp fields `NewItemsNotification` actually
+    // reads, so the cue closure (which lives in `NotificationQueue`
+    // until drained) doesn't pin the full `type_data` object.
+    const wireNewItemsCue = (n: Notification): void => {
+      const pdata = (n.perp?.data ?? {}) as {
+        popup_sprite?: unknown;
+        title?: string;
+        subtitle?: string;
+        description?: string;
+      };
+      (n.config as NotificationConfig).component = NewItemsNotification;
+      (n.config as NotificationConfig).props = {
+        title: n.title,
+        says: n.says,
+        textHtml: n.text,
+        perp: {
+          data: {
+            popup_sprite: pdata.popup_sprite,
+            title: pdata.title,
+            subtitle: pdata.subtitle,
+            description: pdata.description,
+          },
+        },
+      };
+    };
+
     if (data.mission_complete && this.Missions) {
       const mission = this.Missions.getMission(data.mission_complete);
       const n: Notification = mergeData({}, mission.data) as Notification;
@@ -1388,10 +1549,16 @@ export class GameRoot extends GameNode {
       }
     }
     if (data.levelup) {
+      // Snapshot xp_level at cue time so the component is pure — the
+      // popup opens `delay` ms later and xp_level may have drifted.
+      const xpLevel = this.xp_level.number;
+      const xpToNext = this.xp_level.xp_max - this.xp_value;
+      const apMax = this.xp_level.ap_max;
       const n: Notification = {
         game_type: 'LevelUp',
         config: {
-          template: 'levelup.html',
+          component: LevelUpNotification,
+          props: { xpLevel, xpToNext, apMax },
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 1200,
@@ -1443,7 +1610,10 @@ export class GameRoot extends GameNode {
             n.text = sprintf(ntext, span((tdata as { title?: string }).title ?? ''));
           }
         });
-        if (parentIsBuilt) this.cueNotification(n);
+        if (parentIsBuilt) {
+          wireNewItemsCue(n);
+          this.cueNotification(n);
+        }
       });
     }
     // Powerup Notifications.  FIXME same as `data.perps`.
@@ -1504,6 +1674,7 @@ export class GameRoot extends GameNode {
         });
         n.says = i18n.gettext('Mark says:');
         n.text = sprintf(reg.type_data?.ntext ?? '', span(projectstext));
+        wireNewItemsCue(n);
         // popup only if notification = true;
         if (reg.type_data?.notification) this.cueNotification(n);
       });
@@ -1526,13 +1697,16 @@ export class GameRoot extends GameNode {
 
     // Simplemessage
     if (data.simplemessage) {
+      const description = data.simplemessage.text;
+      const says = i18n.gettext('Mark says:');
       this.cueNotification({
         game_type: 'Story',
         button: i18n.gettext('Next'),
-        description: data.simplemessage.text,
-        says: i18n.gettext('Mark says:'),
+        description,
+        says,
         config: {
-          template: 'notification_tutorial.html',
+          component: TutorialNotification,
+          props: { says, descriptionHtml: description },
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 0,
@@ -1543,11 +1717,13 @@ export class GameRoot extends GameNode {
     // Tutorials and Missions
     if (data.story && data.storyPerp) {
       const storyPerp = data.storyPerp;
+      const description = data.story.text;
+      const says = i18n.gettext('Mark says:');
       this.cueNotification({
         game_type: 'Story',
         button: i18n.gettext('Next'),
-        description: data.story.text,
-        says: i18n.gettext('Mark says:'),
+        description,
+        says,
         scriptedEvents: [
           () => {
             const viewMapId = storyPerp.ViewMap?.id;
@@ -1558,7 +1734,8 @@ export class GameRoot extends GameNode {
           },
         ],
         config: {
-          template: 'notification_tutorial.html',
+          component: TutorialNotification,
+          props: { says, descriptionHtml: description },
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 0,
@@ -1570,8 +1747,11 @@ export class GameRoot extends GameNode {
         const n: Notification = tutorial;
         n.button = i18n.gettext('Next');
         n.says = i18n.gettext('Mark says:');
+        const description = (n.description ?? '') as string;
+        const says = n.says;
         n.config = {
-          template: 'notification_tutorial.html',
+          component: TutorialNotification,
+          props: { says, descriptionHtml: description },
           extendClass: 'Tutorial',
           placeBottom: true,
           delay: 600 * speed,
@@ -1880,48 +2060,32 @@ export class GameRoot extends GameNode {
     });
 
     // Status info popups (Profiles / Cash / AP / XP) — Preact port of
-    // views/popup_status.html (issue #80 phase 2, tier 1).  Each component
-    // owns its own i18n + formatting; call sites just hand over the raw
-    // engine scalars they need.
+    // views/popup_status.html (issue #80 phase 2, tier 1).  Each
+    // component owns its own i18n + formatting; call sites just hand
+    // over the raw engine scalars they need.
     this.on('click_status.Profiles', () => {
-      this.openGenericPopup({
-        data: { mainsprites_class: 'Profiles' },
-        preactRender: (container) =>
-          mountProfilesStatusPopup(container, {
-            profilesValue: this.profiles_value,
-            profilesMax: this.profiles_max,
-          }),
+      this.openPreactDialog(ProfilesStatusPopup, {
+        profilesValue: this.profiles_value,
+        profilesMax: this.profiles_max,
       });
     });
 
     this.on('click_status.Cash', () => {
-      this.openGenericPopup({
-        data: { mainsprites_class: 'Cash' },
-        preactRender: (container) =>
-          mountCashStatusPopup(container, { cashValue: this.cash_value }),
-      });
+      this.openPreactDialog(CashStatusPopup, { cashValue: this.cash_value });
     });
 
     this.on('click_status.AP', () => {
-      this.openGenericPopup({
-        data: { mainsprites_class: 'AP' },
-        preactRender: (container) =>
-          mountAPStatusPopup(container, {
-            apValue: this.ap_value,
-            apMax: this.xp_level.ap_max,
-          }),
+      this.openPreactDialog(APStatusPopup, {
+        apValue: this.ap_value,
+        apMax: this.xp_level.ap_max,
       });
     });
 
     this.on('click_status.XP', () => {
-      this.openGenericPopup({
-        data: { mainsprites_class: 'XP' },
-        preactRender: (container) =>
-          mountXPStatusPopup(container, {
-            xpLevel: this.xp_level.number,
-            xpValue: this.xp_value,
-            xpMax: this.xp_level.xp_max,
-          }),
+      this.openPreactDialog(XPStatusPopup, {
+        xpLevel: this.xp_level.number,
+        xpValue: this.xp_value,
+        xpMax: this.xp_level.xp_max,
       });
     });
 
