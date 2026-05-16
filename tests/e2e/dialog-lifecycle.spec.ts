@@ -254,6 +254,24 @@ test.describe('Section B — notification queue popups', () => {
     await expectOpenAndClose(page, '.PopupBody.TutorialBody', 'tap');
   });
 
+  test('LevelUp notification renders i18n markup as real span elements', async ({ page }) => {
+    await bootGame(page);
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.makeNotifications({ levelup: 2 });
+    });
+    await expect(page.locator('.PopupContainer.lockOn.Tutorial')).toBeVisible({ timeout: 5_000 });
+    const body = page.locator('.PopupBody.TutorialBody').first();
+    await expect(body).toBeVisible({ timeout: 3_000 });
+    // The levelup catalog string embeds `<span class="level">…</span>`
+    // markup.  Rendered correctly it must produce real child <span>
+    // ELEMENTS — not escaped text showing the literal tags.
+    const spans = page.locator('.PopupBody.TutorialBody .NotificationText span');
+    await expect(spans.first()).toBeVisible({ timeout: 3_000 });
+    expect(await spans.count()).toBeGreaterThanOrEqual(1);
+    await expectOpenAndClose(page, '.PopupBody.TutorialBody', 'tap');
+  });
+
   test('Mission briefing (active mission) opens and closes', async ({ page }) => {
     await bootGame(page);
     // Use the first available mission gestalt from the GameRoot's mission set,
