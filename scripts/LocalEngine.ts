@@ -19,7 +19,14 @@ import { now as clockNow } from './clock.js';
 import type { UpgradeValuesShape } from './game/ProfileSet.js';
 import { materialize } from './materializer.js';
 import { applyDelta } from './state.js';
-import type { Delta, GameNode, GameValues, LocalState, MissionGoal } from './state.js';
+import type {
+  ChargingEntry,
+  Delta,
+  GameNode,
+  GameValues,
+  LocalState,
+  MissionGoal,
+} from './state.js';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -508,12 +515,17 @@ export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameRe
   // Re-arm one-shot materializers for any charges still in flight. Clear
   // any prior handles first so calling loadGame twice doesn't queue
   // duplicate node_ready emissions for the same charge.
+  // A charge that completed during the away window is emitted by the
+  // queueMicrotask mat.events loop below (and re-rendered ready via the
+  // _loadReady path); only still-charging entries get a timer here. Any
+  // overlap is a UI no-op because markReady() is idempotent
+  // (`if (gperp.renderReady) return;` in all four perp classes).
   _clearAllChargeReady();
   var stillCharging = (seededState && seededState.nodes_charging) || [];
   for (var i = 0; i < stillCharging.length; i++) {
     var c = stillCharging[i];
     if (c && typeof c.charge_end === 'number') {
-      _scheduleChargeReady(c.charge_end, c.path);
+      _scheduleChargeReady(c);
     }
   }
 
@@ -1569,7 +1581,13 @@ export function buyPerp(
   var levelup = newLevel > oldLevel;
   if (levelup) newGv = _applyLevelUp(newGv, newLevel);
 
-  var missionResult = _advanceBuyPerpMissions(state, gestalt);
+  // Project the just-bought node in before the mission cascade so a
+  // cascade-unlocked buy_perp goal targeting this perp auto-completes now
+  // instead of staying stuck until a reload replays the buy delta.
+  var preMissionStateBuy = Object.assign({}, state, {
+    nodes: state.nodes.concat([newNode]),
+  });
+  var missionResult = _advanceBuyPerpMissions(preMissionStateBuy, gestalt);
   newGv = _applyRewardsToGv(newGv, missionResult.rewards);
 
   // profile_set for project*/contact*/city* gestalts:
@@ -1775,7 +1793,7 @@ function _advanceIntegrateProfilesMissions(
     return { missions: null, mission_goals: goals, active_missions: activeMissions };
   }
 
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 function _advanceCollectProfilesMissions(
@@ -1807,12 +1825,13 @@ function _advanceCollectProfilesMissions(
     return { missions: null, mission_goals: goals, active_missions: activeMissions };
   }
 
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 function _completeMissionsIfReady(
   updatedGoals: MissionGoal[],
-  activeMissions: string[]
+  activeMissions: string[],
+  nodes: GameNode[]
 ): MissionAdvanceResult {
   var ruleset = _getRuleset();
   var completed: string[] = [];
@@ -1860,7 +1879,11 @@ function _completeMissionsIfReady(
       });
       // Auto-complete buy_perp goals for items the player already owns so a
       // mission that unlocks after the item was bought doesn't get stuck.
-      updatedGoals = _autoCompleteBuyPerpGoals(updatedGoals, getState().nodes);
+      // `nodes` is the caller's locally-projected node list — reading global
+      // state here would miss own deltas the async webxdc echo hasn't applied
+      // yet (e.g. the perp just bought this turn), stranding the cascaded
+      // mission until a reload replayed the log.
+      updatedGoals = _autoCompleteBuyPerpGoals(updatedGoals, nodes);
     }
   }
 
@@ -1930,7 +1953,7 @@ function _repairStuckMissionGoals(state: LocalState): MissionAdvanceResult | nul
   });
 
   if (!changed && !hasFinishedActiveMission) return null;
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 // Sums up cash / xp / karma rewards across the just-completed missions so
@@ -1993,7 +2016,7 @@ function _advanceChargePerpMissions(state: LocalState, gestalt: string): Mission
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
   }
 
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 function _advanceBuyPowerupMissions(
@@ -2020,7 +2043,7 @@ function _advanceBuyPowerupMissions(
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
   }
 
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 function _advanceUpgradeTokenMissions(
@@ -2047,7 +2070,7 @@ function _advanceUpgradeTokenMissions(
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
   }
 
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 /**
@@ -2078,7 +2101,7 @@ function _advanceBuyPerpMissions(state: LocalState, gestalt: string): MissionAdv
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
   }
 
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 function _advanceCollectCashMissions(
@@ -2111,7 +2134,7 @@ function _advanceCollectCashMissions(
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
   }
 
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 // ---------------------------------------------------------------------------
@@ -2256,9 +2279,9 @@ export function chargePerp(
     })
   );
 
-  // Live-tick: schedule one-shot materialize at exactly charge_end so the
-  // node_ready event fires without depending on the player reloading.
-  _scheduleChargeReady(chargeEntry.charge_end, chargeEntry.path);
+  // Live-tick: emit node_ready at exactly charge_end so the perp flips to
+  // collectable without depending on the player reloading.
+  _scheduleChargeReady(chargeEntry);
 
   // Achievements
   var _cpDisplayName = state.display_name || state.addr;
@@ -2310,29 +2333,38 @@ function _clearAllChargeReady(): void {
   _chargeReadyTimers = {};
 }
 
-// One-shot per charge: at charge_end, run materialize() to transition the
-// charging entry into nodes_collect and emit node_ready.
-function _scheduleChargeReady(chargeEnd: number, path: string): void {
+// One-shot per charge: at charge_end, emit node_ready so the UI flips to
+// collectable without a reload.
+//
+// The node_ready payload is built from the charge `entry` the caller already
+// holds — NOT re-derived from global state. Under canonical-async webxdc the
+// chargePerp echo may not have been applied when this fires (messenger lag,
+// app backgrounded, ~0 ms charge_time); reading nodes_charging back here would
+// see it absent and strand the perp "charging" until a reload replayed the
+// log. Tying the emit to the originating intent removes that whole class of
+// stuck-action. materialize()+setState still advances time-based state
+// (AP regen, and the charge→collect promotion once the echo lands) — a near
+// no-op while the echo is in flight; collectPerp re-materializes on collect
+// regardless. One timer per path (cleared+rearmed via _chargeReadyTimers)
+// guarantees a single emit per charge cycle, so no stale-state dedup probe
+// is needed.
+function _scheduleChargeReady(entry: ChargingEntry): void {
   if (typeof setTimeout !== 'function') return;
+  var path = entry.path;
   _clearChargeReady(path);
-  var msUntil = Math.max(0, chargeEnd - clockNow());
+  var msUntil = Math.max(0, entry.charge_end - clockNow());
   var handle = setTimeout(function () {
     if (path) delete _chargeReadyTimers[path];
     var s = getState();
     if (!s) return;
-    if (path) {
-      var stillCharging = (s.nodes_charging || []).some(function (c: { path: string }) {
-        return c.path === path;
-      });
-      if (!stillCharging) return;
-    }
     var mat = materialize(s, clockNow());
     setState(mat.state);
-    var events = mat.events || [];
-    for (var i = 0; i < events.length; i++) {
-      var e = events[i];
-      if (e) _emit(e.ev, e.pl);
-    }
+    _emit('node_ready', {
+      id: entry.game_id,
+      type: entry.game_type,
+      path: entry.path,
+      result: entry.result,
+    });
   }, msUntil);
   if (path) _chargeReadyTimers[path] = handle;
 }
