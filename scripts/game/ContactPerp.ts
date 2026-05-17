@@ -116,6 +116,7 @@ export class ContactPerp extends GamePerp {
         const r = data.result;
         if (r.error) {
           if (r.error === 1) {
+            groot.reconcileAP(r);
             if (gnode.renderPopup && (gnode.renderPopup as RenderPopupLike).open) {
               (gnode.renderPopup as RenderPopupLike).trigger('no_AP');
             } else {
@@ -193,6 +194,7 @@ export class ContactPerp extends GamePerp {
           groot.getDatabase().cue(inner.profile_set, inner.origin, inner.collect_id);
           gperp.setState('idle', true);
         } else if (data.result?.error) {
+          groot.reconcileAP(data.result);
           if (popup) popup.trigger('no_AP');
           else deco.FXNoAP();
           deco.FXStop();

@@ -467,6 +467,7 @@ export class Database extends GameNode {
       // FIXME returned error 0
       if (r.error !== undefined) {
         // No AP
+        groot.reconcileAP(r);
         if (gnode.renderPopup && gnode.renderPopup.open) {
           gnode.renderPopup.trigger('no_AP');
         } else {

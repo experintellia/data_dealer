@@ -370,6 +370,19 @@ describe('chargePerp — failure: insufficient AP', () => {
     await chargePerp(NODE_PATH);
     expect(getState().nodes_charging).toHaveLength(0);
   });
+
+  // Regression: the AP-rejection must carry the authoritative materialized
+  // ap_snapshot so the client can resync its free-running APTicker estimate
+  // down to the truth. Without it the status bar stays showing phantom
+  // energy the engine has already refused and every retry fails identically.
+  it('returns the authoritative ap_snapshot on AP failure', async () => {
+    setOverride(FIXED_NOW);
+    setState(mkState({ game_values: { cash_value: 500, ap_snapshot: 0 } }));
+
+    const { result } = await chargePerp(NODE_PATH);
+    expect(result.error).toBe(1);
+    expect(result.ap_snapshot).toBe(0);
+  });
 });
 
 describe('chargePerp — failure: perp already charging', () => {

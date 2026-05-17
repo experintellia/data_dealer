@@ -457,6 +457,25 @@ describe('collectPerp — AP cost', () => {
     expect(data.result.error).toBe(4);
   });
 
+  // Regression: the AP-rejection must carry the authoritative materialized
+  // ap_snapshot so the client can resync its free-running APTicker estimate
+  // down to the truth, instead of leaving the bar showing phantom energy
+  // the engine has already refused.
+  it('returns the authoritative ap_snapshot on AP failure', async () => {
+    const PATH = 'Imperium.City.Pusher0.client001';
+    setState(
+      mkState({
+        nodes: [mkNode('ClientPerp', PATH)],
+        nodes_collect: [{ path: PATH, result: { amount: 100 } }],
+        game_values: mkGv({ ap_snapshot: 0, ap_max: 6 }),
+      })
+    );
+
+    const { result } = await collectPerp(PATH);
+    expect(result.error).toBe(4);
+    expect(result.ap_snapshot).toBe(0);
+  });
+
   it('error path: state is untouched when AP is insufficient', async () => {
     const PATH = 'Imperium.City.Pusher0.client001';
     setState(
@@ -925,6 +944,30 @@ describe('integrateCollected — ap cost', () => {
 
     const data = await integrateCollected(COLLECT_ID);
     expect(data.result.error).toBe(1);
+  });
+
+  // Regression: the AP-rejection must carry the authoritative materialized
+  // ap_snapshot so the client can resync its free-running APTicker estimate
+  // down to the truth, instead of leaving the bar showing phantom energy
+  // the engine has already refused.
+  it('returns the authoritative ap_snapshot on AP failure', async () => {
+    setState(
+      mkState({
+        game_values: Object.assign({}, mkGv(), { ap_snapshot: 0, ap_max: 6 }),
+        db_queue: [
+          {
+            origin: 'Imperium.City.contact001',
+            collect_id: COLLECT_ID,
+            profile_set: { profiles_value: 1, tokens_map: {} },
+            collect_dt: FIXED_NOW,
+          },
+        ],
+      })
+    );
+
+    const { result } = await integrateCollected(COLLECT_ID);
+    expect(result.error).toBe(1);
+    expect(result.ap_snapshot).toBe(0);
   });
 
   it('level-up refill overrides the AP cost — full ap_max after crossing threshold', async () => {

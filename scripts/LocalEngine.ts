@@ -2171,7 +2171,11 @@ export function chargePerp(
         : 0;
 
   // Distinct codes (1=AP, 3=cash) let Game.js show the correct feedback animation.
-  if ((gv.ap_snapshot || 0) < 1) return Promise.resolve({ result: { error: 1 } });
+  // Return the materialized snapshot so the client can resync its free-running
+  // APTicker estimate down to the authoritative value — otherwise the bar stays
+  // showing phantom energy the engine has already refused.
+  if ((gv.ap_snapshot || 0) < 1)
+    return Promise.resolve({ result: { error: 1, ap_snapshot: gv.ap_snapshot || 0 } });
   if ((gv.cash_value || 0) < chargeCost) return Promise.resolve({ result: { error: 3 } });
 
   // ClientPerps don't carry collect_amount in the ruleset — they ship
@@ -2442,7 +2446,9 @@ export function collectPerp(
   // The UI pre-checks ap_value < 1 in {Client,Contact,Project,Token}Perp.collect
   // and shows FXNoAP; the engine still guards as defence-in-depth.
   if (((ms.game_values && ms.game_values.ap_snapshot) || 0) < 1) {
-    return Promise.resolve({ result: { error: 4 } });
+    return Promise.resolve({
+      result: { error: 4, ap_snapshot: (ms.game_values && ms.game_values.ap_snapshot) || 0 },
+    });
   }
 
   var collectEntry: { path: string; result?: { amount?: number } } | null = null;
@@ -2684,7 +2690,9 @@ export function integrateCollected(
   var state = materialize(rawState, now).state;
 
   if (((state.game_values && state.game_values.ap_snapshot) || 0) < 1) {
-    return Promise.resolve({ result: { error: 1 } });
+    return Promise.resolve({
+      result: { error: 1, ap_snapshot: (state.game_values && state.game_values.ap_snapshot) || 0 },
+    });
   }
 
   var queue = state.db_queue || [];

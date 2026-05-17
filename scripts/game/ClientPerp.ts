@@ -197,6 +197,7 @@ export class ClientPerp extends GamePerp {
           });
           gperp.setState('idle', true);
         } else if (data.result?.error) {
+          groot.reconcileAP(data.result);
           if (popup) popup.trigger('error');
           else deco.FXError();
           deco.FXStop();
@@ -258,6 +259,7 @@ export class ClientPerp extends GamePerp {
         }
         const r = data.result;
         if (r.error) {
+          groot.reconcileAP(r);
           if (gnode.renderPopup && (gnode.renderPopup as RenderPopupLike).open) {
             (gnode.renderPopup as RenderPopupLike).trigger('no_AP');
           } else {
