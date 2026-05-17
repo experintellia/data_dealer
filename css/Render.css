@@ -3297,3 +3297,39 @@ button {
     box-sizing: border-box;
   }
 }
+
+/* Phase 2 (#80) — DOM port of the legacy FXNoCash/FXNoAP/FXError
+   "bling" sprite for Preact-managed perp dialogs.  The legacy
+   RenderSprite spawned on the board render layer; a Preact dialog has
+   no render node and the board is occluded by the popup overlay, so
+   the cue is rendered as a DOM element centred in the popup instead.
+   Sprite window into MainSprites.png (65x65; offsets set inline). */
+.FXBling {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 65px;
+  height: 65px;
+  z-index: 100001;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  animation: dd-fx-bling 1400ms ease forwards;
+}
+@keyframes dd-fx-bling {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 120px)) scale(3) rotate(-360deg);
+  }
+  14% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+  }
+  82% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 48px)) scale(1.6) rotate(360deg);
+  }
+}

@@ -382,16 +382,10 @@ export class GamePerp extends GameNode {
     });
     this.renderPopup = handle as unknown as RenderPopupLike;
     this.initPopupEvents?.();
-    // Mirror legacy RenderPopup `node.on('no_cash', () =>
-    // node.FXNoCash())` — drive the perp render-node's error bling
-    // off the same emitter events the engine fires (gnode.Charge()
-    // etc.).  The emitter already handles the button-state class.
-    const rn = this.renderNode as
-      | { FXNoCash?(): void; FXNoAP?(): void; FXError?(): void }
-      | undefined;
-    handle.on('no_cash', () => rn?.FXNoCash?.());
-    handle.on('no_AP', () => rn?.FXNoAP?.());
-    handle.on('error', () => rn?.FXError?.());
+    // no_cash/no_AP/error feedback (button state + the floating bling)
+    // is handled in the dialog manager's emitter — the legacy
+    // perp-node FXNoCash spawns on the board layer, occluded by the
+    // popup overlay, so it can't be reused for Preact dialogs.
     return handle;
   }
 

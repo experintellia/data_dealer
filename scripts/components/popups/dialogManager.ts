@@ -7,6 +7,14 @@
 // Preact) is already active closes the existing one first.
 
 import { type ComponentChildren, type ComponentType, h, render } from 'preact';
+import setup from '../../setup.js';
+
+// MainSprites.png window (x y, 65x65) for the legacy FX bling icons.
+const FX_BLING_POS: Record<string, string> = {
+  no_cash: '-401px -737px',
+  no_AP: '-336px -737px',
+  error: '-362px -860px', // legacy FXError → FXNoAP('bug')
+};
 
 /** Extend-class values accepted by `openDialog`.  Each is a CSS hook
  *  in `css/Render.css` (`.PopupContainer.lockOn.<class>`). */
@@ -166,6 +174,17 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
             main.classList.add('disabled', ...cls.split(' '));
           }
         }
+        // DOM port of the legacy FXNoCash/FXNoAP/FXError bling — a
+        // RenderSprite on the board layer (occluded by the popup
+        // overlay) doesn't work for a Preact dialog, so spawn the
+        // sprite-window icon centred in the popup instead.  Self-
+        // removes on animationend.
+        const bling = document.createElement('div');
+        bling.className = 'FXBling';
+        bling.style.backgroundImage = `url(${setup.imagePathPrefix}MainSprites.png)`;
+        bling.style.backgroundPosition = FX_BLING_POS[event] ?? '-362px -860px';
+        bling.addEventListener('animationend', () => bling.remove());
+        opts.container.appendChild(bling);
       }
       const set = listeners.get(event);
       if (set) for (const fn of set) fn(evStub, ...(args ?? []));
