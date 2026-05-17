@@ -24,7 +24,7 @@ const FX_BLING_POS: Record<string, string> = {
  *  fallback), and spawn the floating bling icon — DOM-ported because a
  *  Preact dialog has no render node and the board layer is occluded by
  *  the popup overlay. */
-const FX_RESET_CLASSES = 'active disabled no_cash no_AP ERROR';
+const FX_RESET_CLASSES = ['active', 'disabled', 'no_cash', 'no_AP', 'ERROR'];
 
 function applyFxFeedback(
   event: string,
@@ -41,18 +41,13 @@ function applyFxFeedback(
   for (const b of container.querySelectorAll('.Button')) {
     b.classList.remove('active', 'no_cash', 'no_AP', 'ERROR');
   }
+  const mainFallback = container.querySelector('.Button[data-button-id="MainButton"]');
+  const target = lastButton ?? (mainFallback ? toFXTarget(mainFallback) : undefined);
   let resetMarked: () => void = () => {};
-  if (lastButton) {
-    lastButton.removeClass('active');
-    lastButton.addClass(`disabled ${cls}`);
-    resetMarked = () => lastButton.removeClass(FX_RESET_CLASSES);
-  } else {
-    const main = container.querySelector('.Button[data-button-id="MainButton"]');
-    if (main) {
-      main.classList.remove('active');
-      main.classList.add('disabled', ...cls.split(' '));
-      resetMarked = () => main.classList.remove(...FX_RESET_CLASSES.split(' '));
-    }
+  if (target) {
+    target.removeClass('active');
+    target.addClass(`disabled ${cls}`);
+    resetMarked = () => target.removeClass(FX_RESET_CLASSES.join(' '));
   }
   const bling = document.createElement('div');
   // Legacy FXNoCash spins/drops in; FXNoAP (and FXError, which is
@@ -61,18 +56,15 @@ function applyFxFeedback(
   bling.className = event === 'no_cash' ? 'FXBling' : 'FXBling FXBlingNoAP';
   bling.style.backgroundImage = `url(${setup.imagePathPrefix}MainSprites.png)`;
   bling.style.backgroundPosition = FX_BLING_POS[event] ?? FX_BLING_BUG;
-  // Legacy spawned the cue at the click/tap point; the CSS 50%/50%
-  // lands far from the button.  Convert the click's screen coords into
-  // the container's local space — the game scales the viewport, so a
-  // plain client-coord offset would be off by the scale factor.
+  // Convert the click's screen coords into the container's local
+  // space — the game scales the viewport, so a plain client-coord
+  // offset would be off by the scale factor.
   if (point) {
     const rect = container.getBoundingClientRect();
     const scaleX = rect.width / container.clientWidth || 1;
     const scaleY = rect.height / container.clientHeight || 1;
     bling.style.position = 'absolute';
     bling.style.left = `${(point.x - rect.left) / scaleX}px`;
-    // Lift it above the pointer (legacy spawned the cue over, not on,
-    // the tapped button).
     bling.style.top = `${(point.y - rect.top) / scaleY - FX_BLING_Y_OFFSET}px`;
   }
   bling.addEventListener('animationend', () => {
@@ -92,6 +84,21 @@ export type ExtendClass = 'Tutorial' | 'Alert' | 'NewItems' | 'LevelUp' | 'Missi
 export interface FXClassTarget {
   addClass(s: string): unknown;
   removeClass(s: string): unknown;
+}
+
+/** Wrap a button element as an `FXClassTarget` so `no_cash`/`no_AP`/
+ *  `error` FX targets the element the player clicked, mirroring the
+ *  legacy jQuery handler's `node.lastButton = $(this)`.  Shared by perp
+ *  components (`popup.lastButton`) and the MainButton fallback here. */
+export function toFXTarget(el: Element): FXClassTarget {
+  return {
+    addClass: (s) => {
+      for (const c of s.split(' ')) if (c) el.classList.add(c);
+    },
+    removeClass: (s) => {
+      for (const c of s.split(' ')) if (c) el.classList.remove(c);
+    },
+  };
 }
 
 const FX_EVENTS = new Set(['no_cash', 'no_AP', 'error']);

@@ -85,7 +85,7 @@ function spriteOf(v: unknown): SpriteHelperConfig | undefined {
   return v as SpriteHelperConfig | undefined;
 }
 
-function buildToken(token: TokenEntry, contactCollectAmount: number | undefined): TokenVM {
+function buildToken(token: TokenEntry, contact: ContactData): TokenVM {
   const data = token.data ?? {};
   const isSuper = data.is_supertoken === true;
   const bgCfg = spriteOf(isSuper ? data.perp_background2 : data.perp_background);
@@ -126,7 +126,7 @@ function buildToken(token: TokenEntry, contactCollectAmount: number | undefined)
   // token.collect_amount` where D.collect_amount is the contact-level
   // value threaded by profileset.html.  Gate is `if (collect_amount)`
   // then `else if (database_amount)` — not gated on the text.
-  const collectAmount = contactCollectAmount || token.collect_amount;
+  const collectAmount = contact.collect_amount || token.collect_amount;
   const dbAmount = token.database_amount;
   const findingsText = (data.findings_text ?? data.stats_text) as string | undefined;
   let subTitleHtml = '';
@@ -161,7 +161,7 @@ export function buildContactPopupVM(
   data: ContactData,
   states: { idle?: boolean; chargeRunning?: boolean } | undefined
 ): ContactPopupVM {
-  const tokens = (data.ProfileSet?.tokens_set ?? []).map((t) => buildToken(t, data.collect_amount));
+  const tokens = (data.ProfileSet?.tokens_set ?? []).map((t) => buildToken(t, data));
   const collectMode = !states?.idle && !states?.chargeRunning;
   const collectRisk = data.collect_risk ?? 0;
   return {

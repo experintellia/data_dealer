@@ -13,7 +13,7 @@ import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import type { ContactPopupVM, TokenVM } from '../../game/contactView.js';
 import i18n from '../../i18n.js';
-import type { FXClassTarget, PreactDialogHandle } from './dialogManager.js';
+import { type PreactDialogHandle, toFXTarget } from './dialogManager.js';
 
 export interface ContactPopupProps {
   vm: ContactPopupVM;
@@ -23,21 +23,6 @@ export interface ContactPopupProps {
   popup: PreactDialogHandle;
 }
 
-/** Wrap a button element as the handle's `lastButton` so the
- *  `no_cash` / `no_AP` / `error` FX (driven by `gnode.Charge()`)
- *  targets the button the player just clicked, mirroring the legacy
- *  jQuery handler's `node.lastButton = $(this)`. */
-function asLastButton(el: HTMLElement): FXClassTarget {
-  return {
-    addClass: (s) => {
-      for (const c of s.split(' ')) if (c) el.classList.add(c);
-    },
-    removeClass: (s) => {
-      for (const c of s.split(' ')) if (c) el.classList.remove(c);
-    },
-  };
-}
-
 function TokenTile({
   token,
   onOpen,
@@ -45,12 +30,8 @@ function TokenTile({
   token: TokenVM;
   onOpen: (gestalt: string) => void;
 }) {
-  // `token.html` injects the "New!" ribbon + sprite stack as direct
-  // children of `.PopupTokenPerp`; the ribbon is baked into `sp` so
-  // this stays innerHTML (no wrapper span), matching the still-live
-  // shared template under shared CSS.  Short locals keep the
-  // dangerouslySetInnerHTML elements single-line so the biome-ignore
-  // attaches (codebase convention, see MissionPopup).
+  // Short locals keep the dangerouslySetInnerHTML lines single-line so
+  // the biome-ignore attaches (codebase convention, see MissionPopup).
   const st = token.perpStyle;
   const sp = token.spriteHtml;
   const lb = token.labelHtml;
@@ -118,17 +99,14 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
     e.stopPropagation();
     onClose();
   };
-  // The legacy `.Button:not(.active)` delegated handler structurally
-  // blocked re-fire until the popup closed/re-rendered.  The snapshot
-  // VM never re-renders, so a rapid double-tap before a (hypothetically
-  // async) Charge()/collect() resolves can fire twice — engine-side
-  // idempotency is the sole guard for that window (fine for today's
-  // synchronous local engine; the success path closes synchronously
-  // and the failure path disables the button via applyFxFeedback).
+  // No re-entrancy guard beyond the .disabled check: unlike the legacy
+  // `.Button:not(.active)` handler, the snapshot VM never re-renders,
+  // so engine idempotency is the sole guard for a double-tap before an
+  // async resolve (fine for today's synchronous local engine).
   const fireAction = (e: JSX.TargetedMouseEvent<HTMLDivElement>, buttonId: string): void => {
     e.stopPropagation();
     if (e.currentTarget.classList.contains('disabled')) return;
-    popup.lastButton = asLastButton(e.currentTarget);
+    popup.lastButton = toFXTarget(e.currentTarget);
     popup.lastButtonPoint = { x: e.clientX, y: e.clientY };
     popup.trigger(`button_click.${buttonId}`);
   };
