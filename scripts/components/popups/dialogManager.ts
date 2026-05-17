@@ -149,10 +149,22 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
       }
       if (event === 'no_cash' || event === 'no_AP' || event === 'error') {
         const cls = event === 'error' ? 'ERROR' : event;
+        // Mirror legacy RenderPopup.initBaseUI: clear the state from
+        // every .Button first, then mark the last-clicked one (or the
+        // MainButton if none was tracked).
+        for (const b of opts.container.querySelectorAll('.Button')) {
+          b.classList.remove('active', 'disabled', 'no_cash', 'no_AP', 'ERROR');
+        }
         const lastButton = handle.lastButton;
         if (lastButton) {
           lastButton.removeClass('active');
           lastButton.addClass(`disabled ${cls}`);
+        } else {
+          const main = opts.container.querySelector('.Button[data-button-id="MainButton"]');
+          if (main) {
+            main.classList.remove('active');
+            main.classList.add('disabled', ...cls.split(' '));
+          }
         }
       }
       const set = listeners.get(event);
