@@ -3348,3 +3348,14 @@ button {
   opacity: 1;
   transition: transform 0.1s, opacity 0.1s;
 }
+/* `.SubpopContainer` carries the opaque #FFF→#EEE gradient that masks
+   the token grid; legacy delays its close fade by 0.2s (so the subpop
+   scale-down finishes first), leaving the white box on top until then.
+   Drop the delay for Preact dialogs so the grid shows through as soon
+   as the close starts; keep the open transition instant. */
+.PopupContainer.PopupPreact .SubpopContainer {
+  transition: opacity 0.2s linear, visibility 0.2s;
+}
+.PopupContainer.PopupPreact .SubpopContainer.open {
+  transition: opacity 0s;
+}
