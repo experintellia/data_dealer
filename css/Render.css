@@ -3376,12 +3376,16 @@ button {
   opacity: 1;
   transition: transform 0.1s, opacity 0.1s;
 }
-/* `.SubpopContainer` carries the opaque #FFF→#EEE gradient that masks
-   the token grid; legacy delays its close fade by 0.2s (so the subpop
-   scale-down finishes first), leaving the white box on top until then.
-   Drop the delay for Preact dialogs so the grid shows through as soon
-   as the close starts; keep the open transition instant. */
+/* `.SubpopContainer` carries an opaque #FFF→#EEE gradient (the legacy
+   white panel behind subpops).  A Preact dialog already has its own
+   popup body, so the extra sheet only causes a white flash as a subpop
+   scales away — most visible on the perp-buy (Pusher/Proxy) popups,
+   whose blue `.PopupSelector` doesn't fill the body the way the
+   Contact/Client token grid does, so the fade-out reads as full white.
+   Drop the gradient entirely for Preact dialogs (and keep the no-delay
+   close fade) so closing a subpop reveals the popup content directly. */
 .PopupContainer.PopupPreact .SubpopContainer {
+  background: transparent;
   transition: opacity 0.2s linear, visibility 0.2s;
 }
 .PopupContainer.PopupPreact .SubpopContainer.open {
