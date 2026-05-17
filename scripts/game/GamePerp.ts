@@ -12,7 +12,11 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
-import { type PreactDialogHandle, openDialog } from '../components/popups/dialogManager.js';
+import {
+  type OpenDialogOptions,
+  type PreactDialogHandle,
+  openDialog,
+} from '../components/popups/dialogManager.js';
 import i18n from '../i18n.js';
 import { GameNode, getAllByGestalt, getByFirstId, getFirstId } from './GameNode.js';
 import { mergeData } from './mergeData.js';
@@ -357,14 +361,19 @@ export class GamePerp extends GameNode {
    *  The component fires `popup.trigger('button_click.X', [g,d])` on
    *  click; the emitter dispatches to those handlers unchanged. */
   protected openPreactPopup<P extends Record<string, unknown>>(
-    component: import('preact').ComponentType<P & { onClose: () => void }>,
+    component: import('preact').ComponentType<
+      P & { onClose: () => void; popup: PreactDialogHandle }
+    >,
     props: P
   ): PreactDialogHandle | undefined {
     const vmNode = this.ViewMap?.renderNode as RenderNodeLike | undefined;
     const container = vmNode?.popupContainerDomelem?.[0];
     if (!container) return undefined;
     const handle = openDialog<P>({
-      component,
+      // `popup` is framework-injected by the manager at render time;
+      // the stricter component signature here just enforces that perp
+      // components declare it.
+      component: component as unknown as OpenDialogOptions<P>['component'],
       props,
       container,
       onAfterClose: () => {

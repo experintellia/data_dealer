@@ -174,7 +174,11 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
   if (opts.placeBottom) opts.container.classList.add('PopupPreactBottom');
   if (opts.extendClass) opts.container.classList.add(opts.extendClass);
 
-  const body = h(opts.component, { ...opts.props, onClose: close });
+  // `onClose` + the live `popup` handle are framework-injected.  Perp
+  // components fire `popup.trigger('button_click.ChargeButton',[g,d])`
+  // on action-button clicks — exactly what the legacy jQuery `.Button`
+  // delegated handler did.  Presentational components ignore `popup`.
+  const body = h(opts.component, { ...opts.props, onClose: close, popup: handle });
   const wrapped = h('div', { class: 'Popup' }, body as ComponentChildren);
   render(wrapped, opts.container);
 
