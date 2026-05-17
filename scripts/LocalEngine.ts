@@ -19,7 +19,14 @@ import { now as clockNow } from './clock.js';
 import type { UpgradeValuesShape } from './game/ProfileSet.js';
 import { materialize } from './materializer.js';
 import { applyDelta } from './state.js';
-import type { Delta, GameNode, GameValues, LocalState, MissionGoal } from './state.js';
+import type {
+  ChargingEntry,
+  Delta,
+  GameNode,
+  GameValues,
+  LocalState,
+  MissionGoal,
+} from './state.js';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -513,7 +520,7 @@ export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameRe
   for (var i = 0; i < stillCharging.length; i++) {
     var c = stillCharging[i];
     if (c && typeof c.charge_end === 'number') {
-      _scheduleChargeReady(c.charge_end, c.path);
+      _scheduleChargeReady(c);
     }
   }
 
@@ -2256,9 +2263,9 @@ export function chargePerp(
     })
   );
 
-  // Live-tick: schedule one-shot materialize at exactly charge_end so the
-  // node_ready event fires without depending on the player reloading.
-  _scheduleChargeReady(chargeEntry.charge_end, chargeEntry.path);
+  // Live-tick: emit node_ready at exactly charge_end so the perp flips to
+  // collectable without depending on the player reloading.
+  _scheduleChargeReady(chargeEntry);
 
   // Achievements
   var _cpDisplayName = state.display_name || state.addr;
@@ -2310,29 +2317,38 @@ function _clearAllChargeReady(): void {
   _chargeReadyTimers = {};
 }
 
-// One-shot per charge: at charge_end, run materialize() to transition the
-// charging entry into nodes_collect and emit node_ready.
-function _scheduleChargeReady(chargeEnd: number, path: string): void {
+// One-shot per charge: at charge_end, emit node_ready so the UI flips to
+// collectable without a reload.
+//
+// The node_ready payload is built from the charge `entry` the caller already
+// holds — NOT re-derived from global state. Under canonical-async webxdc the
+// chargePerp echo may not have been applied when this fires (messenger lag,
+// app backgrounded, ~0 ms charge_time); reading nodes_charging back here would
+// see it absent and strand the perp "charging" until a reload replayed the
+// log. Tying the emit to the originating intent removes that whole class of
+// stuck-action. materialize()+setState still advances time-based state
+// (AP regen, and the charge→collect promotion once the echo lands) — a near
+// no-op while the echo is in flight; collectPerp re-materializes on collect
+// regardless. One timer per path (cleared+rearmed via _chargeReadyTimers)
+// guarantees a single emit per charge cycle, so no stale-state dedup probe
+// is needed.
+function _scheduleChargeReady(entry: ChargingEntry): void {
   if (typeof setTimeout !== 'function') return;
+  var path = entry.path;
   _clearChargeReady(path);
-  var msUntil = Math.max(0, chargeEnd - clockNow());
+  var msUntil = Math.max(0, entry.charge_end - clockNow());
   var handle = setTimeout(function () {
     if (path) delete _chargeReadyTimers[path];
     var s = getState();
     if (!s) return;
-    if (path) {
-      var stillCharging = (s.nodes_charging || []).some(function (c: { path: string }) {
-        return c.path === path;
-      });
-      if (!stillCharging) return;
-    }
     var mat = materialize(s, clockNow());
     setState(mat.state);
-    var events = mat.events || [];
-    for (var i = 0; i < events.length; i++) {
-      var e = events[i];
-      if (e) _emit(e.ev, e.pl);
-    }
+    _emit('node_ready', {
+      id: entry.game_id,
+      type: entry.game_type,
+      path: entry.path,
+      result: entry.result,
+    });
   }, msUntil);
   if (path) _chargeReadyTimers[path] = handle;
 }
