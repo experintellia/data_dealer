@@ -1138,6 +1138,18 @@ export class GameRoot extends GameNode {
     this.renderStatusbar?.FXUpdateAP?.(silent);
   }
 
+  /** Snap the displayed AP back down to an authoritative engine
+   *  snapshot.  Spend handlers call this on an insufficient-AP
+   *  rejection: the free-running APTicker estimate (`ap_value += inc`)
+   *  can drift above the engine's materialized `ap_snapshot`, and the
+   *  rejection path never went through `updateGameValues`, so without
+   *  this the bar stays showing phantom energy the engine has already
+   *  refused and every retry fails identically. */
+  reconcileAP(result: unknown): void {
+    const snap = (result as { ap_snapshot?: unknown } | null | undefined)?.ap_snapshot;
+    if (typeof snap === 'number') this.setAP(snap);
+  }
+
   setCash(num?: number, silent?: boolean): void {
     if (num !== undefined) this.cash_value = num;
     const sb = this.data.status_bar;

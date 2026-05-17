@@ -533,6 +533,7 @@ export class ProjectPerp extends GamePerp {
             if (popup?.open) popup.trigger('no_cash');
             else rn?.FXNoCash?.();
           } else if (r.error === 1) {
+            groot.reconcileAP(r);
             gnode.NoAP?.();
           }
           return;
@@ -600,6 +601,7 @@ export class ProjectPerp extends GamePerp {
           groot.getDatabase()?.cue(inner.profile_set, inner.origin, inner.collect_id);
           gperp.setState('idle', true);
         } else if (data.result?.error) {
+          groot.reconcileAP(data.result);
           if (popup) popup.trigger('no_AP');
           else deco.FXNoAP();
           deco.FXStop();

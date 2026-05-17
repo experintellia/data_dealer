@@ -71,6 +71,7 @@ export interface GameRootForPerp {
     missions?: unknown,
     quiet?: boolean
   ): void;
+  reconcileAP(result: unknown): void;
   getType(
     gestalt?: string
   ):
