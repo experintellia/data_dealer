@@ -149,7 +149,6 @@ const Application = function (): ApplicationApi {
   // start() don't need per-call casts on the chained .then() / .fail().
   const INTERNAL_API: Record<string, true> = {
     setEmitter: true,
-    setSendDelta: true,
     setSendAchievement: true,
     setPrngSeed: true,
   };

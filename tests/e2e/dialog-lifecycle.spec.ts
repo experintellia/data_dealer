@@ -45,6 +45,7 @@
  */
 
 import { type Page, expect, test } from '@playwright/test';
+import { installSettle } from './_helpers';
 
 // ── Shared helpers ────────────────────────────────────────────────────────
 
@@ -89,7 +90,19 @@ async function bootGame(page: Page): Promise<void> {
     }
   });
 
-  for (let attempt = 0; attempt < 12; attempt++) {
+  // RenderPopup.close() schedules DOM removal + the next queued open through a
+  // 250–500ms setTimeout that captured the popup ref, so a single momentarily
+  // empty poll is not proof the system is quiescent: a re-mount timer can still
+  // be in flight and fire *after* bootGame returns, landing a stray popup in
+  // the middle of the test (under 2-worker CPU contention this is when the
+  // dialog-lifecycle flakes — a different test each run depending on when the
+  // timer lands). Keep actively draining, but only return once "empty" has
+  // held across consecutive polls spanning longer than that timer window, so
+  // any pending re-mount has had time to fire and be drained first.
+  const STABLE_POLLS_REQUIRED = 3; // 3 × 300ms ≈ 900ms > the 500ms timer ceiling
+  const MAX_ATTEMPTS = 40; // ~12s ceiling for slow/contended CI
+  let consecutiveSettled = 0;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const settled = await page.evaluate(() => {
       const groot = (window as any).__dd?._app?.game;
       if (!groot) return false;
@@ -124,14 +137,14 @@ async function bootGame(page: Page): Promise<void> {
         document.querySelectorAll('.PopupContainer.lockOn').length === 0
       );
     });
-    if (settled) return;
-    // RenderPopup.close() schedules its DOM removal + callback via 250–500ms
-    // setTimeout.  Wait above that floor before re-checking so the queue's
-    // openNotification chain has time to finish or to dispatch the next
-    // item we then drain on the next iteration.
+    consecutiveSettled = settled ? consecutiveSettled + 1 : 0;
+    if (consecutiveSettled >= STABLE_POLLS_REQUIRED) return;
+    // Wait above the 250–500ms close/re-mount timer floor before re-checking
+    // so an in-flight openNotification chain either finishes or dispatches the
+    // next item we then drain on the following iteration.
     await page.waitForTimeout(300);
   }
-  throw new Error('bootGame: could not drain notification queue after 12 attempts');
+  throw new Error('bootGame: notification queue did not stay drained after 40 attempts');
 }
 
 /** Open a popup-status dialog by firing the same `click_status.<id>` event
@@ -659,12 +672,18 @@ test.describe('Section H — profileset import & sub-popups', () => {
     // click path, but driving the engine directly bypasses that wiring).
     // Then the Database.openProfileSetPopup helper opens the popup_profileset
     // template with the right ProfileSet templateData.
+    await installSettle(page);
     await bootGame(page);
     await page.evaluate(async () => {
       const eng = await new Promise<any>((res, rej) =>
         (window as any).require(['LocalEngine'], res, rej)
       );
       await eng.buyPerp('Imperium', 'contact035');
+      // Only SENDS; wait for the listener to apply before reload replays
+      // webxdc history (otherwise contact035 is missing post-reload).
+      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
+        (s) => !!(s.nodes ?? []).some((n: any) => n.full_path === 'Imperium.contact035')
+      );
     });
     await page.reload();
     await bootGame(page);
@@ -674,6 +693,11 @@ test.describe('Section H — profileset import & sub-popups', () => {
         (window as any).require(['LocalEngine'], res, rej)
       );
       await eng.chargePerp('Imperium.contact035');
+      // chargePerp only SENDS; collectPerp reads current state, so wait for
+      // the listener to apply the charge first.
+      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
+        (s) => !!(s.nodes_charging ?? []).some((c: any) => c.path === 'Imperium.contact035')
+      );
       // contact035.charge_time is 30s in the ruleset — advance the
       // injectable clock past it so collectPerp doesn't return error 0.
       (window as any).__dd.advanceNow(31_000);
@@ -1189,12 +1213,16 @@ test.describe('Section J — in-popup action handlers', () => {
     // MainButton click handler (the popup wires it via popup.on(
     // 'button_click.MainButton') → gnode.mergeCued in
     // scripts/game/Database.ts:675).
+    await installSettle(page);
     await bootGame(page);
     await page.evaluate(async () => {
       const eng = await new Promise<any>((res, rej) =>
         (window as any).require(['LocalEngine'], res, rej)
       );
       await eng.buyPerp('Imperium', 'contact035');
+      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
+        (s) => !!(s.nodes ?? []).some((n: any) => n.full_path === 'Imperium.contact035')
+      );
     });
     await page.reload();
     await bootGame(page);
@@ -1204,6 +1232,9 @@ test.describe('Section J — in-popup action handlers', () => {
         (window as any).require(['LocalEngine'], res, rej)
       );
       await eng.chargePerp('Imperium.contact035');
+      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
+        (s) => !!(s.nodes_charging ?? []).some((c: any) => c.path === 'Imperium.contact035')
+      );
       (window as any).__dd.advanceNow(31_000);
       const cr = await eng.collectPerp('Imperium.contact035');
       const inner = cr?.result?.result;

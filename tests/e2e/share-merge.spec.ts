@@ -18,8 +18,10 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { installSettle } from './_helpers';
 
 test.beforeEach(async ({ page }) => {
+  await installSettle(page);
   await page.goto('/?devtools=1');
   await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
     timeout: 50_000,
@@ -66,8 +68,14 @@ test('integrate dilutes untouched token shares + crosssum stays under 100', asyn
     state.integrated_ids = {};
     boot.setState(state);
 
+    const settle = (window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>;
+    // Each integrate only SENDS; the listener applies it asynchronously and is
+    // the sole mutator. The second merge must run on the post-first state, and
+    // the final read must see both applied.
     await eng.integrateCollected('cq_test_a');
+    await settle((s) => !!(s.integrated_ids && s.integrated_ids.cq_test_a));
     await eng.integrateCollected('cq_test_b');
+    await settle((s) => !!(s.integrated_ids && s.integrated_ids.cq_test_b));
 
     const finalNodes = boot.getState().nodes.filter((n: any) => n.game_type === 'TokenPerp');
     const byGestalt: Record<string, number> = {};
@@ -132,7 +140,9 @@ test('integrating the same profileset twice does not change shares (N = 0 dup re
     state.integrated_ids = {};
     boot.setState(state);
 
+    const settle = (window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>;
     await eng.integrateCollected('cq_dup_test');
+    await settle((s) => !!(s.integrated_ids && s.integrated_ids.cq_dup_test));
     const afterFirst = boot.getState();
     const shareAfterFirst =
       afterFirst.nodes.find((n: any) => n.gestalt === 'token008')?.instance_data?.amount ?? null;

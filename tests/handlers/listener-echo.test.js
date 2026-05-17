@@ -1,22 +1,25 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 /**
- * Listener-echo idempotence tests (issue #119 bug class).
+ * Reducer idempotence tests (issue #119 bug class).
  *
- * In production webxdc, the realtime channel echoes a sender's own update
- * back into the listener registered by boot.js. The listener applies the
- * delta through the reducer in scripts/state.js. Handlers that have already
- * called setState(newState) directly will then see the SAME mutation applied
- * a second time on top of the post-handler state.
+ * Canonical webxdc (post #120 follow-up): handlers NEVER call setState — the
+ * sole mutation site is the setUpdateListener callback in boot.js, which
+ * applies each delta through the reducer in scripts/state.js exactly once.
+ * The old "handler setState + echo double-apply" path no longer exists by
+ * construction. These tests remain the regression guard for the snapshot
+ * convention that keeps that single application correct: applying a delta to
+ * its own post-state must be a no-op, so cold-start replay (and any redelivery
+ * across sessions) reconstructs identical state regardless of starting point.
  *
  * Reducers using INCREMENTAL math (e.g. cash_value: gv.cash_value - cashDelta)
- * double-deduct on self-echo. Reducers that apply a full snapshot via
- * Object.assign({}, state.game_values, r.game_values) are idempotent — the
+ * drift if applied more than once. Reducers that apply a full snapshot via
+ * Object.assign({}, state.game_values, r.game_values) are idempotent — a
  * second application overwrites identical values with the same numbers.
  *
- * Status of each reducer in scripts/state.js (as of this commit):
+ * Status of each reducer in scripts/state.js:
  *
- *   chargePerp         — INCREMENTAL math on cash_value/cash_spent/xp/ap.
- *                         BUGGY: double-deducts on echo. (PR #119 reproduces this.)
+ *   chargePerp         — Snapshot-style: emits post-mutation game_values in
+ *                         result; Object.assign is idempotent. Regression guard.
  *
  *   buyKarma           — Snapshot-style: Object.assign(gv, r.game_values).
  *                         Echo-safe IFF the delta carries the full post-handler
@@ -54,9 +57,16 @@ import {
   integrateCollected,
   sellPowerup,
   setEmitter,
-  setSendDelta,
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
+import { installWebxdc, setSendDelta, uninstallWebxdc } from './_webxdc-harness.js';
+
+beforeEach(async () => {
+  await installWebxdc();
+});
+afterEach(() => {
+  uninstallWebxdc();
+});
 import { clearOverride, setOverride } from '../../scripts/clock.js';
 import { materialize } from '../../scripts/materializer.js';
 import { applyDelta, freshState } from '../../scripts/state.js';

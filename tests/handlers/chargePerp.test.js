@@ -1,11 +1,19 @@
 // @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { chargePerp, loadGame, setEmitter, setSendDelta } from '../../scripts/LocalEngine.js';
+import { chargePerp, loadGame, setEmitter } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { clearOverride, setOverride } from '../../scripts/clock.js';
 import { materialize } from '../../scripts/materializer.js';
 import { applyDelta, freshState } from '../../scripts/state.js';
 import { FIXED_NOW, mkState as _mkBaseState, mkNode as _mkNode } from './_fixtures.js';
+import { installWebxdc, setSendDelta, uninstallWebxdc } from './_webxdc-harness.js';
+
+beforeEach(async () => {
+  await installWebxdc();
+});
+afterEach(() => {
+  uninstallWebxdc();
+});
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 

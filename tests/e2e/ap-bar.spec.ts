@@ -16,11 +16,13 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { installSettle } from './_helpers';
 
 const GESTALT = 'contact035';
 const PATH = `Imperium.${GESTALT}`;
 
 test('energy bar: charge action decrements visual AP value and bar width', async ({ page }) => {
+  await installSettle(page);
   await page.goto('/?devtools=1');
   await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
     timeout: 50_000,
@@ -56,6 +58,13 @@ test('energy bar: charge action decrements visual AP value and bar width', async
         (window as any).require(['LocalEngine'], res, rej)
       );
       await eng.buyPerp('Imperium', args.gestalt);
+      // buyPerp only SENDS; wait for the listener to apply it so chargePerp
+      // (which reads current state to find the node) sees the bought perp.
+      await (
+        window as unknown as {
+          __ddSettle: (p: (s: { nodes?: { full_path: string }[] }) => boolean) => Promise<unknown>;
+        }
+      ).__ddSettle((s) => !!s.nodes?.some((n) => n.full_path === args.path));
       return eng.chargePerp(args.path);
     },
     { gestalt: GESTALT, path: PATH }

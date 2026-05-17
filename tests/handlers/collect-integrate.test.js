@@ -16,9 +16,16 @@ import {
   loadGame,
   setEmitter,
   setPrngSeed,
-  setSendDelta,
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
+import { installWebxdc, setSendDelta, uninstallWebxdc } from './_webxdc-harness.js';
+
+beforeEach(async () => {
+  await installWebxdc();
+});
+afterEach(() => {
+  uninstallWebxdc();
+});
 import { advance, clearOverride, setOverride } from '../../scripts/clock.js';
 import { materialize } from '../../scripts/materializer.js';
 import { applyDelta } from '../../scripts/state.js';

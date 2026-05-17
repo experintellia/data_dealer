@@ -24,6 +24,14 @@ import { clearOverride, setOverride } from '../../scripts/clock.js';
 import { materialize } from '../../scripts/materializer.js';
 import { applyDelta, freshState } from '../../scripts/state.js';
 import { FIXED_NOW, mkState } from './_fixtures.js';
+import { installWebxdc, uninstallWebxdc } from './_webxdc-harness.js';
+
+beforeEach(async () => {
+  await installWebxdc();
+});
+afterEach(() => {
+  uninstallWebxdc();
+});
 
 // ── getRanking ───────────────────────────────────────────────────────────────
 

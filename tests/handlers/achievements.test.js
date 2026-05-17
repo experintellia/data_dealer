@@ -18,9 +18,16 @@ import {
   integrateCollected,
   setEmitter,
   setSendAchievement,
-  setSendDelta,
 } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
+import { installWebxdc, setSendDelta, uninstallWebxdc } from './_webxdc-harness.js';
+
+beforeEach(async () => {
+  await installWebxdc();
+});
+afterEach(() => {
+  uninstallWebxdc();
+});
 import { clearOverride, setOverride } from '../../scripts/clock.js';
 import { applyDelta, freshState } from '../../scripts/state.js';
 import { FIXED_NOW, mkGv, mkState } from './_fixtures.js';
