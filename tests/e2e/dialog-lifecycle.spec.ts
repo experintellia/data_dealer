@@ -491,6 +491,24 @@ async function buyAndOpenPerp(page: Page, fixture: PerpFixture): Promise<void> {
   }, fixture.gestalt);
 }
 
+/** Top up AP in both the engine state (`ap_snapshot`, what chargePerp /
+ *  collectPerp gate on) and the live `groot.ap_value` (the perp's UI
+ *  pre-check).  Client Charge/Collect cost 1 AP each; the default boot
+ *  state has none, so AP-gated flows no-op without this. */
+async function giveAP(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const w = window as any;
+    const boot = await new Promise<any>((res, rej) => w.require(['boot'], res, rej));
+    const st = boot.getState();
+    boot.setState({
+      ...st,
+      game_values: { ...st.game_values, ap_snapshot: 50, ap_value: 50 },
+    });
+    const game = w.__dd?._app?.game;
+    if (game) game.ap_value = 50;
+  });
+}
+
 test.describe('Section D — perp popups', () => {
   for (const fixture of PERP_FIXTURES) {
     test(`${fixture.name} popup opens for a bought ${fixture.gestalt} and closes`, async ({
@@ -1449,6 +1467,81 @@ test.describe('Section K — pagination arrows', () => {
       (window as any).__dd?._app?.game.renderPopup?.trigger('popup_close');
     });
   });
+
+  // The Client popup is a different shape again: TWO independently
+  // paged grids (provided 7/page + consumed 6/page) split by a
+  // ClientDivider (min(provided,7) dots).  Pin the dual-grid layout +
+  // independent pagination since nothing else exercises it.
+  test('Client popup renders dual provided/consumed grids + divider', async ({ page }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ClientPerp',
+      gestalt: 'client016',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupBody',
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupBody')).toBeVisible({ timeout: 3_000 });
+
+    // Inject 8 provided + 7 consumed tokens and re-open: provided
+    // paginates at 7 (2 pages), consumed at 6 (2 pages), divider = 7.
+    await page.evaluate(() => {
+      const gnode = (window as any).__dd?._app?.game.getById('client016');
+      gnode.data.ProfileSet = {
+        tokens_set: Array.from({ length: 8 }, (_, i) => ({ gestalt: `pv${i}`, data: {} })),
+      };
+      gnode.data.ConsumedProfileSet = {
+        tokens_set: Array.from({ length: 7 }, (_, i) => ({ gestalt: `cs${i}`, data: {} })),
+      };
+      gnode.openPopup();
+    });
+
+    const read = () =>
+      page.evaluate(() => {
+        const root = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
+        const prov = root?.querySelector<HTMLElement>('.PopupTokens.provided');
+        const cons = root?.querySelector<HTMLElement>('.PopupTokens.consumed');
+        const provArrowR = prov
+          ?.closest('.Pagination')
+          ?.querySelector<HTMLElement>('.PopupPageArrowR');
+        return {
+          providedClass: prov?.parentElement?.className ?? null,
+          consumedClass: cons?.parentElement?.className ?? null,
+          providedPage0: prov?.querySelectorAll('.PopupPage .PopupToken').length ?? 0,
+          consumedPage0: cons?.querySelectorAll('.PopupPage .PopupToken').length ?? 0,
+          dividerItems: root?.querySelectorAll('.ClientDivider .ClientDividerItem').length ?? 0,
+          provArrowRHidden: provArrowR ? provArrowR.classList.contains('hidden') : null,
+        };
+      });
+
+    expect(await read()).toEqual({
+      providedClass: 'Pagination half small',
+      consumedClass: 'Pagination half',
+      providedPage0: 7,
+      consumedPage0: 6,
+      dividerItems: 7,
+      provArrowRHidden: false,
+    });
+
+    // Advancing the provided grid must not move the consumed grid.
+    await page
+      .locator('.PopupContainer.lockOn .PopupTokens.provided')
+      .locator('xpath=ancestor::*[contains(@class,"Pagination")]')
+      .locator('.PopupPageArrowR')
+      .first()
+      .click({ force: true });
+    expect(await read()).toEqual({
+      providedClass: 'Pagination half small',
+      consumedClass: 'Pagination half',
+      providedPage0: 1,
+      consumedPage0: 6,
+      dividerItems: 7,
+      provArrowRHidden: true,
+    });
+
+    await page.evaluate(() => {
+      (window as any).__dd?._app?.game.renderPopup?.trigger('popup_close');
+    });
+  });
 });
 
 // ── Section L: ChargeButton / CollectButton on contact/client ─────────────
@@ -1582,6 +1675,107 @@ test.describe('Section L — Contact/Client Charge & Collect button handlers', (
         { timeout: 5_000 }
       )
       .toBeGreaterThan(dbQueueLenBefore);
+  });
+
+  // client016 is the Section-D open/close fixture and has no
+  // charge_time / income in the ruleset (not chargeable).  client007
+  // is the cheapest chargeable client (charge_time 60s, price 30).
+  test('ChargeButton on a Client popup starts the charge cycle', async ({ page }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ClientPerp',
+      gestalt: 'client007',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupBody',
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupBody')).toBeVisible({ timeout: 3_000 });
+
+    await giveAP(page);
+
+    // Client.Charge() gates on ap_value (not cash like Contact); on
+    // success it triggers popup_close + markTimer → chargeRunning.
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.getById('client007').renderPopup.trigger('button_click.ChargeButton');
+    });
+
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const groot = (window as any).__dd?._app?.game;
+            return !!groot.getById('client007')?.states?.chargeRunning;
+          }),
+        { timeout: 3_000 }
+      )
+      .toBe(true);
+  });
+
+  test('CollectButton on a Client popup pays out cash after charge ready', async ({ page }) => {
+    // Same recipe as the Contact CollectButton test, but Client pays
+    // out cash (FXKatsching) via updateGameValues rather than queuing a
+    // profileset — assert cash_value grows.
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ClientPerp',
+      gestalt: 'client007',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupBody',
+    });
+
+    await giveAP(page);
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.getById('client007').renderPopup.trigger('button_click.ChargeButton');
+    });
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const groot = (window as any).__dd?._app?.game;
+            return !!groot.getById('client007')?.states?.chargeRunning;
+          }),
+        { timeout: 3_000 }
+      )
+      .toBe(true);
+
+    // client007 charge_time is 60s.
+    await page.evaluate(() => {
+      const w = window as any;
+      w.__dd.advanceNow(61_000);
+      const $ = w.jQuery || w.$;
+      $(document).trigger('node_ready', [
+        {
+          id: 'client007',
+          type: 'ClientPerp',
+          path: 'Imperium.client007',
+          result: { amount: 100 },
+        },
+      ]);
+    });
+    await expect(page.locator('[data-testid="dd-collect-ready"]')).toBeVisible({ timeout: 2_000 });
+
+    const cashBefore = await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      return groot.cash_value;
+    });
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      const gnode = groot.getById('client007');
+      gnode.openPopup();
+      gnode.renderPopup.trigger('button_click.CollectButton');
+    });
+
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const groot = (window as any).__dd?._app?.game;
+            return groot.cash_value;
+          }),
+        { timeout: 5_000 }
+      )
+      .toBeGreaterThan(cashBefore);
   });
 });
 
