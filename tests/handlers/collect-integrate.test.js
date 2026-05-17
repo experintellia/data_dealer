@@ -457,10 +457,7 @@ describe('collectPerp — AP cost', () => {
     expect(data.result.error).toBe(4);
   });
 
-  // Regression: the AP-rejection must carry the authoritative materialized
-  // ap_snapshot so the client can resync its free-running APTicker estimate
-  // down to the truth, instead of leaving the bar showing phantom energy
-  // the engine has already refused.
+  // Regression: rejection must carry ap_snapshot so the client can resync.
   it('returns the authoritative ap_snapshot on AP failure', async () => {
     const PATH = 'Imperium.City.Pusher0.client001';
     setState(
@@ -946,10 +943,7 @@ describe('integrateCollected — ap cost', () => {
     expect(data.result.error).toBe(1);
   });
 
-  // Regression: the AP-rejection must carry the authoritative materialized
-  // ap_snapshot so the client can resync its free-running APTicker estimate
-  // down to the truth, instead of leaving the bar showing phantom energy
-  // the engine has already refused.
+  // Regression: rejection must carry ap_snapshot so the client can resync.
   it('returns the authoritative ap_snapshot on AP failure', async () => {
     setState(
       mkState({
