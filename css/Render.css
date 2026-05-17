@@ -3383,7 +3383,12 @@ button {
    whose blue `.PopupSelector` doesn't fill the body the way the
    Contact/Client token grid does, so the fade-out reads as full white.
    Drop the gradient entirely for Preact dialogs (and keep the no-delay
-   close fade) so closing a subpop reveals the popup content directly. */
+   close fade) so closing a subpop reveals the popup content directly.
+   KNOWN FOLLOW-UP: the still-legacy popups (ProjectPerp office / buy-
+   slots / upgrade-selection — tier 7; Agent — tier 6) keep the white
+   flash until they're ported to Preact, at which point this rule
+   covers them automatically (intentionally not unscoped to legacy to
+   avoid a broad legacy-CSS blast radius). */
 .PopupContainer.PopupPreact .SubpopContainer {
   background: transparent;
   transition: opacity 0.2s linear, visibility 0.2s;
