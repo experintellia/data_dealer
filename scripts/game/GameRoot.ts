@@ -2076,7 +2076,6 @@ export class GameRoot extends GameNode {
     this.on('user_data', (e: unknown) => {
       _stopPropFile(e);
       this.openPreactDialog(AboutPopup, {
-        userdebug: (setup as { userdebug?: boolean }).userdebug === true,
         locale: setup.locale ?? '',
         buttonLabel: i18n.gettext('Close'),
       });
