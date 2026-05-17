@@ -3333,6 +3333,34 @@ button {
     transform: translate(-50%, calc(-50% - 48px)) scale(1.6) rotate(360deg);
   }
 }
+/* Legacy FXNoAP / FXError: no rotation — scale up from 0, rise ~32px
+   while fading in, hold, then rise another ~32px scaling to 1.5 as it
+   fades out. */
+.FXBling.FXBlingNoAP {
+  animation: dd-fx-bling-noap 1500ms ease forwards;
+}
+@keyframes dd-fx-bling-noap {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  7% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, calc(-50% - 32px)) scale(1);
+  }
+  87% {
+    opacity: 1;
+    transform: translate(-50%, calc(-50% - 32px)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 64px)) scale(1.5);
+  }
+}
 
 /* Phase 2 (#80) — Preact-dialog subpop close: the legacy `.Subpop`
    only transitions `transform: scale()`, so its opaque #FFF box is

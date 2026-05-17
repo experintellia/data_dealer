@@ -50,7 +50,10 @@ function applyFxFeedback(
     }
   }
   const bling = document.createElement('div');
-  bling.className = 'FXBling';
+  // Legacy FXNoCash spins/drops in; FXNoAP (and FXError, which is
+  // FXNoAP('bug')) scales up with no rotation and drifts upward — two
+  // distinct cues, so no_AP/error get a separate keyframe.
+  bling.className = event === 'no_cash' ? 'FXBling' : 'FXBling FXBlingNoAP';
   bling.style.backgroundImage = `url(${setup.imagePathPrefix}MainSprites.png)`;
   bling.style.backgroundPosition = FX_BLING_POS[event] ?? FX_BLING_BUG;
   // Legacy spawned the cue at the click/tap point; the CSS 50%/50%
