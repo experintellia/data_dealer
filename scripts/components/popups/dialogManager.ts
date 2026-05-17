@@ -12,7 +12,7 @@ import setup from '../../setup.js';
 // MainSprites.png window (x y, 65x65) for the legacy FX bling icons.
 const FX_BLING_BUG = '-362px -860px'; // legacy FXError → FXNoAP('bug')
 // Container-local px the FX bling is lifted above the click point.
-const FX_BLING_Y_OFFSET = 40;
+const FX_BLING_Y_OFFSET = 20;
 const FX_BLING_POS: Record<string, string> = {
   no_cash: '-401px -737px',
   no_AP: '-336px -737px',
