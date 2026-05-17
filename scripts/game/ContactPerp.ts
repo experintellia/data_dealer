@@ -72,7 +72,7 @@ export class ContactPerp extends GamePerp {
       this.states
     );
     const handle = this.openPreactPopup(ContactPopup, { vm });
-    return handle as unknown as RenderPopupLike;
+    return handle as RenderPopupLike;
   }
 
   override extendEventHandlers(): void {

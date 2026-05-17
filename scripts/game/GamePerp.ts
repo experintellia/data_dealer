@@ -380,7 +380,7 @@ export class GamePerp extends GameNode {
         if ((this.renderPopup as unknown) === handle) delete this.renderPopup;
       },
     });
-    this.renderPopup = handle as unknown as RenderPopupLike;
+    this.renderPopup = handle as RenderPopupLike;
     this.initPopupEvents?.();
     // no_cash/no_AP/error feedback (button state + the floating bling)
     // is handled in the dialog manager's emitter — the legacy

@@ -13,7 +13,7 @@ import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import type { ContactPopupVM, TokenVM } from '../../game/contactView.js';
 import i18n from '../../i18n.js';
-import type { PreactDialogHandle } from './dialogManager.js';
+import type { FXClassTarget, PreactDialogHandle } from './dialogManager.js';
 
 export interface ContactPopupProps {
   vm: ContactPopupVM;
@@ -27,10 +27,7 @@ export interface ContactPopupProps {
  *  `no_cash` / `no_AP` / `error` FX (driven by `gnode.Charge()`)
  *  targets the button the player just clicked, mirroring the legacy
  *  jQuery handler's `node.lastButton = $(this)`. */
-function asLastButton(el: HTMLElement): {
-  addClass(s: string): void;
-  removeClass(s: string): void;
-} {
+function asLastButton(el: HTMLElement): FXClassTarget {
   return {
     addClass: (s) => {
       for (const c of s.split(' ')) if (c) el.classList.add(c);
