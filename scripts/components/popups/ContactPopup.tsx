@@ -116,6 +116,7 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
     e.stopPropagation();
     if (e.currentTarget.classList.contains('disabled')) return;
     popup.lastButton = asLastButton(e.currentTarget);
+    popup.lastButtonPoint = { x: e.clientX, y: e.clientY };
     popup.trigger(`button_click.${buttonId}`);
   };
 

@@ -22,30 +22,47 @@ const FX_BLING_POS: Record<string, string> = {
  *  fallback), and spawn the floating bling icon — DOM-ported because a
  *  Preact dialog has no render node and the board layer is occluded by
  *  the popup overlay. */
+const FX_RESET_CLASSES = 'active disabled no_cash no_AP ERROR';
+
 function applyFxFeedback(
   event: string,
   container: HTMLElement,
-  lastButton: FXClassTarget | undefined
+  lastButton: FXClassTarget | undefined,
+  point: { x: number; y: number } | undefined
 ): void {
   const cls = event === 'error' ? 'ERROR' : event;
   for (const b of container.querySelectorAll('.Button')) {
     b.classList.remove('active', 'disabled', 'no_cash', 'no_AP', 'ERROR');
   }
+  let resetMarked: () => void = () => {};
   if (lastButton) {
     lastButton.removeClass('active');
     lastButton.addClass(`disabled ${cls}`);
+    resetMarked = () => lastButton.removeClass(FX_RESET_CLASSES);
   } else {
     const main = container.querySelector('.Button[data-button-id="MainButton"]');
     if (main) {
       main.classList.remove('active');
       main.classList.add('disabled', ...cls.split(' '));
+      resetMarked = () => main.classList.remove(...FX_RESET_CLASSES.split(' '));
     }
   }
   const bling = document.createElement('div');
   bling.className = 'FXBling';
   bling.style.backgroundImage = `url(${setup.imagePathPrefix}MainSprites.png)`;
   bling.style.backgroundPosition = FX_BLING_POS[event] ?? FX_BLING_BUG;
-  bling.addEventListener('animationend', () => bling.remove());
+  // Legacy spawned the cue at the click/tap point; the popup container
+  // is a full-screen flex box, so the CSS 50%/50% lands far from the
+  // button.  Pin to the pointer (viewport-fixed) when we have it.
+  if (point) {
+    bling.style.position = 'fixed';
+    bling.style.left = `${point.x}px`;
+    bling.style.top = `${point.y}px`;
+  }
+  bling.addEventListener('animationend', () => {
+    bling.remove();
+    resetMarked();
+  });
   container.appendChild(bling);
 }
 
@@ -89,6 +106,9 @@ export interface PreactDialogHandle {
    *  contract; tier 5+ buy-button code) — read by `no_cash` /
    *  `no_AP` / `error` triggers. */
   lastButton?: FXClassTarget;
+  /** Viewport coords of the last action click — the FX bling is pinned
+   *  here (legacy spawned the cue at the click/tap point). */
+  lastButtonPoint?: { x: number; y: number };
 }
 
 export interface OpenDialogOptions<P> {
@@ -196,7 +216,7 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
         return;
       }
       if (FX_EVENTS.has(event)) {
-        applyFxFeedback(event, opts.container, handle.lastButton);
+        applyFxFeedback(event, opts.container, handle.lastButton, handle.lastButtonPoint);
       }
       const set = listeners.get(event);
       if (set) for (const fn of set) fn(evStub, ...(args ?? []));
