@@ -51,13 +51,17 @@ function applyFxFeedback(
   bling.className = 'FXBling';
   bling.style.backgroundImage = `url(${setup.imagePathPrefix}MainSprites.png)`;
   bling.style.backgroundPosition = FX_BLING_POS[event] ?? FX_BLING_BUG;
-  // Legacy spawned the cue at the click/tap point; the popup container
-  // is a full-screen flex box, so the CSS 50%/50% lands far from the
-  // button.  Pin to the pointer (viewport-fixed) when we have it.
+  // Legacy spawned the cue at the click/tap point; the CSS 50%/50%
+  // lands far from the button.  Convert the click's screen coords into
+  // the container's local space — the game scales the viewport, so a
+  // plain client-coord offset would be off by the scale factor.
   if (point) {
-    bling.style.position = 'fixed';
-    bling.style.left = `${point.x}px`;
-    bling.style.top = `${point.y}px`;
+    const rect = container.getBoundingClientRect();
+    const scaleX = rect.width / container.clientWidth || 1;
+    const scaleY = rect.height / container.clientHeight || 1;
+    bling.style.position = 'absolute';
+    bling.style.left = `${(point.x - rect.left) / scaleX}px`;
+    bling.style.top = `${(point.y - rect.top) / scaleY}px`;
   }
   bling.addEventListener('animationend', () => {
     bling.remove();
