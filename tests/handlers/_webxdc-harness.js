@@ -19,9 +19,11 @@
  * `setSendDelta` is a capture-only spy (it does NOT mutate state and is NOT in
  * production code) kept so the pre-existing delta-capture/idempotence tests
  * migrate with only an import-path change. It receives the VERBOSE delta
- * payload, identical to what the old LocalEngine `_sendDelta` sink received.
+ * (decodeDelta of the on-the-wire compact payload), identical to what the old
+ * LocalEngine `_sendDelta` sink received.
  */
 import { __resetBootForTest, boot } from '../../scripts/boot.js';
+import { decodeDelta } from '../../scripts/delta-codec.js';
 
 const SELF_ADDR = 'test@local';
 
@@ -40,7 +42,7 @@ function _makeFakeWebxdc() {
       const entry = Object.assign({}, update, { serial, max_serial: serial });
       updates.push(entry);
       _sent.push(update && update.payload);
-      const decoded = update && update.payload;
+      const decoded = decodeDelta(update && update.payload);
       if (_captureCb && decoded && decoded.kind === 'delta') {
         _captureCb(decoded);
       }
@@ -94,7 +96,7 @@ export function setSendDelta(fn) {
 
 /** All delta-kind payloads sent so far, decoded to verbose form (send order). */
 export function sentDeltas() {
-  return _sent.filter((d) => d && d.kind === 'delta');
+  return _sent.map((p) => decodeDelta(p)).filter((d) => d && d.kind === 'delta');
 }
 
 /** Raw on-the-wire payloads sent so far (send order), including achievements. */

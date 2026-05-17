@@ -16,6 +16,7 @@ import i18nDe from '../i18n/de_AT.json' with { type: 'json' };
 import i18nEn from '../i18n/en_US.json' with { type: 'json' };
 import { getState, setState } from './boot.js';
 import { now as clockNow } from './clock.js';
+import { encodeDelta } from './delta-codec.js';
 import type { UpgradeValuesShape } from './game/ProfileSet.js';
 import { materialize } from './materializer.js';
 import { applyDelta } from './state.js';
@@ -372,10 +373,11 @@ function triggerAchievement(
 // setUpdateListener callback (scripts/boot.ts) when the messenger delivers the
 // update back — including our own. Nothing here mutates state or reads it back;
 // the real Delta Chat messenger delivers asynchronously, so any synchronous
-// post-send read would observe stale state.
+// post-send read would observe stale state. The compact wire form keeps the
+// replayed history small; the listener decodes via applyDelta → decodeDelta.
 function _persistDelta(delta: Delta): void {
   if (typeof webxdc !== 'undefined' && webxdc) {
-    webxdc.sendUpdate({ payload: delta }, '');
+    webxdc.sendUpdate({ payload: encodeDelta(delta) }, '');
   }
 }
 

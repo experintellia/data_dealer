@@ -7,6 +7,7 @@
 
 import defaultGameData from '../data/default_game.json';
 import { now as clockNow } from './clock.js';
+import { decodeDelta } from './delta-codec.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -182,7 +183,8 @@ var _defaultSeed: GameSeed = (defaultGameData as GameSeed) || { game_values: {} 
 
 // Every handler op that can appear as delta.op.  Read-only handlers
 // (getToken, ping, etc.) never produce deltas but get stubs for completeness.
-var OP_NAMES = [
+// Exported so the delta-codec drift test can assert every op has a wire code.
+export var OP_NAMES = [
   'loadGame',
   'setPerpCoordinates',
   'integrateCollected',
@@ -771,6 +773,12 @@ function _applyPeerDelta(state: LocalState, delta: Delta): LocalState {
  *   5. Dispatch to reducer[delta.op]; unknown op → return guarded state as-is
  */
 export function applyDelta(state: LocalState, delta: any): LocalState {
+  // Single read choke point: deltas arrive compact over webxdc.sendUpdate
+  // (encodeDelta in LocalEngine), but legacy verbose deltas persisted by older
+  // builds — and hand-built verbose deltas in tests — must still apply.
+  // decodeDelta handles both shapes and is idempotent on verbose input.
+  delta = decodeDelta(delta);
+
   if (!delta || typeof delta !== 'object' || delta.kind !== 'delta') {
     return state;
   }

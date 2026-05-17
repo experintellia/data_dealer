@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buyKarma } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { clearOverride, setOverride } from '../../scripts/clock.js';
+import { decodeDelta } from '../../scripts/delta-codec.js';
 import { applyDelta, freshState } from '../../scripts/state.js';
 import { FIXED_NOW } from './_fixtures.js';
 import {
@@ -58,8 +59,10 @@ describe('_persistDelta — send-only, listener is the sole mutator', () => {
 
     const payloads = sentPayloads();
     expect(payloads).toHaveLength(1);
-    // Raw verbose delta is persisted (no wire codec in this PR).
-    const decoded = payloads[0];
+    // Compact wire form: single-letter tag `k:'d'`, never the verbose `kind`.
+    expect(payloads[0].k).toBe('d');
+    expect(payloads[0].kind).toBeUndefined();
+    const decoded = decodeDelta(payloads[0]);
     expect(decoded.kind).toBe('delta');
     expect(decoded.op).toBe('buyKarma');
   });
