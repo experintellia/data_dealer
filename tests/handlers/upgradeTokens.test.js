@@ -23,6 +23,7 @@ import { getState, setState } from '../../scripts/boot.js';
 import { clearOverride, setOverride } from '../../scripts/clock.js';
 import { applyDelta } from '../../scripts/state.js';
 import { FIXED_NOW, mkState } from './_fixtures.js';
+import { installWebxdc, uninstallWebxdc } from './_webxdc-harness.js';
 
 // project009 = "Preventive checkup" (ruleset_3.en.json:7531)
 const PROJECT_PATH = 'Imperium.CityVienna.project009';
@@ -52,12 +53,14 @@ function projectState(overrides) {
   );
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await installWebxdc();
   setOverride(FIXED_NOW);
 });
 
 afterEach(() => {
   clearOverride();
+  uninstallWebxdc();
 });
 
 describe('buyPowerup — upgrade tokens unlock venture data points', () => {

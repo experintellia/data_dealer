@@ -160,6 +160,22 @@ export function getState(): LocalState {
 }
 
 /**
+ * Test-only: clear the boot singletons so the next boot() re-runs and
+ * re-registers the setUpdateListener against a fresh messenger. boot() is
+ * idempotent in production (one boot per page load) but unit tests boot once
+ * per test against a new fake-webxdc; without this reset the cached
+ * _bootPromise would skip listener registration on the new messenger.
+ */
+export function __resetBootForTest(): void {
+  _bootPromise = null;
+  _currentState = null;
+  _replayProgress.serial = 0;
+  _replayProgress.max_serial = 0;
+  _replayProgress.done = false;
+  _peersChangedSubs.length = 0;
+}
+
+/**
  * Replace the in-memory state.  Called by LocalEngine after materializer
  * runs to persist the advanced state.  Also useful in tests to seed state
  * before exercising handlers.

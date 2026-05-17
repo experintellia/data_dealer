@@ -45,6 +45,7 @@
  */
 
 import { type Page, expect, test } from '@playwright/test';
+import { installSettle } from './_helpers';
 
 // ── Shared helpers ────────────────────────────────────────────────────────
 
@@ -641,12 +642,18 @@ test.describe('Section H — profileset import & sub-popups', () => {
     // click path, but driving the engine directly bypasses that wiring).
     // Then the Database.openProfileSetPopup helper opens the popup_profileset
     // template with the right ProfileSet templateData.
+    await installSettle(page);
     await bootGame(page);
     await page.evaluate(async () => {
       const eng = await new Promise<any>((res, rej) =>
         (window as any).require(['LocalEngine'], res, rej)
       );
       await eng.buyPerp('Imperium', 'contact035');
+      // Only SENDS; wait for the listener to apply before reload replays
+      // webxdc history (otherwise contact035 is missing post-reload).
+      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
+        (s) => !!(s.nodes ?? []).some((n: any) => n.full_path === 'Imperium.contact035')
+      );
     });
     await page.reload();
     await bootGame(page);
@@ -656,6 +663,11 @@ test.describe('Section H — profileset import & sub-popups', () => {
         (window as any).require(['LocalEngine'], res, rej)
       );
       await eng.chargePerp('Imperium.contact035');
+      // chargePerp only SENDS; collectPerp reads current state, so wait for
+      // the listener to apply the charge first.
+      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
+        (s) => !!(s.nodes_charging ?? []).some((c: any) => c.path === 'Imperium.contact035')
+      );
       // contact035.charge_time is 30s in the ruleset — advance the
       // injectable clock past it so collectPerp doesn't return error 0.
       (window as any).__dd.advanceNow(31_000);
@@ -1171,12 +1183,16 @@ test.describe('Section J — in-popup action handlers', () => {
     // MainButton click handler (the popup wires it via popup.on(
     // 'button_click.MainButton') → gnode.mergeCued in
     // scripts/game/Database.ts:675).
+    await installSettle(page);
     await bootGame(page);
     await page.evaluate(async () => {
       const eng = await new Promise<any>((res, rej) =>
         (window as any).require(['LocalEngine'], res, rej)
       );
       await eng.buyPerp('Imperium', 'contact035');
+      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
+        (s) => !!(s.nodes ?? []).some((n: any) => n.full_path === 'Imperium.contact035')
+      );
     });
     await page.reload();
     await bootGame(page);
@@ -1186,6 +1202,9 @@ test.describe('Section J — in-popup action handlers', () => {
         (window as any).require(['LocalEngine'], res, rej)
       );
       await eng.chargePerp('Imperium.contact035');
+      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
+        (s) => !!(s.nodes_charging ?? []).some((c: any) => c.path === 'Imperium.contact035')
+      );
       (window as any).__dd.advanceNow(31_000);
       const cr = await eng.collectPerp('Imperium.contact035');
       const inner = cr?.result?.result;

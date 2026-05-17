@@ -48,6 +48,7 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { installSettle } from './_helpers';
 
 const GESTALT = 'contact035';
 const PATH = `Imperium.${GESTALT}`;
@@ -61,6 +62,7 @@ async function waitForGameReady(page: import('@playwright/test').Page) {
 test('collect-icon: DecoratorReady appears after node_ready emit (no stuck clock)', async ({
   page,
 }) => {
+  await installSettle(page);
   await page.goto('/?devtools=1');
   await waitForGameReady(page);
 
@@ -72,8 +74,15 @@ test('collect-icon: DecoratorReady appears after node_ready emit (no stuck clock
     const eng = await new Promise<any>((res, rej) =>
       (window as any).require(['LocalEngine'], res, rej)
     );
+    const path = `Imperium.${gestalt}`;
+    const settle = (window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>;
     await eng.buyPerp('Imperium', gestalt);
-    await eng.chargePerp(`Imperium.${gestalt}`);
+    // Each handler only SENDS; wait for the listener to apply before the
+    // dependent step. chargePerp needs the bought node; the reload below
+    // replays webxdc history so the charge must be applied/persisted first.
+    await settle((s) => !!(s.nodes ?? []).some((n: any) => n.full_path === path));
+    await eng.chargePerp(path);
+    await settle((s) => !!(s.nodes_charging ?? []).some((c: any) => c.path === path));
   }, GESTALT);
 
   // ── 2. Reload — boot.js replays the delta log, the engine's

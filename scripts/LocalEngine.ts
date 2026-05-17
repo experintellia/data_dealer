@@ -211,7 +211,6 @@ interface AchievementPayload {
 }
 
 type Emitter = (ev: string, pl: unknown) => void;
-type DeltaSender = (delta: Delta) => void;
 type AchievementSender = (msg: { info: string; payload: AchievementPayload }) => void;
 
 interface MissionUpdate {
@@ -315,19 +314,8 @@ function _isProvidable(
 }
 
 // ---------------------------------------------------------------------------
-// Delta persistence — injected by production boot so webxdc.sendUpdate is
-// not imported here.  Tests override with setSendDelta to capture deltas.
+// Delta persistence
 // ---------------------------------------------------------------------------
-let _sendDelta: DeltaSender | null = null;
-
-/**
- * Inject the test-only delta sink. When set, `_persistDelta` short-circuits
- * and does NOT call `webxdc.sendUpdate`, so tests asserting the real
- * listener round-trip must leave the spy unset.
- */
-export function setSendDelta(fn: DeltaSender): void {
-  _sendDelta = fn;
-}
 
 // ---------------------------------------------------------------------------
 // Achievement emit — fires info messages at action sites only.
@@ -380,24 +368,14 @@ function triggerAchievement(
   }
 }
 
-// Single persistence path: capture for tests, then either fire the production
-// webxdc.sendUpdate (listener will echo and apply via applyDelta) or, in
-// Node/no-webxdc environments, emulate the listener echo synchronously.
-// This is the only place outside the listener that calls setState — it IS the
-// listener-equivalent for environments without webxdc.
+// Canonical webxdc: handlers only SEND. State mutation happens solely in the
+// setUpdateListener callback (scripts/boot.ts) when the messenger delivers the
+// update back — including our own. Nothing here mutates state or reads it back;
+// the real Delta Chat messenger delivers asynchronously, so any synchronous
+// post-send read would observe stale state.
 function _persistDelta(delta: Delta): void {
-  // Test sink and webxdc.sendUpdate are mutually exclusive (otherwise the
-  // shim's listener echo double-mutates state). We still advance state
-  // synchronously so handlers see the post-mutation view.
-  if (_sendDelta) {
-    _sendDelta(delta);
-    setState(applyDelta(getState(), delta));
-    return;
-  }
   if (typeof webxdc !== 'undefined' && webxdc) {
     webxdc.sendUpdate({ payload: delta }, '');
-  } else {
-    setState(applyDelta(getState(), delta));
   }
 }
 
@@ -515,13 +493,16 @@ export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameRe
   var startupRepair = _repairStuckMissionGoals(seededState);
   if (startupRepair && startupRepair.missions) {
     var startupGv = _applyRewardsToGv(seededState.game_values || {}, startupRepair.rewards);
-    _persistDelta(
-      _mkDelta(seededState.addr, 'recheckMissions', [], {
-        game_values: startupGv,
-        missions: startupRepair.missions,
-      })
-    );
-    seededState = getState();
+    var recheckDelta = _mkDelta(seededState.addr, 'recheckMissions', [], {
+      game_values: startupGv,
+      missions: startupRepair.missions,
+    });
+    _persistDelta(recheckDelta);
+    // State mutates only in the setUpdateListener (canonical webxdc), which the
+    // async messenger has not invoked yet. Project the same delta locally —
+    // applyDelta is pure — to build this call's response without reading back
+    // global state. The listener independently commits the durable mutation.
+    seededState = applyDelta(seededState, recheckDelta);
   }
 
   // Re-arm one-shot materializers for any charges still in flight. Clear
@@ -2993,7 +2974,6 @@ var LocalEngine = Object.assign(
     markTokenSeen: markTokenSeen,
     recheckMissions: recheckMissions,
     setEmitter: setEmitter,
-    setSendDelta: setSendDelta,
     setSendAchievement: setSendAchievement,
     setPrngSeed: setPrngSeed,
   },
