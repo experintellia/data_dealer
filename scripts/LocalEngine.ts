@@ -515,6 +515,11 @@ export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameRe
   // Re-arm one-shot materializers for any charges still in flight. Clear
   // any prior handles first so calling loadGame twice doesn't queue
   // duplicate node_ready emissions for the same charge.
+  // A charge that completed during the away window is emitted by the
+  // queueMicrotask mat.events loop below (and re-rendered ready via the
+  // _loadReady path); only still-charging entries get a timer here. Any
+  // overlap is a UI no-op because markReady() is idempotent
+  // (`if (gperp.renderReady) return;` in all four perp classes).
   _clearAllChargeReady();
   var stillCharging = (seededState && seededState.nodes_charging) || [];
   for (var i = 0; i < stillCharging.length; i++) {

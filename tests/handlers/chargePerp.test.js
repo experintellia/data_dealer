@@ -547,6 +547,38 @@ describe('chargePerp — live-tick setTimeout', () => {
     expect(s.nodes_collect[0].path).toBe(NODE_PATH);
   });
 
+  // Regression for the reported "actions stuck until I reload the app" bug.
+  // Under canonical-async webxdc the chargePerp delta is SENT but the
+  // messenger may not have echoed it back when the timer fires, so the live
+  // state has no nodes_charging entry for this path. Pre-fix,
+  // _scheduleChargeReady's `if (!stillCharging) return;` probe bailed here
+  // and node_ready never fired — the perp stayed "charging" with no collect
+  // icon until a reload replayed the log. The emit must now come from the
+  // captured ChargingEntry, independent of echo-lagged global state.
+  it('emits node_ready from the captured entry even when nodes_charging is empty at fire time', async () => {
+    var events = [];
+    setEmitter(function (ev, payload) {
+      events.push({ ev: ev, payload: payload });
+    });
+
+    await chargePerp(NODE_PATH);
+    // Simulate the echo never having been applied: replace live state with
+    // one that has no in-flight charge. The timer closure still holds the
+    // ChargingEntry it was armed with.
+    setState(mkState());
+    expect(getState().nodes_charging.length).toBe(0);
+
+    setOverride(FIXED_NOW + CHARGE_TIME + 1);
+    vi.advanceTimersByTime(CHARGE_TIME + 1);
+
+    const ready = events.filter(function (e) {
+      return e.ev === 'node_ready';
+    });
+    expect(ready.length).toBe(1);
+    expect(ready[0].payload.path).toBe(NODE_PATH);
+    expect(ready[0].payload.result).toBeDefined();
+  });
+
   it('loadGame re-arms timers for charges still in flight', async () => {
     // Seed state with an active charge whose charge_end is 30s from now.
     setState(
