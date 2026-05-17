@@ -1,19 +1,14 @@
 // Contact perp popup — Preact port of `views/popup_contact.html`
-// (+ profileset / token / subpop_token partials, computed in
-// `scripts/game/contactView.ts`).  Issue #80 phase 2 tier 5a.
-//
-// Action buttons fire `popup.trigger('button_click.ChargeButton')`
-// etc. — exactly what the legacy jQuery `.Button` delegated handler
-// did; `GameNode.initPopupEvents` (bound via the perp's
-// `openPreactPopup`) routes it to `gnode.Charge()/collect()`.  Token
-// detail subpop + token-grid pagination are Preact `useState`, not
-// the legacy jQuery reveal/pagination handlers.
+// (+ profileset partial, computed in `scripts/game/contactView.ts`).
+// Issue #80 phase 2 tier 5a.  Token tile / subpop / pagination /
+// action-button seam live in `perpShared.tsx` (shared with Client).
 
 import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
-import type { ContactPopupVM, TokenVM } from '../../game/contactView.js';
+import type { ContactPopupVM } from '../../game/contactView.js';
 import i18n from '../../i18n.js';
-import { type PreactDialogHandle, toFXTarget } from './dialogManager.js';
+import type { PreactDialogHandle } from './dialogManager.js';
+import { PageArrows, TokenSubpop, TokenTile, fireAction } from './perpShared.js';
 
 export interface ContactPopupProps {
   vm: ContactPopupVM;
@@ -21,71 +16,6 @@ export interface ContactPopupProps {
   onClose: () => void;
   /** Framework-injected — the live perp popup handle. */
   popup: PreactDialogHandle;
-}
-
-function TokenTile({
-  token,
-  onOpen,
-}: {
-  token: TokenVM;
-  onOpen: (gestalt: string) => void;
-}) {
-  // Short locals keep the dangerouslySetInnerHTML lines single-line so
-  // the biome-ignore attaches (codebase convention, see MissionPopup).
-  const st = token.perpStyle;
-  const sp = token.spriteHtml;
-  const lb = token.labelHtml;
-  return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass
-    <div
-      class={token.locked ? 'PopupToken locked' : 'PopupToken'}
-      data-subpop-id={`token${token.gestalt}`}
-      onClick={() => !token.locked && onOpen(token.gestalt)}
-    >
-      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
-      <div class="PopupTokenPerp" style={st} dangerouslySetInnerHTML={{ __html: sp }} />
-      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: ruleset label via crlf2html */}
-      <div class="PopupTokenLabel" dangerouslySetInnerHTML={{ __html: lb }} />
-    </div>
-  );
-}
-
-function TokenSubpop({
-  token,
-  isOpen,
-  onClose,
-}: {
-  token: TokenVM;
-  isOpen: boolean;
-  onClose: () => void;
-}) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
-  const sub = token.subpop.subTitleHtml;
-  return (
-    <div class={isOpen ? 'Subpop open' : 'Subpop'} data-subpop-id={`token${token.gestalt}`}>
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-      <div class="SubpopClose" data-button-id="CloseSubpop" onClick={close}>
-        X
-      </div>
-      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
-      <div class="SubpopLogo" dangerouslySetInnerHTML={{ __html: token.subpop.logoHtml }} />
-      <div class="SubpopTitle">{token.subpop.title}</div>
-      {sub ? (
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: ruleset findings/knowledge text
-        <div class="SubpopSubTitle" dangerouslySetInnerHTML={{ __html: sub }} />
-      ) : null}
-      <div class="SubpopText">{token.subpop.description}</div>
-      <div class="SubpopButtons">
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-        <div class="Button" data-button-id="OKButton" onClick={close}>
-          {i18n.gettext('Close')}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
@@ -98,17 +28,6 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
   const closeX = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
     e.stopPropagation();
     onClose();
-  };
-  // No re-entrancy guard beyond the .disabled check: unlike the legacy
-  // `.Button:not(.active)` handler, the snapshot VM never re-renders,
-  // so engine idempotency is the sole guard for a double-tap before an
-  // async resolve (fine for today's synchronous local engine).
-  const fireAction = (e: JSX.TargetedMouseEvent<HTMLDivElement>, buttonId: string): void => {
-    e.stopPropagation();
-    if (e.currentTarget.classList.contains('disabled')) return;
-    popup.lastButton = toFXTarget(e.currentTarget);
-    popup.lastButtonPoint = { x: e.clientX, y: e.clientY };
-    popup.trigger(`button_click.${buttonId}`);
   };
 
   return (
@@ -149,20 +68,7 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
                 </div>
               </div>
             </div>
-            {pageCount > 1 ? (
-              <>
-                {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-                <div
-                  class={page < pageCount - 1 ? 'PopupPageArrowR' : 'PopupPageArrowR hidden'}
-                  onClick={() => setPage((p) => Math.min(p + 1, pageCount - 1))}
-                />
-                {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-                <div
-                  class={page > 0 ? 'PopupPageArrowL' : 'PopupPageArrowL hidden'}
-                  onClick={() => setPage((p) => Math.max(p - 1, 0))}
-                />
-              </>
-            ) : null}
+            <PageArrows page={page} pageCount={pageCount} setPage={setPage} />
           </div>
           <div class="PopupSummary">
             <div class="PopupSummaryItem Profiles">
@@ -184,7 +90,7 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
                 class="Button"
                 data-button-id="CollectButton"
                 data-testid="dd-collect-button"
-                onClick={(e) => fireAction(e, 'CollectButton')}
+                onClick={(e) => fireAction(popup, e, 'CollectButton')}
               >
                 {i18n.gettext('Collect')}
               </div>
@@ -200,7 +106,7 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
                 class={vm.chargeDisabled ? 'Button disabled' : 'Button'}
                 data-button-id="ChargeButton"
                 data-testid="dd-charge-button"
-                onClick={(e) => fireAction(e, 'ChargeButton')}
+                onClick={(e) => fireAction(popup, e, 'ChargeButton')}
               >
                 {vm.buttonText}
               </div>

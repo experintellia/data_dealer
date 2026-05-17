@@ -8,6 +8,7 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { ClientPopup } from '../components/popups/ClientPopup.js';
 import { toKSNum } from '../dd-helpers.js';
 import { type GameNodeConfig } from './GameNode.js';
 import {
@@ -17,6 +18,7 @@ import {
   type RenderPopupLike,
 } from './GamePerp.js';
 import { ProfileSet } from './ProfileSet.js';
+import { buildClientPopupVM } from './clientView.js';
 
 interface DecoratorReadyLike {
   on(ev: string, handler: (...args: unknown[]) => void): void;
@@ -69,6 +71,15 @@ export class ClientPerp extends GamePerp {
     if (this.gestalt !== undefined) {
       this.groot.IPerps[this.gestalt] = true;
     }
+  }
+
+  override openPopup(): RenderPopupLike {
+    const vm = buildClientPopupVM(
+      (this.data ?? {}) as Parameters<typeof buildClientPopupVM>[0],
+      this.states
+    );
+    const handle = this.openPreactPopup(ClientPopup, { vm });
+    return handle as RenderPopupLike;
   }
 
   override AniTick(): void {
