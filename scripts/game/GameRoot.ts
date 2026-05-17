@@ -21,9 +21,9 @@ import type { ComponentType } from 'preact';
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
 import { APStatusPopup } from '../components/popups/APStatusPopup.js';
+import { AboutPopup } from '../components/popups/AboutPopup.js';
 import { CashStatusPopup } from '../components/popups/CashStatusPopup.js';
 import { ProfilesStatusPopup } from '../components/popups/ProfilesStatusPopup.js';
-import { UserDataPopup } from '../components/popups/UserDataPopup.js';
 import { XPStatusPopup } from '../components/popups/XPStatusPopup.js';
 import { type PreactDialogHandle, openDialog } from '../components/popups/dialogManager.js';
 import { type DialogSpec, resolveDialog } from '../components/popups/dialogRegistry.js';
@@ -2075,7 +2075,7 @@ export class GameRoot extends GameNode {
 
     this.on('user_data', (e: unknown) => {
       _stopPropFile(e);
-      this.openPreactDialog(UserDataPopup, {
+      this.openPreactDialog(AboutPopup, {
         userdebug: (setup as { userdebug?: boolean }).userdebug === true,
         locale: setup.locale ?? '',
         buttonLabel: i18n.gettext('Close'),

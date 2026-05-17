@@ -1,5 +1,7 @@
-// Settings / About panel — Preact port of `views/popup_user_data.html`
-// (issue #80 phase 2 tier 4).  First multi-tab dialog: the active tab
+// About dialog — Preact port of `views/popup_user_data.html`
+// (issue #80 phase 2 tier 4).  Informational; the only interactive
+// surface is the dev-only Debug tab (gated on `userdebug`).  First
+// multi-tab dialog: the active tab
 // is a `useState` value and the DOM is derived from it, so the
 // "tab description sometimes not shown" desync the legacy
 // jQuery-`.show()/.hide()` flow could produce is structurally
@@ -14,7 +16,7 @@ import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import i18n from '../../i18n.js';
 
-export interface UserDataPopupProps {
+export interface AboutPopupProps {
   /** `game.setup.userdebug` — gates the tab strip + Debug tab. */
   userdebug: boolean;
   /** `game.setup.locale` — MainMenuLogo sprite locale class. */
@@ -25,7 +27,7 @@ export interface UserDataPopupProps {
 
 type Tab = 'settings' | 'debug';
 
-export function UserDataPopup({ userdebug, locale, buttonLabel, onClose }: UserDataPopupProps) {
+export function AboutPopup({ userdebug, locale, buttonLabel, onClose }: AboutPopupProps) {
   const [tab, setTab] = useState<Tab>('settings');
   const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
     e.stopPropagation();
