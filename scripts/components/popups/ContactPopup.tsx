@@ -45,6 +45,15 @@ function TokenTile({
   token: TokenVM;
   onOpen: (gestalt: string) => void;
 }) {
+  // `token.html` injects the "New!" ribbon + sprite stack as direct
+  // children of `.PopupTokenPerp`; the ribbon is baked into `sp` so
+  // this stays innerHTML (no wrapper span), matching the still-live
+  // shared template under shared CSS.  Short locals keep the
+  // dangerouslySetInnerHTML elements single-line so the biome-ignore
+  // attaches (codebase convention, see MissionPopup).
+  const st = token.perpStyle;
+  const sp = token.spriteHtml;
+  const lb = token.labelHtml;
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass
     <div
@@ -52,13 +61,10 @@ function TokenTile({
       data-subpop-id={`token${token.gestalt}`}
       onClick={() => !token.locked && onOpen(token.gestalt)}
     >
-      <div class="PopupTokenPerp" style={token.perpStyle}>
-        {token.isNew ? <div class="new">{i18n.gettext('New!')}</div> : null}
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
-        <span dangerouslySetInnerHTML={{ __html: token.spriteHtml }} />
-      </div>
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
+      <div class="PopupTokenPerp" style={st} dangerouslySetInnerHTML={{ __html: sp }} />
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: ruleset label via crlf2html */}
-      <div class="PopupTokenLabel" dangerouslySetInnerHTML={{ __html: token.labelHtml }} />
+      <div class="PopupTokenLabel" dangerouslySetInnerHTML={{ __html: lb }} />
     </div>
   );
 }
@@ -112,6 +118,13 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
     e.stopPropagation();
     onClose();
   };
+  // The legacy `.Button:not(.active)` delegated handler structurally
+  // blocked re-fire until the popup closed/re-rendered.  The snapshot
+  // VM never re-renders, so a rapid double-tap before a (hypothetically
+  // async) Charge()/collect() resolves can fire twice — engine-side
+  // idempotency is the sole guard for that window (fine for today's
+  // synchronous local engine; the success path closes synchronously
+  // and the failure path disables the button via applyFxFeedback).
   const fireAction = (e: JSX.TargetedMouseEvent<HTMLDivElement>, buttonId: string): void => {
     e.stopPropagation();
     if (e.currentTarget.classList.contains('disabled')) return;

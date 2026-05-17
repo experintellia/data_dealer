@@ -33,8 +33,13 @@ function applyFxFeedback(
   point: { x: number; y: number } | undefined
 ): void {
   const cls = event === 'error' ? 'ERROR' : event;
+  // Reset only the FX classes from every button — `disabled` is owned
+  // by the VM and the snapshot component never re-renders to restore
+  // it, so clearing it here would wrongly enable a VM-disabled button.
+  // The marked button still gets `disabled ${cls}` below (it was
+  // clicked, so it was enabled) and resetMarked() clears that.
   for (const b of container.querySelectorAll('.Button')) {
-    b.classList.remove('active', 'disabled', 'no_cash', 'no_AP', 'ERROR');
+    b.classList.remove('active', 'no_cash', 'no_AP', 'ERROR');
   }
   let resetMarked: () => void = () => {};
   if (lastButton) {
