@@ -6,6 +6,7 @@
 // once here instead of being duplicated per perp component.
 
 import type { JSX } from 'preact';
+import type { ProvidedSubpopVM, ProvidedTileVM } from '../../game/providedView.js';
 import type { TokenVM } from '../../game/tokenView.js';
 import i18n from '../../i18n.js';
 import { type PreactDialogHandle, toFXTarget } from './dialogManager.js';
@@ -21,13 +22,16 @@ import { type PreactDialogHandle, toFXTarget } from './dialogManager.js';
 export function fireAction(
   popup: PreactDialogHandle,
   e: JSX.TargetedMouseEvent<HTMLDivElement>,
-  buttonId: string
+  buttonId: string,
+  args?: unknown[]
 ): void {
   e.stopPropagation();
   if (e.currentTarget.classList.contains('disabled')) return;
   popup.lastButton = toFXTarget(e.currentTarget);
   popup.lastButtonPoint = { x: e.clientX, y: e.clientY };
-  popup.trigger(`button_click.${buttonId}`);
+  // Legacy `.Button` handler forwards `[data-button-gestalt,
+  // data-button-data]`; buy buttons (PerpBuyButton) need the gestalt.
+  popup.trigger(`button_click.${buttonId}`, args);
 }
 
 export function TokenTile({
@@ -101,24 +105,138 @@ export function PageArrows({
   page,
   pageCount,
   setPage,
+  standalone,
 }: {
   page: number;
   pageCount: number;
   setPage: (next: (p: number) => number) => void;
+  /** Pusher/Proxy selectors use `.PopupPageArrowR.standalone`. */
+  standalone?: boolean;
 }) {
   if (pageCount <= 1) return null;
+  const sa = standalone ? ' standalone' : '';
   return (
     <>
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
       <div
-        class={page < pageCount - 1 ? 'PopupPageArrowR' : 'PopupPageArrowR hidden'}
+        class={page < pageCount - 1 ? `PopupPageArrowR${sa}` : `PopupPageArrowR${sa} hidden`}
         onClick={() => setPage((p) => Math.min(p + 1, pageCount - 1))}
       />
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
       <div
-        class={page > 0 ? 'PopupPageArrowL' : 'PopupPageArrowL hidden'}
+        class={page > 0 ? `PopupPageArrowL${sa}` : `PopupPageArrowL${sa} hidden`}
         onClick={() => setPage((p) => Math.max(p - 1, 0))}
       />
     </>
   );
+}
+
+/** One provided-perp grid tile (`client.html` / `perp.html`).  Opens
+ *  its detail subpop by the legacy row key (`data-subpop-id`). */
+export function PerpProvidedTile({
+  tile,
+  onOpen,
+}: {
+  tile: ProvidedTileVM;
+  onOpen: (key: number) => void;
+}) {
+  const ps = tile.perpStyle;
+  const rp = tile.renderPerpHtml;
+  const lb = tile.labelHtml;
+  const dh = tile.dataHtml;
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass
+    <div
+      class={`PopupPerp provided${tile.locked ? ' locked' : ''}${tile.extraClass}`}
+      data-subpop-id={tile.key}
+      data-gestalt={tile.gestalt}
+      onClick={() => !tile.locked && onOpen(tile.key)}
+    >
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
+      <div class="RenderPerp" style={ps} dangerouslySetInnerHTML={{ __html: rp }} />
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: ruleset label via crlf2html */}
+      <div class={tile.labelClass} dangerouslySetInnerHTML={{ __html: lb }} />
+      <div class={tile.labelDataClass}>
+        <div class="Price">
+          <div class="Buy Cash" />
+          {tile.priceText}
+        </div>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced values / requires markup */}
+        <div style="display:contents" dangerouslySetInnerHTML={{ __html: dh }} />
+      </div>
+    </div>
+  );
+}
+
+/** The buy detail subpop (`subpop_perp_provided.html`).  PerpBuyButton
+ *  forwards its gestalt through the legacy `button_click` seam. */
+export function PerpProvidedSubpop({
+  subpop,
+  isOpen,
+  onClose,
+  popup,
+}: {
+  subpop: ProvidedSubpopVM;
+  isOpen: boolean;
+  onClose: () => void;
+  popup: PreactDialogHandle;
+}) {
+  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
+    e.stopPropagation();
+    onClose();
+  };
+  const vd = subpop.valuesDetailsHtml;
+  return (
+    <div class={isOpen ? 'Subpop open' : 'Subpop'} data-subpop-id={subpop.key}>
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+      <div class="SubpopClose" data-button-id="CloseSubpop" onClick={close}>
+        X
+      </div>
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
+      <div class="SubpopLogo" dangerouslySetInnerHTML={{ __html: subpop.logoHtml }} />
+      <div class="SubpopTitle">{subpop.title}</div>
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced bonus markup */}
+      <div class="PowerupLabelData SubpopLabelData" dangerouslySetInnerHTML={{ __html: vd }} />
+      <div class="SubpopText">{subpop.description}</div>
+      <div class="SubpopButtons">
+        <div class="ButtonDecorator Cash">
+          <div class="RenderSprite Tobi" />
+          {subpop.priceText}
+        </div>
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+        <div
+          class="Button"
+          data-button-id="PerpBuyButton"
+          data-button-gestalt={subpop.gestalt}
+          data-testid={`dd-perp-buy-${subpop.gestalt}`}
+          onClick={(e) => fireAction(popup, e, 'PerpBuyButton', [subpop.gestalt])}
+        >
+          {subpop.buyButtonText}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** `noitems.html` — empty / loading state for a provided grid. */
+export function NoItems({
+  loading,
+  textNoItems,
+  textLoading,
+}: {
+  loading: boolean;
+  textNoItems: string;
+  textLoading: string;
+}) {
+  if (loading) {
+    return (
+      <div class="SelectorNoItems loading">
+        <div class="LoadingSpinner" />
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted i18n string (may contain <br />) */}
+        <span dangerouslySetInnerHTML={{ __html: textLoading }} />
+      </div>
+    );
+  }
+  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted i18n string (may contain <br />)
+  return <div class="SelectorNoItems" dangerouslySetInnerHTML={{ __html: textNoItems }} />;
 }

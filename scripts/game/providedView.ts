@@ -1,0 +1,282 @@
+// Shared provided-perp view-model — ports the legacy partials the
+// Pusher/Proxy (and later Agent/City/Project) buy popups all render:
+// `client.html` / `perp.html` (grid tiles), `subpop_perp_provided.html`
+// (+ `values.html` / `values_details.html`), `noitems.html`.  These
+// partials stay on disk (still rendered by not-yet-ported popups);
+// mirroring that, this duplicates their logic in TS during the
+// transition, same pattern as tokenView.ts.
+
+import { crlf2html, sprintf, toKSNum } from '../dd-helpers.js';
+import i18n from '../i18n.js';
+import { type SpriteHelperConfig, renderSpriteHtml } from '../render/renderSpriteHelper.js';
+import type { ProvidedPerpRow } from './GamePerp.js';
+
+/** Minimal groot surface the locked-tile / values-details branches
+ *  need (perp.html reads DBTokens + xp_level; values_details.html
+ *  gates on the gestalt's perp type). */
+export interface ProvidedContext {
+  xpLevel: number;
+  dbTokens: Record<string, number>;
+  typeOf(gestalt: string): string;
+}
+
+type Frame = { width?: number; height?: number; pivotx?: number; pivoty?: number };
+
+function spriteOf(v: unknown): SpriteHelperConfig | undefined {
+  return v as SpriteHelperConfig | undefined;
+}
+
+function normalFrame(cfg: SpriteHelperConfig | undefined): Frame | undefined {
+  return (cfg as { frameMap?: { normal?: Frame } } | undefined)?.frameMap?.normal;
+}
+
+/** RenderPerp inline style — `box` is the pivot origin (48 in
+ *  client.html, 49 in perp.html). */
+function perpStyle(fm: Frame | undefined, box: number): string {
+  let offsetX = 0;
+  let offsetY = 0;
+  let width = 100;
+  let height = 100;
+  if (fm) {
+    offsetX = box - (fm.pivotx ?? 0);
+    offsetY = box - (fm.pivoty ?? 0);
+    width = fm.width ?? 100;
+    height = fm.height ?? 100;
+  }
+  return `position:absolute; top:${offsetY}px; left:${offsetX}px; width:${width}px; height:${height}px;`;
+}
+
+/** `values.html` — the `.PowerupLabelData` / `.PerpLabelData` value
+ *  rows for an unlocked tile (price is rendered by the caller). */
+function buildValuesHtml(data: Record<string, unknown>): string {
+  const g = i18n.gettext.bind(i18n);
+  const num = (v: unknown) => toKSNum((v as number) ?? 0);
+  let h = '';
+  const tokens = data.tokens as unknown[] | undefined;
+  const consumed = data.consumed_tokens as unknown[] | undefined;
+  if (tokens?.length)
+    h += `<div class="Profiles"><div class="Buy Token"></div> ×${tokens.length}</div>`;
+  if (consumed?.length)
+    h += `<div class="Profiles consumed"><div class="Buy Token"></div> ×${consumed.length}</div>`;
+  if (data.collect_amount_modifier)
+    h += `<div class="Profiles">+${sprintf(g('%s Profiles'), data.collect_amount_modifier)}</div>`;
+  if (data.collect_amount)
+    h += `<div class="Profiles">${sprintf(g('%s Profiles'), data.collect_amount)}</div>`;
+  if (data.charge_cost_modifier)
+    h += `<div class="Invest">+$${num(data.charge_cost_modifier)} ${g('Invest')}</div>`;
+  if (data.charge_cost)
+    h += `<div class="Invest">$${num(data.charge_cost)} ${(data.button_text as string) ?? ''}</div>`;
+  if (data.income_base) h += `<div class="Invest">$${num(data.income_base)} ${g('income')}</div>`;
+  const risk = data.collect_risk as number | undefined;
+  if (risk)
+    h += `<div class="Risk ${risk < 0 ? 'Up' : 'Down'}"><div class="Buy Risk"></div>${toKSNum(Math.abs(risk))} ${g('Risk')}</div>`;
+  const riskMod = data.collect_risk_modifier as number | undefined;
+  if (riskMod)
+    h += `<div class="Risk ${riskMod < 0 ? 'Up' : 'Down'}"><div class="Buy Risk"></div>${toKSNum(Math.abs(riskMod))} ${g('Risk')}</div>`;
+  const karma = data.karma_points as number | undefined;
+  if (karma)
+    h += `<div class="Risk Up"><div class="Buy Risk"></div>${toKSNum(Math.abs(karma))} ${g('karma_image')}</div>`;
+  if (data.max_slots)
+    h += `<div class="Slots">${sprintf(g('proxy_buy can host %s projects'), data.max_slots)}</div>`;
+  const pp = data.provided_perps as unknown[] | undefined;
+  if (pp)
+    h += `<div class="ProvidedPerps">${sprintf((data.provided_perps_text as string) ?? '', pp.length)}</div>`;
+  return h;
+}
+
+/** `values_details.html` — the subpop `.BonusValues` block, only for
+ *  Project/Contact/Client/Proxy gestalts. */
+function buildValuesDetailsHtml(data: Record<string, unknown>, perpType: string): string {
+  if (!['ProjectPerp', 'ContactPerp', 'ClientPerp', 'ProxyPerp'].includes(perpType)) return '';
+  const g = i18n.gettext.bind(i18n);
+  const num = (v: unknown) => toKSNum((v as number) ?? 0);
+  let b = '';
+  const consumed = data.consumed_tokens as unknown[] | undefined;
+  const tokens = data.tokens as unknown[] | undefined;
+  if (consumed?.length)
+    b += `<div class="Bonus Profiles consumed"><div class="Buy Token"></div>×${consumed.length}</div>`;
+  if (tokens?.length)
+    b += `<div class="Bonus Profiles"><div class="Buy Token"></div>×${tokens.length}</div>`;
+  if (data.collect_amount_modifier)
+    b += `<div class="Bonus Profiles">+${sprintf(g('%s Profiles'), data.collect_amount_modifier)}</div>`;
+  if (data.collect_amount)
+    b += `<div class="Bonus Profiles">${sprintf(g('%s Profiles'), data.collect_amount)}</div>`;
+  if (data.max_slots)
+    b += `<div class="Bonus Slots">${sprintf(g('proxy_buy can host %s projects'), data.max_slots)}</div>`;
+  if (data.charge_cost_modifier)
+    b += `<div class="Bonus Invest">+$${num(data.charge_cost_modifier)} ${g('Invest')}</div>`;
+  if (data.charge_cost)
+    b += `<div class="Bonus Invest">$${num(data.charge_cost)} ${g('per deal')}</div>`;
+  if (data.income_base)
+    b += `<div class="Bonus Invest">$${num(data.income_base)} ${g('income')}</div>`;
+  const risk = data.collect_risk as number | undefined;
+  if (risk)
+    b += `<div class="Bonus Risk ${risk < 0 ? 'Up' : 'Down'}"><div class="Buy Risk"></div>${toKSNum(Math.abs(risk))} ${g('Risk')}</div>`;
+  const riskMod = data.collect_risk_modifier as number | undefined;
+  if (riskMod)
+    b += `<div class="Bonus Risk ${riskMod < 0 ? 'Up' : 'Down'}"><div class="Buy Risk"></div>${toKSNum(Math.abs(riskMod))} ${g('Risk')}</div>`;
+  const karma = data.karma_points as number | undefined;
+  if (karma)
+    b += `<div class="Bonus Risk ${karma > 0 ? 'Up' : 'Down'}"><div class="Buy Risk"></div>${toKSNum(Math.abs(karma))} ${g('Risk')}</div>`;
+  const pp = data.provided_perps as unknown[] | undefined;
+  if (pp && data.provided_perps_text)
+    b += `<div class="Bonus ProvidedPerps">${sprintf(data.provided_perps_text as string, pp.length)}</div>`;
+  return `<div class="BonusWrap"><div class="BonusValues">${b}</div></div>`;
+}
+
+/** One provided-perp grid tile. `client.html` and `perp.html` share
+ *  the `.PopupPerp.provided` shell but differ in the inner label
+ *  classes + locked branch, captured here as resolved HTML. */
+export interface ProvidedTileVM {
+  /** Stable array index — legacy `data-subpop-id` is the row key. */
+  key: number;
+  gestalt: string;
+  locked: boolean;
+  /** Extra outer class (`' CityPerpSpecial'` for perp.html cities). */
+  extraClass: string;
+  perpStyle: string;
+  /** `.RenderPerp` inner HTML (background + sprite layers). */
+  renderPerpHtml: string;
+  labelHtml: string;
+  /** `.PowerupLabel`/`.PerpLabel` class. */
+  labelClass: string;
+  /** `.PowerupLabelData`/`.PerpLabelData` class. */
+  labelDataClass: string;
+  priceText: string;
+  /** Unlocked: the values rows; locked: the Requires block. */
+  dataHtml: string;
+}
+
+/** `client.html` — Pusher tiles (PowerupBackground/Label). */
+function buildClientTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
+  const data = perp.data;
+  const bg = spriteOf(data.perp_background);
+  const locked = perp.locked === true;
+  let dataHtml = '';
+  if (locked) {
+    const provs = (data.requiredProviders as string[] | undefined) ?? [];
+    dataHtml = `<div class="Requires">${i18n.gettext('Requires')}<div class="RequiresProviders">${provs.join(', ')}</div></div>`;
+  } else {
+    dataHtml = buildValuesHtml(data);
+  }
+  return {
+    key,
+    gestalt: perp.gestalt,
+    locked,
+    extraClass: '',
+    perpStyle: perpStyle(normalFrame(bg), 48),
+    renderPerpHtml: `<div class="PowerupBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PowerupSprite">${renderSpriteHtml(spriteOf(data.perp_sprite))}</div>`,
+    labelHtml: crlf2html(data.label),
+    labelClass: 'PowerupLabel',
+    labelDataClass: 'PowerupLabelData',
+    priceText: toKSNum((data.price as number) ?? 0),
+    dataHtml,
+  };
+}
+
+/** `perp.html` — Proxy tiles (PerpBackground/Label, supertoken bg2,
+ *  CityPerpSpecial, DB-token-filtered Requires + level fallback). */
+function buildPerpTile(perp: ProvidedPerpRow, key: number, ctx: ProvidedContext): ProvidedTileVM {
+  const data = perp.data;
+  const locked = perp.locked === true;
+  const isSuper = data.is_supertoken === true;
+  let bg = spriteOf(data.perp_background);
+  if (bg && isSuper) bg = spriteOf(data.perp_background2);
+  if (!bg && data.slot_background) bg = spriteOf(data.slot_background);
+  let dataHtml = '';
+  if (locked) {
+    const reqTokens = data.requiredTokens as
+      | { gestalt: string; type_data?: { title?: string } }[]
+      | undefined;
+    const reqLevel = (data.required_level as number | undefined) ?? 0;
+    if (reqTokens?.length && reqLevel <= ctx.xpLevel) {
+      const filtered = reqTokens.filter(
+        (t) => !Object.prototype.hasOwnProperty.call(ctx.dbTokens, t.gestalt)
+      );
+      const titles = filtered.map((t) => t.type_data?.title ?? '');
+      dataHtml = `<div class="Requires">${i18n.gettext('Requires')}<div class="RequiresProviders">${titles.join(',<br />')}</div></div>`;
+    } else {
+      dataHtml = `<div class="Requires">${sprintf(i18n.gettext('Requires <div class="RequiresLevel">Level %s</div>'), reqLevel)}</div>`;
+    }
+  } else {
+    dataHtml = buildValuesHtml(data);
+  }
+  return {
+    key,
+    gestalt: perp.gestalt,
+    locked,
+    extraClass: data.is_city ? ' CityPerpSpecial' : '',
+    perpStyle: perpStyle(normalFrame(bg), 49),
+    renderPerpHtml: `<div class="PerpBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PerpSprite">${renderSpriteHtml(spriteOf(data.perp_sprite ?? data.slot_sprite))}</div>`,
+    labelHtml: crlf2html(data.label),
+    labelClass: 'PerpLabel',
+    labelDataClass: 'PerpLabelData',
+    priceText: toKSNum((data.price as number) ?? 0),
+    dataHtml,
+  };
+}
+
+/** `subpop_perp_provided.html` — the buy detail subpop. */
+export interface ProvidedSubpopVM {
+  key: number;
+  gestalt: string;
+  logoHtml: string;
+  title: string;
+  valuesDetailsHtml: string;
+  description: string;
+  priceText: string;
+  buyButtonText: string;
+}
+
+function buildProvidedSubpop(
+  perp: ProvidedPerpRow,
+  key: number,
+  ctx: ProvidedContext
+): ProvidedSubpopVM {
+  const data = perp.data;
+  return {
+    key,
+    gestalt: perp.gestalt,
+    logoHtml: renderSpriteHtml(spriteOf(data.popup_sprite)),
+    title: (data.title as string | undefined) ?? '',
+    valuesDetailsHtml: buildValuesDetailsHtml(data, ctx.typeOf(perp.gestalt)),
+    description: (data.description as string | undefined) ?? '',
+    priceText: toKSNum((data.price as number) ?? 0),
+    buyButtonText: (data.buy_button_text as string | undefined) ?? i18n.gettext('Buy'),
+  };
+}
+
+/** The Pusher/Proxy buy popup — same shell (header, subpop container,
+ *  paged provided-perp selector, MainButton); they differ only in
+ *  subtitle, selector title, tile kind, button-disabled, and the
+ *  empty-state copy, all resolved into this one VM. */
+export interface ProvidedPopupVM {
+  spriteHtml: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  selectorTitle: string;
+  tiles: ProvidedTileVM[];
+  subpops: ProvidedSubpopVM[];
+  pageSize: number;
+  loading: boolean;
+  noItemsText: string;
+  loadingText: string;
+  buttonText: string;
+  buttonDisabled: boolean;
+}
+
+/** Build the tile + subpop VMs for a provided-perp grid.  `kind`
+ *  selects the legacy grid partial: `client` (Pusher) / `perp`
+ *  (Proxy). */
+export function buildProvided(
+  rows: ProvidedPerpRow[],
+  kind: 'client' | 'perp',
+  ctx: ProvidedContext
+): { tiles: ProvidedTileVM[]; subpops: ProvidedSubpopVM[] } {
+  const tiles = rows.map((p, i) =>
+    kind === 'client' ? buildClientTile(p, i) : buildPerpTile(p, i, ctx)
+  );
+  const subpops = rows.map((p, i) => buildProvidedSubpop(p, i, ctx));
+  return { tiles, subpops };
+}

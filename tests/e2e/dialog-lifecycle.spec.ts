@@ -2020,3 +2020,101 @@ test.describe('Section O — OKButton + PowerupBuySlotsButton', () => {
     await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupMenu', 'x');
   });
 });
+
+// ── Section P — Pusher/Proxy provided-perp popups (tier 5c) ──────────────
+//
+// Pusher/Proxy don't have a Charge/collect lifecycle — they render a
+// "provided perps" buy grid (client.html / perp.html + subpop_perp_
+// provided.html) and live-refetch via fetchProvided→compileProvided→
+// updatePopup.  Section D only covers open/close; pin the grid, the
+// PerpBuyButton gestalt-forwarding seam, the Proxy slot subtitle, and
+// the Path-A re-mount on refetch.
+
+test.describe('Section P — Pusher/Proxy provided-perp popups', () => {
+  test('Pusher popup renders the provided grid and the PerpBuyButton seam', async ({ page }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'PusherPerp',
+      gestalt: 'pusher004',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupBody',
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupBody')).toBeVisible({ timeout: 3_000 });
+
+    // buyAndOpenPerp opens via openPopup (not vclick), so no
+    // fetchProvided ran — inject a provided perp + re-open.
+    await page.evaluate(() => {
+      const gnode = (window as any).__dd?._app?.game.getById('pusher004');
+      gnode.data.buyablePerps = ['provtest'];
+      gnode.data.providedPerps = [
+        {
+          gestalt: 'provtest',
+          locked: false,
+          data: { label: 'Test Perp', price: 42, title: 'Test Perp', description: 'd' },
+        },
+      ];
+      gnode.openPopup();
+    });
+
+    const root = '.PopupContainer.lockOn';
+    await expect(page.locator(`${root} .PopupPerp.provided`)).toHaveCount(1);
+
+    await page.locator(`${root} .PopupPerp.provided`).first().click({ force: true });
+    const buy = page.locator(`${root} .Subpop.open [data-testid="dd-perp-buy-provtest"]`);
+    await expect(buy).toBeVisible();
+    await expect(buy).toHaveAttribute('data-button-gestalt', 'provtest');
+
+    // The seam: clicking PerpBuyButton triggers
+    // button_click.PerpBuyButton with [gestalt] (the extended
+    // fireAction args path).
+    const fired = await page.evaluate(
+      () =>
+        new Promise<unknown>((res) => {
+          const groot = (window as any).__dd?._app?.game;
+          groot
+            .getById('pusher004')
+            .renderPopup.on('button_click.PerpBuyButton', (_e: unknown, g: unknown) => res(g));
+          document
+            .querySelector<HTMLElement>(
+              '.PopupContainer.lockOn .Subpop.open [data-testid="dd-perp-buy-provtest"]'
+            )
+            ?.click();
+        })
+    );
+    expect(fired).toBe('provtest');
+  });
+
+  test('Proxy popup shows the slot subtitle + NoItems, then re-mounts on refetch', async ({
+    page,
+  }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ProxyPerp',
+      gestalt: 'proxy001',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupBody',
+      boost: { cash: 1000, xp_level: 2, xp_value: 20 },
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupBody')).toBeVisible({ timeout: 3_000 });
+
+    const root = '.PopupContainer.lockOn';
+    // No providedPerps + undefined buyable → "Daughter companies: x/y"
+    // subtitle and the empty/loading NoItems state.
+    await expect(page.locator(`${root} .PopupSubTitle`)).toContainText('/');
+    await expect(page.locator(`${root} .SelectorNoItems`)).toBeVisible();
+
+    // Simulate fetchProvided→compileProvided→updatePopup: Path A
+    // re-mounts the dialog with the fresh grid.
+    await page.evaluate(() => {
+      const gnode = (window as any).__dd?._app?.game.getById('proxy001');
+      gnode.data.buyablePerps = ['v1'];
+      gnode.data.providedPerps = [
+        { gestalt: 'v1', locked: false, data: { label: 'Venture', price: 99 } },
+      ];
+      gnode.updatePopup();
+    });
+
+    await expect(page.locator(`${root} .PopupPerp.provided`)).toHaveCount(1);
+    await expect(page.locator(`${root} .SelectorNoItems`)).toHaveCount(0);
+  });
+});
