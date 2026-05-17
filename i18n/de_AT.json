@@ -693,6 +693,30 @@
     null,
     "Über"
   ],
+  "about fork headline": [
+    null,
+    "Über diesen Fork"
+  ],
+  "about fork text": [
+    null,
+    "Dies ist eine webxdc-Portierung des originalen Data-Dealer-Browserspiels, neu verpackt, damit es ohne Server in einer Delta-Chat-Gruppe läuft. Quellcode, Fehlerberichte und Beiträge: %s."
+  ],
+  "about displayname text": [
+    null,
+    "Dein Anzeigename wird über dein Delta-Chat-Profil festgelegt — ändere ihn dort, und das Spiel übernimmt ihn automatisch."
+  ],
+  "about original headline": [
+    null,
+    "Das Originalspiel"
+  ],
+  "about original text": [
+    null,
+    "Data Dealer wurde zwischen 2011 und 2014 in Wien von Cuteacute Media OG entwickelt (Ivan Averintsev, Wolfie Christl, Pascale Osterwalder, Tobi Schäfer, Ralf Traunsteiner). Es war ein satirisches Browserspiel über den Handel mit persönlichen Daten, das als öffentliche Beta auf datadealer.com veröffentlicht und als %s, %s und %s quelloffen gemacht wurde."
+  ],
+  "about original faq": [
+    null,
+    "Hintergrundinfos und die ursprüngliche FAQ: %s."
+  ],
   "agent_popup selector title": [
     null,
     "Kontakte anwerben"

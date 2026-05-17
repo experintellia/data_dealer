@@ -959,49 +959,6 @@ test.describe('Section I — popup tab strip navigation', () => {
     }
     await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupMenu', 'x');
   });
-
-  test('UserData tab strip switches between Settings and Debug when userdebug is on', async ({
-    page,
-  }) => {
-    await bootGame(page);
-    // popup_user_data.html only renders the .PopupMenu when
-    // game.setup.userdebug is truthy — the live setup module is mutable
-    // (groot.setup is the same singleton) so flipping the flag before
-    // opening the popup activates the Settings/Debug tabs.
-    await page.evaluate(() => {
-      const groot = (window as any).__dd?._app?.game;
-      groot.setup.userdebug = true;
-      groot.trigger('user_data');
-    });
-    await expect(page.locator('.PopupBody.About .PopupMenu')).toBeVisible({ timeout: 3_000 });
-
-    // Click Debug → debug body shown, settings body hidden.
-    await page
-      .locator('.PopupBody.About .PopupMenuButton[data-tab="debug"]')
-      .first()
-      .click({ force: true });
-    await expect(
-      page.locator('.PopupBody.About .PopupMenuButton[data-tab="debug"].active').first()
-    ).toBeVisible();
-    await expect(
-      page.locator('.PopupBody.About .PopupTab[data-tab="debug"]').first()
-    ).toBeVisible();
-    await expect(
-      page.locator('.PopupBody.About .PopupTab[data-tab="settings"]').first()
-    ).toBeHidden();
-
-    // Click Settings → flip back.
-    await page
-      .locator('.PopupBody.About .PopupMenuButton[data-tab="settings"]')
-      .first()
-      .click({ force: true });
-    await expect(
-      page.locator('.PopupBody.About .PopupTab[data-tab="settings"]').first()
-    ).toBeVisible();
-    await expect(page.locator('.PopupBody.About .PopupTab[data-tab="debug"]').first()).toBeHidden();
-
-    await expectOpenAndClose(page, '.PopupBody.About', 'x');
-  });
 });
 
 // ── Section J: in-popup action handlers (buy / sell / integrate) ────────
@@ -1647,10 +1604,11 @@ test.describe('Section M — Subpop close + simple TokenPerp', () => {
 // without verifying they're actually fired.
 //
 // - ResetButton (data-button-id="ResetButton", data-testid="dd-reset-game-button")
-//   appears in popup_user_data.html's Debug tab.  No listener anywhere in
-//   scripts/.  Engine has no resetGame export by design (the webxdc-native
-//   reset is to re-share the .xdc; see scripts/LocalEngine.ts:10).  No
-//   test added because there is nothing to assert beyond DOM presence.
+//   was in popup_user_data.html's Debug tab.  No listener anywhere in
+//   scripts/; the engine has no resetGame export by design (the
+//   webxdc-native reset is to re-share the .xdc; see
+//   scripts/LocalEngine.ts:10).  The AboutPopup Preact port dropped the
+//   Debug tab entirely, so this affordance no longer exists.
 //
 // - button_click.RefreshButton listener exists at GameNode.ts:807 but no
 //   template uses data-button-id="RefreshButton".  Dead handler.
