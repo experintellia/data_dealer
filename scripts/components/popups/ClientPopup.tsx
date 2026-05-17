@@ -113,6 +113,8 @@ export function ClientPopup({ vm, onClose, popup }: ClientPopupProps) {
             tokensClass="PopupTokens consumed"
             onOpen={setOpenToken}
           />
+          {/* `.PopupSummary` is emitted by profileset_client.html, so
+              it stays inside `.PopupTab`. */}
           <div class="PopupSummary">
             <div class={`PopupSummaryItem ${vm.summaryClass}`}>
               <div class="RenderSprite Tobi" />
@@ -120,42 +122,45 @@ export function ClientPopup({ vm, onClose, popup }: ClientPopupProps) {
               <span dangerouslySetInnerHTML={{ __html: vm.summaryHtml }} />
             </div>
           </div>
-          {vm.collectMode ? (
-            <div class="PopupButtons">
-              <div class="ButtonDecorator AP">
-                <div class="RenderSprite Tobi" />1
-              </div>
-              {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-              <div
-                class="Button"
-                data-button-id="CollectButton"
-                data-testid="dd-collect-button"
-                onClick={(e) => fireAction(popup, e, 'CollectButton')}
-              >
-                {i18n.gettext('Collect')}
-              </div>
-            </div>
-          ) : (
-            <div class="PopupButtons">
-              <div class="ButtonDecorator AP">
-                <div class="RenderSprite Tobi" />1
-              </div>
-              {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-              <div
-                class={vm.chargeDisabled ? 'Button disabled' : 'Button'}
-                data-button-id="ChargeButton"
-                data-testid="dd-charge-button"
-                onClick={(e) => fireAction(popup, e, 'ChargeButton')}
-              >
-                {vm.buttonText}
-              </div>
-              <div class="ButtonDecorator Time">
-                <div class="RenderSprite Tobi" />
-                {vm.chargeTimeText}
-              </div>
-            </div>
-          )}
         </div>
+        {/* `.PopupButtons` is a sibling of `.PopupTab` in
+            popup_client.html (the tab closes before the button bar),
+            unlike popup_contact.html where it nests inside. */}
+        {vm.collectMode ? (
+          <div class="PopupButtons">
+            <div class="ButtonDecorator AP">
+              <div class="RenderSprite Tobi" />1
+            </div>
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+            <div
+              class="Button"
+              data-button-id="CollectButton"
+              data-testid="dd-collect-button"
+              onClick={(e) => fireAction(popup, e, 'CollectButton')}
+            >
+              {i18n.gettext('Collect')}
+            </div>
+          </div>
+        ) : (
+          <div class="PopupButtons">
+            <div class="ButtonDecorator AP">
+              <div class="RenderSprite Tobi" />1
+            </div>
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+            <div
+              class={vm.chargeDisabled ? 'Button disabled' : 'Button'}
+              data-button-id="ChargeButton"
+              data-testid="dd-charge-button"
+              onClick={(e) => fireAction(popup, e, 'ChargeButton')}
+            >
+              {vm.buttonText}
+            </div>
+            <div class="ButtonDecorator Time">
+              <div class="RenderSprite Tobi" />
+              {vm.chargeTimeText}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
