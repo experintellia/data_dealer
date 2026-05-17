@@ -1147,7 +1147,9 @@ export class GameRoot extends GameNode {
    *  refused and every retry fails identically. */
   reconcileAP(result: unknown): void {
     const snap = (result as { ap_snapshot?: unknown } | null | undefined)?.ap_snapshot;
-    if (typeof snap === 'number') this.setAP(snap);
+    // Mirror updateGameValues' guard: skip the statusbar re-render when the
+    // authoritative value already matches what's shown.
+    if (typeof snap === 'number' && snap !== this.ap_value) this.setAP(snap);
   }
 
   setCash(num?: number, silent?: boolean): void {
