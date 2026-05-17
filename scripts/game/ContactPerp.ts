@@ -215,6 +215,8 @@ export class ContactPerp extends GamePerp {
 
   override markReady(): void {
     const gperp = this;
+    // Idempotent: a duplicate node_ready must not stack a 2nd DecoratorReady.
+    if (gperp.renderReady) return;
     gperp.setState('idle', false);
     gperp.setState('chargeRunning', false);
     const timer = gperp.renderTimer as { FXPuff?(): void } | undefined;

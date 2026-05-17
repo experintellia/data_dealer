@@ -1576,7 +1576,13 @@ export function buyPerp(
   var levelup = newLevel > oldLevel;
   if (levelup) newGv = _applyLevelUp(newGv, newLevel);
 
-  var missionResult = _advanceBuyPerpMissions(state, gestalt);
+  // Project the just-bought node in before the mission cascade so a
+  // cascade-unlocked buy_perp goal targeting this perp auto-completes now
+  // instead of staying stuck until a reload replays the buy delta.
+  var preMissionStateBuy = Object.assign({}, state, {
+    nodes: state.nodes.concat([newNode]),
+  });
+  var missionResult = _advanceBuyPerpMissions(preMissionStateBuy, gestalt);
   newGv = _applyRewardsToGv(newGv, missionResult.rewards);
 
   // profile_set for project*/contact*/city* gestalts:
@@ -1782,7 +1788,7 @@ function _advanceIntegrateProfilesMissions(
     return { missions: null, mission_goals: goals, active_missions: activeMissions };
   }
 
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 function _advanceCollectProfilesMissions(
@@ -1814,12 +1820,13 @@ function _advanceCollectProfilesMissions(
     return { missions: null, mission_goals: goals, active_missions: activeMissions };
   }
 
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 function _completeMissionsIfReady(
   updatedGoals: MissionGoal[],
-  activeMissions: string[]
+  activeMissions: string[],
+  nodes: GameNode[]
 ): MissionAdvanceResult {
   var ruleset = _getRuleset();
   var completed: string[] = [];
@@ -1867,7 +1874,11 @@ function _completeMissionsIfReady(
       });
       // Auto-complete buy_perp goals for items the player already owns so a
       // mission that unlocks after the item was bought doesn't get stuck.
-      updatedGoals = _autoCompleteBuyPerpGoals(updatedGoals, getState().nodes);
+      // `nodes` is the caller's locally-projected node list — reading global
+      // state here would miss own deltas the async webxdc echo hasn't applied
+      // yet (e.g. the perp just bought this turn), stranding the cascaded
+      // mission until a reload replayed the log.
+      updatedGoals = _autoCompleteBuyPerpGoals(updatedGoals, nodes);
     }
   }
 
@@ -1937,7 +1948,7 @@ function _repairStuckMissionGoals(state: LocalState): MissionAdvanceResult | nul
   });
 
   if (!changed && !hasFinishedActiveMission) return null;
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 // Sums up cash / xp / karma rewards across the just-completed missions so
@@ -2000,7 +2011,7 @@ function _advanceChargePerpMissions(state: LocalState, gestalt: string): Mission
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
   }
 
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 function _advanceBuyPowerupMissions(
@@ -2027,7 +2038,7 @@ function _advanceBuyPowerupMissions(
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
   }
 
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 function _advanceUpgradeTokenMissions(
@@ -2054,7 +2065,7 @@ function _advanceUpgradeTokenMissions(
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
   }
 
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 /**
@@ -2085,7 +2096,7 @@ function _advanceBuyPerpMissions(state: LocalState, gestalt: string): MissionAdv
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
   }
 
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 function _advanceCollectCashMissions(
@@ -2118,7 +2129,7 @@ function _advanceCollectCashMissions(
     return { missions: null, mission_goals: missionGoals, active_missions: activeMissions };
   }
 
-  return _completeMissionsIfReady(updatedGoals, activeMissions);
+  return _completeMissionsIfReady(updatedGoals, activeMissions, state.nodes);
 }
 
 // ---------------------------------------------------------------------------
