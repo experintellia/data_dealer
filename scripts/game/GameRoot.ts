@@ -21,6 +21,7 @@ import type { ComponentType } from 'preact';
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
 import { APStatusPopup } from '../components/popups/APStatusPopup.js';
+import { AboutPopup } from '../components/popups/AboutPopup.js';
 import { CashStatusPopup } from '../components/popups/CashStatusPopup.js';
 import { ProfilesStatusPopup } from '../components/popups/ProfilesStatusPopup.js';
 import { XPStatusPopup } from '../components/popups/XPStatusPopup.js';
@@ -2074,9 +2075,10 @@ export class GameRoot extends GameNode {
 
     this.on('user_data', (e: unknown) => {
       _stopPropFile(e);
-      this.openGenericPopup({
-        data: { title: 'About', description: 'Data Dealer &mdash; webxdc port' },
-        template: 'popup_user_data.html',
+      this.openPreactDialog(AboutPopup, {
+        userdebug: (setup as { userdebug?: boolean }).userdebug === true,
+        locale: setup.locale ?? '',
+        buttonLabel: i18n.gettext('Close'),
       });
     });
 
