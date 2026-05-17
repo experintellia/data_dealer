@@ -66,14 +66,22 @@ function TokenTile({
   );
 }
 
-function TokenSubpop({ token, onClose }: { token: TokenVM; onClose: () => void }) {
+function TokenSubpop({
+  token,
+  isOpen,
+  onClose,
+}: {
+  token: TokenVM;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
   const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
     e.stopPropagation();
     onClose();
   };
   const sub = token.subpop.subTitleHtml;
   return (
-    <div class="Subpop open" data-subpop-id={`token${token.gestalt}`}>
+    <div class={isOpen ? 'Subpop open' : 'Subpop'} data-subpop-id={`token${token.gestalt}`}>
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
       <div class="SubpopClose" data-button-id="CloseSubpop" onClick={close}>
         X
@@ -102,7 +110,6 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
 
   const pageCount = Math.max(1, Math.ceil(vm.tokens.length / vm.pageSize));
   const pageTokens = vm.tokens.slice(page * vm.pageSize, page * vm.pageSize + vm.pageSize);
-  const active = openToken ? vm.tokens.find((t) => t.gestalt === openToken) : undefined;
 
   const closeX = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
     e.stopPropagation();
@@ -129,8 +136,19 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
       </div>
       <div class="PopupContent">
         <div class="PopupTab">
-          <div class={active ? 'SubpopContainer open' : 'SubpopContainer'}>
-            {active ? <TokenSubpop token={active} onClose={() => setOpenToken(null)} /> : null}
+          {/* All token subpops stay mounted (matches legacy
+              profileset.html); only `.open` toggles, so the CSS
+              scale/opacity transition plays and the grid underneath
+              is never re-rendered (no white flash). */}
+          <div class={openToken ? 'SubpopContainer open' : 'SubpopContainer'}>
+            {vm.tokens.map((t) => (
+              <TokenSubpop
+                key={t.gestalt}
+                token={t}
+                isOpen={openToken === t.gestalt}
+                onClose={() => setOpenToken(null)}
+              />
+            ))}
           </div>
           <div class="Pagination">
             <div class="PopupTokens">
