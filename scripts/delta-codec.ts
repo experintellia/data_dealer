@@ -62,6 +62,81 @@ export const DELTA_FIELD = {
 export const COMPACT_DELTA_TAG = 'd';
 
 /**
+ * Verbose `GameValues` counter name → compact code. Same append-only contract
+ * as OP_CODE (see file header): never change or reuse a code.
+ *
+ * `delta.result.game_values` repeats these long economy-counter keys on every
+ * persisted delta, so compacting them is the bulk of the log-size win beyond
+ * the envelope. Codes are numeric strings: real counter names are snake_case
+ * identifiers, so a known→code remap is unambiguous, and any unknown/dynamic
+ * key (the `[key: string]` index on GameValues) is carried verbatim — the same
+ * raw-fallback tradeoff OP_CODE documents for unmapped ops.
+ *
+ * Migration: legacy verbose deltas keep their long keys (decodeDelta passes
+ * them through untouched); new deltas are emitted short and expanded back to
+ * long here. A returning player's immutable history therefore replays a mix of
+ * long- and short-form game_values correctly — both are read, only short is
+ * written.
+ */
+export const GAME_VALUES_FIELD: Readonly<Record<string, string>> = {
+  xp_value: '1',
+  xp_level: '2',
+  cash_value: '3',
+  cash_spent: '4',
+  karma_value: '5',
+  profiles_value: '6',
+  profiles_max: '7',
+  ap_snapshot: '8',
+  ap_update: '9',
+  ap_inc_value: '10',
+  ap_inc_interval: '11',
+  ap_max: '12',
+} as const;
+
+/** Reverse of GAME_VALUES_FIELD, derived once at module load. */
+const GAME_VALUES_CODE: Readonly<Record<string, string>> = (function () {
+  const m: Record<string, string> = {};
+  for (const [name, code] of Object.entries(GAME_VALUES_FIELD)) {
+    m[code] = name;
+  }
+  return m;
+})();
+
+const hasOwn = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+
+/** Remap game_values keys through `map`; unmapped keys pass through verbatim. */
+function remapGameValues(
+  gv: Record<string, unknown>,
+  map: Readonly<Record<string, string>>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k in gv) {
+    if (!hasOwn(gv, k)) continue;
+    const mapped = map[k];
+    out[mapped !== undefined ? mapped : k] = gv[k];
+  }
+  return out;
+}
+
+/**
+ * Rewrite `result.game_values` keys via `map`, leaving every other part of
+ * `result` (e.g. `node`) untouched. Returns the input unchanged when there is
+ * no `game_values` object, and never mutates the input.
+ */
+function recodeResult(result: unknown, map: Readonly<Record<string, string>>): unknown {
+  if (!isPlainObject(result) || !isPlainObject(result.game_values)) {
+    return result;
+  }
+  return Object.assign({}, result, {
+    game_values: remapGameValues(result.game_values, map),
+  });
+}
+
+/**
  * Stable op-name → numeric code map. APPEND-ONLY (see file header).
  *
  * Mirrors scripts/state.ts `OP_NAMES`; the drift test
@@ -144,7 +219,7 @@ export function encodeDelta(delta: Delta): CompactDelta {
     o: code,
   };
   if (delta.args !== undefined) out.g = delta.args;
-  if (delta.result !== undefined) out.r = delta.result;
+  if (delta.result !== undefined) out.r = recodeResult(delta.result, GAME_VALUES_FIELD);
   if (delta.ts !== undefined) out.t = delta.ts;
   if (delta.locale !== undefined) out.l = delta.locale;
   return out;
@@ -189,7 +264,7 @@ export function decodeDelta(payload: unknown): unknown {
     op: decodeOp(p.o),
   };
   if (p.g !== undefined) out.args = p.g as unknown[];
-  if (p.r !== undefined) out.result = p.r;
+  if (p.r !== undefined) out.result = recodeResult(p.r, GAME_VALUES_CODE);
   if (typeof p.t === 'number') out.ts = p.t;
   if (typeof p.l === 'string') out.locale = p.l;
   return out;
