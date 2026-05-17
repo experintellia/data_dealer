@@ -9,6 +9,7 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { ContactPopup } from '../components/popups/ContactPopup.js';
 import { toKSNum } from '../dd-helpers.js';
 import { type GameNodeConfig } from './GameNode.js';
 import {
@@ -18,6 +19,7 @@ import {
   type RenderPopupLike,
 } from './GamePerp.js';
 import { ProfileSet } from './ProfileSet.js';
+import { buildContactPopupVM } from './contactView.js';
 
 /** Decorator surface used by ContactPerp.markReady / collect. */
 interface DecoratorReadyLike {
@@ -62,6 +64,15 @@ export class ContactPerp extends GamePerp {
     if (this.gestalt !== undefined) {
       this.groot.IPerps[this.gestalt] = true;
     }
+  }
+
+  override openPopup(): RenderPopupLike {
+    const vm = buildContactPopupVM(
+      (this.data ?? {}) as Parameters<typeof buildContactPopupVM>[0],
+      this.states
+    );
+    const handle = this.openPreactPopup(ContactPopup, { vm });
+    return handle as RenderPopupLike;
   }
 
   override extendEventHandlers(): void {

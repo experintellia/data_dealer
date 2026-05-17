@@ -1411,6 +1411,10 @@ export class GameRoot extends GameNode {
         trigger(event: string) {
           if (event === 'popup_close' || event === 'popup_cancel') closeFromStub();
         },
+        on() {
+          // No-op: notification cues have no `button_click` handlers
+          // bound to the pre-mount stub.
+        },
         render() {},
         close: closeFromStub,
       };

@@ -1370,6 +1370,85 @@ test.describe('Section K — pagination arrows', () => {
       groot.renderPopup?.trigger('popup_close');
     });
   });
+
+  // The Preact Contact popup uses a different pagination model than the
+  // legacy slide (single `.PopupPage[data-page-id={page}]` swapped via
+  // useState, 12/page) — the two Karma tests above only cover the
+  // legacy template model.  Pin the new model directly so it can't
+  // regress unnoticed during the ~3 tiers the shared profileset.html
+  // stays live for popup_project/popup_client.
+  test('Contact popup paginates a >12-token profileset (swap model)', async ({ page }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ContactPerp',
+      gestalt: 'contact035',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupBody',
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupBody')).toBeVisible({ timeout: 3_000 });
+
+    // Inject a 13-token profileset and re-open so the VM paginates
+    // (ceil(13/12) = 2 pages).
+    await page.evaluate(() => {
+      const gnode = (window as any).__dd?._app?.game.getById('contact035');
+      gnode.data.ProfileSet = {
+        tokens_set: Array.from({ length: 13 }, (_, i) => ({ gestalt: `pg${i}`, data: {} })),
+      };
+      gnode.openPopup();
+    });
+
+    const read = () =>
+      page.evaluate(() => {
+        const root = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
+        const pag = root?.querySelector<HTMLElement>('.Pagination');
+        const activePage = pag?.querySelector<HTMLElement>('.PopupPage');
+        const arrowL = pag?.querySelector<HTMLElement>('.PopupPageArrowL');
+        const arrowR = pag?.querySelector<HTMLElement>('.PopupPageArrowR');
+        return {
+          activePageId: activePage?.getAttribute('data-page-id') ?? null,
+          tokenCount: activePage?.querySelectorAll('.PopupToken').length ?? 0,
+          arrowLHidden: arrowL ? arrowL.classList.contains('hidden') : null,
+          arrowRHidden: arrowR ? arrowR.classList.contains('hidden') : null,
+        };
+      });
+
+    // Page 0: 12 tiles, left arrow hidden, right arrow shown.
+    expect(await read()).toEqual({
+      activePageId: '0',
+      tokenCount: 12,
+      arrowLHidden: true,
+      arrowRHidden: false,
+    });
+
+    await page
+      .locator('.PopupContainer.lockOn .Pagination .PopupPageArrowR')
+      .first()
+      .click({ force: true });
+
+    // Page 1 (last): the remaining 1 tile, right arrow hidden, left shown.
+    expect(await read()).toEqual({
+      activePageId: '1',
+      tokenCount: 1,
+      arrowLHidden: false,
+      arrowRHidden: true,
+    });
+
+    await page
+      .locator('.PopupContainer.lockOn .Pagination .PopupPageArrowL')
+      .first()
+      .click({ force: true });
+
+    expect(await read()).toEqual({
+      activePageId: '0',
+      tokenCount: 12,
+      arrowLHidden: true,
+      arrowRHidden: false,
+    });
+
+    await page.evaluate(() => {
+      (window as any).__dd?._app?.game.renderPopup?.trigger('popup_close');
+    });
+  });
 });
 
 // ── Section L: ChargeButton / CollectButton on contact/client ─────────────

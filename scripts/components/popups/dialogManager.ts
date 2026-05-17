@@ -7,17 +7,94 @@
 // Preact) is already active closes the existing one first.
 
 import { type ComponentChildren, type ComponentType, h, render } from 'preact';
+import setup from '../../setup.js';
+
+// MainSprites.png window (x y, 65x65) for the legacy FX bling icons.
+const FX_BLING_BUG = '-362px -860px'; // legacy FXError → FXNoAP('bug')
+// Container-local px the FX bling is lifted above the click point.
+const FX_BLING_Y_OFFSET = 20;
+const FX_BLING_POS: Record<string, string> = {
+  no_cash: '-401px -737px',
+  no_AP: '-336px -737px',
+  error: FX_BLING_BUG,
+};
+
+/** Mirror legacy `RenderPopup.on('no_cash'|'no_AP'|'error')`: reset the
+ *  state from every `.Button`, mark the last-clicked one (or MainButton
+ *  fallback), and spawn the floating bling icon — DOM-ported because a
+ *  Preact dialog has no render node and the board layer is occluded by
+ *  the popup overlay. */
+const FX_RESET_CLASSES = 'active disabled no_cash no_AP ERROR';
+
+function applyFxFeedback(
+  event: string,
+  container: HTMLElement,
+  lastButton: FXClassTarget | undefined,
+  point: { x: number; y: number } | undefined
+): void {
+  const cls = event === 'error' ? 'ERROR' : event;
+  // Reset only the FX classes from every button — `disabled` is owned
+  // by the VM and the snapshot component never re-renders to restore
+  // it, so clearing it here would wrongly enable a VM-disabled button.
+  // The marked button still gets `disabled ${cls}` below (it was
+  // clicked, so it was enabled) and resetMarked() clears that.
+  for (const b of container.querySelectorAll('.Button')) {
+    b.classList.remove('active', 'no_cash', 'no_AP', 'ERROR');
+  }
+  let resetMarked: () => void = () => {};
+  if (lastButton) {
+    lastButton.removeClass('active');
+    lastButton.addClass(`disabled ${cls}`);
+    resetMarked = () => lastButton.removeClass(FX_RESET_CLASSES);
+  } else {
+    const main = container.querySelector('.Button[data-button-id="MainButton"]');
+    if (main) {
+      main.classList.remove('active');
+      main.classList.add('disabled', ...cls.split(' '));
+      resetMarked = () => main.classList.remove(...FX_RESET_CLASSES.split(' '));
+    }
+  }
+  const bling = document.createElement('div');
+  // Legacy FXNoCash spins/drops in; FXNoAP (and FXError, which is
+  // FXNoAP('bug')) scales up with no rotation and drifts upward — two
+  // distinct cues, so no_AP/error get a separate keyframe.
+  bling.className = event === 'no_cash' ? 'FXBling' : 'FXBling FXBlingNoAP';
+  bling.style.backgroundImage = `url(${setup.imagePathPrefix}MainSprites.png)`;
+  bling.style.backgroundPosition = FX_BLING_POS[event] ?? FX_BLING_BUG;
+  // Legacy spawned the cue at the click/tap point; the CSS 50%/50%
+  // lands far from the button.  Convert the click's screen coords into
+  // the container's local space — the game scales the viewport, so a
+  // plain client-coord offset would be off by the scale factor.
+  if (point) {
+    const rect = container.getBoundingClientRect();
+    const scaleX = rect.width / container.clientWidth || 1;
+    const scaleY = rect.height / container.clientHeight || 1;
+    bling.style.position = 'absolute';
+    bling.style.left = `${(point.x - rect.left) / scaleX}px`;
+    // Lift it above the pointer (legacy spawned the cue over, not on,
+    // the tapped button).
+    bling.style.top = `${(point.y - rect.top) / scaleY - FX_BLING_Y_OFFSET}px`;
+  }
+  bling.addEventListener('animationend', () => {
+    bling.remove();
+    resetMarked();
+  });
+  container.appendChild(bling);
+}
 
 /** Extend-class values accepted by `openDialog`.  Each is a CSS hook
  *  in `css/Render.css` (`.PopupContainer.lockOn.<class>`). */
 export type ExtendClass = 'Tutorial' | 'Alert' | 'NewItems' | 'LevelUp' | 'Mission';
 
 /** Minimal `addClass` / `removeClass` surface (jQuery-shaped) used by
- *  the FX-feedback `trigger` events. */
-interface FXClassTarget {
+ *  the FX-feedback `trigger` events.  Exported so perp components
+ *  typing `popup.lastButton` share the contract. */
+export interface FXClassTarget {
   addClass(s: string): unknown;
   removeClass(s: string): unknown;
 }
+
+const FX_EVENTS = new Set(['no_cash', 'no_AP', 'error']);
 
 /** Minimal jQuery surface used to replicate the legacy SubpopClose
  *  handler when running inside a Preact-managed dialog. */
@@ -35,12 +112,19 @@ interface JQueryLikeForSubpop {
 export interface PreactDialogHandle {
   readonly open: boolean;
   trigger(event: string, args?: unknown[]): void;
+  /** Register a listener (legacy `RenderPopupLike.on` shape).  Lets
+   *  `GameNode.initPopupEvents` bind `button_click.X` handlers to a
+   *  Preact-managed perp popup unchanged. */
+  on(event: string, handler: (...a: unknown[]) => void): void;
   render(): void;
-  close(): void;
+  close(cb?: () => void): void;
   /** Last button the player clicked.  Set externally (phase-1 test
    *  contract; tier 5+ buy-button code) — read by `no_cash` /
    *  `no_AP` / `error` triggers. */
   lastButton?: FXClassTarget;
+  /** Viewport coords of the last action click — the FX bling is pinned
+   *  here (legacy spawned the cue at the click/tap point). */
+  lastButtonPoint?: { x: number; y: number };
 }
 
 export interface OpenDialogOptions<P> {
@@ -111,35 +195,56 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
     opts.container.removeEventListener('click', handleInteraction);
     opts.container.removeEventListener('touchend', handleInteraction);
     render(null, opts.container);
+    // `.FXBling` is created outside the Preact tree (raw appendChild),
+    // so `render(null, …)` won't reap an in-flight one — drop it
+    // explicitly or it orphans (listener + visual) on early close.
+    for (const b of opts.container.querySelectorAll('.FXBling')) b.remove();
     opts.container.classList.remove('lockOn', 'PopupPreact', 'PopupPreactBottom');
     if (opts.extendClass) opts.container.classList.remove(opts.extendClass);
     active = null;
     opts.onAfterClose?.();
   };
 
+  // Listener registry — the emitter half of the legacy `popup` seam.
+  // `GameNode.initPopupEvents` does `p.on('button_click.ChargeButton',
+  // fn)`; perp Preact components fire
+  // `popup.trigger('button_click.ChargeButton', [g, d])` on click.
+  const listeners = new Map<string, Set<(...a: unknown[]) => void>>();
+  // Minimal event stub — `GameNode._stopProp` only probes
+  // `.stopPropagation`; handlers also call `.preventDefault`.
+  const evStub = { stopPropagation() {}, preventDefault() {} };
+
   const handle: PreactDialogHandle = {
     get open() {
       return isOpen;
     },
-    trigger(event: string): void {
+    on(event: string, fn: (...a: unknown[]) => void): void {
+      let set = listeners.get(event);
+      if (!set) {
+        set = new Set();
+        listeners.set(event, set);
+      }
+      set.add(fn);
+    },
+    trigger(event: string, args?: unknown[]): void {
       if (event === 'popup_close' || event === 'popup_cancel') {
         close();
         return;
       }
-      if (event === 'no_cash' || event === 'no_AP' || event === 'error') {
-        const cls = event === 'error' ? 'ERROR' : event;
-        const lastButton = handle.lastButton;
-        if (lastButton) {
-          lastButton.removeClass('active');
-          lastButton.addClass(`disabled ${cls}`);
-        }
+      if (FX_EVENTS.has(event)) {
+        applyFxFeedback(event, opts.container, handle.lastButton, handle.lastButtonPoint);
       }
+      const set = listeners.get(event);
+      if (set) for (const fn of set) fn(evStub, ...(args ?? []));
     },
     render(): void {
       // Snapshot props captured at open time; tier 5+ stateful
-      // components should manage their own re-renders via hooks.
+      // components manage their own re-renders via hooks.
     },
-    close,
+    close(cb?: () => void): void {
+      close();
+      cb?.();
+    },
   };
 
   opts.container.addEventListener('click', handleInteraction);
@@ -148,7 +253,11 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
   if (opts.placeBottom) opts.container.classList.add('PopupPreactBottom');
   if (opts.extendClass) opts.container.classList.add(opts.extendClass);
 
-  const body = h(opts.component, { ...opts.props, onClose: close });
+  // `onClose` + the live `popup` handle are framework-injected.  Perp
+  // components fire `popup.trigger('button_click.ChargeButton',[g,d])`
+  // on action-button clicks — exactly what the legacy jQuery `.Button`
+  // delegated handler did.  Presentational components ignore `popup`.
+  const body = h(opts.component, { ...opts.props, onClose: close, popup: handle });
   const wrapped = h('div', { class: 'Popup' }, body as ComponentChildren);
   render(wrapped, opts.container);
 
