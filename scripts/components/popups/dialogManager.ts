@@ -35,8 +35,12 @@ interface JQueryLikeForSubpop {
 export interface PreactDialogHandle {
   readonly open: boolean;
   trigger(event: string, args?: unknown[]): void;
+  /** Register a listener (legacy `RenderPopupLike.on` shape).  Lets
+   *  `GameNode.initPopupEvents` bind `button_click.X` handlers to a
+   *  Preact-managed perp popup unchanged. */
+  on(event: string, handler: (...a: unknown[]) => void): void;
   render(): void;
-  close(): void;
+  close(cb?: () => void): void;
   /** Last button the player clicked.  Set externally (phase-1 test
    *  contract; tier 5+ buy-button code) — read by `no_cash` /
    *  `no_AP` / `error` triggers. */
@@ -117,11 +121,28 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
     opts.onAfterClose?.();
   };
 
+  // Listener registry — the emitter half of the legacy `popup` seam.
+  // `GameNode.initPopupEvents` does `p.on('button_click.ChargeButton',
+  // fn)`; perp Preact components fire
+  // `popup.trigger('button_click.ChargeButton', [g, d])` on click.
+  const listeners = new Map<string, Set<(...a: unknown[]) => void>>();
+  // Minimal event stub — `GameNode._stopProp` only probes
+  // `.stopPropagation`; handlers also call `.preventDefault`.
+  const evStub = { stopPropagation() {}, preventDefault() {} };
+
   const handle: PreactDialogHandle = {
     get open() {
       return isOpen;
     },
-    trigger(event: string): void {
+    on(event: string, fn: (...a: unknown[]) => void): void {
+      let set = listeners.get(event);
+      if (!set) {
+        set = new Set();
+        listeners.set(event, set);
+      }
+      set.add(fn);
+    },
+    trigger(event: string, args?: unknown[]): void {
       if (event === 'popup_close' || event === 'popup_cancel') {
         close();
         return;
@@ -134,12 +155,17 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
           lastButton.addClass(`disabled ${cls}`);
         }
       }
+      const set = listeners.get(event);
+      if (set) for (const fn of set) fn(evStub, ...(args ?? []));
     },
     render(): void {
       // Snapshot props captured at open time; tier 5+ stateful
-      // components should manage their own re-renders via hooks.
+      // components manage their own re-renders via hooks.
     },
-    close,
+    close(cb?: () => void): void {
+      close();
+      cb?.();
+    },
   };
 
   opts.container.addEventListener('click', handleInteraction);
