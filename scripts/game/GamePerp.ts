@@ -12,6 +12,7 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { type PreactDialogHandle, openDialog } from '../components/popups/dialogManager.js';
 import i18n from '../i18n.js';
 import { GameNode, getAllByGestalt, getByFirstId, getFirstId } from './GameNode.js';
 import { mergeData } from './mergeData.js';
@@ -25,6 +26,9 @@ import { computeBuyPerpSpawnPos } from './spawnPosition.js';
 type CableType = 'in' | 'out' | 'inout';
 
 export interface RenderNodeLike {
+  /** Present on a ViewMap's renderNode — the `.PopupContainer` the
+   *  legacy popup + the Preact dialog manager both mount into. */
+  popupContainerDomelem?: { 0?: HTMLElement };
   sticky?: boolean;
   cableTo?(target: unknown, opts: { mode: CableType }): void;
   cableAnimatedTo?(target: unknown, opts: { mode: CableType }, cb?: () => void): void;
@@ -343,6 +347,33 @@ export class GamePerp extends GameNode {
 
   updatePopup(): RenderPopupLike {
     return this._buildPopup(true);
+  }
+
+  /** Phase 2 (issue #80) — open a Preact perp dialog through the
+   *  dialog manager.  Mirrors `_buildPopup`: mounts into the
+   *  ViewMap's `.PopupContainer`, parks the handle on the perp's own
+   *  `renderPopup` (so `Charge()`/`collect()`/`initPopupEvents` read
+   *  it), then binds the `button_click.*` seam via `initPopupEvents`.
+   *  The component fires `popup.trigger('button_click.X', [g,d])` on
+   *  click; the emitter dispatches to those handlers unchanged. */
+  protected openPreactPopup<P extends Record<string, unknown>>(
+    component: import('preact').ComponentType<P & { onClose: () => void }>,
+    props: P
+  ): PreactDialogHandle | undefined {
+    const vmNode = this.ViewMap?.renderNode as RenderNodeLike | undefined;
+    const container = vmNode?.popupContainerDomelem?.[0];
+    if (!container) return undefined;
+    const handle = openDialog<P>({
+      component,
+      props,
+      container,
+      onAfterClose: () => {
+        if ((this.renderPopup as unknown) === handle) delete this.renderPopup;
+      },
+    });
+    this.renderPopup = handle as unknown as RenderPopupLike;
+    this.initPopupEvents?.();
+    return handle;
   }
 
   // -------------------------------------------------------------------
