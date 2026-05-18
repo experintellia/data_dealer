@@ -3374,16 +3374,20 @@ button {
   opacity: 1;
   transition: transform 0.1s, opacity 0.1s;
 }
-/* `background` is deliberately NOT transitioned, so the card's white
-   (`.Subpop`, line ~1767) is dropped the instant `.open` is removed —
-   the white vanishes at close-start instead of fading with the scale.
-   Opaque white only while open. ProvidedPerp-scoped: Contact/Client
-   keep their existing subpop behaviour. */
-.PopupContainer.PopupPreact .PopupBody.ProvidedPerp .Subpop {
+/* The detail card keeps its legacy opaque #FFF at rest AND while open
+   (white card, exactly like the legacy perp-buy popup — the previous
+   `.Subpop`-transparent / `.Subpop.open`-#fff scheme rendered the open
+   card see-through, showing the blue selector behind it).  Only while
+   the body is `.subpopClosing` (the ~0.25s window ProvidedPerpPopup
+   sets on close) is the card dropped to transparent; `background` is
+   not transitioned, so the white vanishes the instant close starts and
+   the card scales/fades out over the blue selector — no white flash.
+   One synchronized signal (`.subpopClosing`) instead of per-element
+   `.open` toggling, so the card / container / content all clear
+   together (fixes the desynced close ghosting).  ProvidedPerp-scoped:
+   Contact/Client keep their existing subpop behaviour. */
+.PopupContainer.PopupPreact .PopupBody.ProvidedPerp.subpopClosing .Subpop {
   background: transparent;
-}
-.PopupContainer.PopupPreact .PopupBody.ProvidedPerp .Subpop.open {
-  background: #fff;
 }
 /* Drop the shared opaque #FFF→#EEE gradient (line ~677) off
    `.SubpopContainer` for Preact dialogs — the dialog already has its
