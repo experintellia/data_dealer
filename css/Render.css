@@ -3376,6 +3376,23 @@ button {
   opacity: 1;
   transition: transform 0.1s, opacity 0.1s;
 }
+/* On the perp-buy popups the subpop card's own opaque `#FFF`
+   background (`.Subpop`, css/Render.css line ~1767) is the dominant
+   white during close: the opacity fade above still shows it as a
+   shrinking white box for the first ~0.1–0.2s.  `background` is NOT
+   in the transition list, so dropping it on the non-`.open` state
+   makes the white vanish the instant close starts while the card's
+   content still scales/fades away gracefully over the blue selector
+   (the `.PopupContent` rule below removes the panel behind it).  The
+   card stays opaque white only while `.open` (a readable detail
+   card).  Scoped to `.PopupBody.ProvidedPerp` so Contact/Client keep
+   their already-approved subpop behaviour. */
+.PopupContainer.PopupPreact .PopupBody.ProvidedPerp .Subpop {
+  background: transparent;
+}
+.PopupContainer.PopupPreact .PopupBody.ProvidedPerp .Subpop.open {
+  background: #fff;
+}
 /* `.SubpopContainer` carries an opaque #FFF→#EEE gradient (the legacy
    white panel behind subpops).  A Preact dialog already has its own
    popup body, so the extra sheet only adds to the white flash as a
