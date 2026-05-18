@@ -688,47 +688,6 @@ export class RenderPopup extends RenderNode {
 
     jq.on(
       'click touchend',
-      '.Subpop[data-subpop-id="buyslots"] .BuySlotsInc',
-      function (this: HTMLElement, e: UIEventLike) {
-        e.stopPropagation();
-        e.preventDefault();
-        const spop = $(this).parents('.Subpop[data-subpop-id="buyslots"]');
-        const button = spop.find('.Button[data-button-id="PowerupBuySlotsButton"]');
-        let num = Number.parseInt((button.attr('data-button-data') as string | undefined) ?? '0');
-        const left = Number.parseInt(spop.find('.BuySlotsNumLeft').text());
-        const jprice = spop.find('.SlotCost');
-        let price = Number.parseInt((jprice.attr('data-slot-cost') as string | undefined) ?? '0');
-        const max_slots = left;
-        num = num + 1 > max_slots ? num : num + 1;
-        price = price * num;
-        jprice.text(toKSNum(price));
-        spop.find('.BuySlotsNum').text(String(num));
-        spop.find('.BuySlotsNum').text(String(num));
-        button.attr('data-button-data', num);
-      }
-    );
-
-    jq.on(
-      'click touchend',
-      '.Subpop[data-subpop-id="buyslots"] .BuySlotsDec',
-      function (this: HTMLElement, e: UIEventLike) {
-        e.stopPropagation();
-        e.preventDefault();
-        const spop = $(this).parents('.Subpop[data-subpop-id="buyslots"]');
-        const button = spop.find('.Button[data-button-id="PowerupBuySlotsButton"]');
-        let num = Number.parseInt((button.attr('data-button-data') as string | undefined) ?? '0');
-        const jprice = spop.find('.SlotCost');
-        let price = Number.parseInt((jprice.attr('data-slot-cost') as string | undefined) ?? '0');
-        num = num - 1 < 1 ? 1 : num - 1;
-        price = price * num;
-        jprice.text(toKSNum(price));
-        spop.find('.BuySlotsNum').text(String(num));
-        button.attr('data-button-data', num);
-      }
-    );
-
-    jq.on(
-      'click touchend',
       '.PopupMenu .PopupMenuButton',
       function (this: HTMLElement, e: UIEventLike) {
         e.stopPropagation();
@@ -751,27 +710,6 @@ export class RenderPopup extends RenderNode {
         } else {
           delete node.templateData.lastTab;
         }
-      }
-    );
-
-    jq.on(
-      'click touchend',
-      '.Powerup:not(.updating, .locked)',
-      function (this: HTMLElement, e: UIEventLike) {
-        e.stopPropagation();
-        e.preventDefault();
-        const powerup = $(this);
-        const subpopid = powerup.attr('data-subpop-id') as string | undefined;
-        const slotid = powerup.attr('data-button-data') as string | undefined;
-        const container = powerup.parents('.PopupTab').find('.SubpopContainer');
-        powerup.parents('.PopupTab').addClass('hasPopup');
-        container.addClass('open');
-        container.find('.Selector.open').addClass('hasPopup');
-        container.find('.Subpop[data-subpop-id=' + (subpopid ?? '') + ']').addClass('open');
-        container
-          .find('.Subpop[data-subpop-id=' + (subpopid ?? '') + ']')
-          .find('.Powerup, .Button')
-          .attr('data-button-data', slotid ?? '');
       }
     );
 
@@ -831,22 +769,6 @@ export class RenderPopup extends RenderNode {
         }
       }
     );
-
-    node.on('close_powerup', (_e: UIEventLike, ...args: unknown[]) => {
-      const cb = args[0] as (() => void) | undefined;
-      const jelem = node.lastButton;
-      if (!jelem) return;
-      jelem.removeClass('active');
-      const container = jelem.parents('.PopupTab').find('.SubpopContainer, .Selector');
-      jelem.parents('.PopupTab').removeClass('hasPopup');
-      container.removeClass('hasPopup');
-      const subpop = jelem.parents('.Subpop');
-      subpop.removeClass('open');
-      container.removeClass('open');
-      if (cb) {
-        window.setTimeout(cb, 400);
-      }
-    });
 
     jq.on(
       'click touchend',
@@ -935,35 +857,6 @@ export class RenderPopup extends RenderNode {
         jq.find('.PopupMenuButton[data-tab="' + (tabid as string) + '"]').addClass('TabArrowNew');
       }
     }
-  }
-
-  renderDataTab(): void {
-    const jq = this.jdomelem;
-    const app = getApp();
-    const htmlPS = app.renderView('profileset.html', this.templateData);
-    const htmlButt = app.renderView('buttons_project.html', this.templateData);
-    jq.find('.PopupTab.data').empty().append(htmlPS).append(htmlButt);
-  }
-
-  renderPowerupSelectors(pkey?: string): void {
-    if (!pkey) {
-      return;
-    }
-    const pcat = this.templateData.data?.powerups_compiled?.[pkey];
-    if (!pcat) return;
-    const html = getApp().renderView('selector_powerups.html', {
-      D: this.templateData.data,
-      game_values: this.templateData.game_values,
-      pcat,
-      data: this.templateData.data,
-      typelower: pcat.typelower,
-      pkey,
-    });
-    const jq = this.jdomelem;
-    const jtab = jq.find('.PopupTab.Powerups[data-tab="' + pkey + '"]');
-    jtab.find('.Subpop.InSelector').remove();
-    jtab.find('.Subpop.Selector').remove();
-    jtab.find('.SubpopContainer').append(html);
   }
 
   override onAddInit(): void {
