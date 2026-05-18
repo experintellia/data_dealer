@@ -173,11 +173,16 @@ export function PerpProvidedTile({
 export function PerpProvidedSubpop({
   subpop,
   isOpen,
+  isClosing,
   onClose,
   popup,
 }: {
   subpop: ProvidedSubpopVM;
   isOpen: boolean;
+  /** True only for the ~0.25s this specific card is animating out, so
+   *  the close-transparency targets just the closing card — not every
+   *  mounted/stacked subpop. */
+  isClosing?: boolean;
   onClose: () => void;
   popup: PreactDialogHandle;
 }) {
@@ -186,8 +191,9 @@ export function PerpProvidedSubpop({
     onClose();
   };
   const vd = subpop.valuesDetailsHtml;
+  const cls = `Subpop${isOpen ? ' open' : ''}${isClosing ? ' closing' : ''}`;
   return (
-    <div class={isOpen ? 'Subpop open' : 'Subpop'} data-subpop-id={subpop.key}>
+    <div class={cls} data-subpop-id={subpop.key}>
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
       <div class="SubpopClose" data-button-id="CloseSubpop" onClick={close}>
         X

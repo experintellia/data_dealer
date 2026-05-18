@@ -3374,47 +3374,31 @@ button {
   opacity: 1;
   transition: transform 0.1s, opacity 0.1s;
 }
-/* The detail card keeps its legacy opaque #FFF at rest AND while open
-   (white card, exactly like the legacy perp-buy popup — the previous
-   `.Subpop`-transparent / `.Subpop.open`-#fff scheme rendered the open
-   card see-through, showing the blue selector behind it).  Only while
-   the body is `.subpopClosing` (the ~0.25s window ProvidedPerpPopup
-   sets on close) is the card dropped to transparent; `background` is
-   not transitioned, so the white vanishes the instant close starts and
-   the card scales/fades out over the blue selector — no white flash.
-   One synchronized signal (`.subpopClosing`) instead of per-element
-   `.open` toggling, so the card / container / content all clear
-   together (fixes the desynced close ghosting).  ProvidedPerp-scoped:
-   Contact/Client keep their existing subpop behaviour. */
-.PopupContainer.PopupPreact .PopupBody.ProvidedPerp.subpopClosing .Subpop {
+/* The detail card and its container keep their legacy opaque white
+   (`.Subpop` #FFF / `.SubpopContainer` #FFF→#EEE gradient, line ~677)
+   at rest AND while open — exactly the legacy perp-buy look.  The
+   close-transparency is scoped to ONLY the specific card that is
+   animating out (`.Subpop.closing`) and its own container
+   (`.SubpopContainer.closing`), set by ProvidedPerpPopup for the
+   ~0.25s close window.  `background` is not transitioned, so the white
+   vanishes the instant close starts and that card scales/fades away
+   over the (still opaque white) popup content + blue selector behind
+   — no white flash.  `.PopupContent` is NEVER blanked: a closing
+   subpop just reveals the popup's normal resting state, and a
+   stacked/sibling subpop that is NOT closing keeps its white.
+   ProvidedPerp-scoped: Contact/Client keep their behaviour. */
+.PopupContainer.PopupPreact .PopupBody.ProvidedPerp .Subpop.closing {
   background: transparent;
 }
-/* `.SubpopContainer` keeps its legacy opaque #FFF→#EEE gradient (line
-   ~677) at rest AND while open — only the close-fade *timing* is
-   overridden for Preact (drop the legacy 0.2s delay so the fade tracks
-   the card). It goes transparent only during the `.subpopClosing`
-   window (rule below), in lock-step with `.Subpop` / `.PopupContent`,
-   so the whole subpop layer clears together on close — no white
-   flash, no desynced ghosting. */
+/* `.SubpopContainer`: only the close-fade *timing* is overridden for
+   Preact (drop the legacy 0.2s delay so the fade tracks the card);
+   the gradient is untouched at rest/open. */
 .PopupContainer.PopupPreact .SubpopContainer {
   transition: opacity 0.2s linear, visibility 0.2s;
 }
 .PopupContainer.PopupPreact .SubpopContainer.open {
   transition: opacity 0s;
 }
-.PopupContainer.PopupPreact .PopupBody.ProvidedPerp.subpopClosing .SubpopContainer {
-  background: transparent;
-}
-/* Container transparency alone is insufficient on the perp-buy popups:
-   their `.PopupSelector` is `.standalone` (inset, absolutely
-   positioned) so it doesn't fill `.PopupContent`, so a closing subpop
-   reveals `.PopupContent`'s own copy of the line ~677 white gradient
-   as a full-area flash. Drop that gradient ONLY while a subpop is
-   closing — `.subpopClosing` is set by ProvidedPerpPopup for the
-   ~0.25s close window, then removed so `.PopupContent` returns to its
-   opaque white resting look (matching the legacy perp-buy popup; the
-   transparent body must not be the resting state). ProvidedPerp-scoped
-   so Contact/Client (grid fills `.PopupContent`) are untouched. */
-.PopupContainer.PopupPreact .PopupBody.ProvidedPerp.subpopClosing .PopupContent {
+.PopupContainer.PopupPreact .PopupBody.ProvidedPerp .SubpopContainer.closing {
   background: transparent;
 }
