@@ -1285,25 +1285,25 @@
   font-size: 26px;
   text-align: center;
   line-height: 26px;
-  margin: 8px 0px 4px 0px;
+  margin: 20px 0px 4px 0px;
 }
 .TopscoreLabelLine {
   line-height: 26px;
 }
 .TopscoreLabelIcon {
-  margin: 10px 0px 12px 0px;
+  margin: 12px 0px 14px 0px;
   text-align: center;
   line-height: 0;
 }
 .TopscoreLabelIcon .Buy.Cash,
 .TopscoreLabelIcon .Buy.Token {
-  transform: scale(1.9);
+  transform: scale(2.4);
   margin: 0px;
 }
 .TopscoreLabelStar {
   display: inline-block;
-  font-size: 30px;
-  line-height: 30px;
+  font-size: 38px;
+  line-height: 38px;
 }
 
 .small .PopupToken {
