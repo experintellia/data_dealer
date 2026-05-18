@@ -1273,76 +1273,31 @@ test.describe('Section J — in-popup action handlers', () => {
 
 test.describe('Section K — pagination arrows', () => {
   test('Karma popup pagination flips pages and toggles arrow visibility', async ({ page }) => {
+    // Karma is now the Preact ProvidedPerpPopup (tier 13): only the
+    // active `.PopupPage.PerpPage` is rendered (data-page-id flips),
+    // not every page with `.hidden` — same contract as Pusher Section P.
     await bootGame(page);
     await openStatusPopup(page, 'karma');
 
-    // Initial state: page 0 visible, .PopupPageArrowL hidden, R visible.
-    const initial = await page.evaluate(() => {
-      const root = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
-      if (!root) return null;
-      const pagination = root.querySelector<HTMLElement>('.Pagination');
-      if (!pagination) return null;
-      const pages = Array.from(pagination.querySelectorAll<HTMLElement>('.PopupPage'));
-      const visiblePages = pages.filter((p) => !p.classList.contains('hidden'));
-      const arrowL = pagination.querySelector<HTMLElement>('.PopupPageArrowL');
-      const arrowR = pagination.querySelector<HTMLElement>('.PopupPageArrowR');
-      return {
-        pageCount: pages.length,
-        activePageId: visiblePages[0]?.getAttribute('data-page-id'),
-        arrowLHidden: arrowL?.classList.contains('hidden') ?? null,
-        arrowRHidden: arrowR?.classList.contains('hidden') ?? null,
-      };
-    });
-    expect(initial).not.toBeNull();
-    expect(initial?.pageCount).toBeGreaterThan(1);
-    expect(initial?.activePageId).toBe('0');
-    expect(initial?.arrowLHidden).toBe(true);
-    expect(initial?.arrowRHidden).toBe(false);
+    const root = '.PopupContainer.lockOn';
+    const pageEl = `${root} .PopupPage.PerpPage`;
+    const arrowR = `${root} .PopupPageArrowR.standalone`;
+    const arrowL = `${root} .PopupPageArrowL.standalone`;
+    const hidden = /(^|\s)hidden(\s|$)/;
 
-    // Click the right arrow → page 1 visible, both arrows visible (or
-    // arrowR hidden if there are only 2 pages and we're on the last one).
-    await page
-      .locator('.PopupContainer.lockOn .Pagination .PopupPageArrowR')
-      .first()
-      .click({ force: true });
+    // 10 ruleset karmalauters @ 5/page ⇒ 2 pages; page 0, L hidden.
+    await expect(page.locator(pageEl)).toHaveAttribute('data-page-id', '0');
+    await expect(page.locator(arrowR)).not.toHaveClass(hidden);
+    await expect(page.locator(arrowL)).toHaveClass(hidden);
 
-    const afterNext = await page.evaluate(() => {
-      const root = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
-      const pagination = root?.querySelector<HTMLElement>('.Pagination');
-      const pages = Array.from(pagination?.querySelectorAll<HTMLElement>('.PopupPage') ?? []);
-      const visiblePages = pages.filter((p) => !p.classList.contains('hidden'));
-      const arrowL = pagination?.querySelector<HTMLElement>('.PopupPageArrowL');
-      return {
-        activePageId: visiblePages[0]?.getAttribute('data-page-id'),
-        arrowLHidden: arrowL?.classList.contains('hidden') ?? null,
-      };
-    });
-    expect(afterNext.activePageId).toBe('1');
-    // Going forward always reveals the left arrow.
-    expect(afterNext.arrowLHidden).toBe(false);
+    await page.locator(arrowR).first().click({ force: true });
+    await expect(page.locator(pageEl)).toHaveAttribute('data-page-id', '1');
+    await expect(page.locator(arrowL)).not.toHaveClass(hidden);
 
-    // Click the left arrow → back to page 0, arrowL hidden again.
-    await page
-      .locator('.PopupContainer.lockOn .Pagination .PopupPageArrowL')
-      .first()
-      .click({ force: true });
+    await page.locator(arrowL).first().click({ force: true });
+    await expect(page.locator(pageEl)).toHaveAttribute('data-page-id', '0');
+    await expect(page.locator(arrowL)).toHaveClass(hidden);
 
-    const afterPrev = await page.evaluate(() => {
-      const root = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
-      const pagination = root?.querySelector<HTMLElement>('.Pagination');
-      const visiblePages = Array.from(
-        pagination?.querySelectorAll<HTMLElement>('.PopupPage') ?? []
-      ).filter((p) => !p.classList.contains('hidden'));
-      const arrowL = pagination?.querySelector<HTMLElement>('.PopupPageArrowL');
-      return {
-        activePageId: visiblePages[0]?.getAttribute('data-page-id'),
-        arrowLHidden: arrowL?.classList.contains('hidden') ?? null,
-      };
-    });
-    expect(afterPrev.activePageId).toBe('0');
-    expect(afterPrev.arrowLHidden).toBe(true);
-
-    // Cleanup.
     await page.evaluate(() => {
       const groot = (window as any).__dd?._app?.game;
       groot.renderPopup?.trigger('popup_close');
@@ -1350,38 +1305,28 @@ test.describe('Section K — pagination arrows', () => {
   });
 
   test('Karma popup pagination hides the right arrow on the last page', async ({ page }) => {
-    // Walk forward until arrowR becomes hidden — the handler logic at
-    // RenderTopLevelUI.ts:879 only hides arrowR when index === len, so
-    // missing that branch is a real bug that only shows up at the end
-    // of the page list.
+    // Walk right until arrowR hides — only the last page hides it, so a
+    // missing last-page branch is a real bug. Preact contract: one
+    // `.PopupPage` whose data-page-id advances; arrowR gains `.hidden`
+    // on the final page.
     await bootGame(page);
     await openStatusPopup(page, 'karma');
 
-    const pageCount = await page.evaluate(() => {
-      const root = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
-      return root?.querySelectorAll('.Pagination .PopupPage').length ?? 0;
-    });
-    expect(pageCount).toBeGreaterThan(1);
+    const root = '.PopupContainer.lockOn';
+    const arrowR = page.locator(`${root} .PopupPageArrowR.standalone`).first();
+    const arrowL = page.locator(`${root} .PopupPageArrowL.standalone`).first();
+    const hidden = /(^|\s)hidden(\s|$)/;
 
-    for (let i = 1; i < pageCount; i++) {
-      await page
-        .locator('.PopupContainer.lockOn .Pagination .PopupPageArrowR')
-        .first()
-        .click({ force: true });
+    // Click next while the right arrow is still active (cap to avoid an
+    // infinite loop if the contract regresses).
+    for (let i = 0; i < 10; i++) {
+      const cls = (await arrowR.getAttribute('class')) ?? '';
+      if (/(^|\s)hidden(\s|$)/.test(cls)) break;
+      await arrowR.click({ force: true });
     }
 
-    const onLast = await page.evaluate(() => {
-      const root = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
-      const pagination = root?.querySelector<HTMLElement>('.Pagination');
-      const arrowR = pagination?.querySelector<HTMLElement>('.PopupPageArrowR');
-      const arrowL = pagination?.querySelector<HTMLElement>('.PopupPageArrowL');
-      return {
-        arrowRHidden: arrowR?.classList.contains('hidden') ?? null,
-        arrowLHidden: arrowL?.classList.contains('hidden') ?? null,
-      };
-    });
-    expect(onLast.arrowRHidden).toBe(true);
-    expect(onLast.arrowLHidden).toBe(false);
+    await expect(arrowR).toHaveClass(hidden);
+    await expect(arrowL).not.toHaveClass(hidden);
 
     await page.evaluate(() => {
       const groot = (window as any).__dd?._app?.game;
