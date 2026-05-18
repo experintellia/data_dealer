@@ -1287,6 +1287,24 @@
   line-height: 26px;
   margin: 8px 0px 4px 0px;
 }
+.TopscoreLabelLine {
+  line-height: 26px;
+}
+.TopscoreLabelIcon {
+  margin: 10px 0px 12px 0px;
+  text-align: center;
+  line-height: 0;
+}
+.TopscoreLabelIcon .Buy.Cash,
+.TopscoreLabelIcon .Buy.Token {
+  transform: scale(1.9);
+  margin: 0px;
+}
+.TopscoreLabelStar {
+  display: inline-block;
+  font-size: 30px;
+  line-height: 30px;
+}
 
 .small .PopupToken {
   width:67px;
