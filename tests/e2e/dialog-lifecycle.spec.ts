@@ -2020,3 +2020,237 @@ test.describe('Section O — OKButton + PowerupBuySlotsButton', () => {
     await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupMenu', 'x');
   });
 });
+
+// ── Section P — Pusher/Proxy provided-perp popups (tier 5c) ──────────────
+//
+// Pusher/Proxy don't have a Charge/collect lifecycle — they render a
+// "provided perps" buy grid (client.html / perp.html + subpop_perp_
+// provided.html) and live-refetch via fetchProvided→compileProvided→
+// updatePopup.  Section D only covers open/close; pin the grid, the
+// PerpBuyButton gestalt-forwarding seam, the Proxy slot subtitle, and
+// the Path-A re-mount on refetch.
+
+test.describe('Section P — Pusher/Proxy provided-perp popups', () => {
+  test('Pusher popup renders the provided grid and the PerpBuyButton seam', async ({ page }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'PusherPerp',
+      gestalt: 'pusher004',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupBody',
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupBody')).toBeVisible({ timeout: 3_000 });
+
+    // buyAndOpenPerp opens via openPopup (not vclick), so no
+    // fetchProvided ran — inject a provided perp + re-open.
+    await page.evaluate(() => {
+      const gnode = (window as any).__dd?._app?.game.getById('pusher004');
+      gnode.data.buyablePerps = ['provtest'];
+      gnode.data.providedPerps = [
+        {
+          gestalt: 'provtest',
+          locked: false,
+          data: { label: 'Test Perp', price: 42, title: 'Test Perp', description: 'd' },
+        },
+      ];
+      gnode.openPopup();
+    });
+
+    const root = '.PopupContainer.lockOn';
+    await expect(page.locator(`${root} .PopupPerp.provided`)).toHaveCount(1);
+
+    await page.locator(`${root} .PopupPerp.provided`).first().click({ force: true });
+    const buy = page.locator(`${root} .Subpop.open [data-testid="dd-perp-buy-provtest"]`);
+    await expect(buy).toBeVisible();
+    await expect(buy).toHaveAttribute('data-button-gestalt', 'provtest');
+
+    // The seam: clicking PerpBuyButton triggers
+    // button_click.PerpBuyButton with [gestalt] (the extended
+    // fireAction args path).
+    const fired = await page.evaluate(
+      () =>
+        new Promise<unknown>((res) => {
+          const groot = (window as any).__dd?._app?.game;
+          groot
+            .getById('pusher004')
+            .renderPopup.on('button_click.PerpBuyButton', (_e: unknown, g: unknown) => res(g));
+          document
+            .querySelector<HTMLElement>(
+              '.PopupContainer.lockOn .Subpop.open [data-testid="dd-perp-buy-provtest"]'
+            )
+            ?.click();
+        })
+    );
+    expect(fired).toBe('provtest');
+  });
+
+  test('Proxy popup shows the slot subtitle + NoItems, then re-mounts on refetch', async ({
+    page,
+  }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ProxyPerp',
+      gestalt: 'proxy001',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupBody',
+      boost: { cash: 1000, xp_level: 2, xp_value: 20 },
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupBody')).toBeVisible({ timeout: 3_000 });
+
+    const root = '.PopupContainer.lockOn';
+    // No providedPerps + undefined buyable → "Daughter companies: x/y"
+    // subtitle and the loading NoItems state (spinner + .loading).
+    await expect(page.locator(`${root} .PopupSubTitle`)).toContainText('/');
+    await expect(page.locator(`${root} .SelectorNoItems.loading`)).toBeVisible();
+    await expect(page.locator(`${root} .SelectorNoItems .LoadingSpinner`)).toBeVisible();
+
+    // Simulate fetchProvided→compileProvided→updatePopup: Path A
+    // re-mounts the dialog with the fresh grid.
+    await page.evaluate(() => {
+      const gnode = (window as any).__dd?._app?.game.getById('proxy001');
+      gnode.data.buyablePerps = ['v1'];
+      gnode.data.providedPerps = [
+        { gestalt: 'v1', locked: false, data: { label: 'Venture', price: 99 } },
+      ];
+      gnode.updatePopup();
+    });
+
+    await expect(page.locator(`${root} .PopupPerp.provided`)).toHaveCount(1);
+    await expect(page.locator(`${root} .SelectorNoItems`)).toHaveCount(0);
+  });
+
+  test('Pusher provided grid paginates at 5/page (standalone arrows)', async ({ page }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'PusherPerp',
+      gestalt: 'pusher004',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupBody',
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupBody')).toBeVisible({ timeout: 3_000 });
+
+    await page.evaluate(() => {
+      const gnode = (window as any).__dd?._app?.game.getById('pusher004');
+      const rows = Array.from({ length: 6 }, (_, i) => ({
+        gestalt: `g${i}`,
+        locked: false,
+        data: { label: `P${i}`, price: i, title: `P${i}`, description: 'd' },
+      }));
+      gnode.data.buyablePerps = rows.map((r) => r.gestalt);
+      gnode.data.providedPerps = rows;
+      gnode.openPopup();
+    });
+
+    const root = '.PopupContainer.lockOn';
+    const arrowR = `${root} .PopupPageArrowR.standalone`;
+    const arrowL = `${root} .PopupPageArrowL.standalone`;
+    await expect(page.locator(`${root} .PopupPerp.provided`)).toHaveCount(5);
+    await expect(page.locator(`${root} .PopupPage.PerpPage`)).toHaveAttribute('data-page-id', '0');
+    await expect(page.locator(arrowR)).not.toHaveClass(/(^|\s)hidden(\s|$)/);
+    await expect(page.locator(arrowL)).toHaveClass(/(^|\s)hidden(\s|$)/);
+
+    await page.locator(arrowR).first().click({ force: true });
+    await expect(page.locator(`${root} .PopupPerp.provided`)).toHaveCount(1);
+    await expect(page.locator(`${root} .PopupPage.PerpPage`)).toHaveAttribute('data-page-id', '1');
+    await expect(page.locator(arrowR)).toHaveClass(/(^|\s)hidden(\s|$)/);
+    await expect(page.locator(arrowL)).not.toHaveClass(/(^|\s)hidden(\s|$)/);
+  });
+
+  test('Pusher locked tile renders Requires/RequiresProviders and is not openable', async ({
+    page,
+  }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'PusherPerp',
+      gestalt: 'pusher004',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupBody',
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupBody')).toBeVisible({ timeout: 3_000 });
+
+    await page.evaluate(() => {
+      const gnode = (window as any).__dd?._app?.game.getById('pusher004');
+      gnode.data.buyablePerps = ['l1'];
+      gnode.data.providedPerps = [
+        {
+          gestalt: 'l1',
+          locked: true,
+          data: { label: 'Locked', price: 0, requiredProviders: ['Alpha', 'Beta'] },
+        },
+      ];
+      gnode.openPopup();
+    });
+
+    const root = '.PopupContainer.lockOn';
+    await expect(page.locator(`${root} .PopupPerp.provided.locked`)).toHaveCount(1);
+    await expect(page.locator(`${root} .PopupPerp.provided.locked .Requires`)).toContainText(
+      'Requires'
+    );
+    await expect(
+      page.locator(`${root} .PopupPerp.provided.locked .RequiresProviders`)
+    ).toContainText('Alpha, Beta');
+    // A locked tile must not open its subpop on click.
+    await page.locator(`${root} .PopupPerp.provided.locked`).first().click({ force: true });
+    await expect(page.locator(`${root} .Subpop.open`)).toHaveCount(0);
+  });
+
+  test('Proxy locked tile: DB-token-filtered providers vs level fallback', async ({ page }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ProxyPerp',
+      gestalt: 'proxy001',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupBody',
+      boost: { cash: 1000, xp_level: 2, xp_value: 20 },
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupBody')).toBeVisible({ timeout: 3_000 });
+
+    // Branch A: required_level <= xp_level → RequiresProviders, with
+    // already-owned DB tokens filtered out.
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.xp_level.number = 5;
+      groot.DBTokens = { tokB: 1 };
+      const gnode = groot.getById('proxy001');
+      gnode.data.buyablePerps = ['lp'];
+      gnode.data.providedPerps = [
+        {
+          gestalt: 'lp',
+          locked: true,
+          data: {
+            label: 'L',
+            price: 0,
+            required_level: 2,
+            requiredTokens: [
+              { gestalt: 'tokA', type_data: { title: 'Token A' } },
+              { gestalt: 'tokB', type_data: { title: 'Token B' } },
+            ],
+          },
+        },
+      ];
+      gnode.openPopup();
+    });
+    const root = '.PopupContainer.lockOn';
+    const provs = page.locator(`${root} .PopupPerp.provided.locked .RequiresProviders`);
+    await expect(provs).toContainText('Token A');
+    await expect(provs).not.toContainText('Token B');
+
+    // Branch B: required_level > xp_level → "Level N" fallback.
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.xp_level.number = 1;
+      const gnode = groot.getById('proxy001');
+      gnode.data.providedPerps = [
+        {
+          gestalt: 'lp',
+          locked: true,
+          data: { label: 'L', price: 0, required_level: 9, requiredTokens: [] },
+        },
+      ];
+      gnode.updatePopup();
+    });
+    await expect(
+      page.locator(`${root} .PopupPerp.provided.locked .Requires .RequiresLevel`)
+    ).toContainText('Level 9');
+  });
+});
