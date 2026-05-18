@@ -216,6 +216,62 @@ function buildPerpTile(perp: ProvidedPerpRow, key: number, ctx: ProvidedContext)
   };
 }
 
+/** `agent.html` — CityPerp Agents-tab tile (PowerupBackground/Label,
+ *  box pivot 49, plain level-Requires locked branch). */
+function buildAgentTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
+  const data = perp.data;
+  const bg = spriteOf(data.perp_background);
+  const locked = perp.locked === true;
+  const reqLevel = (data.required_level as number | undefined) ?? 0;
+  const dataHtml = locked
+    ? `<div class="Requires">${sprintf(i18n.gettext('Requires <div class="RequiresLevel">Level %s</div>'), reqLevel)}</div>`
+    : buildValuesHtml(data);
+  return {
+    key,
+    gestalt: perp.gestalt,
+    locked,
+    extraClass: '',
+    perpStyle: perpStyle(normalFrame(bg), 49),
+    renderPerpHtml: `<div class="PowerupBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PowerupSprite">${renderSpriteHtml(spriteOf(data.perp_sprite))}</div>`,
+    labelHtml: crlf2html(data.label),
+    labelClass: 'PowerupLabel',
+    labelDataClass: 'PowerupLabelData',
+    priceText: toKSNum((data.price as number) ?? 0),
+    dataHtml,
+  };
+}
+
+/** `pusher.html` — CityPerp Pushers-tab tile (PowerupBackground/Label,
+ *  box pivot 47, `Requires either … or<br/>` locked branch). */
+function buildPusherTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
+  const data = perp.data;
+  const bg = spriteOf(data.perp_background);
+  const locked = perp.locked === true;
+  let dataHtml: string;
+  if (locked) {
+    const provs = (data.requiredProviders as string[] | undefined) ?? [];
+    const inner = provs
+      .map((v, k) => (k + 1 < provs.length ? `${v},<br />` : `${i18n.gettext('or<br/>')}${v}`))
+      .join('');
+    dataHtml = `<div class="Requires">${i18n.gettext('Requires either')}<div class="RequiresProviders">${inner}</div></div>`;
+  } else {
+    dataHtml = buildValuesHtml(data);
+  }
+  return {
+    key,
+    gestalt: perp.gestalt,
+    locked,
+    extraClass: '',
+    perpStyle: perpStyle(normalFrame(bg), 47),
+    renderPerpHtml: `<div class="PowerupBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PowerupSprite">${renderSpriteHtml(spriteOf(data.perp_sprite))}</div>`,
+    labelHtml: crlf2html(data.label),
+    labelClass: 'PowerupLabel',
+    labelDataClass: 'PowerupLabelData',
+    priceText: toKSNum((data.price as number) ?? 0),
+    dataHtml,
+  };
+}
+
 /** `subpop_perp_provided.html` — the buy detail subpop. */
 export interface ProvidedSubpopVM {
   key: number;
@@ -274,15 +330,26 @@ export interface ProvidedPopupVM {
 
 /** Build the tile + subpop VMs for a provided-perp grid.  `kind`
  *  selects the legacy grid partial: `client` (Pusher) / `perp`
- *  (Proxy). */
+ *  (Proxy / City Bogus+City tabs) / `agent` (City Agents tab) /
+ *  `pusher` (City Pushers tab). */
 export function buildProvided(
   rows: ProvidedPerpRow[],
-  kind: 'client' | 'perp',
+  kind: 'client' | 'perp' | 'agent' | 'pusher',
   ctx: ProvidedContext
 ): { tiles: ProvidedTileVM[]; subpops: ProvidedSubpopVM[] } {
-  const tiles = rows.map((p, i) =>
-    kind === 'client' ? buildClientTile(p, i) : buildPerpTile(p, i, ctx)
-  );
+  const build = (p: ProvidedPerpRow, i: number): ProvidedTileVM => {
+    switch (kind) {
+      case 'client':
+        return buildClientTile(p, i);
+      case 'agent':
+        return buildAgentTile(p, i);
+      case 'pusher':
+        return buildPusherTile(p, i);
+      default:
+        return buildPerpTile(p, i, ctx);
+    }
+  };
+  const tiles = rows.map(build);
   const subpops = rows.map((p, i) => buildProvidedSubpop(p, i, ctx));
   return { tiles, subpops };
 }
