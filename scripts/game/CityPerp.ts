@@ -5,8 +5,16 @@
 //
 // Extracted from scripts/Game.js's IIFE in PR 12 of issue #147.
 
+import { CityPopup } from '../components/popups/CityPopup.js';
 import { type GameNodeConfig, getAllByGestalt, getByGestalt } from './GameNode.js';
-import { GamePerp, type GameRootForPerp, type ProvidedPerpRow } from './GamePerp.js';
+import {
+  GamePerp,
+  type GameRootForPerp,
+  type ProvidedPerpRow,
+  type RenderPopupLike,
+} from './GamePerp.js';
+import { buildCityPopupVM } from './cityView.js';
+import { type ProvidedContext, buildProvidedContext } from './providedView.js';
 
 type TabKey = 'AgentPerp' | 'PusherPerp' | 'ProxyPerp' | 'CityPerp';
 
@@ -23,10 +31,29 @@ interface GameRootForCityPerp extends GameRootForPerp {
 export class CityPerp extends GamePerp {
   override renderType = 'Perp';
   override cableType = 'inout' as const;
-  override popupTemplate = 'popup_city.html';
 
   protected override get groot(): GameRootForCityPerp {
     return this.GameRoot as unknown as GameRootForCityPerp;
+  }
+
+  private providedCtx(): ProvidedContext {
+    return buildProvidedContext(
+      this.groot as unknown as Parameters<typeof buildProvidedContext>[0]
+    );
+  }
+
+  override openPopup(): RenderPopupLike {
+    const vm = buildCityPopupVM(
+      (this.data ?? {}) as Parameters<typeof buildCityPopupVM>[0],
+      this.providedCtx()
+    );
+    return this.openPreactPopup(CityPopup, { vm }) as RenderPopupLike;
+  }
+
+  // Live-loader Path-A re-mount (vclick empties providedTabs, then
+  // fetchProvided → compileProvided → updatePopup) — see PusherPerp.
+  override updatePopup(): RenderPopupLike {
+    return this.openPopup();
   }
 
   constructor(config: GameNodeConfig) {

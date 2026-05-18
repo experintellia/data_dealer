@@ -20,6 +20,24 @@ export interface ProvidedContext {
   typeOf(gestalt: string): string;
 }
 
+/** Minimal groot surface a `ProvidedContext` is built from. */
+interface ProvidedContextRoot {
+  xp_level: { number: number };
+  DBTokens: Record<string, number>;
+  getTypeFromGestalt(gestalt?: string): string;
+}
+
+/** The `{ xpLevel, dbTokens, typeOf }` literal was hand-built at every
+ *  provided-grid call site (Database / GameRoot karma / CityPerp); one
+ *  factory keeps them in sync. */
+export function buildProvidedContext(groot: ProvidedContextRoot): ProvidedContext {
+  return {
+    xpLevel: groot.xp_level.number,
+    dbTokens: groot.DBTokens,
+    typeOf: (gestalt: string) => groot.getTypeFromGestalt(gestalt),
+  };
+}
+
 type Frame = { width?: number; height?: number; pivotx?: number; pivoty?: number };
 
 function spriteOf(v: unknown): SpriteHelperConfig | undefined {
@@ -31,15 +49,19 @@ function normalFrame(cfg: SpriteHelperConfig | undefined): Frame | undefined {
 }
 
 /** RenderPerp inline style — `box` is the pivot origin (48 in
- *  client.html, 49 in perp.html). */
+ *  client.html, 49 in perp.html).  `fm` is the perp_background frame
+ *  or undefined (the slot_background fallback passes undefined so the
+ *  box stays 0/0/100/100, matching perp.html's else-branch).  A
+ *  non-numeric pivot stays at offset 0 (legacy `box - undefined`
+ *  produced NaN → ignored CSS → 0). */
 function perpStyle(fm: Frame | undefined, box: number): string {
   let offsetX = 0;
   let offsetY = 0;
   let width = 100;
   let height = 100;
   if (fm) {
-    offsetX = box - (fm.pivotx ?? 0);
-    offsetY = box - (fm.pivoty ?? 0);
+    if (typeof fm.pivotx === 'number') offsetX = box - fm.pivotx;
+    if (typeof fm.pivoty === 'number') offsetY = box - fm.pivoty;
     width = fm.width ?? 100;
     height = fm.height ?? 100;
   }
@@ -180,9 +202,17 @@ function buildPerpTile(perp: ProvidedPerpRow, key: number, ctx: ProvidedContext)
   const data = perp.data;
   const locked = perp.locked === true;
   const isSuper = data.is_supertoken === true;
+  // Mirror perp.html exactly: the RenderPerp box (pivot offset + size)
+  // is derived ONLY from `perp_background`'s frame.  When there's no
+  // `perp_background` frame the legacy code fell to the
+  // `else if (slot_background)` branch, which rendered the
+  // slot_background sprite but left offset/size at 0/0/100/100 —
+  // it did *not* pivot-centre by the slot frame (whose pivot is 0,0,
+  // which would shove the tile +49px and bleed it across neighbours).
   let bg = spriteOf(data.perp_background);
   if (bg && isSuper) bg = spriteOf(data.perp_background2);
-  if (!bg && data.slot_background) bg = spriteOf(data.slot_background);
+  const styleFrame = normalFrame(bg);
+  if (!styleFrame && data.slot_background) bg = spriteOf(data.slot_background);
   let dataHtml = '';
   if (locked) {
     const reqTokens = data.requiredTokens as
@@ -206,11 +236,67 @@ function buildPerpTile(perp: ProvidedPerpRow, key: number, ctx: ProvidedContext)
     gestalt: perp.gestalt,
     locked,
     extraClass: data.is_city ? ' CityPerpSpecial' : '',
-    perpStyle: perpStyle(normalFrame(bg), 49),
+    perpStyle: perpStyle(styleFrame, 49),
     renderPerpHtml: `<div class="PerpBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PerpSprite">${renderSpriteHtml(spriteOf(data.perp_sprite ?? data.slot_sprite))}</div>`,
     labelHtml: crlf2html(data.label),
     labelClass: 'PerpLabel',
     labelDataClass: 'PerpLabelData',
+    priceText: toKSNum((data.price as number) ?? 0),
+    dataHtml,
+  };
+}
+
+/** `agent.html` — CityPerp Agents-tab tile (PowerupBackground/Label,
+ *  box pivot 49, plain level-Requires locked branch). */
+function buildAgentTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
+  const data = perp.data;
+  const bg = spriteOf(data.perp_background);
+  const locked = perp.locked === true;
+  const reqLevel = (data.required_level as number | undefined) ?? 0;
+  const dataHtml = locked
+    ? `<div class="Requires">${sprintf(i18n.gettext('Requires <div class="RequiresLevel">Level %s</div>'), reqLevel)}</div>`
+    : buildValuesHtml(data);
+  return {
+    key,
+    gestalt: perp.gestalt,
+    locked,
+    extraClass: '',
+    perpStyle: perpStyle(normalFrame(bg), 49),
+    renderPerpHtml: `<div class="PowerupBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PowerupSprite">${renderSpriteHtml(spriteOf(data.perp_sprite))}</div>`,
+    labelHtml: crlf2html(data.label),
+    labelClass: 'PowerupLabel',
+    labelDataClass: 'PowerupLabelData',
+    priceText: toKSNum((data.price as number) ?? 0),
+    dataHtml,
+  };
+}
+
+/** `pusher.html` — CityPerp Pushers-tab tile (PowerupBackground/Label,
+ *  box pivot 47, `Requires either … or<br/>` locked branch). */
+function buildPusherTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
+  const data = perp.data;
+  const bg = spriteOf(data.perp_background);
+  const locked = perp.locked === true;
+  let dataHtml: string;
+  if (locked) {
+    const provs = (data.requiredProviders as string[] | undefined) ?? [];
+    const inner = provs
+      .map((v, k) => (k + 1 < provs.length ? `${v},<br />` : `${i18n.gettext('or<br/>')}${v}`))
+      .join('');
+    dataHtml = `<div class="Requires">${i18n.gettext('Requires either')}<div class="RequiresProviders">${inner}</div></div>`;
+  } else {
+    dataHtml = buildValuesHtml(data);
+  }
+  return {
+    key,
+    gestalt: perp.gestalt,
+    locked,
+    extraClass: '',
+    perpStyle: perpStyle(normalFrame(bg), 47),
+    renderPerpHtml: `<div class="PowerupBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PowerupSprite">${renderSpriteHtml(spriteOf(data.perp_sprite))}</div>`,
+    labelHtml: crlf2html(data.label),
+    labelClass: 'PowerupLabel',
+    labelDataClass: 'PowerupLabelData',
     priceText: toKSNum((data.price as number) ?? 0),
     dataHtml,
   };
@@ -252,10 +338,21 @@ function buildProvidedSubpop(
  *  empty-state copy, all resolved into this one VM. */
 export interface ProvidedPopupVM {
   spriteHtml: string;
+  /** When set, the header logo is a `.MainSpritesPopup.<class>` chip
+   *  (legacy `popup.html` / `popup_karma.html` `mainsprites_class`
+   *  branch) instead of `spriteHtml`. */
+  mainspritesClass?: string;
   title: string;
   subtitle: string;
   description: string;
+  /** Empty string → the `.SubpopHeader` title bar is omitted (legacy
+   *  `popup.html` only renders it when `data.selectortitle` is set;
+   *  `popup_karma.html` always renders it because of `karmaChip`). */
   selectorTitle: string;
+  /** `popup_karma.html` SubpopHeader Risk chip (karma value).  When
+   *  set, the `.SubpopHeader` renders even with an empty
+   *  `selectorTitle`, with this chip before the title. */
+  karmaChip?: { up: boolean; text: string };
   tiles: ProvidedTileVM[];
   subpops: ProvidedSubpopVM[];
   pageSize: number;
@@ -268,15 +365,26 @@ export interface ProvidedPopupVM {
 
 /** Build the tile + subpop VMs for a provided-perp grid.  `kind`
  *  selects the legacy grid partial: `client` (Pusher) / `perp`
- *  (Proxy). */
+ *  (Proxy / City Bogus+City tabs) / `agent` (City Agents tab) /
+ *  `pusher` (City Pushers tab). */
 export function buildProvided(
   rows: ProvidedPerpRow[],
-  kind: 'client' | 'perp',
+  kind: 'client' | 'perp' | 'agent' | 'pusher',
   ctx: ProvidedContext
 ): { tiles: ProvidedTileVM[]; subpops: ProvidedSubpopVM[] } {
-  const tiles = rows.map((p, i) =>
-    kind === 'client' ? buildClientTile(p, i) : buildPerpTile(p, i, ctx)
-  );
+  const build = (p: ProvidedPerpRow, i: number): ProvidedTileVM => {
+    switch (kind) {
+      case 'client':
+        return buildClientTile(p, i);
+      case 'agent':
+        return buildAgentTile(p, i);
+      case 'pusher':
+        return buildPusherTile(p, i);
+      default:
+        return buildPerpTile(p, i, ctx);
+    }
+  };
+  const tiles = rows.map(build);
   const subpops = rows.map((p, i) => buildProvidedSubpop(p, i, ctx));
   return { tiles, subpops };
 }

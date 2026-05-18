@@ -6,8 +6,16 @@
 // `perpCtors[name]` (typed direct map, PR 17 of issue #147); the
 // known-name `Game.TokenPerp` reference uses a direct import.
 
+import type { ComponentType } from 'preact';
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { ProfileSetPopup } from '../components/popups/ProfileSetPopup.js';
+import { ProvidedPerpPopup } from '../components/popups/ProvidedPerpPopup.js';
+import {
+  type OpenDialogOptions,
+  type PreactDialogHandle,
+  openDialog,
+} from '../components/popups/dialogManager.js';
 import { toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
 import {
@@ -28,8 +36,11 @@ import { type GameRoot } from './GameRoot.js';
 import { OrderedSet } from './OrderedSet.js';
 import { ProfileSet } from './ProfileSet.js';
 import { TokenPerp } from './TokenPerp.js';
+import { buildDatabaseUpgradesPopupVM } from './databaseUpgradesView.js';
 import { mergeData } from './mergeData.js';
 import { perpCtors } from './perpCtors.js';
+import { type ProfileSetPopupVM, buildProfileSetPopupVM } from './profilesetView.js';
+import { type ProvidedPopupVM, buildProvidedContext } from './providedView.js';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -43,6 +54,7 @@ type RenderMenuLike = Pick<InstanceType<RenderApi['MainMenu']>, 'addButton'>;
 interface RenderNodeLike {
   addChild?(node: unknown, ...args: unknown[]): void;
   addPopup?(node: unknown): void;
+  popupContainerDomelem?: { 0?: HTMLElement };
   lock?(): void;
   unlock?(): void;
   getPosition?(): { x: number; y: number };
@@ -172,6 +184,29 @@ export class Database extends GameNode {
     return this.renderNode as RenderNodeLike | undefined;
   }
 
+  /** Mount a Preact popup into the Database view's PopupContainer and
+   *  park it on `renderPopup` (Database isn't a GamePerp, so it can't
+   *  use `GamePerp.openPreactPopup`).  Shared by the upgrades + the
+   *  profileset-import popups; callers wire their own button seam
+   *  (`initPopupEvents` / a `.on(...)` handler) on the returned handle. */
+  private mountPopup<P extends Record<string, unknown>>(
+    component: ComponentType<P & { onClose: () => void; popup: PreactDialogHandle }>,
+    props: P
+  ): PreactDialogHandle | undefined {
+    const container = this.renderApi?.popupContainerDomelem?.[0];
+    if (!container) return undefined;
+    const handle = openDialog<P>({
+      component: component as unknown as OpenDialogOptions<P>['component'],
+      props,
+      container,
+      onAfterClose: () => {
+        if ((this.renderPopup as unknown) === handle) delete this.renderPopup;
+      },
+    });
+    this.renderPopup = handle as unknown as RenderPopupLike;
+    return handle;
+  }
+
   private getRenderModule(): Pick<RenderApi, 'Popup' | 'DBQueue' | 'DecoratorNew' | 'getById'> {
     return getRender();
   }
@@ -235,15 +270,10 @@ export class Database extends GameNode {
   }
 
   openUpgradesPopup(): unknown {
-    const Render = this.getRenderModule();
     const groot = this.groot;
-    // Popup instantiated for the first time
-    if (!this.popupTemplateData) {
-      this.popupTemplateData = {};
-      this.popupTemplateData.status_icons = groot.data.status_icons;
-      this.popupTemplateData.states = {};
-      this.popupTemplateData.data = this.data;
-      const pdata = this.data as Record<string, unknown>;
+    const pdata = this.data as Record<string, unknown>;
+    // First open: stamp the static copy onto `data` (read by the VM).
+    if (pdata.title === undefined) {
       pdata.gestalt = 'Database';
       pdata.id = this.id;
       pdata.title = i18n.gettext('database_buytokens title');
@@ -251,28 +281,19 @@ export class Database extends GameNode {
       pdata.description = i18n.gettext('database_buytokens description');
       pdata.selectortitle = i18n.gettext('database_buytokens selector title');
       pdata.mainsprites_class = 'DBUpgrade';
-      this.popupTemplateData.groot = groot;
     }
-    this.popupTemplateData.data = this.data;
-
-    const popupConfig = {
-      gameNode: this,
-      template: 'popup.html',
-      templateData: this.popupTemplateData,
-      popupContainer: this,
-    };
-
-    const popup = new Render.Popup(
-      popupConfig as unknown as ConstructorParameters<RenderApi['Popup']>[0]
-    ) as unknown as RenderPopupLike;
-    this.renderPopup = popup;
-    this.renderApi?.addPopup?.(popup);
-
-    // initPopupEvents lives on GameNode.prototype (added by Game.js's
-    // legacy mixin block).  Type loosely until that mixin is consolidated.
-    if (this.initPopupEvents) this.initPopupEvents();
-
-    return popup;
+    const ctx = buildProvidedContext(
+      groot as unknown as Parameters<typeof buildProvidedContext>[0]
+    );
+    const vm = buildDatabaseUpgradesPopupVM(
+      this.data as Parameters<typeof buildDatabaseUpgradesPopupVM>[0],
+      ctx
+    );
+    const handle = this.mountPopup(ProvidedPerpPopup, { vm });
+    // initPopupEvents (GameNode) wires button_click.PerpBuyButton →
+    // BuyPerp/BuyToken, MainButton → popup_close, etc.
+    this.initPopupEvents?.();
+    return handle;
   }
 
   BuyPerp(bgestalt: string, placePos?: { x: number; y: number }): void {
@@ -639,57 +660,24 @@ export class Database extends GameNode {
   }
 
   openProfileSetPopup(ps: ProfileSet): unknown {
-    const gnode = this;
-    const groot = this.groot;
-    const Render = this.getRenderModule();
     const origin = ps.origin;
     if (!origin) return undefined;
     ps.updateNewMarker();
-    // Popup instantiated for the first time
-    if (!ps.popupTemplateData) {
-      ps.popupTemplateData = {};
-      const ptd = ps.popupTemplateData;
-      ptd.ProfileSet = ps;
-      ptd.states = origin.states;
-      ptd.status_icons = groot.data.status_icons;
-      const pd: Record<string, unknown> = {};
-      if (origin.gestalt) pd.gestalt = origin.gestalt;
-      if (origin.id) pd.id = origin.id;
-      ptd.data = pd;
-    }
-
-    // Update data with current gnode data
-    Object.assign(ps.popupTemplateData.data as Record<string, unknown>, origin.data || {});
-
-    const popupConfig = {
-      gameNode: this,
-      template: 'popup_profileset.html',
-      templateData: ps.popupTemplateData,
-      popupContainer: this,
-    };
-
-    const popup = new Render.Popup(
-      popupConfig as unknown as ConstructorParameters<RenderApi['Popup']>[0]
-    ) as unknown as RenderPopupLike;
-    this.renderPopup = popup;
-    (gnode.renderNode as RenderNodeLike | undefined)?.addPopup?.(popup);
-
-    popup.on('button_click.MainButton', function (e: unknown) {
+    const vm = buildProfileSetPopupVM(
+      ps as unknown as Parameters<typeof buildProfileSetPopupVM>[0]
+    );
+    const handle = this.mountPopup(ProfileSetPopup, { vm });
+    // Import (MainButton) → mergeCued.  Legacy bound this inline (not
+    // via initPopupEvents); popup_close is handled by the dialog
+    // manager (X / backdrop) + onAfterClose, and mergeCued triggers
+    // `popup_close` on renderPopup on success → manager closes.
+    handle?.on('button_click.MainButton', (e: unknown) => {
       if (e && typeof (e as { stopPropagation?: () => void }).stopPropagation === 'function') {
         (e as { stopPropagation: () => void }).stopPropagation();
       }
-      if (ps.psid) gnode.mergeCued(ps.psid);
+      if (ps.psid) this.mergeCued(ps.psid);
     });
-
-    popup.on('popup_close', function (e: unknown) {
-      if (e && typeof (e as { stopPropagation?: () => void }).stopPropagation === 'function') {
-        (e as { stopPropagation: () => void }).stopPropagation();
-      }
-      popup.close();
-      delete gnode.renderPopup;
-    });
-
-    return popup;
+    return handle;
   }
 
   override initEventHandlers(): void {

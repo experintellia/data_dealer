@@ -11,11 +11,13 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { TokenPopup } from '../components/popups/TokenPopup.js';
 import { toKSNum } from '../dd-helpers.js';
 import { type GameNodeConfig, getByGestalt } from './GameNode.js';
 import { GamePerp, type RenderNodeLike, type RenderPopupLike } from './GamePerp.js';
 import type { GameRoot } from './GameRoot.js';
 import { ProfileSet } from './ProfileSet.js';
+import { buildTokenPopupVM } from './tokenPopupView.js';
 
 interface DecoratorAmountLike {
   setAmount(n: number): void;
@@ -74,13 +76,26 @@ export class TokenPerp extends GamePerp {
   // `'in'` default).  PR #229 swaps to the intended values; see
   // issue #191 for context.
   override cableType = 'in' as const;
-  override popupTemplate = 'popup_token.html';
 
   amount?: number;
   renderReady?: DecoratorReadyLike;
 
   protected override get groot(): GameRoot {
     return this.GameRoot;
+  }
+
+  override openPopup(): RenderPopupLike {
+    const vm = buildTokenPopupVM(
+      (this.data ?? {}) as Parameters<typeof buildTokenPopupVM>[0],
+      this.states
+    );
+    return this.openPreactPopup(TokenPopup, { vm }) as RenderPopupLike;
+  }
+
+  // Single snapshot (no live re-fetch); Charge/collect trigger
+  // `popup_close`. Path-A re-mount kept for parity with the other perps.
+  override updatePopup(): RenderPopupLike {
+    return this.openPopup();
   }
 
   constructor(config: GameNodeConfig) {

@@ -9,9 +9,11 @@
 // generic already type-checks props against the component.
 
 import type { ComponentType } from 'preact';
+import type { ProvidedPopupVM } from '../../game/providedView.js';
 import { LevelUpNotification, type LevelUpNotificationProps } from './LevelUpNotification.js';
 import { MissionPopup, type MissionPopupProps } from './MissionPopup.js';
 import { NewItemsNotification, type NewItemsNotificationProps } from './NewItemsNotification.js';
+import { ProvidedPerpPopup } from './ProvidedPerpPopup.js';
 import { TutorialNotification, type TutorialNotificationProps } from './TutorialNotification.js';
 
 /** `onClose` is framework-injected by the dialog manager — cue sites
@@ -25,6 +27,12 @@ interface DialogVariants {
   tutorial: TutorialNotificationProps;
   missionBriefing: MissionPopupProps;
   missionComplete: MissionPopupProps;
+  /** Karmalizer-incident notification — the one interactive cue
+   *  variant; reuses the shared perp-buy popup.  `GameRoot`'s
+   *  config.dialog path calls `initPopupEvents` on its handle so the
+   *  PerpBuyButton/MainButton seam works (the others are
+   *  presentational). */
+  karma: { vm: ProvidedPopupVM };
 }
 
 const REGISTRY: { [K in keyof DialogVariants]: ComponentType<DialogVariants[K]> } = {
@@ -33,6 +41,7 @@ const REGISTRY: { [K in keyof DialogVariants]: ComponentType<DialogVariants[K]> 
   tutorial: TutorialNotification,
   missionBriefing: MissionPopup,
   missionComplete: MissionPopup,
+  karma: ProvidedPerpPopup as unknown as ComponentType<{ vm: ProvidedPopupVM }>,
 };
 
 /** Discriminated union — `{ variant, props }` with `props` typed to

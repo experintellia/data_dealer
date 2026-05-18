@@ -265,7 +265,15 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
   // on action-button clicks — exactly what the legacy jQuery `.Button`
   // delegated handler did.  Presentational components ignore `popup`.
   const body = h(opts.component, { ...opts.props, onClose: close, popup: handle });
-  const wrapped = h('div', { class: 'Popup' }, body as ComponentChildren);
+  // Mirror legacy RenderPopup: the extend-class lives on the `.Popup`
+  // element too (not just `.PopupContainer`), so `.Popup.Tutorial` /
+  // `.Popup.LevelUp` / `.Popup.Mission` / `.Popup.NewItems` /
+  // `.Popup.Alert` rules (border:none, margins, …) actually match.
+  const wrapped = h(
+    'div',
+    { class: opts.extendClass ? `Popup ${opts.extendClass}` : 'Popup' },
+    body as ComponentChildren
+  );
   render(wrapped, opts.container);
 
   active = { container: opts.container, extendClass: opts.extendClass, handle };

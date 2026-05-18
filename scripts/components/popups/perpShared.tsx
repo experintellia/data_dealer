@@ -7,6 +7,7 @@
 
 import type { JSX } from 'preact';
 import type { ProvidedSubpopVM, ProvidedTileVM } from '../../game/providedView.js';
+import type { TokenUpgradeSubpopVM } from '../../game/tokenPopupView.js';
 import type { TokenVM } from '../../game/tokenView.js';
 import i18n from '../../i18n.js';
 import { type PreactDialogHandle, toFXTarget } from './dialogManager.js';
@@ -239,4 +240,48 @@ export function NoItems({
   }
   // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted i18n string (may contain <br />)
   return <div class="SelectorNoItems" dangerouslySetInnerHTML={{ __html: textNoItems }} />;
+}
+
+/** `subpop_token_upgrade.html` — the SuperToken "analyzed / not yet
+ *  analyzed" detail card.  Distinct from `TokenSubpop` (findings):
+ *  `.Subpop.TokenUpgrade`, an OKButton close, no action button. */
+export function TokenUpgradeSubpop({
+  sub,
+  isOpen,
+  onClose,
+}: {
+  sub: TokenUpgradeSubpopVM;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
+    e.stopPropagation();
+    onClose();
+  };
+  return (
+    <div
+      class={isOpen ? 'Subpop TokenUpgrade open' : 'Subpop TokenUpgrade'}
+      data-subpop-id={sub.subpopId}
+    >
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+      <div class="SubpopClose" data-button-id="CloseSubpop" onClick={close}>
+        X
+      </div>
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
+      <div class="SubpopLogo" dangerouslySetInnerHTML={{ __html: sub.logoHtml }} />
+      <div class="SubpopTitle">{sub.title}</div>
+      <div class="SubpopSubTitle">
+        {sub.todoLabel} <span class="UpgradeTodo">{sub.todoText}</span>
+        <br />
+        {sub.doneLabel} <span class="UpgradeDone">{sub.doneText}</span>
+      </div>
+      <div class="SubpopText">{sub.description}</div>
+      <div class="SubpopButtons">
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+        <div class="Button" data-button-id="OKButton" onClick={close}>
+          {i18n.gettext('Close')}
+        </div>
+      </div>
+    </div>
+  );
 }

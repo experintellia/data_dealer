@@ -24,6 +24,7 @@ import { APStatusPopup } from '../components/popups/APStatusPopup.js';
 import { AboutPopup } from '../components/popups/AboutPopup.js';
 import { CashStatusPopup } from '../components/popups/CashStatusPopup.js';
 import { ProfilesStatusPopup } from '../components/popups/ProfilesStatusPopup.js';
+import { ProvidedPerpPopup } from '../components/popups/ProvidedPerpPopup.js';
 import { XPStatusPopup } from '../components/popups/XPStatusPopup.js';
 import { type PreactDialogHandle, openDialog } from '../components/popups/dialogManager.js';
 import { type DialogSpec, resolveDialog } from '../components/popups/dialogRegistry.js';
@@ -57,9 +58,11 @@ import { Mission } from './Mission.js';
 import { Missions } from './Missions.js';
 import { Topscore } from './Topscore.js';
 import { Topscores } from './Topscores.js';
+import { buildKarmaPopupVM } from './karmaView.js';
 import { mergeData } from './mergeData.js';
 import { buildMissionPopupProps } from './missionView.js';
 import { perpCtors } from './perpCtors.js';
+import { buildProvidedContext } from './providedView.js';
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -1460,6 +1463,13 @@ export class GameRoot extends GameNode {
           drainOnClose();
           return;
         }
+        // The `karma` cue is the one interactive notification variant
+        // (PerpBuyButton → BuyKarma, MainButton → close).  The other
+        // variants are presentational; only karma needs the GameNode
+        // button seam wired onto its live handle.
+        if (config.dialog?.variant === 'karma') {
+          this.initPopupEvents?.(liveHandle as unknown as RenderPopupLike);
+        }
         if (notification.nonblocking) {
           window.setTimeout(() => liveHandle?.close(), notification.nonblocking);
         }
@@ -1759,10 +1769,22 @@ export class GameRoot extends GameNode {
       n.selectortitle = i18n.gettext('Choose your counter measures');
       n.karma_dec = data.karma.dec;
       n.button = i18n.gettext('Do nothing');
-      n.config = { template: 'popup_karma.html', extendClass: 'Alert', delay: 650 };
       n.providedKarma = this.data.providedKarma;
       const type = this.getType(gestalt);
       n.game_type = type?.game_type;
+      const ctx = buildProvidedContext(
+        this as unknown as Parameters<typeof buildProvidedContext>[0]
+      );
+      const vm = buildKarmaPopupVM(
+        n as Parameters<typeof buildKarmaPopupVM>[0],
+        this.karma_value,
+        ctx
+      );
+      n.config = {
+        dialog: { variant: 'karma', props: { vm } },
+        extendClass: 'Alert',
+        delay: 650,
+      };
       this.cueNotification(n);
     }
 
@@ -2115,16 +2137,29 @@ export class GameRoot extends GameNode {
 
     this.on('click_status.karma', () => {
       const providedKarma = this.compileProvidedKarma();
-      this.openGenericPopup({
-        data: {
+      const ctx = buildProvidedContext(
+        this as unknown as Parameters<typeof buildProvidedContext>[0]
+      );
+      const vm = buildKarmaPopupVM(
+        {
           title: i18n.gettext('karma_popup title'),
           description: i18n.gettext('karma_popup description'),
           selectortitle: i18n.gettext('karma_popup selector title'),
           mainsprites_class: 'karma',
           providedKarma,
         },
-        template: 'popup_karma.html',
-      });
+        this.karma_value,
+        ctx
+      );
+      this.openPreactDialog(
+        ProvidedPerpPopup as unknown as ComponentType<{ vm: typeof vm } & { onClose: () => void }>,
+        { vm },
+        { slot: 'popup' }
+      );
+      // GameRoot extends GameNode → initPopupEvents wires
+      // button_click.PerpBuyButton (→ BuyPerp → Karmalauter → BuyKarma)
+      // + MainButton → popup_close on the parked handle.
+      this.initPopupEvents?.();
     });
 
     // Status info popups (Profiles / Cash / AP / XP) — Preact port of
