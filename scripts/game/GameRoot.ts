@@ -149,6 +149,15 @@ interface Level {
   [key: string]: unknown;
 }
 
+/** Level-shaped zero sentinel.  Used where a real level isn't available
+ *  yet (pre-bootstrap `xp_level`, out-of-range `getLevel`/`getLevelByXP`
+ *  lookups) so the strict-TS shape stays satisfied without a legacy
+ *  `undefined.xp_min` TypeError.  Returns a fresh object each call —
+ *  callers assign it to `xp_level`, which other code may overwrite. */
+function emptyLevel(): Level {
+  return { number: 0, xp_min: 0, xp_max: 0, ap_max: 0, ap_inc_value: 0, ap_inc_interval: 0 };
+}
+
 // Render Popup surface used by `openNotification` — re-imports the
 // canonical `RenderPopupLike` from GamePerp.ts (was duplicated across
 // GameRoot / GameNode / GamePerp / Database / ProjectPerp before this
@@ -514,14 +523,7 @@ export class GameRoot extends GameNode {
   karma_value = 0;
   karma_max = 100;
   xp_value = 0;
-  xp_level: Level = {
-    number: 0,
-    xp_min: 0,
-    xp_max: 0,
-    ap_max: 0,
-    ap_inc_value: 0,
-    ap_inc_interval: 0,
-  };
+  xp_level: Level = emptyLevel();
   /** Set by `loadGame` (still in Game.js) once the Missions singleton
    *  is constructed.  Forward-ref optional until Missions extracts. */
   Missions?: Missions;
@@ -980,16 +982,7 @@ export class GameRoot extends GameNode {
   getLevel(level?: number): Level {
     const levels = this.data.levels ?? [];
     const idx = level ? level - 1 : (this.data.game_values?.xp_level ?? 1) - 1;
-    return (
-      levels[idx] ?? {
-        number: 0,
-        xp_min: 0,
-        xp_max: 0,
-        ap_max: 0,
-        ap_inc_value: 0,
-        ap_inc_interval: 0,
-      }
-    );
+    return levels[idx] ?? emptyLevel();
   }
 
   /** Returns the Level `xp` resolves to, or an empty Level-shape when
@@ -1007,7 +1000,7 @@ export class GameRoot extends GameNode {
    *  (RangeError / stack overflow surfacing in `FXSimpleCue`). */
   getLevelByXP(xp?: number): Level {
     if (!xp) {
-      return { number: 0, xp_min: 0, xp_max: 0, ap_max: 0, ap_inc_value: 0, ap_inc_interval: 0 };
+      return emptyLevel();
     }
     const levels = this.data.levels ?? [];
     for (let i = levels.length - 1; i >= 0; i--) {
@@ -1018,7 +1011,7 @@ export class GameRoot extends GameNode {
         return lvl;
       }
     }
-    return { number: 0, xp_min: 0, xp_max: 0, ap_max: 0, ap_inc_value: 0, ap_inc_interval: 0 };
+    return emptyLevel();
   }
 
   override APTick(): void {
