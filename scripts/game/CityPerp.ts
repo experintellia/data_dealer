@@ -31,7 +31,6 @@ interface GameRootForCityPerp extends GameRootForPerp {
 export class CityPerp extends GamePerp {
   override renderType = 'Perp';
   override cableType = 'inout' as const;
-  override popupTemplate = 'popup_city.html';
 
   protected override get groot(): GameRootForCityPerp {
     return this.GameRoot as unknown as GameRootForCityPerp;

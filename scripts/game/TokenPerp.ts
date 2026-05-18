@@ -76,7 +76,6 @@ export class TokenPerp extends GamePerp {
   // `'in'` default).  PR #229 swaps to the intended values; see
   // issue #191 for context.
   override cableType = 'in' as const;
-  override popupTemplate = 'popup_token.html';
 
   amount?: number;
   renderReady?: DecoratorReadyLike;
