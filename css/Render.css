@@ -3374,37 +3374,22 @@ button {
   opacity: 1;
   transition: transform 0.1s, opacity 0.1s;
 }
-/* `background` is deliberately NOT transitioned, so the card's white
-   (`.Subpop`, line ~1767) is dropped the instant `.open` is removed —
-   the white vanishes at close-start instead of fading with the scale.
-   Opaque white only while open. ProvidedPerp-scoped: Contact/Client
-   keep their existing subpop behaviour. */
-.PopupContainer.PopupPreact .PopupBody.ProvidedPerp .Subpop {
-  background: transparent;
-}
-.PopupContainer.PopupPreact .PopupBody.ProvidedPerp .Subpop.open {
-  background: #fff;
-}
-/* Drop the shared opaque #FFF→#EEE gradient (line ~677) off
-   `.SubpopContainer` for Preact dialogs — the dialog already has its
-   own body, so the extra sheet only adds white during close. */
+/* The detail card and its container keep their legacy opaque white
+   (`.Subpop` #FFF / `.SubpopContainer` #FFF→#EEE gradient, line ~677)
+   at rest AND while open — exactly the legacy perp-buy look.  On close
+   the opacity fade above dissolves the WHOLE card (white bg + border +
+   inset glow + content) together over 0.2s while it scales away — a
+   clean per-element fade, no white flash.  No `background:transparent`
+   close hack: that only exposed the card's `0 0 64px #BDE7F5 inset`
+   blue glow / blue border (which a transparent background does NOT
+   hide) as a shrinking blue box, and is unnecessary once the card
+   fades via opacity.  `.SubpopContainer` only needs its close-fade
+   *timing* de-delayed for Preact so the container fade tracks the
+   card; the gradient is untouched at rest/open and fades out with the
+   container's own opacity transition. */
 .PopupContainer.PopupPreact .SubpopContainer {
-  background: transparent;
   transition: opacity 0.2s linear, visibility 0.2s;
 }
 .PopupContainer.PopupPreact .SubpopContainer.open {
   transition: opacity 0s;
-}
-/* Container transparency alone is insufficient on the perp-buy popups:
-   their `.PopupSelector` is `.standalone` (inset, absolutely
-   positioned) so it doesn't fill `.PopupContent`, so a closing subpop
-   reveals `.PopupContent`'s own copy of the line ~677 white gradient
-   as a full-area flash. Drop that gradient ONLY while a subpop is
-   closing — `.subpopClosing` is set by ProvidedPerpPopup for the
-   ~0.25s close window, then removed so `.PopupContent` returns to its
-   opaque white resting look (matching the legacy perp-buy popup; the
-   transparent body must not be the resting state). ProvidedPerp-scoped
-   so Contact/Client (grid fills `.PopupContent`) are untouched. */
-.PopupContainer.PopupPreact .PopupBody.ProvidedPerp.subpopClosing .PopupContent {
-  background: transparent;
 }
