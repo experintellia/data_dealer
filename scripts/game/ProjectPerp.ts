@@ -13,6 +13,7 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { type ProjectBridge, ProjectPopup } from '../components/popups/ProjectPopup.js';
 import { toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
 import { type GameNodeConfig } from './GameNode.js';
@@ -20,6 +21,7 @@ import { GamePerp, type RenderNodeLike, type RenderPopupLike } from './GamePerp.
 import { ProfileSet } from './ProfileSet.js';
 import { mergeData } from './mergeData.js';
 import { convertPowerupType, getPowerupTypeFromGestalt } from './powerupTypes.js';
+import { buildProjectPopupVM } from './powerupView.js';
 
 interface DecoratorReadyLike {
   on(ev: string, handler: (...args: unknown[]) => void): void;
@@ -38,29 +40,6 @@ interface ProjectRenderNodeLike extends RenderNodeLike {
   FXCharge?(): void;
   FXNoCash?(): void;
   FXDataOut?(): void;
-}
-
-/** Minimal jQuery-element surface used by updatePopupGracefully — local
- *  shim so this file doesn't depend on the global env.d.ts namespace. */
-interface JQueryElemLike {
-  find(selector: string): JQueryElemLike;
-  removeAttr?(name: string): unknown;
-  remove?(): unknown;
-  append?(content: unknown): unknown;
-  addClass?(cls: string): unknown;
-  removeClass?(cls: string): unknown;
-  replaceWith?(content: unknown): unknown;
-}
-
-interface JQueryStaticLike {
-  parseHTML(html: string): unknown;
-}
-
-interface ProjectRenderPopupLike extends RenderPopupLike {
-  templateData?: { cached?: boolean; loading?: boolean; data?: Record<string, unknown> };
-  jdomelem?: JQueryElemLike;
-  renderDataTab?(): void;
-  renderPowerupSelectors?(pcat: string): void;
 }
 
 interface PowerupRow {
@@ -86,8 +65,43 @@ export class ProjectPerp extends GamePerp {
 
   renderReady?: DecoratorReadyLike;
 
+  /** Active `.PopupMenu` tab — persisted across the BuySlots Path-A
+   *  re-mount (legacy `templateData.lastTab`); seeded into the VM so
+   *  the rebuilt popup stays on the powerup tab, not snap to Data. */
+  private lastTab = 'data';
+  /** Published by the mounted `ProjectPopup`; drives the buy/sell
+   *  graceful slot-swap animation without a re-mount. */
+  private projectBridge: { current: ProjectBridge | null } = { current: null };
+
   protected override get groot() {
     return this.GameRoot;
+  }
+
+  private xpLevel(): number {
+    return (this.groot as unknown as { xp_level?: { number?: number } }).xp_level?.number ?? 1;
+  }
+
+  override openPopup(): RenderPopupLike {
+    const vm = buildProjectPopupVM(
+      (this.data ?? {}) as Parameters<typeof buildProjectPopupVM>[0],
+      this.states,
+      this.xpLevel(),
+      this.lastTab
+    );
+    const handle = this.openPreactPopup(ProjectPopup, {
+      vm,
+      bridge: this.projectBridge,
+    });
+    handle?.on('tab_change', (_e: unknown, tab: unknown) => {
+      if (typeof tab === 'string') this.lastTab = tab;
+    });
+    return handle as RenderPopupLike;
+  }
+
+  // Live-refetch / post-BuySlots re-mount (Path A) — see
+  // PusherPerp.updatePopup.  Rebuilds with the persisted `lastTab`.
+  override updatePopup(): RenderPopupLike {
+    return this.openPopup();
   }
 
   constructor(config: GameNodeConfig) {
@@ -299,7 +313,7 @@ export class ProjectPerp extends GamePerp {
         gnode.removeProvidedPowerup(bgestalt as string);
         gnode.compilePowerups();
         gnode.compileProfileSet();
-        const popup = gnode.renderPopup as ProjectRenderPopupLike | undefined;
+        const popup = gnode.renderPopup as RenderPopupLike | undefined;
         popup?.trigger('close_powerup', [
           // NOTE: close_powerup has callback with timeout
           () => gnode.updatePopupGracefully(bslot, bgestalt as string),
@@ -334,7 +348,7 @@ export class ProjectPerp extends GamePerp {
         gnode.addProvidedPowerup(bgestalt);
         gnode.compilePowerups();
         gnode.compileProfileSet();
-        const popup = gnode.renderPopup as ProjectRenderPopupLike | undefined;
+        const popup = gnode.renderPopup as RenderPopupLike | undefined;
         popup?.trigger('close_powerup', [() => gnode.updatePopupGracefully(bslot, bgestalt, true)]);
       })
       .fail(function (data) {
@@ -401,7 +415,7 @@ export class ProjectPerp extends GamePerp {
         gnode.data = mergeData(gnode.data, r.node?.instance_data);
         gnode.compilePowerups();
         // FIXME: do this gracefully
-        const popup = gnode.renderPopup as ProjectRenderPopupLike | undefined;
+        const popup = gnode.renderPopup as RenderPopupLike | undefined;
         popup?.trigger('close_powerup', [() => gnode.updatePopup()]);
       })
       .fail(function (data) {
@@ -410,72 +424,27 @@ export class ProjectPerp extends GamePerp {
       });
   }
 
+  /** Buy/sell succeeded: rebuild the VM from the freshly-compiled data
+   *  and hand it to the mounted `ProjectPopup`, which plays the
+   *  plug-out → plug-in slot swap (legacy walked the popup DOM via
+   *  jQuery + `renderDataTab`/`renderPowerupSelectors`; the Preact
+   *  component reconciles the whole tree from the new VM instead). */
   updatePopupGracefully(bslot: number | string, bgestalt: string, selling?: boolean): void {
     const pcat = getPowerupTypeFromGestalt(bgestalt);
     if (!pcat) return;
     this.updateTemplateData();
-    if (this.popupTemplateData) {
-      (this.popupTemplateData as { loading?: boolean }).loading = false;
-    }
-    const popup = this.renderPopup as ProjectRenderPopupLike | undefined;
-    if (!popup) return;
-    popup.renderDataTab?.();
-    popup.renderPowerupSelectors?.(pcat);
-
-    const jpop = popup.jdomelem;
-    if (!jpop) return;
-    const jtab = jpop.find(`.PopupTab[data-tab="${pcat}"]`);
-    const dataRec = (this.data || {}) as { powerups?: PowerupRow[]; slot_background?: unknown };
-    const renderView = appModule.getApplication().renderView;
-    if (!selling) {
-      let slot = jtab.find(`.Powerup.free[data-button-data="${bslot}"]`);
-      slot.removeAttr?.('data-subpop-id');
-      const powerup = dataRec.powerups?.find((p) => p.gestalt === bgestalt);
-      const jpowerup = renderView('powerup.html', {
-        powerup,
-        slot: bslot,
-        key: pcat + bslot,
-        updating: true,
-      });
-      jtab.find(`.Subpop[data-subpop-id="${pcat}${bslot}"]`).remove?.();
-      const jpowerupSubpop = renderView('subpop_powerup.html', {
-        powerup,
-        slot: bslot,
-        key: pcat + bslot,
-      });
-      jtab.find('.SubpopContainer').append?.(jpowerupSubpop);
-      const parsed = (globalThis.$ as unknown as JQueryStaticLike).parseHTML(jpowerup);
-      slot.addClass?.('updating hide ');
-      window.setTimeout(function () {
-        slot.replaceWith?.(parsed);
-        slot = jtab.find(`.Powerup.updating[data-button-data="${bslot}"]`);
-        window.setTimeout(function () {
-          slot.removeClass?.('updating');
-          slot.addClass?.('taken new');
-        }, 400);
-      }, 400);
-    } else {
-      let slot = jtab.find(`.Powerup.taken[data-button-data="${bslot}"]`);
-      slot.removeAttr?.('data-subpop-id');
-      const jpowerup = renderView('powerup_free.html', {
-        slot: bslot,
-        slot_background: dataRec.slot_background,
-        pkey: pcat,
-        data: (this.popupTemplateData as { data?: unknown } | undefined)?.data,
-        typelower: convertPowerupType(pcat),
-        updating: true,
-      });
-      const parsed = (globalThis.$ as unknown as JQueryStaticLike).parseHTML(jpowerup);
-      slot.addClass?.('updating hide');
-      window.setTimeout(function () {
-        slot.replaceWith?.(parsed);
-        slot = jtab.find(`.Powerup.updating[data-button-data="${bslot}"]`);
-        window.setTimeout(function () {
-          slot.removeClass?.('updating');
-          slot.addClass?.('free');
-        }, 400);
-      }, 400);
-    }
+    const nextVM = buildProjectPopupVM(
+      (this.data ?? {}) as Parameters<typeof buildProjectPopupVM>[0],
+      this.states,
+      this.xpLevel(),
+      this.lastTab
+    );
+    this.projectBridge.current?.gracefulSlot(
+      pcat,
+      Number.parseInt(String(bslot), 10) || 0,
+      selling === true,
+      nextVM
+    );
   }
 
   Charge(): void {
