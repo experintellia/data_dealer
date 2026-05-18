@@ -1291,7 +1291,7 @@
   line-height: 26px;
 }
 .TopscoreLabel .TopscoreLabelLine:last-child {
-  padding: 4px 0px 10px 0px;
+  padding: 16px 0px 10px 0px;
 }
 .TopscoreLabelIcon {
   margin: 26px 0px 0px 0px;
