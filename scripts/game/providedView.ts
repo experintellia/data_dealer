@@ -316,8 +316,13 @@ export interface ProvidedPopupVM {
   subtitle: string;
   description: string;
   /** Empty string → the `.SubpopHeader` title bar is omitted (legacy
-   *  `popup.html` only renders it when `data.selectortitle` is set). */
+   *  `popup.html` only renders it when `data.selectortitle` is set;
+   *  `popup_karma.html` always renders it because of `karmaChip`). */
   selectorTitle: string;
+  /** `popup_karma.html` SubpopHeader Risk chip (karma value).  When
+   *  set, the `.SubpopHeader` renders even with an empty
+   *  `selectorTitle`, with this chip before the title. */
+  karmaChip?: { up: boolean; text: string };
   tiles: ProvidedTileVM[];
   subpops: ProvidedSubpopVM[];
   pageSize: number;

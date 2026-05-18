@@ -76,8 +76,14 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
             ))}
           </div>
           <div class="Pagination Selector standalone">
-            {vm.selectorTitle ? (
+            {vm.selectorTitle || vm.karmaChip ? (
               <div class="SubpopHeader">
+                {vm.karmaChip ? (
+                  <div class={`PopupSummaryItem Risk ${vm.karmaChip.up ? 'Up' : 'Down'}`}>
+                    <div class="RenderSprite Tobi" />
+                    {vm.karmaChip.text}
+                  </div>
+                ) : null}
                 <div class="SubpopHeaderTitle">{vm.selectorTitle}</div>
               </div>
             ) : null}
