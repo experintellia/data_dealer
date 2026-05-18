@@ -38,7 +38,7 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
   };
 
   return (
-    <div class="PopupBody">
+    <div class="PopupBody ProvidedPerp">
       <div class="PopupHeader">
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
         <div class="PopupClose" onClick={closeX}>
