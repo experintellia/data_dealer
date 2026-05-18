@@ -202,7 +202,6 @@ async function expectOpenAndClose(
   await expect(body).toBeHidden({ timeout: 3_000 });
 }
 
-
 // ── Section A: Status info popups ─────────────────────────────────────────
 //
 // All four share `popup_status.html` and a `.MainSpritesPopup.<icon>` root.
