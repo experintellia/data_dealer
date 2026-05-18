@@ -1478,57 +1478,11 @@ export class GameRoot extends GameNode {
       return undefined;
     }
 
-    const popupTemplateData: Record<string, unknown> = {
-      status_icons: this.data.status_icons,
-      states: notification.states ?? {},
-      data: { ...notification, id: this.id },
-      groot: this,
-    };
-
-    // Legacy template path — remaining tier-3+ notification cues
-    // (mission popups, popup_karma) still flow through `Render.Popup`
-    // + the Underscore.js template.
-    config.templateData = popupTemplateData;
-    config.popupContainer = this;
-
-    const Render = getRender() as Pick<RenderApi, 'Popup'>;
-    const popup = new Render.Popup(
-      config as unknown as ConstructorParameters<RenderApi['Popup']>[0]
-    ) as unknown as RenderPopupLike & {
-      notificationMission?: string;
-      callback?: () => void;
-    };
-    this.notificationPopup = popup;
-    // Tag the popup with the mission gestalt so the popup_close
-    // handler in initPopupEvents can persist the dismissal directly.
-    // Persisting in popup.callback (which only fires via popup.close
-    // (cb)) was unreliable — popup_close fires the moment the user
-    // clicks X, before the close animation/timeout chain that
-    // triggers the callback.
-    if (notification.mission_active_gestalt) {
-      popup.notificationMission = notification.mission_active_gestalt;
-    }
-
-    window.setTimeout(() => {
-      notification.scriptedEvents?.forEach((s) => s());
-    }, config.delayScript ?? 0);
-
-    window.setTimeout(() => {
-      this.renderNode?.addPopup?.(popup);
-      this.initPopupEvents?.(popup);
-    }, config.delay ?? 0);
-
-    popup.callback = () => {
-      this.uncueNotification(notification);
-      delete this.notificationPopup;
-      const next = this.NotificationQueue[0];
-      if (next) this.openNotification(next);
-    };
-
-    if (notification.nonblocking) {
-      window.setTimeout(() => popup.trigger('popup_close'), notification.nonblocking);
-    }
-    return popup;
+    // Every notification cue carries a typed `config.dialog` (mission /
+    // levelup / perps / powerups / karma / simplemessage / story /
+    // tutorial), so the legacy `Render.Popup` + Underscore-template
+    // notification path was removed with the rest of the legacy engine.
+    return undefined;
   }
 
   /** Build notification cues from the server's payload and kick the

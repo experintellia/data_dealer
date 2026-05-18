@@ -46,7 +46,6 @@ import { RenderText } from './render/RenderText.js';
 import {
   RenderDBQueue,
   RenderMissionPerp,
-  RenderPopup,
   RenderStatusItem,
   RenderStatusbar,
   RenderTopscorePerp,
@@ -110,7 +109,6 @@ export interface RenderApi {
   MainMenu: typeof RenderMainMenu;
   ButtonInline: typeof RenderButtonInline;
   Stage: typeof RenderStage;
-  Popup: typeof RenderPopup;
   SlowTicker: typeof RenderSlowTicker;
   Statusbar: typeof RenderStatusbar;
   DBQueue: typeof RenderDBQueue;
@@ -182,7 +180,6 @@ function Render(): RenderApi {
     MainMenu: RenderMainMenu,
     ButtonInline: RenderButtonInline,
     Stage: RenderStage,
-    Popup: RenderPopup,
     SlowTicker: RenderSlowTicker,
     Statusbar: RenderStatusbar,
     DBQueue: RenderDBQueue,

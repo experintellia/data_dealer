@@ -159,7 +159,6 @@ export class GamePerp extends GameNode {
   cableType: CableType = 'in';
   labelClass?: string;
   sticky = true;
-  popupTemplate = 'popup.html';
   textNewItems?: string;
 
   // Init flags carried across renders (legacy fields).
@@ -185,10 +184,7 @@ export class GamePerp extends GameNode {
     return this.renderNode as RenderNodeLike | undefined;
   }
 
-  private getRenderModule(): Pick<
-    RenderApi,
-    'Popup' | 'DecoratorLabel' | 'DecoratorNew' | 'DecoratorTimer'
-  > {
+  private getRenderModule(): Pick<RenderApi, 'DecoratorLabel' | 'DecoratorNew' | 'DecoratorTimer'> {
     return getRender();
   }
 
@@ -297,61 +293,18 @@ export class GamePerp extends GameNode {
   // Popup helpers
   // -------------------------------------------------------------------
 
-  updateTemplateData(): void {
-    const groot = this.groot;
-    // Popup instantiated for the first time
-    if (!this.popupTemplateData) {
-      const ptd: Record<string, unknown> = {};
-      ptd.states = this.states;
-      ptd.status_icons = groot.data.status_icons;
-      const pd: Record<string, unknown> = {};
-      if (this.gestalt !== undefined) pd.gestalt = this.gestalt;
-      pd.id = this.id;
-      ptd.data = pd;
-      ptd.loading = true;
-      ptd.groot = groot;
-      this.popupTemplateData = ptd;
-    }
-    // Highlight tabs in popups.
-    this.popupTemplateData.highlightTabs = this.highlightTabs || [];
-    Object.assign(this.popupTemplateData.data as Record<string, unknown>, this.data || {});
-    // FIXME: make this a getGameValues method on groot.
-    this.popupTemplateData.game_values = {
-      xp_level: groot.xp_level,
-    };
-  }
-
-  private _buildPopup(replaceExisting: boolean): RenderPopupLike {
-    const Render = this.getRenderModule();
-    this.updateTemplateData();
-
-    const popup = new Render.Popup({
-      // FIXME: gameNode only used for debug info on logo click.
-      gameNode: this,
-      template: this.popupTemplate,
-      templateData: this.popupTemplateData,
-      popupContainer: this.ViewMap,
-    } as unknown as ConstructorParameters<RenderApi['Popup']>[0]) as unknown as RenderPopupLike;
-
-    if (replaceExisting && this.renderPopup) {
-      (this.renderPopup as RenderPopupLike).remove?.();
-    }
-    this.renderPopup = popup;
-
-    const viewMapNode = this.ViewMap?.renderNode as RenderNodeLike | undefined;
-    viewMapNode?.addPopup?.(popup);
-
-    if (this.initPopupEvents) this.initPopupEvents();
-
-    return popup;
-  }
-
+  // Every concrete perp overrides `openPopup`/`updatePopup` to mount a
+  // Preact dialog via `openPreactPopup` (issue #80).  The legacy
+  // `Render.Popup` template engine + `_buildPopup` were removed once
+  // the last legacy consumer (SupertokenPerp) was retired; the base
+  // methods stay only to satisfy the `override` contract and fail
+  // loudly if a future perp forgets to provide a Preact popup.
   openPopup(): RenderPopupLike {
-    return this._buildPopup(false);
+    throw new Error(`${this.constructor.name} must override openPopup() with a Preact dialog`);
   }
 
   updatePopup(): RenderPopupLike {
-    return this._buildPopup(true);
+    throw new Error(`${this.constructor.name} must override updatePopup() with a Preact dialog`);
   }
 
   /** Phase 2 (issue #80) — open a Preact perp dialog through the
