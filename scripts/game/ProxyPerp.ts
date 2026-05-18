@@ -19,7 +19,6 @@ interface GameRootForProvided {
 
 export class ProxyPerp extends GamePerp {
   override renderType = 'Perp';
-  override popupTemplate = 'popup_proxy.html';
 
   private providedCtx(): ProvidedContext {
     const g = this.groot as unknown as GameRootForProvided;

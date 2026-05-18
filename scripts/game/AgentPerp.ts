@@ -22,7 +22,6 @@ interface GameRootForProvided {
 
 export class AgentPerp extends GamePerp {
   override renderType = 'Perp';
-  override popupTemplate = 'popup_agent.html';
 
   private providedCtx(): ProvidedContext {
     const g = this.groot as unknown as GameRootForProvided;

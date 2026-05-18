@@ -61,7 +61,6 @@ interface PowerupSlotsBucket {
 export class ProjectPerp extends GamePerp {
   override renderType = 'Perp';
   override sticky = false;
-  override popupTemplate = 'popup_project.html';
 
   renderReady?: DecoratorReadyLike;
 

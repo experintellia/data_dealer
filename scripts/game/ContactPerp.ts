@@ -50,7 +50,6 @@ interface GameRootForContactPerp extends GameRootForPerp {
 
 export class ContactPerp extends GamePerp {
   override renderType = 'Perp';
-  override popupTemplate = 'popup_contact.html';
   override sticky = false;
 
   renderReady?: DecoratorReadyLike;

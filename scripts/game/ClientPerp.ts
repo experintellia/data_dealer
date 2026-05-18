@@ -58,7 +58,6 @@ export class ClientPerp extends GamePerp {
   override cableType = 'out' as const;
   override labelClass = 'client';
   override sticky = false;
-  override popupTemplate = 'popup_client.html';
 
   renderReady?: DecoratorReadyLike;
 

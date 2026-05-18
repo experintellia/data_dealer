@@ -22,7 +22,6 @@ export class PusherPerp extends GamePerp {
   override renderType = 'Perp';
   override cableType = 'out' as const;
   override labelClass = 'client';
-  override popupTemplate = 'popup_pusher.html';
 
   private providedCtx(): ProvidedContext {
     const g = this.groot as unknown as GameRootForProvided;
