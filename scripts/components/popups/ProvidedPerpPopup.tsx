@@ -48,8 +48,14 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
         <div class="PopupClose" onClick={closeX}>
           X
         </div>
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
-        <div class="PopupLogo" dangerouslySetInnerHTML={{ __html: vm.spriteHtml }} />
+        {vm.mainspritesClass ? (
+          <div class="PopupLogo">
+            <div class={`MainSpritesPopup ${vm.mainspritesClass}`} />
+          </div>
+        ) : (
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup
+          <div class="PopupLogo" dangerouslySetInnerHTML={{ __html: vm.spriteHtml }} />
+        )}
         <div class="PopupTitle">{vm.title}</div>
         <div class="PopupSubTitle">{vm.subtitle}</div>
         <div class="PopupText">{vm.description}</div>
@@ -70,9 +76,11 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
             ))}
           </div>
           <div class="Pagination Selector standalone">
-            <div class="SubpopHeader">
-              <div class="SubpopHeaderTitle">{vm.selectorTitle}</div>
-            </div>
+            {vm.selectorTitle ? (
+              <div class="SubpopHeader">
+                <div class="SubpopHeaderTitle">{vm.selectorTitle}</div>
+              </div>
+            ) : null}
             <div class="PopupSelector">
               <div class="PopupPageWrap">
                 {vm.tiles.length === 0 ? (

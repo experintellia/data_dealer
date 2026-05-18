@@ -8,6 +8,12 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { ProvidedPerpPopup } from '../components/popups/ProvidedPerpPopup.js';
+import {
+  type OpenDialogOptions,
+  type PreactDialogHandle,
+  openDialog,
+} from '../components/popups/dialogManager.js';
 import { toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
 import {
@@ -28,8 +34,10 @@ import { type GameRoot } from './GameRoot.js';
 import { OrderedSet } from './OrderedSet.js';
 import { ProfileSet } from './ProfileSet.js';
 import { TokenPerp } from './TokenPerp.js';
+import { buildDatabaseUpgradesPopupVM } from './databaseUpgradesView.js';
 import { mergeData } from './mergeData.js';
 import { perpCtors } from './perpCtors.js';
+import type { ProvidedContext, ProvidedPopupVM } from './providedView.js';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -43,6 +51,7 @@ type RenderMenuLike = Pick<InstanceType<RenderApi['MainMenu']>, 'addButton'>;
 interface RenderNodeLike {
   addChild?(node: unknown, ...args: unknown[]): void;
   addPopup?(node: unknown): void;
+  popupContainerDomelem?: { 0?: HTMLElement };
   lock?(): void;
   unlock?(): void;
   getPosition?(): { x: number; y: number };
@@ -235,15 +244,10 @@ export class Database extends GameNode {
   }
 
   openUpgradesPopup(): unknown {
-    const Render = this.getRenderModule();
     const groot = this.groot;
-    // Popup instantiated for the first time
-    if (!this.popupTemplateData) {
-      this.popupTemplateData = {};
-      this.popupTemplateData.status_icons = groot.data.status_icons;
-      this.popupTemplateData.states = {};
-      this.popupTemplateData.data = this.data;
-      const pdata = this.data as Record<string, unknown>;
+    const pdata = this.data as Record<string, unknown>;
+    // First open: stamp the static copy onto `data` (read by the VM).
+    if (pdata.title === undefined) {
       pdata.gestalt = 'Database';
       pdata.id = this.id;
       pdata.title = i18n.gettext('database_buytokens title');
@@ -251,28 +255,33 @@ export class Database extends GameNode {
       pdata.description = i18n.gettext('database_buytokens description');
       pdata.selectortitle = i18n.gettext('database_buytokens selector title');
       pdata.mainsprites_class = 'DBUpgrade';
-      this.popupTemplateData.groot = groot;
     }
-    this.popupTemplateData.data = this.data;
-
-    const popupConfig = {
-      gameNode: this,
-      template: 'popup.html',
-      templateData: this.popupTemplateData,
-      popupContainer: this,
+    const container = this.renderApi?.popupContainerDomelem?.[0];
+    if (!container) return undefined;
+    const ctx: ProvidedContext = {
+      xpLevel: groot.xp_level.number,
+      dbTokens: groot.DBTokens,
+      typeOf: (g: string) => groot.getTypeFromGestalt(g),
     };
-
-    const popup = new Render.Popup(
-      popupConfig as unknown as ConstructorParameters<RenderApi['Popup']>[0]
-    ) as unknown as RenderPopupLike;
-    this.renderPopup = popup;
-    this.renderApi?.addPopup?.(popup);
-
-    // initPopupEvents lives on GameNode.prototype (added by Game.js's
-    // legacy mixin block).  Type loosely until that mixin is consolidated.
-    if (this.initPopupEvents) this.initPopupEvents();
-
-    return popup;
+    const vm = buildDatabaseUpgradesPopupVM(
+      this.data as Parameters<typeof buildDatabaseUpgradesPopupVM>[0],
+      ctx
+    );
+    const handle: PreactDialogHandle | undefined = openDialog<{ vm: ProvidedPopupVM }>({
+      component: ProvidedPerpPopup as unknown as OpenDialogOptions<{
+        vm: ProvidedPopupVM;
+      }>['component'],
+      props: { vm },
+      container,
+      onAfterClose: () => {
+        if ((this.renderPopup as unknown) === handle) delete this.renderPopup;
+      },
+    });
+    this.renderPopup = handle as unknown as RenderPopupLike;
+    // initPopupEvents (GameNode) wires button_click.PerpBuyButton →
+    // BuyPerp/BuyToken, MainButton → popup_close, etc.
+    this.initPopupEvents?.();
+    return handle;
   }
 
   BuyPerp(bgestalt: string, placePos?: { x: number; y: number }): void {

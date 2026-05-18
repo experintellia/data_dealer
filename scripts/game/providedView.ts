@@ -252,9 +252,15 @@ function buildProvidedSubpop(
  *  empty-state copy, all resolved into this one VM. */
 export interface ProvidedPopupVM {
   spriteHtml: string;
+  /** When set, the header logo is a `.MainSpritesPopup.<class>` chip
+   *  (legacy `popup.html` / `popup_karma.html` `mainsprites_class`
+   *  branch) instead of `spriteHtml`. */
+  mainspritesClass?: string;
   title: string;
   subtitle: string;
   description: string;
+  /** Empty string → the `.SubpopHeader` title bar is omitted (legacy
+   *  `popup.html` only renders it when `data.selectortitle` is set). */
   selectorTitle: string;
   tiles: ProvidedTileVM[];
   subpops: ProvidedSubpopVM[];
