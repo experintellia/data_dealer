@@ -20,6 +20,24 @@ export interface ProvidedContext {
   typeOf(gestalt: string): string;
 }
 
+/** Minimal groot surface a `ProvidedContext` is built from. */
+interface ProvidedContextRoot {
+  xp_level: { number: number };
+  DBTokens: Record<string, number>;
+  getTypeFromGestalt(gestalt?: string): string;
+}
+
+/** The `{ xpLevel, dbTokens, typeOf }` literal was hand-built at every
+ *  provided-grid call site (Database / GameRoot karma / CityPerp); one
+ *  factory keeps them in sync. */
+export function buildProvidedContext(groot: ProvidedContextRoot): ProvidedContext {
+  return {
+    xpLevel: groot.xp_level.number,
+    dbTokens: groot.DBTokens,
+    typeOf: (gestalt: string) => groot.getTypeFromGestalt(gestalt),
+  };
+}
+
 type Frame = { width?: number; height?: number; pivotx?: number; pivoty?: number };
 
 function spriteOf(v: unknown): SpriteHelperConfig | undefined {

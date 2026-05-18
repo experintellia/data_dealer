@@ -6,6 +6,7 @@
 // `perpCtors[name]` (typed direct map, PR 17 of issue #147); the
 // known-name `Game.TokenPerp` reference uses a direct import.
 
+import type { ComponentType } from 'preact';
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
 import { ProfileSetPopup } from '../components/popups/ProfileSetPopup.js';
@@ -39,7 +40,7 @@ import { buildDatabaseUpgradesPopupVM } from './databaseUpgradesView.js';
 import { mergeData } from './mergeData.js';
 import { perpCtors } from './perpCtors.js';
 import { type ProfileSetPopupVM, buildProfileSetPopupVM } from './profilesetView.js';
-import type { ProvidedContext, ProvidedPopupVM } from './providedView.js';
+import { type ProvidedPopupVM, buildProvidedContext } from './providedView.js';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -183,6 +184,29 @@ export class Database extends GameNode {
     return this.renderNode as RenderNodeLike | undefined;
   }
 
+  /** Mount a Preact popup into the Database view's PopupContainer and
+   *  park it on `renderPopup` (Database isn't a GamePerp, so it can't
+   *  use `GamePerp.openPreactPopup`).  Shared by the upgrades + the
+   *  profileset-import popups; callers wire their own button seam
+   *  (`initPopupEvents` / a `.on(...)` handler) on the returned handle. */
+  private mountPopup<P extends Record<string, unknown>>(
+    component: ComponentType<P & { onClose: () => void; popup: PreactDialogHandle }>,
+    props: P
+  ): PreactDialogHandle | undefined {
+    const container = this.renderApi?.popupContainerDomelem?.[0];
+    if (!container) return undefined;
+    const handle = openDialog<P>({
+      component: component as unknown as OpenDialogOptions<P>['component'],
+      props,
+      container,
+      onAfterClose: () => {
+        if ((this.renderPopup as unknown) === handle) delete this.renderPopup;
+      },
+    });
+    this.renderPopup = handle as unknown as RenderPopupLike;
+    return handle;
+  }
+
   private getRenderModule(): Pick<RenderApi, 'Popup' | 'DBQueue' | 'DecoratorNew' | 'getById'> {
     return getRender();
   }
@@ -258,28 +282,14 @@ export class Database extends GameNode {
       pdata.selectortitle = i18n.gettext('database_buytokens selector title');
       pdata.mainsprites_class = 'DBUpgrade';
     }
-    const container = this.renderApi?.popupContainerDomelem?.[0];
-    if (!container) return undefined;
-    const ctx: ProvidedContext = {
-      xpLevel: groot.xp_level.number,
-      dbTokens: groot.DBTokens,
-      typeOf: (g: string) => groot.getTypeFromGestalt(g),
-    };
+    const ctx = buildProvidedContext(
+      groot as unknown as Parameters<typeof buildProvidedContext>[0]
+    );
     const vm = buildDatabaseUpgradesPopupVM(
       this.data as Parameters<typeof buildDatabaseUpgradesPopupVM>[0],
       ctx
     );
-    const handle: PreactDialogHandle | undefined = openDialog<{ vm: ProvidedPopupVM }>({
-      component: ProvidedPerpPopup as unknown as OpenDialogOptions<{
-        vm: ProvidedPopupVM;
-      }>['component'],
-      props: { vm },
-      container,
-      onAfterClose: () => {
-        if ((this.renderPopup as unknown) === handle) delete this.renderPopup;
-      },
-    });
-    this.renderPopup = handle as unknown as RenderPopupLike;
+    const handle = this.mountPopup(ProvidedPerpPopup, { vm });
     // initPopupEvents (GameNode) wires button_click.PerpBuyButton →
     // BuyPerp/BuyToken, MainButton → popup_close, etc.
     this.initPopupEvents?.();
@@ -653,22 +663,10 @@ export class Database extends GameNode {
     const origin = ps.origin;
     if (!origin) return undefined;
     ps.updateNewMarker();
-    const container = this.renderApi?.popupContainerDomelem?.[0];
-    if (!container) return undefined;
     const vm = buildProfileSetPopupVM(
       ps as unknown as Parameters<typeof buildProfileSetPopupVM>[0]
     );
-    const handle: PreactDialogHandle | undefined = openDialog<{ vm: ProfileSetPopupVM }>({
-      component: ProfileSetPopup as unknown as OpenDialogOptions<{
-        vm: ProfileSetPopupVM;
-      }>['component'],
-      props: { vm },
-      container,
-      onAfterClose: () => {
-        if ((this.renderPopup as unknown) === handle) delete this.renderPopup;
-      },
-    });
-    this.renderPopup = handle as unknown as RenderPopupLike;
+    const handle = this.mountPopup(ProfileSetPopup, { vm });
     // Import (MainButton) → mergeCued.  Legacy bound this inline (not
     // via initPopupEvents); popup_close is handled by the dialog
     // manager (X / backdrop) + onAfterClose, and mergeCued triggers

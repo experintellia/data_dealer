@@ -62,7 +62,7 @@ import { buildKarmaPopupVM } from './karmaView.js';
 import { mergeData } from './mergeData.js';
 import { buildMissionPopupProps } from './missionView.js';
 import { perpCtors } from './perpCtors.js';
-import type { ProvidedContext } from './providedView.js';
+import { buildProvidedContext } from './providedView.js';
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -1772,11 +1772,9 @@ export class GameRoot extends GameNode {
       n.providedKarma = this.data.providedKarma;
       const type = this.getType(gestalt);
       n.game_type = type?.game_type;
-      const ctx: ProvidedContext = {
-        xpLevel: this.xp_level.number,
-        dbTokens: this.DBTokens,
-        typeOf: (g: string) => this.getTypeFromGestalt(g),
-      };
+      const ctx = buildProvidedContext(
+        this as unknown as Parameters<typeof buildProvidedContext>[0]
+      );
       const vm = buildKarmaPopupVM(
         n as Parameters<typeof buildKarmaPopupVM>[0],
         this.karma_value,
@@ -2139,11 +2137,9 @@ export class GameRoot extends GameNode {
 
     this.on('click_status.karma', () => {
       const providedKarma = this.compileProvidedKarma();
-      const ctx: ProvidedContext = {
-        xpLevel: this.xp_level.number,
-        dbTokens: this.DBTokens,
-        typeOf: (g: string) => this.getTypeFromGestalt(g),
-      };
+      const ctx = buildProvidedContext(
+        this as unknown as Parameters<typeof buildProvidedContext>[0]
+      );
       const vm = buildKarmaPopupVM(
         {
           title: i18n.gettext('karma_popup title'),

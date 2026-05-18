@@ -14,7 +14,7 @@ import {
   type RenderPopupLike,
 } from './GamePerp.js';
 import { buildCityPopupVM } from './cityView.js';
-import type { ProvidedContext } from './providedView.js';
+import { type ProvidedContext, buildProvidedContext } from './providedView.js';
 
 type TabKey = 'AgentPerp' | 'PusherPerp' | 'ProxyPerp' | 'CityPerp';
 
@@ -37,16 +37,9 @@ export class CityPerp extends GamePerp {
   }
 
   private providedCtx(): ProvidedContext {
-    const g = this.groot as unknown as {
-      xp_level: { number: number };
-      DBTokens: Record<string, number>;
-      getTypeFromGestalt(gestalt?: string): string;
-    };
-    return {
-      xpLevel: g.xp_level.number,
-      dbTokens: g.DBTokens,
-      typeOf: (gestalt: string) => g.getTypeFromGestalt(gestalt),
-    };
+    return buildProvidedContext(
+      this.groot as unknown as Parameters<typeof buildProvidedContext>[0]
+    );
   }
 
   override openPopup(): RenderPopupLike {
