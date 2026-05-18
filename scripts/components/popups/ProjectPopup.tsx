@@ -101,7 +101,13 @@ function SellSubpop({
   };
   // Short local keeps the dangerouslySetInnerHTML line single-line so
   // the biome-ignore attaches (codebase convention, see perpShared).
+  // Short locals keep the dangerouslySetInnerHTML lines single-line so
+  // the biome-ignore attaches. Legacy subpop_powerup.html emits title /
+  // description with `<%= … %>` (raw HTML — ruleset copy can contain a
+  // `<div class="TabSubTitle">` etc.), so they render as innerHTML.
   const vd = sub.valuesDetailsHtml;
+  const st = sub.title;
+  const sx = sub.description;
   return (
     <div class={isOpen ? 'Subpop open' : 'Subpop'} data-subpop-id={sub.subpopId}>
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
@@ -110,10 +116,12 @@ function SellSubpop({
       </div>
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
       <div class="SubpopLogo" dangerouslySetInnerHTML={html(sub.logoHtml)} />
-      <div class="SubpopTitle">{sub.title}</div>
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
+      <div class="SubpopTitle" dangerouslySetInnerHTML={html(st)} />
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced bonus markup */}
       <div class="PowerupLabelData SubpopLabelData" dangerouslySetInnerHTML={html(vd)} />
-      <div class="SubpopText">{sub.description}</div>
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
+      <div class="SubpopText" dangerouslySetInnerHTML={html(sx)} />
       <div class="SubpopButtons">
         <div class="ButtonDecorator Cash">
           <div class="RenderSprite Tobi" />
@@ -154,9 +162,12 @@ function ProvidedSubpop({
     e.stopPropagation();
     onClose();
   };
-  // Short local keeps the dangerouslySetInnerHTML line single-line so
-  // the biome-ignore attaches (codebase convention, see perpShared).
+  // Short locals keep the dangerouslySetInnerHTML lines single-line so
+  // the biome-ignore attaches. Legacy subpop_powerup_provided.html
+  // emits title / description with `<%= … %>` (raw ruleset HTML).
   const vd = sub.valuesDetailsHtml;
+  const st = sub.title;
+  const sx = sub.description;
   return (
     <div
       class={isOpen ? 'Subpop InSelector open' : 'Subpop InSelector'}
@@ -168,10 +179,12 @@ function ProvidedSubpop({
       </div>
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
       <div class="SubpopLogo" dangerouslySetInnerHTML={html(sub.logoHtml)} />
-      <div class="SubpopTitle">{sub.title}</div>
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
+      <div class="SubpopTitle" dangerouslySetInnerHTML={html(st)} />
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced bonus markup */}
       <div class="PowerupLabelData SubpopLabelData" dangerouslySetInnerHTML={html(vd)} />
-      <div class="SubpopText">{sub.description}</div>
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
+      <div class="SubpopText" dangerouslySetInnerHTML={html(sx)} />
       <div class="SubpopButtons">
         <div class="ButtonDecorator Cash">
           <div class="RenderSprite Tobi" />
@@ -320,6 +333,14 @@ function BuySlotsSubpop({
     e.stopPropagation();
     setNum((n) => (n + 1 > bs.slotsLeft ? n : n + 1));
   };
+  // Legacy subpop_buyslots.html emits title / subtitle / description
+  // with `<%= … %>` (raw ruleset HTML); short locals keep the
+  // dangerouslySetInnerHTML lines single-line so the biome-ignore
+  // attaches. Description sits inline before .BuySlotsWrap (legacy
+  // renders both inside .SubpopText), so it's a display:contents span.
+  const bt = bs.title;
+  const bsub = bs.subtitle;
+  const bd = bs.description;
   return (
     <div class={isOpen ? 'Subpop open' : 'Subpop'} data-subpop-id="buyslots">
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
@@ -329,10 +350,13 @@ function BuySlotsSubpop({
       <div class="SubpopLogo">
         <div class="BuySlotsLogo" />
       </div>
-      <div class="SubpopTitle">{bs.title}</div>
-      <div class="SubpopSubTitle">{bs.subtitle}</div>
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
+      <div class="SubpopTitle" dangerouslySetInnerHTML={html(bt)} />
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
+      <div class="SubpopSubTitle" dangerouslySetInnerHTML={html(bsub)} />
       <div class="SubpopText">
-        {bs.description}
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
+        <span style="display:contents" dangerouslySetInnerHTML={html(bd)} />
         <div class="BuySlotsWrap">
           {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
           <div class="BuySlotsDec ButtonInc" onClick={dec}>
@@ -475,6 +499,11 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
   };
 
   const dataActive = activeTab === 'data';
+  // Legacy popup_project.html emits the tab/description copy with
+  // `<%= … %>` (raw HTML — it contains a `<div class="TabSubTitle">`
+  // prefix), so these render as innerHTML, not escaped text.
+  const desc = vm.description;
+  const dataTabCls = dataActive ? 'PopupText TabText' : 'PopupText TabText hidden';
   const tokPageCount = Math.max(1, Math.ceil(vm.tokens.length / vm.pageSize));
   const pageTokens = vm.tokens.slice(
     tokenPage * vm.pageSize,
@@ -491,18 +520,16 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
         <div class="PopupLogo" dangerouslySetInnerHTML={html(vm.spriteHtml)} />
         <div class="PopupTitle">{vm.title}</div>
-        <div class={dataActive ? 'PopupText TabText' : 'PopupText TabText hidden'} data-tab="data">
-          {vm.description}
-        </div>
-        {vm.categories.map((c) => (
-          <div
-            key={c.pkey}
-            class={activeTab === c.pkey ? 'PopupText TabText' : 'PopupText TabText hidden'}
-            data-tab={c.pkey}
-          >
-            {c.tabText}
-          </div>
-        ))}
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %> tab copy) */}
+        <div class={dataTabCls} data-tab="data" dangerouslySetInnerHTML={html(desc)} />
+        {vm.categories.map((c) => {
+          const tcls = activeTab === c.pkey ? 'PopupText TabText' : 'PopupText TabText hidden';
+          const tt = c.tabText;
+          return (
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %> tab copy)
+            <div key={c.pkey} class={tcls} data-tab={c.pkey} dangerouslySetInnerHTML={html(tt)} />
+          );
+        })}
         <div class="PopupMenu">
           {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
           <div
