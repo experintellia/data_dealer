@@ -6,7 +6,7 @@
 // button-disabled / empty-state copy into one `ProvidedPopupVM`.
 
 import type { JSX } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import type { ProvidedPopupVM } from '../../game/providedView.js';
 import type { PreactDialogHandle } from './dialogManager.js';
 import {
@@ -28,40 +28,10 @@ export interface ProvidedPerpPopupProps {
 export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps) {
   const [page, setPage] = useState(0);
   const [openKey, setOpenKey] = useState<number | null>(null);
-  // The key of the subpop currently animating out (~0.25s). Only that
-  // specific card + its container get the close-transparency — not the
-  // body, and not every mounted/stacked subpop — so a closing card
-  // vanishes over the blue selector with no white flash while anything
-  // else on screen stays opaque white.
-  const [closingKey, setClosingKey] = useState<number | null>(null);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const clearCloseTimer = (): void => {
-    if (closeTimer.current !== undefined) {
-      clearTimeout(closeTimer.current);
-      closeTimer.current = undefined;
-    }
-  };
-  useEffect(
-    () => () => {
-      if (closeTimer.current !== undefined) clearTimeout(closeTimer.current);
-    },
-    []
-  );
-
-  const openSubpop = (key: number): void => {
-    clearCloseTimer();
-    setClosingKey(null);
-    setOpenKey(key);
-  };
-  // 250ms > the 0.2s `.Subpop`/`.SubpopContainer` close transition, so
-  // the card is fully gone before the close-transparency lifts.
-  const closeSubpop = (): void => {
-    const closing = openKey;
-    setOpenKey(null);
-    setClosingKey(closing);
-    clearCloseTimer();
-    closeTimer.current = setTimeout(() => setClosingKey(null), 250);
-  };
+  // Open/close is just the `.open` toggle: the CSS opacity+scale fade
+  // dissolves the whole card cleanly on close (no transparent-bg hack).
+  const openSubpop = (key: number): void => setOpenKey(key);
+  const closeSubpop = (): void => setOpenKey(null);
 
   const pageCount = Math.max(1, Math.ceil(vm.tiles.length / vm.pageSize));
   const pageTiles = vm.tiles.slice(page * vm.pageSize, page * vm.pageSize + vm.pageSize);
@@ -87,20 +57,13 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
       <div class="PopupContent">
         <div class="PopupTab">
           {/* All subpops stay mounted; only `.open` toggles (matches
-              the legacy SubpopContainer reveal — no grid re-render).
-              `.closing` marks just this container during its own
-              card's ~0.25s close. */}
-          <div
-            class={`SubpopContainer${openKey !== null ? ' open' : ''}${
-              closingKey !== null ? ' closing' : ''
-            }`}
-          >
+              the legacy SubpopContainer reveal — no grid re-render). */}
+          <div class={openKey !== null ? 'SubpopContainer open' : 'SubpopContainer'}>
             {vm.subpops.map((s) => (
               <PerpProvidedSubpop
                 key={s.key}
                 subpop={s}
                 isOpen={openKey === s.key}
-                isClosing={closingKey === s.key}
                 onClose={closeSubpop}
                 popup={popup}
               />

@@ -3376,29 +3376,20 @@ button {
 }
 /* The detail card and its container keep their legacy opaque white
    (`.Subpop` #FFF / `.SubpopContainer` #FFF→#EEE gradient, line ~677)
-   at rest AND while open — exactly the legacy perp-buy look.  The
-   close-transparency is scoped to ONLY the specific card that is
-   animating out (`.Subpop.closing`) and its own container
-   (`.SubpopContainer.closing`), set by ProvidedPerpPopup for the
-   ~0.25s close window.  `background` is not transitioned, so the white
-   vanishes the instant close starts and that card scales/fades away
-   over the (still opaque white) popup content + blue selector behind
-   — no white flash.  `.PopupContent` is NEVER blanked: a closing
-   subpop just reveals the popup's normal resting state, and a
-   stacked/sibling subpop that is NOT closing keeps its white.
-   ProvidedPerp-scoped: Contact/Client keep their behaviour. */
-.PopupContainer.PopupPreact .PopupBody.ProvidedPerp .Subpop.closing {
-  background: transparent;
-}
-/* `.SubpopContainer`: only the close-fade *timing* is overridden for
-   Preact (drop the legacy 0.2s delay so the fade tracks the card);
-   the gradient is untouched at rest/open. */
+   at rest AND while open — exactly the legacy perp-buy look.  On close
+   the opacity fade above dissolves the WHOLE card (white bg + border +
+   inset glow + content) together over 0.2s while it scales away — a
+   clean per-element fade, no white flash.  No `background:transparent`
+   close hack: that only exposed the card's `0 0 64px #BDE7F5 inset`
+   blue glow / blue border (which a transparent background does NOT
+   hide) as a shrinking blue box, and is unnecessary once the card
+   fades via opacity.  `.SubpopContainer` only needs its close-fade
+   *timing* de-delayed for Preact so the container fade tracks the
+   card; the gradient is untouched at rest/open and fades out with the
+   container's own opacity transition. */
 .PopupContainer.PopupPreact .SubpopContainer {
   transition: opacity 0.2s linear, visibility 0.2s;
 }
 .PopupContainer.PopupPreact .SubpopContainer.open {
   transition: opacity 0s;
-}
-.PopupContainer.PopupPreact .PopupBody.ProvidedPerp .SubpopContainer.closing {
-  background: transparent;
 }
