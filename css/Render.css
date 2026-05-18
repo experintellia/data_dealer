@@ -1285,13 +1285,13 @@
   font-size: 26px;
   text-align: center;
   line-height: 26px;
-  margin: 20px 0px 4px 0px;
+  margin: 8px 0px 4px 0px;
 }
 .TopscoreLabelLine {
   line-height: 26px;
 }
 .TopscoreLabelIcon {
-  margin: 12px 0px 14px 0px;
+  margin: 26px 0px 14px 0px;
   text-align: center;
   line-height: 0;
 }
