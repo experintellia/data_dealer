@@ -3389,15 +3389,21 @@ button {
 .PopupContainer.PopupPreact .PopupBody.ProvidedPerp.subpopClosing .Subpop {
   background: transparent;
 }
-/* Drop the shared opaque #FFF→#EEE gradient (line ~677) off
-   `.SubpopContainer` for Preact dialogs — the dialog already has its
-   own body, so the extra sheet only adds white during close. */
+/* `.SubpopContainer` keeps its legacy opaque #FFF→#EEE gradient (line
+   ~677) at rest AND while open — only the close-fade *timing* is
+   overridden for Preact (drop the legacy 0.2s delay so the fade tracks
+   the card). It goes transparent only during the `.subpopClosing`
+   window (rule below), in lock-step with `.Subpop` / `.PopupContent`,
+   so the whole subpop layer clears together on close — no white
+   flash, no desynced ghosting. */
 .PopupContainer.PopupPreact .SubpopContainer {
-  background: transparent;
   transition: opacity 0.2s linear, visibility 0.2s;
 }
 .PopupContainer.PopupPreact .SubpopContainer.open {
   transition: opacity 0s;
+}
+.PopupContainer.PopupPreact .PopupBody.ProvidedPerp.subpopClosing .SubpopContainer {
+  background: transparent;
 }
 /* Container transparency alone is insufficient on the perp-buy popups:
    their `.PopupSelector` is `.standalone` (inset, absolutely
