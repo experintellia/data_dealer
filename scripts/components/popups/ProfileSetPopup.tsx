@@ -1,0 +1,95 @@
+// Database profileset-import popup — Preact port of
+// `views/popup_profileset.html` (computed in `game/profilesetView.ts`).
+// Issue #80 phase 2 tier 10.  A trimmed popup_contact: the shared
+// token grid / subpop / pagination (perpShared) + a single Profiles
+// summary and one Import MainButton (routed through the same
+// `fireAction` seam, wired to `Database.mergeCued`).
+
+import type { JSX } from 'preact';
+import { useState } from 'preact/hooks';
+import type { ProfileSetPopupVM } from '../../game/profilesetView.js';
+import type { PreactDialogHandle } from './dialogManager.js';
+import { PageArrows, TokenSubpop, TokenTile, fireAction } from './perpShared.js';
+
+export interface ProfileSetPopupProps {
+  vm: ProfileSetPopupVM;
+  /** Framework-injected by the dialog manager. */
+  onClose: () => void;
+  /** Framework-injected — the live popup handle. */
+  popup: PreactDialogHandle;
+}
+
+export function ProfileSetPopup({ vm, onClose, popup }: ProfileSetPopupProps) {
+  const [page, setPage] = useState(0);
+  const [openToken, setOpenToken] = useState<string | null>(null);
+
+  const pageCount = Math.max(1, Math.ceil(vm.tokens.length / vm.pageSize));
+  const pageTokens = vm.tokens.slice(page * vm.pageSize, page * vm.pageSize + vm.pageSize);
+
+  const closeX = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
+    e.stopPropagation();
+    onClose();
+  };
+
+  return (
+    <div class="PopupBody">
+      <div class="PopupHeader">
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+        <div class="PopupClose" onClick={closeX}>
+          X
+        </div>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
+        <div class="PopupLogo" dangerouslySetInnerHTML={{ __html: vm.spriteHtml }} />
+        <div class="PopupTitle">{vm.title}</div>
+        <div class="PopupSubTitle">{vm.subtitle}</div>
+        <div class="PopupText">{vm.description}</div>
+      </div>
+      <div class="PopupContent">
+        <div class="PopupTab">
+          <div class={openToken ? 'SubpopContainer open' : 'SubpopContainer'}>
+            {vm.tokens.map((t) => (
+              <TokenSubpop
+                key={t.gestalt}
+                token={t}
+                isOpen={openToken === t.gestalt}
+                onClose={() => setOpenToken(null)}
+              />
+            ))}
+          </div>
+          <div class="Pagination">
+            <div class="PopupTokens">
+              <div class="PopupPageWrap">
+                <div class="PopupPage" data-page-id={page}>
+                  {pageTokens.map((t) => (
+                    <TokenTile key={t.gestalt} token={t} onOpen={setOpenToken} />
+                  ))}
+                </div>
+              </div>
+            </div>
+            <PageArrows page={page} pageCount={pageCount} setPage={setPage} />
+          </div>
+          <div class="PopupSummary">
+            <div class="PopupSummaryItem Profiles">
+              <div class="RenderSprite Tobi" />
+              {vm.summaryProfiles}
+            </div>
+          </div>
+          <div class="PopupButtons">
+            <div class="ButtonDecorator AP">
+              <div class="RenderSprite Tobi" />1
+            </div>
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+            <div
+              class="Button"
+              data-button-id="MainButton"
+              data-testid="dd-integrate-button"
+              onClick={(e) => fireAction(popup, e, 'MainButton')}
+            >
+              {vm.buttonText}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

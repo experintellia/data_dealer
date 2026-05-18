@@ -8,6 +8,7 @@
 
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
+import { ProfileSetPopup } from '../components/popups/ProfileSetPopup.js';
 import { ProvidedPerpPopup } from '../components/popups/ProvidedPerpPopup.js';
 import {
   type OpenDialogOptions,
@@ -37,6 +38,7 @@ import { TokenPerp } from './TokenPerp.js';
 import { buildDatabaseUpgradesPopupVM } from './databaseUpgradesView.js';
 import { mergeData } from './mergeData.js';
 import { perpCtors } from './perpCtors.js';
+import { type ProfileSetPopupVM, buildProfileSetPopupVM } from './profilesetView.js';
 import type { ProvidedContext, ProvidedPopupVM } from './providedView.js';
 
 // ---------------------------------------------------------------------------
@@ -648,57 +650,36 @@ export class Database extends GameNode {
   }
 
   openProfileSetPopup(ps: ProfileSet): unknown {
-    const gnode = this;
-    const groot = this.groot;
-    const Render = this.getRenderModule();
     const origin = ps.origin;
     if (!origin) return undefined;
     ps.updateNewMarker();
-    // Popup instantiated for the first time
-    if (!ps.popupTemplateData) {
-      ps.popupTemplateData = {};
-      const ptd = ps.popupTemplateData;
-      ptd.ProfileSet = ps;
-      ptd.states = origin.states;
-      ptd.status_icons = groot.data.status_icons;
-      const pd: Record<string, unknown> = {};
-      if (origin.gestalt) pd.gestalt = origin.gestalt;
-      if (origin.id) pd.id = origin.id;
-      ptd.data = pd;
-    }
-
-    // Update data with current gnode data
-    Object.assign(ps.popupTemplateData.data as Record<string, unknown>, origin.data || {});
-
-    const popupConfig = {
-      gameNode: this,
-      template: 'popup_profileset.html',
-      templateData: ps.popupTemplateData,
-      popupContainer: this,
-    };
-
-    const popup = new Render.Popup(
-      popupConfig as unknown as ConstructorParameters<RenderApi['Popup']>[0]
-    ) as unknown as RenderPopupLike;
-    this.renderPopup = popup;
-    (gnode.renderNode as RenderNodeLike | undefined)?.addPopup?.(popup);
-
-    popup.on('button_click.MainButton', function (e: unknown) {
+    const container = this.renderApi?.popupContainerDomelem?.[0];
+    if (!container) return undefined;
+    const vm = buildProfileSetPopupVM(
+      ps as unknown as Parameters<typeof buildProfileSetPopupVM>[0]
+    );
+    const handle: PreactDialogHandle | undefined = openDialog<{ vm: ProfileSetPopupVM }>({
+      component: ProfileSetPopup as unknown as OpenDialogOptions<{
+        vm: ProfileSetPopupVM;
+      }>['component'],
+      props: { vm },
+      container,
+      onAfterClose: () => {
+        if ((this.renderPopup as unknown) === handle) delete this.renderPopup;
+      },
+    });
+    this.renderPopup = handle as unknown as RenderPopupLike;
+    // Import (MainButton) → mergeCued.  Legacy bound this inline (not
+    // via initPopupEvents); popup_close is handled by the dialog
+    // manager (X / backdrop) + onAfterClose, and mergeCued triggers
+    // `popup_close` on renderPopup on success → manager closes.
+    handle?.on('button_click.MainButton', (e: unknown) => {
       if (e && typeof (e as { stopPropagation?: () => void }).stopPropagation === 'function') {
         (e as { stopPropagation: () => void }).stopPropagation();
       }
-      if (ps.psid) gnode.mergeCued(ps.psid);
+      if (ps.psid) this.mergeCued(ps.psid);
     });
-
-    popup.on('popup_close', function (e: unknown) {
-      if (e && typeof (e as { stopPropagation?: () => void }).stopPropagation === 'function') {
-        (e as { stopPropagation: () => void }).stopPropagation();
-      }
-      popup.close();
-      delete gnode.renderPopup;
-    });
-
-    return popup;
+    return handle;
   }
 
   override initEventHandlers(): void {
