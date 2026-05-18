@@ -49,15 +49,19 @@ function normalFrame(cfg: SpriteHelperConfig | undefined): Frame | undefined {
 }
 
 /** RenderPerp inline style — `box` is the pivot origin (48 in
- *  client.html, 49 in perp.html). */
+ *  client.html, 49 in perp.html).  `fm` is the perp_background frame
+ *  or undefined (the slot_background fallback passes undefined so the
+ *  box stays 0/0/100/100, matching perp.html's else-branch).  A
+ *  non-numeric pivot stays at offset 0 (legacy `box - undefined`
+ *  produced NaN → ignored CSS → 0). */
 function perpStyle(fm: Frame | undefined, box: number): string {
   let offsetX = 0;
   let offsetY = 0;
   let width = 100;
   let height = 100;
   if (fm) {
-    offsetX = box - (fm.pivotx ?? 0);
-    offsetY = box - (fm.pivoty ?? 0);
+    if (typeof fm.pivotx === 'number') offsetX = box - fm.pivotx;
+    if (typeof fm.pivoty === 'number') offsetY = box - fm.pivoty;
     width = fm.width ?? 100;
     height = fm.height ?? 100;
   }
@@ -198,9 +202,17 @@ function buildPerpTile(perp: ProvidedPerpRow, key: number, ctx: ProvidedContext)
   const data = perp.data;
   const locked = perp.locked === true;
   const isSuper = data.is_supertoken === true;
+  // Mirror perp.html exactly: the RenderPerp box (pivot offset + size)
+  // is derived ONLY from `perp_background`'s frame.  When there's no
+  // `perp_background` frame the legacy code fell to the
+  // `else if (slot_background)` branch, which rendered the
+  // slot_background sprite but left offset/size at 0/0/100/100 —
+  // it did *not* pivot-centre by the slot frame (whose pivot is 0,0,
+  // which would shove the tile +49px and bleed it across neighbours).
   let bg = spriteOf(data.perp_background);
   if (bg && isSuper) bg = spriteOf(data.perp_background2);
-  if (!bg && data.slot_background) bg = spriteOf(data.slot_background);
+  const styleFrame = normalFrame(bg);
+  if (!styleFrame && data.slot_background) bg = spriteOf(data.slot_background);
   let dataHtml = '';
   if (locked) {
     const reqTokens = data.requiredTokens as
@@ -224,7 +236,7 @@ function buildPerpTile(perp: ProvidedPerpRow, key: number, ctx: ProvidedContext)
     gestalt: perp.gestalt,
     locked,
     extraClass: data.is_city ? ' CityPerpSpecial' : '',
-    perpStyle: perpStyle(normalFrame(bg), 49),
+    perpStyle: perpStyle(styleFrame, 49),
     renderPerpHtml: `<div class="PerpBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PerpSprite">${renderSpriteHtml(spriteOf(data.perp_sprite ?? data.slot_sprite))}</div>`,
     labelHtml: crlf2html(data.label),
     labelClass: 'PerpLabel',
