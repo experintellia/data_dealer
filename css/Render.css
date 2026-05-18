@@ -3362,12 +3362,10 @@ button {
   }
 }
 
-/* Phase 2 (#80) — Preact-dialog subpop close: the legacy `.Subpop`
-   only transitions `transform: scale()`, so its opaque #FFF box is
-   visible shrinking until the scale finishes.  Scope an opacity
-   fade to Preact-managed dialogs (`.PopupPreact`) so the white
-   background fades out as the subpop closes; legacy popups keep the
-   original scale-only behaviour. */
+/* #80 Preact subpop close: legacy `.Subpop` only transitions
+   `transform: scale()`, leaving its opaque #FFF box visible until the
+   scale finishes. Add an opacity fade for Preact dialogs; legacy
+   popups keep the scale-only behaviour. */
 .PopupContainer.PopupPreact .Subpop {
   opacity: 0;
   transition: transform 0.2s, opacity 0.2s;
@@ -3376,28 +3374,20 @@ button {
   opacity: 1;
   transition: transform 0.1s, opacity 0.1s;
 }
-/* On the perp-buy popups the subpop card's own opaque `#FFF`
-   background (`.Subpop`, css/Render.css line ~1767) is the dominant
-   white during close: the opacity fade above still shows it as a
-   shrinking white box for the first ~0.1–0.2s.  `background` is NOT
-   in the transition list, so dropping it on the non-`.open` state
-   makes the white vanish the instant close starts while the card's
-   content still scales/fades away gracefully over the blue selector
-   (the `.PopupContent` rule below removes the panel behind it).  The
-   card stays opaque white only while `.open` (a readable detail
-   card).  Scoped to `.PopupBody.ProvidedPerp` so Contact/Client keep
-   their already-approved subpop behaviour. */
+/* `background` is deliberately NOT transitioned, so the card's white
+   (`.Subpop`, line ~1767) is dropped the instant `.open` is removed —
+   the white vanishes at close-start instead of fading with the scale.
+   Opaque white only while open. ProvidedPerp-scoped: Contact/Client
+   keep their existing subpop behaviour. */
 .PopupContainer.PopupPreact .PopupBody.ProvidedPerp .Subpop {
   background: transparent;
 }
 .PopupContainer.PopupPreact .PopupBody.ProvidedPerp .Subpop.open {
   background: #fff;
 }
-/* `.SubpopContainer` carries an opaque #FFF→#EEE gradient (the legacy
-   white panel behind subpops).  A Preact dialog already has its own
-   popup body, so the extra sheet only adds to the white flash as a
-   subpop scales away — drop it for Preact dialogs (and keep the
-   no-delay close fade) so the container stops contributing white. */
+/* Drop the shared opaque #FFF→#EEE gradient (line ~677) off
+   `.SubpopContainer` for Preact dialogs — the dialog already has its
+   own body, so the extra sheet only adds white during close. */
 .PopupContainer.PopupPreact .SubpopContainer {
   background: transparent;
   transition: opacity 0.2s linear, visibility 0.2s;
@@ -3405,25 +3395,13 @@ button {
 .PopupContainer.PopupPreact .SubpopContainer.open {
   transition: opacity 0s;
 }
-/* …but `.SubpopContainer` transparency alone is NOT enough on the
-   perp-buy (Pusher/Proxy) popups: `.PopupContent` ITSELF carries the
-   same opaque #FFF→#EEE gradient, and the perp-buy popup's blue
-   `.PopupSelector` is `.standalone` (absolutely positioned, inset) so
-   it doesn't tile-fill `.PopupContent` the way the Contact/Client
-   token grid does.  With the container transparent, the closing
-   subpop fades to reveal that opaque `.PopupContent` gradient as a
-   full-area white flash (empirically: a differential e2e probe with
-   `.PopupContent` forced transparent is the only thing that makes the
-   blue selector show through during close).  Scope the transparency
-   to the perp-buy body (`.PopupBody.ProvidedPerp`, shared by Pusher +
-   Proxy) so the close reveals the blue selector directly; the dark
-   `.PopupBody` then frames the inset selector instead of a white
-   border, which matches the rest of the dialog chrome.  Contact /
-   Client keep their opaque `.PopupContent` (their grid fills it, so
-   no flash there) and other Preact dialogs are untouched.  KNOWN
-   FOLLOW-UP: still-legacy popups (ProjectPerp office / buy-slots /
-   upgrade-selection — tier 7; Agent — tier 6) keep the white flash
-   until they're ported to Preact. */
+/* Container transparency alone is insufficient on the perp-buy popups:
+   their `.PopupSelector` is `.standalone` (inset, absolutely
+   positioned) so it doesn't fill `.PopupContent`, leaving that
+   element's own copy of the line ~677 gradient flashing white as the
+   subpop closes. Make it transparent too (ProvidedPerp-scoped: the
+   Contact/Client grid fills `.PopupContent`, so they're unaffected and
+   stay opaque). */
 .PopupContainer.PopupPreact .PopupBody.ProvidedPerp .PopupContent {
   background: transparent;
 }
