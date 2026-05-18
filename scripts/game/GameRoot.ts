@@ -992,19 +992,33 @@ export class GameRoot extends GameNode {
     );
   }
 
-  /** Returns the Level whose `xp_min..xp_max` window contains `xp`,
-   *  or an empty Level-shape when `xp` is falsy.  Legacy returned
-   *  `{}` for the falsy branch — flattened to a Level-shaped sentinel
-   *  to keep the strict-TS signature clean (callers pass it to
-   *  `setLevel`'s identity check, never read fields off it). */
+  /** Returns the Level `xp` resolves to, or an empty Level-shape when
+   *  `xp` is falsy.  Legacy returned `{}` for the falsy branch —
+   *  flattened to a Level-shaped sentinel to keep the strict-TS
+   *  signature clean (callers pass it to `setLevel`'s identity check,
+   *  never read fields off it).
+   *
+   *  Ruleset levels leave a one-XP gap between consecutive ranges
+   *  (L1: 0–10, L2: 11–30, …).  `xp_max` is the promotion threshold:
+   *  xp landing exactly on a level's `xp_max` resolves to the *next*
+   *  level, mirroring the engine's `_getLevelByXP`.  The old inclusive
+   *  `xp <= xp_max` match kept it on the lower level, which made
+   *  `setXP` and `setLevel` recurse forever on the boundary value
+   *  (RangeError / stack overflow surfacing in `FXSimpleCue`). */
   getLevelByXP(xp?: number): Level {
     if (!xp) {
       return { number: 0, xp_min: 0, xp_max: 0, ap_max: 0, ap_inc_value: 0, ap_inc_interval: 0 };
     }
-    const found = (this.data.levels ?? []).find((lvl) => xp >= lvl.xp_min && xp <= lvl.xp_max);
-    return (
-      found ?? { number: 0, xp_min: 0, xp_max: 0, ap_max: 0, ap_inc_value: 0, ap_inc_interval: 0 }
-    );
+    const levels = this.data.levels ?? [];
+    for (let i = levels.length - 1; i >= 0; i--) {
+      const lvl = levels[i];
+      if (lvl && xp >= lvl.xp_min) {
+        const next = levels[i + 1];
+        if (next && xp >= lvl.xp_max) return next;
+        return lvl;
+      }
+    }
+    return { number: 0, xp_min: 0, xp_max: 0, ap_max: 0, ap_inc_value: 0, ap_inc_interval: 0 };
   }
 
   override APTick(): void {
@@ -1208,11 +1222,18 @@ export class GameRoot extends GameNode {
     if (num !== undefined && num > this.xp_value) {
       this.xp_value = num;
     }
-    if (this.xp_value >= this.xp_level.xp_max) {
-      this.setLevel(this.getLevelByXP(this.xp_value).number);
-    }
-    if (this.xp_value < this.xp_level.xp_min) {
-      this.setLevel(this.getLevelByXP(this.xp_value).number);
+    // `setLevel` calls back into `setXP`, so only re-enter it when the
+    // XP actually resolves to a *different* level.  Without the
+    // `resolved.number !== this.xp_level.number` guard, an `xp_value`
+    // sitting on a level boundary (e.g. exactly L1.xp_max) keeps
+    // resolving to the level we're already on and the two methods
+    // recurse until the stack overflows.
+    const resolved = this.getLevelByXP(this.xp_value);
+    if (
+      resolved.number !== this.xp_level.number &&
+      (this.xp_value >= this.xp_level.xp_max || this.xp_value < this.xp_level.xp_min)
+    ) {
+      this.setLevel(resolved.number);
     }
     const sb = this.data.status_bar;
     if (!sb) return;
