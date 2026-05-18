@@ -3397,11 +3397,14 @@ button {
 }
 /* Container transparency alone is insufficient on the perp-buy popups:
    their `.PopupSelector` is `.standalone` (inset, absolutely
-   positioned) so it doesn't fill `.PopupContent`, leaving that
-   element's own copy of the line ~677 gradient flashing white as the
-   subpop closes. Make it transparent too (ProvidedPerp-scoped: the
-   Contact/Client grid fills `.PopupContent`, so they're unaffected and
-   stay opaque). */
-.PopupContainer.PopupPreact .PopupBody.ProvidedPerp .PopupContent {
+   positioned) so it doesn't fill `.PopupContent`, so a closing subpop
+   reveals `.PopupContent`'s own copy of the line ~677 white gradient
+   as a full-area flash. Drop that gradient ONLY while a subpop is
+   closing — `.subpopClosing` is set by ProvidedPerpPopup for the
+   ~0.25s close window, then removed so `.PopupContent` returns to its
+   opaque white resting look (matching the legacy perp-buy popup; the
+   transparent body must not be the resting state). ProvidedPerp-scoped
+   so Contact/Client (grid fills `.PopupContent`) are untouched. */
+.PopupContainer.PopupPreact .PopupBody.ProvidedPerp.subpopClosing .PopupContent {
   background: transparent;
 }

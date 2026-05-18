@@ -6,7 +6,7 @@
 // button-disabled / empty-state copy into one `ProvidedPopupVM`.
 
 import type { JSX } from 'preact';
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ProvidedPopupVM } from '../../game/providedView.js';
 import type { PreactDialogHandle } from './dialogManager.js';
 import {
@@ -28,6 +28,39 @@ export interface ProvidedPerpPopupProps {
 export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps) {
   const [page, setPage] = useState(0);
   const [openKey, setOpenKey] = useState<number | null>(null);
+  // The `.standalone` selector doesn't fill `.PopupContent`, so the
+  // closing subpop would reveal its white gradient as a flash. Mark
+  // the body `.subpopClosing` for the close-transition window (CSS
+  // drops `.PopupContent`'s white only while this is set); `.PopupBody`
+  // is opaque white at rest, matching the legacy perp-buy popup.
+  const [subpopClosing, setSubpopClosing] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const clearCloseTimer = (): void => {
+    if (closeTimer.current !== undefined) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = undefined;
+    }
+  };
+  useEffect(
+    () => () => {
+      if (closeTimer.current !== undefined) clearTimeout(closeTimer.current);
+    },
+    []
+  );
+
+  const openSubpop = (key: number): void => {
+    clearCloseTimer();
+    setSubpopClosing(false);
+    setOpenKey(key);
+  };
+  // 250ms > the 0.2s `.SubpopContainer`/`.Subpop` close transition, so
+  // the white only returns once the subpop is fully gone.
+  const closeSubpop = (): void => {
+    setOpenKey(null);
+    setSubpopClosing(true);
+    clearCloseTimer();
+    closeTimer.current = setTimeout(() => setSubpopClosing(false), 250);
+  };
 
   const pageCount = Math.max(1, Math.ceil(vm.tiles.length / vm.pageSize));
   const pageTiles = vm.tiles.slice(page * vm.pageSize, page * vm.pageSize + vm.pageSize);
@@ -38,7 +71,7 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
   };
 
   return (
-    <div class="PopupBody ProvidedPerp">
+    <div class={subpopClosing ? 'PopupBody ProvidedPerp subpopClosing' : 'PopupBody ProvidedPerp'}>
       <div class="PopupHeader">
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
         <div class="PopupClose" onClick={closeX}>
@@ -60,7 +93,7 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
                 key={s.key}
                 subpop={s}
                 isOpen={openKey === s.key}
-                onClose={() => setOpenKey(null)}
+                onClose={closeSubpop}
                 popup={popup}
               />
             ))}
@@ -80,7 +113,7 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
                 ) : (
                   <div class="PopupPage PerpPage" data-page-id={page}>
                     {pageTiles.map((t) => (
-                      <PerpProvidedTile key={t.key} tile={t} onOpen={setOpenKey} />
+                      <PerpProvidedTile key={t.key} tile={t} onOpen={openSubpop} />
                     ))}
                   </div>
                 )}
