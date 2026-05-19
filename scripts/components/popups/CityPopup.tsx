@@ -7,6 +7,7 @@
 import { useState } from 'preact/hooks';
 import type { CityPopupVM } from '../../game/cityView.js';
 import { PopupHeader } from './PopupHeader.js';
+import { PopupMenu } from './PopupMenu.js';
 import type { PreactDialogHandle } from './dialogManager.js';
 import { NoItems, PerpProvidedSubpop, PerpProvidedTile, fireAction } from './perpShared.js';
 
@@ -40,19 +41,11 @@ export function CityPopup({ vm, onClose, popup }: CityPopupProps) {
         subtitle={vm.subtitle}
         description={vm.description}
       >
-        <div class="PopupMenu">
-          {vm.tabs.map((t) => (
-            // biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass
-            <div
-              key={t.pkey}
-              class={activeTab === t.pkey ? 'PopupMenuButton active' : 'PopupMenuButton'}
-              data-tab={t.pkey}
-              onClick={() => switchTab(t.pkey)}
-            >
-              {t.menuLabel}
-            </div>
-          ))}
-        </div>
+        <PopupMenu
+          tabs={vm.tabs.map((t) => ({ key: t.pkey, label: t.menuLabel }))}
+          activeKey={activeTab}
+          onSelect={switchTab}
+        />
       </PopupHeader>
       <div class="PopupContent">
         {vm.tabs.map((t) => {

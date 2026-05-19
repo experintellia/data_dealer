@@ -21,6 +21,7 @@ import type {
   SellSubpopVM,
 } from '../../game/powerupView.js';
 import i18n from '../../i18n.js';
+import { PopupMenu } from './PopupMenu.js';
 import type { PreactDialogHandle } from './dialogManager.js';
 import { PageArrows, TokenSubpop, TokenTile, fireAction } from './perpShared.js';
 
@@ -530,29 +531,16 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
             <div key={c.pkey} class={tcls} data-tab={c.pkey} dangerouslySetInnerHTML={html(tt)} />
           );
         })}
-        <div class="PopupMenu">
-          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-          <div
-            class={dataActive ? 'PopupMenuButton active' : 'PopupMenuButton'}
-            data-tab="data"
-            onClick={() => switchTab('data')}
-          >
-            {i18n.gettext('Data')}
-          </div>
-          {vm.categories
-            .filter((c) => c.menuVisible)
-            .map((c) => (
-              // biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass
-              <div
-                key={c.pkey}
-                class={activeTab === c.pkey ? 'PopupMenuButton active' : 'PopupMenuButton'}
-                data-tab={c.pkey}
-                onClick={() => switchTab(c.pkey)}
-              >
-                {c.menuLabel}
-              </div>
-            ))}
-        </div>
+        <PopupMenu
+          tabs={[
+            { key: 'data', label: i18n.gettext('Data') },
+            ...vm.categories
+              .filter((c) => c.menuVisible)
+              .map((c) => ({ key: c.pkey, label: c.menuLabel })),
+          ]}
+          activeKey={activeTab}
+          onSelect={switchTab}
+        />
       </div>
       <div class="PopupContent">
         <div
