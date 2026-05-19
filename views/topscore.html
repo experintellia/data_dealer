@@ -4,10 +4,10 @@
   var type = D.gameNode.scoretype || 'cash';
   var type_headline = data.type_headlines[type];
   var icon_map = {
-    cash: '<div class="Buy Cash"></div>',
-    profiles: '<div class="Buy Token"></div>',
+    cash: '<div class="TopscoreLabelCash"></div>',
+    profiles: '<div class="TopscoreLabelToken"></div>',
     xp: '<div class="TopscoreLabelStar"><span>XP</span></div>',
-    spent: '<div class="Buy Cash"></div>',
+    spent: '<div class="TopscoreLabelCash"></div>',
   };
   var headline_parts = String(type_headline).split(/<br\s*\/?>/i);
   var headline_top = headline_parts.shift();
