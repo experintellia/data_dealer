@@ -11,7 +11,7 @@ import type { ProvidedSubpopVM, ProvidedTileVM } from '../../game/providedView.j
 import type { TokenUpgradeSubpopVM } from '../../game/tokenPopupView.js';
 import type { TokenVM } from '../../game/tokenView.js';
 import i18n from '../../i18n.js';
-import { type PreactDialogHandle, toFXTarget } from './dialogManager.js';
+import { type PreactDialogHandle, stopAndClose, toFXTarget } from './dialogManager.js';
 
 /** Fire the legacy `.Button` seam: park the clicked element +
  *  click point on the handle, then `popup.trigger('button_click.X')`
@@ -72,10 +72,7 @@ export function TokenSubpop({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   const sub = token.subpop.subTitleHtml;
   return (
     <div class={isOpen ? 'Subpop open' : 'Subpop'} data-subpop-id={`token${token.gestalt}`}>
@@ -220,10 +217,7 @@ export function PerpProvidedSubpop({
   onClose: () => void;
   popup: PreactDialogHandle;
 }) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   const vd = subpop.valuesDetailsHtml;
   return (
     <div class={isOpen ? 'Subpop open' : 'Subpop'} data-subpop-id={subpop.key}>
@@ -292,10 +286,7 @@ export function TokenUpgradeSubpop({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   return (
     <div
       class={isOpen ? 'Subpop TokenUpgrade open' : 'Subpop TokenUpgrade'}

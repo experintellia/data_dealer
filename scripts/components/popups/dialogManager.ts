@@ -6,7 +6,7 @@
 // transition: opening a new Preact dialog while another (legacy or
 // Preact) is already active closes the existing one first.
 
-import { type ComponentChildren, type ComponentType, h, render } from 'preact';
+import { type ComponentChildren, type ComponentType, type JSX, h, render } from 'preact';
 import setup from '../../setup.js';
 
 // MainSprites.png window (x y, 65x65) for the legacy FX bling icons.
@@ -84,6 +84,19 @@ export type ExtendClass = 'Tutorial' | 'Alert' | 'NewItems' | 'LevelUp' | 'Missi
 export interface FXClassTarget {
   addClass(s: string): unknown;
   removeClass(s: string): unknown;
+}
+
+/** Popup close click handler — `stopPropagation` so the dialog
+ *  manager's backdrop click (which also closes) doesn't double-fire,
+ *  then `onClose`.  Every `.PopupClose` / `.SubpopClose` reproduced
+ *  this 3-liner verbatim. */
+export function stopAndClose(
+  onClose: () => void
+): (e: JSX.TargetedMouseEvent<HTMLDivElement>) => void {
+  return (e) => {
+    e.stopPropagation();
+    onClose();
+  };
 }
 
 /** Wrap a button element as an `FXClassTarget` so `no_cash`/`no_AP`/
