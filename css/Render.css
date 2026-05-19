@@ -1311,15 +1311,15 @@
   background-image: url(../img/MainSprites.png);
   background-repeat: no-repeat;
   background-position: -325px -655px;
+  transform: scale(1.35);
 }
 .TopscoreLabelStar span {
   position: absolute;
   left: 0px;
-  right: 0px;
-  top: 50%;
-  transform: translateY(-50%);
+  right: 3px;
+  top: 16px;
   text-align: center;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1;
   color: #333;
   font-family: Bowlby;
