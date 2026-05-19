@@ -1716,6 +1716,32 @@ function _autoCompleteBuyPerpGoals(
   return changed ? result : goals;
 }
 
+// buy_powerup analogue of _autoCompleteBuyPerpGoals. Powerups live in each
+// node's instance_data.powerups[] rather than as standalone nodes, so a
+// mission that unlocks after the player already owns the powerup would stay
+// stuck (the goal only advances on a fresh buyPowerup event — which is why
+// re-buying after a sell was the only workaround). Same same-reference
+// contract so callers can detect "nothing changed".
+function _autoCompleteBuyPowerupGoals(
+  goals: MissionGoal[],
+  nodes: GameNode[] | undefined
+): MissionGoal[] {
+  var owned: Record<string, true> = {};
+  (nodes || []).forEach(function (n) {
+    var pus = ((n.instance_data as NodeInstanceData) || {}).powerups || [];
+    pus.forEach(function (pu) {
+      if (pu && pu.gestalt) owned[pu.gestalt] = true;
+    });
+  });
+  var changed = false;
+  var result = goals.map(function (g) {
+    if (g.workflow !== 'buy_powerup' || g.complete || !owned[g.target]) return g;
+    changed = true;
+    return _completeGoal(g);
+  });
+  return changed ? result : goals;
+}
+
 function _eachMissionDef(ruleset: Ruleset, fn: (def: MissionDef) => void): void {
   if (!ruleset.missions) return;
   for (var i = 0; i < ruleset.missions.length; i++) {
@@ -1750,9 +1776,11 @@ function _seedMissionGoals(state: LocalState): LocalState {
     });
   });
 
-  // Repair stuck buy_perp goals for items the player already owns — covers
-  // both newly seeded goals and goals seeded before a prior session ended.
+  // Repair stuck buy_perp / buy_powerup goals for items the player already
+  // owns — covers both newly seeded goals and goals seeded before a prior
+  // session ended.
   var repairedGoals = _autoCompleteBuyPerpGoals(newGoals, state.nodes);
+  repairedGoals = _autoCompleteBuyPowerupGoals(repairedGoals, state.nodes);
   if (!added && repairedGoals === newGoals) return state;
   return Object.assign({}, state, { mission_goals: repairedGoals });
 }
@@ -1897,6 +1925,7 @@ function _completeMissionsIfReady(
       // yet (e.g. the perp just bought this turn), stranding the cascaded
       // mission until a reload replayed the log.
       updatedGoals = _autoCompleteBuyPerpGoals(updatedGoals, nodes);
+      updatedGoals = _autoCompleteBuyPowerupGoals(updatedGoals, nodes);
     }
   }
 

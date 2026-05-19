@@ -1457,6 +1457,72 @@ describe('buyPerp — loadGame repairs stuck buy_perp goal', () => {
   });
 });
 
+// Regression: a buy_powerup goal whose target the player already owns (the
+// powerup sits in a node's instance_data.powerups[]) stayed stuck on load —
+// it only advanced on a fresh buyPowerup event, so the player had to sell and
+// re-buy the upgrade to clear the objective.
+describe('buyPowerup — loadGame repairs stuck buy_powerup goal', () => {
+  const OWNED_PROJECT_NODE = Object.assign({}, PROJECT_NODE, {
+    instance_data: { x: 100, y: 100, powerups: [{ slot: 0, gestalt: 'ad002' }] },
+  });
+
+  it('marks buy_powerup goal complete when the powerup is already owned at load time', async () => {
+    setState(
+      Object.assign(mkBuyPerpState(), {
+        active_missions: ['mission006'],
+        mission_goals: [
+          {
+            mission: 'mission006',
+            workflow: 'buy_powerup',
+            target: 'ad002',
+            amount: null,
+            position: 1,
+            current_amount: 0,
+            complete: false,
+          },
+        ],
+        nodes: mkBuyPerpState().nodes.concat([OWNED_PROJECT_NODE]),
+      })
+    );
+
+    await loadGame();
+
+    const goal = getState().mission_goals.find(
+      (g) => g.mission === 'mission006' && g.workflow === 'buy_powerup'
+    );
+    expect(goal).toBeDefined();
+    expect(goal.complete).toBe(true);
+  });
+
+  it('does not alter buy_powerup goals when the powerup is not yet owned', async () => {
+    setState(
+      Object.assign(mkBuyPerpState(), {
+        active_missions: ['mission006'],
+        mission_goals: [
+          {
+            mission: 'mission006',
+            workflow: 'buy_powerup',
+            target: 'ad002',
+            amount: null,
+            position: 1,
+            current_amount: 0,
+            complete: false,
+          },
+        ],
+        nodes: mkBuyPerpState().nodes.concat([PROJECT_NODE]),
+      })
+    );
+
+    await loadGame();
+
+    const goal = getState().mission_goals.find(
+      (g) => g.mission === 'mission006' && g.workflow === 'buy_powerup'
+    );
+    expect(goal).toBeDefined();
+    expect(goal.complete).toBe(false);
+  });
+});
+
 describe('recheckMissions — recovers stuck goals (current_amount >= amount)', () => {
   it('flips a stuck integrate_profiles goal to complete and finishes the mission', async () => {
     setState(
