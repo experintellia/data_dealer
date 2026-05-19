@@ -50,7 +50,7 @@ export function TokenPopup({ vm, onClose, popup }: TokenPopupProps) {
       </PopupHeader>
       {vm.isSuper ? (
         <div class="PopupContent">
-          <div class="PopupTab">
+          <div class={openToken ? 'PopupTab hasPopup' : 'PopupTab'}>
             <div class={openToken ? 'SubpopContainer half open' : 'SubpopContainer half'}>
               {vm.upgradeSubpops.map((s) => (
                 <TokenUpgradeSubpop

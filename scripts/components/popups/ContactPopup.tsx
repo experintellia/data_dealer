@@ -34,7 +34,7 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
         description={vm.description}
       />
       <div class="PopupContent">
-        <div class="PopupTab">
+        <div class={openToken ? 'PopupTab hasPopup' : 'PopupTab'}>
           {/* All token subpops stay mounted (matches legacy
               profileset.html); only `.open` toggles, so the CSS
               scale/opacity transition plays and the grid underneath

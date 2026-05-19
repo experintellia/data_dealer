@@ -68,7 +68,7 @@ export function ClientPopup({ vm, onClose, popup }: ClientPopupProps) {
         description={vm.description}
       />
       <div class="PopupContent">
-        <div class="PopupTab">
+        <div class={openToken ? 'PopupTab hasPopup' : 'PopupTab'}>
           {/* SubpopContainer holds the subpops for BOTH token sets
               (legacy profileset_client.html); only `.open` toggles. */}
           <div class={openToken ? 'SubpopContainer open' : 'SubpopContainer'}>

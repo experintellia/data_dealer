@@ -555,7 +555,10 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
         </div>
       </div>
       <div class="PopupContent">
-        <div class={dataActive ? 'PopupTab data' : 'PopupTab data hidden'} data-tab="data">
+        <div
+          class={`PopupTab data${dataActive ? '' : ' hidden'}${openToken ? ' hasPopup' : ''}`}
+          data-tab="data"
+        >
           <div class={openToken ? 'SubpopContainer open' : 'SubpopContainer'}>
             {vm.tokens.map((t) => (
               <TokenSubpop

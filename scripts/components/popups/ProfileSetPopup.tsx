@@ -36,7 +36,7 @@ export function ProfileSetPopup({ vm, onClose, popup }: ProfileSetPopupProps) {
         description={vm.description}
       />
       <div class="PopupContent">
-        <div class="PopupTab">
+        <div class={openToken ? 'PopupTab hasPopup' : 'PopupTab'}>
           <div class={openToken ? 'SubpopContainer open' : 'SubpopContainer'}>
             {vm.tokens.map((t) => (
               <TokenSubpop
