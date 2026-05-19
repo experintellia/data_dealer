@@ -3,10 +3,10 @@
 // Issue #80 phase 2 tier 5a.  Token tile / subpop / pagination /
 // action-button seam live in `perpShared.tsx` (shared with Client).
 
-import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import type { ContactPopupVM } from '../../game/contactView.js';
 import i18n from '../../i18n.js';
+import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
 import { PageArrows, TokenSubpop, TokenTile, fireAction } from './perpShared.js';
 
@@ -25,23 +25,14 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
   const pageCount = Math.max(1, Math.ceil(vm.tokens.length / vm.pageSize));
   const pageTokens = vm.tokens.slice(page * vm.pageSize, page * vm.pageSize + vm.pageSize);
 
-  const closeX = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
-
   return (
     <div class="PopupBody">
-      <div class="PopupHeader">
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-        <div class="PopupClose" onClick={closeX}>
-          X
-        </div>
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
-        <div class="PopupLogo" dangerouslySetInnerHTML={{ __html: vm.spriteHtml }} />
-        <div class="PopupTitle">{vm.title}</div>
-        <div class="PopupText">{vm.description}</div>
-      </div>
+      <PopupHeader
+        onClose={onClose}
+        spriteHtml={vm.spriteHtml}
+        title={vm.title}
+        description={vm.description}
+      />
       <div class="PopupContent">
         <div class="PopupTab">
           {/* All token subpops stay mounted (matches legacy

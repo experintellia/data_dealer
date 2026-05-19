@@ -1,0 +1,76 @@
+// Shared `.PopupHeader` chrome — the close button + logo + title +
+// optional subtitle/description block that every non-trivial dialog
+// (Contact / Client / ProfileSet / City / Token / ProvidedPerp / …)
+// reproduced verbatim, each with its own identical `closeX` handler.
+// One component so the header markup + close behaviour lives in a
+// single place (notably: one spot to restyle for the mobile port).
+//
+// Every field is opt-in so each caller's exact DOM is preserved: a
+// prop that's omitted renders no element (callers that always emitted
+// an empty `.PopupSubTitle` pass `subtitle=""`).  `children` render
+// after the description for headers that carry extra content
+// (City's `.PopupMenu` tab strip, Token's `.PopupButtons`).
+
+import type { ComponentChildren, JSX } from 'preact';
+
+export interface PopupHeaderProps {
+  /** Framework `onClose`; the X stops propagation so the backdrop
+   *  handler doesn't double-fire (mirrors the old per-file `closeX`). */
+  onClose: () => void;
+  /** `MainSpritesPopup` logo class.  Takes precedence over `spriteHtml`.
+   *  `| undefined` so callers can forward an optional VM field directly
+   *  under `exactOptionalPropertyTypes`. */
+  mainspritesClass?: string | undefined;
+  /** Pre-rendered sprite markup for the logo (legacy `<%= sprite %>`). */
+  spriteHtml?: string;
+  title: string;
+  /** Plain-text subtitle. */
+  subtitle?: string;
+  /** Raw-HTML subtitle (legacy `<% print %>`); wins over `subtitle`. */
+  subtitleHtml?: string;
+  /** Plain-text description (`.PopupText`). */
+  description?: string;
+  /** Extra in-header content rendered after the description. */
+  children?: ComponentChildren;
+}
+
+export function PopupHeader({
+  onClose,
+  mainspritesClass,
+  spriteHtml,
+  title,
+  subtitle,
+  subtitleHtml,
+  description,
+  children,
+}: PopupHeaderProps) {
+  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
+    e.stopPropagation();
+    onClose();
+  };
+  return (
+    <div class="PopupHeader">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+      <div class="PopupClose" onClick={close}>
+        X
+      </div>
+      {mainspritesClass ? (
+        <div class="PopupLogo">
+          <div class={`MainSpritesPopup ${mainspritesClass}`} />
+        </div>
+      ) : (
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup
+        <div class="PopupLogo" dangerouslySetInnerHTML={{ __html: spriteHtml ?? '' }} />
+      )}
+      <div class="PopupTitle">{title}</div>
+      {subtitleHtml !== undefined ? (
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <% print %>)
+        <div class="PopupSubTitle" dangerouslySetInnerHTML={{ __html: subtitleHtml }} />
+      ) : subtitle !== undefined ? (
+        <div class="PopupSubTitle">{subtitle}</div>
+      ) : null}
+      {description !== undefined ? <div class="PopupText">{description}</div> : null}
+      {children}
+    </div>
+  );
+}

@@ -5,9 +5,9 @@
 // per-perp views resolve the subtitle / selector title / tile kind /
 // button-disabled / empty-state copy into one `ProvidedPopupVM`.
 
-import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import type { ProvidedPopupVM } from '../../game/providedView.js';
+import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
 import {
   NoItems,
@@ -36,30 +36,16 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
   const pageCount = Math.max(1, Math.ceil(vm.tiles.length / vm.pageSize));
   const pageTiles = vm.tiles.slice(page * vm.pageSize, page * vm.pageSize + vm.pageSize);
 
-  const closeX = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
-
   return (
     <div class="PopupBody ProvidedPerp">
-      <div class="PopupHeader">
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-        <div class="PopupClose" onClick={closeX}>
-          X
-        </div>
-        {vm.mainspritesClass ? (
-          <div class="PopupLogo">
-            <div class={`MainSpritesPopup ${vm.mainspritesClass}`} />
-          </div>
-        ) : (
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup
-          <div class="PopupLogo" dangerouslySetInnerHTML={{ __html: vm.spriteHtml }} />
-        )}
-        <div class="PopupTitle">{vm.title}</div>
-        <div class="PopupSubTitle">{vm.subtitle}</div>
-        <div class="PopupText">{vm.description}</div>
-      </div>
+      <PopupHeader
+        onClose={onClose}
+        mainspritesClass={vm.mainspritesClass}
+        spriteHtml={vm.spriteHtml}
+        title={vm.title}
+        subtitle={vm.subtitle}
+        description={vm.description}
+      />
       <div class="PopupContent">
         <div class="PopupTab">
           {/* All subpops stay mounted; only `.open` toggles (matches

@@ -4,9 +4,9 @@
 // provided-perp grids reusing the shared perpShared tiles/subpops.
 // No pagination (popup_city renders a single PerpPage per tab).
 
-import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import type { CityPopupVM } from '../../game/cityView.js';
+import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
 import { NoItems, PerpProvidedSubpop, PerpProvidedTile, fireAction } from './perpShared.js';
 
@@ -25,10 +25,6 @@ export function CityPopup({ vm, onClose, popup }: CityPopupProps) {
   // active tab is enough.
   const [openKey, setOpenKey] = useState<number | null>(null);
 
-  const closeX = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
   const switchTab = (pkey: string): void => {
     if (pkey === activeTab) return;
     setOpenKey(null);
@@ -37,16 +33,13 @@ export function CityPopup({ vm, onClose, popup }: CityPopupProps) {
 
   return (
     <div class="PopupBody">
-      <div class="PopupHeader">
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-        <div class="PopupClose" onClick={closeX}>
-          X
-        </div>
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
-        <div class="PopupLogo" dangerouslySetInnerHTML={{ __html: vm.spriteHtml }} />
-        <div class="PopupTitle">{vm.title}</div>
-        <div class="PopupSubTitle">{vm.subtitle}</div>
-        <div class="PopupText">{vm.description}</div>
+      <PopupHeader
+        onClose={onClose}
+        spriteHtml={vm.spriteHtml}
+        title={vm.title}
+        subtitle={vm.subtitle}
+        description={vm.description}
+      >
         <div class="PopupMenu">
           {vm.tabs.map((t) => (
             // biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass
@@ -60,7 +53,7 @@ export function CityPopup({ vm, onClose, popup }: CityPopupProps) {
             </div>
           ))}
         </div>
-      </div>
+      </PopupHeader>
       <div class="PopupContent">
         {vm.tabs.map((t) => {
           const tabActive = activeTab === t.pkey;
@@ -86,9 +79,7 @@ export function CityPopup({ vm, onClose, popup }: CityPopupProps) {
               {/* Legacy `.Selector.hasPopup { display:none }` — hide
                   the selector (incl. standalone arrows) under an open
                   token subpop overlay. */}
-              <div
-                class={`Pagination Selector standalone${containerOpen ? ' hasPopup' : ''}`}
-              >
+              <div class={`Pagination Selector standalone${containerOpen ? ' hasPopup' : ''}`}>
                 <div class="SubpopHeader">
                   <div class="SubpopHeaderTitle">{t.selectorTitle}</div>
                 </div>

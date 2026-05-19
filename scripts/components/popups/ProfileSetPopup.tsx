@@ -5,9 +5,9 @@
 // summary and one Import MainButton (routed through the same
 // `fireAction` seam, wired to `Database.mergeCued`).
 
-import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import type { ProfileSetPopupVM } from '../../game/profilesetView.js';
+import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
 import { PageArrows, TokenSubpop, TokenTile, fireAction } from './perpShared.js';
 
@@ -26,24 +26,15 @@ export function ProfileSetPopup({ vm, onClose, popup }: ProfileSetPopupProps) {
   const pageCount = Math.max(1, Math.ceil(vm.tokens.length / vm.pageSize));
   const pageTokens = vm.tokens.slice(page * vm.pageSize, page * vm.pageSize + vm.pageSize);
 
-  const closeX = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
-
   return (
     <div class="PopupBody">
-      <div class="PopupHeader">
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-        <div class="PopupClose" onClick={closeX}>
-          X
-        </div>
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
-        <div class="PopupLogo" dangerouslySetInnerHTML={{ __html: vm.spriteHtml }} />
-        <div class="PopupTitle">{vm.title}</div>
-        <div class="PopupSubTitle">{vm.subtitle}</div>
-        <div class="PopupText">{vm.description}</div>
-      </div>
+      <PopupHeader
+        onClose={onClose}
+        spriteHtml={vm.spriteHtml}
+        title={vm.title}
+        subtitle={vm.subtitle}
+        description={vm.description}
+      />
       <div class="PopupContent">
         <div class="PopupTab">
           <div class={openToken ? 'SubpopContainer open' : 'SubpopContainer'}>
