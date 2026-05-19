@@ -81,6 +81,21 @@ export class ProjectPerp extends GamePerp {
   }
 
   override openPopup(): RenderPopupLike {
+    // A genuine open always starts on the first tab.  `lastTab` only
+    // persists *within* an open session so the BuySlots Path-A
+    // re-mount (`updatePopup`) doesn't snap back to Data — it must
+    // not carry across opens.
+    this.lastTab = 'data';
+    return this.mountProjectPopup();
+  }
+
+  // Live-refetch / post-BuySlots re-mount (Path A) — see
+  // PusherPerp.updatePopup.  Rebuilds with the persisted `lastTab`.
+  override updatePopup(): RenderPopupLike {
+    return this.mountProjectPopup();
+  }
+
+  private mountProjectPopup(): RenderPopupLike {
     const vm = buildProjectPopupVM(
       (this.data ?? {}) as Parameters<typeof buildProjectPopupVM>[0],
       this.states,
@@ -95,12 +110,6 @@ export class ProjectPerp extends GamePerp {
       if (typeof tab === 'string') this.lastTab = tab;
     });
     return handle as RenderPopupLike;
-  }
-
-  // Live-refetch / post-BuySlots re-mount (Path A) — see
-  // PusherPerp.updatePopup.  Rebuilds with the persisted `lastTab`.
-  override updatePopup(): RenderPopupLike {
-    return this.openPopup();
   }
 
   constructor(config: GameNodeConfig) {
