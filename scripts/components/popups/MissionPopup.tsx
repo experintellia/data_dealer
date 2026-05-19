@@ -27,6 +27,36 @@ export interface MissionRewardVM {
   amount: string;
 }
 
+/** One mission-goal row.  Shared by the briefing/complete dialog
+ *  (`MissionPopup`, full variant) and the Missions-tab card
+ *  (`MissionCard`, `small` variant — legacy `mission_goal_small.html`:
+ *  the `.MissionGoal.small` modifier, no `.MissionGoalText`).  The
+ *  per-goal view-model is computed once in `missionView.ts`, so the
+ *  two render paths can't drift. */
+export function MissionGoalRow({
+  goal,
+  small = false,
+}: {
+  goal: MissionGoalVM;
+  small?: boolean;
+}): JSX.Element {
+  const sp = renderSpriteHtml(goal.spriteConfig as Parameters<typeof renderSpriteHtml>[0]);
+  const base = small ? 'MissionGoal small' : 'MissionGoal';
+  return (
+    <div class={goal.complete ? `${base} complete` : base}>
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
+      <div class="MissionGoalSprite" dangerouslySetInnerHTML={{ __html: sp }} />
+      {!small && (
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string
+        <div class="MissionGoalText" dangerouslySetInnerHTML={{ __html: goal.textHtml }} />
+      )}
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally formatted progress markup */}
+      <div class="MissionGoalProgress" dangerouslySetInnerHTML={{ __html: goal.progressHtml }} />
+      <div class="MissionGoalStatus" />
+    </div>
+  );
+}
+
 export interface MissionPopupProps {
   /** `complete` renders the `.Complete` body modifier + the
    *  mission-done text/button; `briefing` is the active-mission /
@@ -74,23 +104,10 @@ export function MissionPopup({
         <div class="MissionWrap">
           <div class="MissionGoals">
             <div class="MissionGoalsTitle">{i18n.gettext('Mission Goals')}</div>
-            {goals.map((g, i) => {
-              const sp = renderSpriteHtml(g.spriteConfig as Parameters<typeof renderSpriteHtml>[0]);
-              const tx = g.textHtml;
-              const pr = g.progressHtml;
-              return (
-                // biome-ignore lint/suspicious/noArrayIndexKey: goals are a fixed positional list, no reordering
-                <div class={g.complete ? 'MissionGoal complete' : 'MissionGoal'} key={i}>
-                  {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
-                  <div class="MissionGoalSprite" dangerouslySetInnerHTML={{ __html: sp }} />
-                  {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
-                  <div class="MissionGoalText" dangerouslySetInnerHTML={{ __html: tx }} />
-                  {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally formatted progress markup */}
-                  <div class="MissionGoalProgress" dangerouslySetInnerHTML={{ __html: pr }} />
-                  <div class="MissionGoalStatus" />
-                </div>
-              );
-            })}
+            {goals.map((g, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: goals are a fixed positional list, no reordering
+              <MissionGoalRow goal={g} key={i} />
+            ))}
           </div>
           <div class="MissionRewards">
             <div class="MissionRewardsTitle">{i18n.gettext('Rewards')}</div>

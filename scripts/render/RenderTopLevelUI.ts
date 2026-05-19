@@ -36,8 +36,11 @@
 // PR #221 (RenderSprite/RenderText) and PR #223 (RenderStage); the
 // reviewer flagged it as worth a header-level note.
 
+import { h, render as preactRender } from 'preact';
 import appModule from '../app.js';
+import { MissionCard } from '../components/MissionCard.js';
 import { span, sprintf, toKSNum, toTime } from '../dd-helpers.js';
+import { buildMissionCardProps } from '../game/missionView.js';
 import i18n from '../i18n.js';
 import setup from '../setup.js';
 import { type NodeConfig, RenderNode } from './RenderNode.js';
@@ -514,11 +517,6 @@ export class RenderMissionPerp extends RenderNode {
   declare frameSrc: string | undefined;
   declare frameMap: SpriteFrameMap | undefined;
   declare frame: string;
-  declare template: string;
-
-  static {
-    RenderMissionPerp.prototype.template = 'mission.html';
-  }
 
   constructor(config: MissionPerpConfig = {}) {
     const $ = getRenderJQuery('RenderTopLevelUI');
@@ -581,10 +579,29 @@ export class RenderMissionPerp extends RenderNode {
     } else {
       this.show();
     }
-    jq.empty();
-    const html = getApp().renderView(this.template, this);
-    jq.append(html);
+    // Preact owns the `.MissionPerp` node's children — no `jq.empty()`
+    // (that would desync Preact's vdom; re-renders are diffed in place,
+    // unmounted in `remove()`).  Goal/reward view-models are shared
+    // with `MissionPopup` via `buildMissionCardProps` (missionView.ts).
+    const el = this.jdomelem[0];
+    if (el) {
+      const groot = this.gameNode?.GameRoot;
+      const props = buildMissionCardProps({
+        data: this.gameNode?.data ?? {},
+        getType: (g) => groot?.getType(g),
+        getTypeData: (g) => groot?.getTypeData(g),
+      });
+      preactRender(h(MissionCard, props), el);
+    }
     this.draw();
+  }
+
+  override remove(): void {
+    const el = this.jdomelem?.[0];
+    if (el) {
+      preactRender(null, el);
+    }
+    super.remove();
   }
 
   override draw(): void {
