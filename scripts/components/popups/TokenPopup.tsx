@@ -5,9 +5,9 @@
 // SuperToken profileset grid + Compute/Update footer.  Reuses the
 // shared TokenTile/PageArrows/fireAction + the new TokenUpgradeSubpop.
 
-import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import type { TokenPopupVM } from '../../game/tokenPopupView.js';
+import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
 import { PageArrows, TokenTile, TokenUpgradeSubpop, fireAction } from './perpShared.js';
 
@@ -26,24 +26,15 @@ export function TokenPopup({ vm, onClose, popup }: TokenPopupProps) {
   const pageCount = Math.max(1, Math.ceil(vm.tokens.length / vm.pageSize));
   const pageTokens = vm.tokens.slice(page * vm.pageSize, page * vm.pageSize + vm.pageSize);
 
-  const closeX = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
-
   return (
     <div class={vm.isSuper ? 'PopupBody TokenPerp SuperToken' : 'PopupBody TokenPerp'}>
-      <div class="PopupHeader">
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-        <div class="PopupClose" onClick={closeX}>
-          X
-        </div>
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
-        <div class="PopupLogo" dangerouslySetInnerHTML={{ __html: vm.spriteHtml }} />
-        <div class="PopupTitle">{vm.title}</div>
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <% print %>) */}
-        <div class="PopupSubTitle" dangerouslySetInnerHTML={{ __html: vm.subtitleHtml }} />
-        <div class="PopupText">{vm.description}</div>
+      <PopupHeader
+        onClose={onClose}
+        spriteHtml={vm.spriteHtml}
+        title={vm.title}
+        subtitleHtml={vm.subtitleHtml}
+        description={vm.description}
+      >
         {vm.isSuper ? null : (
           <div class="PopupButtons">
             {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
@@ -56,10 +47,10 @@ export function TokenPopup({ vm, onClose, popup }: TokenPopupProps) {
             </div>
           </div>
         )}
-      </div>
+      </PopupHeader>
       {vm.isSuper ? (
         <div class="PopupContent">
-          <div class="PopupTab">
+          <div class={openToken ? 'PopupTab hasPopup' : 'PopupTab'}>
             <div class={openToken ? 'SubpopContainer half open' : 'SubpopContainer half'}>
               {vm.upgradeSubpops.map((s) => (
                 <TokenUpgradeSubpop

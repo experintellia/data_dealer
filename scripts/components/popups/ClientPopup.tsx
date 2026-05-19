@@ -5,11 +5,11 @@
 // Charge/Collect button seam as Contact.  Token tile / subpop /
 // arrows / action seam are the shared `perpShared.tsx`.
 
-import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import type { ClientPopupVM } from '../../game/clientView.js';
 import type { TokenVM } from '../../game/tokenView.js';
 import i18n from '../../i18n.js';
+import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
 import { PageArrows, TokenSubpop, TokenTile, fireAction } from './perpShared.js';
 
@@ -59,25 +59,16 @@ function TokenGrid({
 export function ClientPopup({ vm, onClose, popup }: ClientPopupProps) {
   const [openToken, setOpenToken] = useState<string | null>(null);
 
-  const closeX = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
-
   return (
     <div class="PopupBody">
-      <div class="PopupHeader">
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-        <div class="PopupClose" onClick={closeX}>
-          X
-        </div>
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
-        <div class="PopupLogo" dangerouslySetInnerHTML={{ __html: vm.spriteHtml }} />
-        <div class="PopupTitle">{vm.title}</div>
-        <div class="PopupText">{vm.description}</div>
-      </div>
+      <PopupHeader
+        onClose={onClose}
+        spriteHtml={vm.spriteHtml}
+        title={vm.title}
+        description={vm.description}
+      />
       <div class="PopupContent">
-        <div class="PopupTab">
+        <div class={openToken ? 'PopupTab hasPopup' : 'PopupTab'}>
           {/* SubpopContainer holds the subpops for BOTH token sets
               (legacy profileset_client.html); only `.open` toggles. */}
           <div class={openToken ? 'SubpopContainer open' : 'SubpopContainer'}>
