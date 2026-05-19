@@ -1126,14 +1126,14 @@ test.describe('Section J — in-popup action handlers', () => {
     });
     expect(node?.instance_data?.powerups || []).toHaveLength(0);
 
-    // Regression (Bug B): SellPowerup rebuilt gnode.data from
-    // `getTypeData`, dropping the runtime `powerupsCached` flag, so the
-    // post-sell VM fell back to `cached:false` — the popup hung forever
-    // on the loading spinner with no powerup tabs (unresponsive dialog).
-    // The graceful slot-swap is `close_powerup` (400ms) → out (400ms) →
-    // setVm → in (400ms); settle well past that, then assert the dialog
-    // rebuilt into the *grid* (not the permanent spinner).  Verified to
-    // fail (`spinner:1, cat:0`) when the fix is reverted.
+    // Regression: a post-sell perp-data rebuild that drops the runtime
+    // `powerupsCached` flag makes the rebuilt VM fall back to
+    // `cached:false`, hanging the dialog forever on the loading spinner.
+    // The buggy spinner only appears *after* the graceful slot-swap
+    // (`close_powerup` 400ms → out 400ms → setVm → in 400ms) and is then
+    // permanent, so an auto-retrying assertion would pass on the
+    // pre-rebuild DOM and miss it — a fixed settle past that ~1.2s chain
+    // is required before asserting the dialog rebuilt into the grid.
     await page.waitForTimeout(2_000);
     await expect(page.locator('.PopupContainer.lockOn .PopupContentLoading')).toHaveCount(0);
     await expect(page.locator('.PopupContainer.lockOn .PopupTab.Powerups').first()).toBeAttached();
