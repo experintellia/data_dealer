@@ -1315,10 +1315,10 @@
 }
 .TopscoreLabelStar span {
   position: absolute;
-  left: 0px;
-  right: 3px;
-  top: 16px;
-  text-align: center;
+  left: 19.5px;
+  top: 20.5px;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
   font-size: 14px;
   line-height: 1;
   color: #333;
