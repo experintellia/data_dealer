@@ -1754,6 +1754,13 @@
 .PopupTab.hidden {
   display: none;
 }
+/* Inactive ProjectPopup per-tab header description.  Legacy hid these
+   `[data-tab]` texts via the RenderTopLevelUI tab-switch JS that was
+   deleted with the engine; the `hidden` class is now CSS-backed (same
+   fix as `.PopupTab.hidden`). */
+.PopupText.TabText.hidden {
+  display: none;
+}
 .PopupTab.hasPopup .PopupPageArrowL,
 .PopupTab.hasPopup .PopupPageArrowR {
   display: none;
