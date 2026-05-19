@@ -75,7 +75,11 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
               />
             ))}
           </div>
-          <div class="Pagination Selector standalone">
+          {/* Legacy `.Selector.hasPopup { display:none }` — hide the
+              whole selector (grid + standalone arrows + header) while
+              a token subpop overlays it, so the arrows don't poke out
+              from behind the overlay. */}
+          <div class={`Pagination Selector standalone${openKey !== null ? ' hasPopup' : ''}`}>
             {vm.selectorTitle || vm.karmaChip ? (
               <div class="SubpopHeader">
                 {vm.karmaChip ? (

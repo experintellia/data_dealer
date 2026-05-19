@@ -83,7 +83,12 @@ export function CityPopup({ vm, onClose, popup }: CityPopupProps) {
                   />
                 ))}
               </div>
-              <div class="Pagination Selector standalone">
+              {/* Legacy `.Selector.hasPopup { display:none }` — hide
+                  the selector (incl. standalone arrows) under an open
+                  token subpop overlay. */}
+              <div
+                class={`Pagination Selector standalone${containerOpen ? ' hasPopup' : ''}`}
+              >
                 <div class="SubpopHeader">
                   <div class="SubpopHeaderTitle">{t.selectorTitle}</div>
                 </div>
