@@ -7,11 +7,10 @@
 
 import { useState } from 'preact/hooks';
 import type { ClientPopupVM } from '../../game/clientView.js';
-import type { TokenVM } from '../../game/tokenView.js';
 import i18n from '../../i18n.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
-import { PageArrows, TokenSubpop, TokenTile, fireAction } from './perpShared.js';
+import { TokenGrid, TokenSubpop, fireAction } from './perpShared.js';
 
 export interface ClientPopupProps {
   vm: ClientPopupVM;
@@ -19,41 +18,6 @@ export interface ClientPopupProps {
   onClose: () => void;
   /** Framework-injected — the live perp popup handle. */
   popup: PreactDialogHandle;
-}
-
-/** One paged token grid — `profileset_client.html` renders the blue
- *  "provided" set and the orange "consumed" set with the same markup,
- *  differing only in the wrapper classes and page size. */
-function TokenGrid({
-  tokens,
-  pageSize,
-  paginationClass,
-  tokensClass,
-  onOpen,
-}: {
-  tokens: TokenVM[];
-  pageSize: number;
-  paginationClass: string;
-  tokensClass: string;
-  onOpen: (gestalt: string) => void;
-}) {
-  const [page, setPage] = useState(0);
-  const pageCount = Math.max(1, Math.ceil(tokens.length / pageSize));
-  const pageTokens = tokens.slice(page * pageSize, page * pageSize + pageSize);
-  return (
-    <div class={paginationClass}>
-      <div class={tokensClass}>
-        <div class="PopupPageWrap">
-          <div class="PopupPage" data-page-id={page}>
-            {pageTokens.map((t) => (
-              <TokenTile key={t.gestalt} token={t} onOpen={onOpen} />
-            ))}
-          </div>
-        </div>
-      </div>
-      <PageArrows page={page} pageCount={pageCount} setPage={setPage} />
-    </div>
-  );
 }
 
 export function ClientPopup({ vm, onClose, popup }: ClientPopupProps) {

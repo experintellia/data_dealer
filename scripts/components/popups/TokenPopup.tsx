@@ -9,7 +9,7 @@ import { useState } from 'preact/hooks';
 import type { TokenPopupVM } from '../../game/tokenPopupView.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
-import { PageArrows, TokenTile, TokenUpgradeSubpop, fireAction } from './perpShared.js';
+import { TokenGrid, TokenUpgradeSubpop, fireAction } from './perpShared.js';
 
 export interface TokenPopupProps {
   vm: TokenPopupVM;
@@ -20,11 +20,7 @@ export interface TokenPopupProps {
 }
 
 export function TokenPopup({ vm, onClose, popup }: TokenPopupProps) {
-  const [page, setPage] = useState(0);
   const [openToken, setOpenToken] = useState<string | null>(null);
-
-  const pageCount = Math.max(1, Math.ceil(vm.tokens.length / vm.pageSize));
-  const pageTokens = vm.tokens.slice(page * vm.pageSize, page * vm.pageSize + vm.pageSize);
 
   return (
     <div class={vm.isSuper ? 'PopupBody TokenPerp SuperToken' : 'PopupBody TokenPerp'}>
@@ -61,18 +57,13 @@ export function TokenPopup({ vm, onClose, popup }: TokenPopupProps) {
                 />
               ))}
             </div>
-            <div class="Pagination half">
-              <div class="PopupTokens">
-                <div class="PopupPageWrap">
-                  <div class="PopupPage" data-page-id={page}>
-                    {pageTokens.map((t) => (
-                      <TokenTile key={t.gestalt} token={t} onOpen={setOpenToken} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <PageArrows page={page} pageCount={pageCount} setPage={setPage} />
-            </div>
+            <TokenGrid
+              tokens={vm.tokens}
+              pageSize={vm.pageSize}
+              paginationClass="Pagination half"
+              tokensClass="PopupTokens"
+              onOpen={setOpenToken}
+            />
             <div class="PopupSummary half">
               <div class="PopupSummaryItem Profiles">
                 <div class="RenderSprite Tobi" />
