@@ -431,7 +431,6 @@ export class ProjectPerp extends GamePerp {
   updatePopupGracefully(bslot: number | string, bgestalt: string, selling?: boolean): void {
     const pcat = getPowerupTypeFromGestalt(bgestalt);
     if (!pcat) return;
-    this.updateTemplateData();
     const nextVM = buildProjectPopupVM(
       (this.data ?? {}) as Parameters<typeof buildProjectPopupVM>[0],
       this.states,

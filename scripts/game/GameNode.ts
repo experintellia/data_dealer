@@ -666,41 +666,6 @@ export class GameNode {
   // body; collapse when GameRoot / Render.js extract.
   // -------------------------------------------------------------------
 
-  openGenericPopup(config: {
-    gnode?: GameNode;
-    data?: Record<string, unknown>;
-    states?: Record<string, boolean>;
-    template?: string;
-    extendClass?: string;
-  }): RenderPopupLike {
-    const gnode = config.gnode || this;
-    const groot = this.GameRoot as unknown as GameRootForGameNode;
-    const data = config.data || gnode.data;
-
-    const ptd: Record<string, unknown> = {};
-    ptd.status_icons = groot.data.status_icons;
-    ptd.states = config.states || {};
-    ptd.data = data;
-    ptd.groot = groot;
-    gnode.popupTemplateData = ptd;
-
-    const Render = getRender() as Pick<RenderApi, 'Popup'>;
-    const popup = new Render.Popup({
-      gameNode: this,
-      template: config.template || 'popup.html',
-      extendClass: config.extendClass || '',
-      templateData: gnode.popupTemplateData,
-      popupContainer: this,
-    } as unknown as ConstructorParameters<RenderApi['Popup']>[0]) as unknown as RenderPopupLike;
-    this.renderPopup = popup;
-
-    (gnode.renderNode as RenderNodeLike | undefined)?.addPopup?.(popup);
-
-    gnode.initPopupEvents();
-
-    return popup;
-  }
-
   initPopupEvents(popup?: RenderPopupLike): void {
     const groot = this.GameRoot as unknown as GameRootForGameNode;
     const p = popup || (this.renderPopup as RenderPopupLike | undefined);

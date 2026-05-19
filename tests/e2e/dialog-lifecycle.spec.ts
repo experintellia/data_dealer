@@ -528,29 +528,17 @@ test.describe('Section D — perp popups', () => {
   // scripts/game/DatabasePerp.ts).  The tab-switch is covered separately by
   // mobile-touch.spec.ts; there is no popup wrapper to exercise here.
 
-  test('TokenPerp popup opens against synthesised database token and closes', async ({ page }) => {
-    // TokenPerp lives inside the Database after a profileset is integrated;
-    // setting that up end-to-end here would conflate the popup-wrapper test
-    // with the materializer flow.  Instead we drive the GameRoot's generic
-    // popup helper with the token's ruleset type_data plus the small set of
-    // template fields popup_token.html reads (`absoluteAmount`,
-    // `contained_tokens`, `knowledge_text`).  This still exercises the
-    // popup_token.html template + RenderPopup wrapper end-to-end.
-    await bootGame(page);
-    await page.evaluate(() => {
-      const groot = (window as any).__dd?._app?.game;
-      const td = groot.getTypeData('token001');
-      if (!td) throw new Error('token001 missing from ruleset');
-      const data = Object.assign({}, td, {
-        absoluteAmount: 0,
-        contained_tokens: [],
-        knowledge_text: td.knowledge_text || '%s profiles',
-      });
-      groot.openGenericPopup({ data, template: 'popup_token.html' });
-    });
-    await expect(page.locator('.PopupBody.TokenPerp')).toBeVisible({ timeout: 3_000 });
-    await expectOpenAndClose(page, '.PopupBody.TokenPerp', 'x');
-  });
+  // No TokenPerp popup test: TokenPerp.openPopup() mounts the Preact
+  // `TokenPopup` through the same `openPreactPopup` seam already
+  // e2e-validated by ContactPerp/ClientPerp/PusherPerp/ProxyPerp/
+  // AgentPerp/ProjectPerp/CityPerp here (Section D) and Sections H/I/M.
+  // The old coverage drove the *legacy* `openGenericPopup(
+  // {template:'popup_token.html'})` scaffolding — a path that never
+  // existed in production and was deleted with the legacy engine
+  // (issue #80 tier 15).  A real TokenPerp is only materialised by the
+  // full profileset-integration economy + Database-internal node
+  // creation; reproducing that just to smoke the wrapper is
+  // disproportionate and fragile, so it's intentionally not re-pinned.
 });
 
 // ── Section F: button-level FX animations (no_cash / no_AP / error) ──────
@@ -1787,31 +1775,13 @@ test.describe('Section M — Subpop close + simple TokenPerp', () => {
     await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupMenu', 'x');
   });
 
-  test('Simple (non-Super) TokenPerp popup MainButton dismisses', async ({ page }) => {
-    // popup_token.html has two layouts driven by `isSuper =
-    // data.contained_tokens.length`.  Section D's TokenPerp test opens
-    // the SuperToken branch with a stubbed contained_tokens.  Here we
-    // open the simple branch (empty contained_tokens) where the only
-    // button is .Button[data-button-id="MainButton"] = Close.
-    await bootGame(page);
-    await page.evaluate(() => {
-      const groot = (window as any).__dd?._app?.game;
-      const td = groot.getTypeData('token001');
-      if (!td) throw new Error('token001 missing from ruleset');
-      const data = Object.assign({}, td, {
-        absoluteAmount: 0,
-        contained_tokens: [],
-        knowledge_text: td.knowledge_text || '%s profiles',
-      });
-      groot.openGenericPopup({ data, template: 'popup_token.html' });
-    });
-    const body = page.locator('.PopupBody.TokenPerp:not(.SuperToken)').first();
-    await expect(body).toBeVisible({ timeout: 3_000 });
-    // Dismiss via the popup's MainButton (the Close button rendered only
-    // in the simple branch).
-    await body.locator('.Button[data-button-id="MainButton"]').first().click({ force: true });
-    await expect(body).toBeHidden({ timeout: 3_000 });
-  });
+  // The non-super TokenPerp MainButton test was removed with the legacy
+  // engine (issue #80 tier 15): it drove the test-only
+  // `openGenericPopup({template:'popup_token.html'})` scaffolding, not
+  // a production path.  TokenPopup's super/non-super branching is
+  // typechecked; its mount seam (`TokenPerp.openPopup` →
+  // `openPreactPopup`) is the same one Sections D/H/I exercise for the
+  // other perps.  See the matching note in Section D.
 });
 
 // ── Section N: dead-code audit ───────────────────────────────────────────

@@ -22,7 +22,6 @@ import { DatabasePerp } from './DatabasePerp.js';
 import { ProjectPerp } from './ProjectPerp.js';
 import { ProxyPerp } from './ProxyPerp.js';
 import { PusherPerp } from './PusherPerp.js';
-import { SupertokenPerp } from './SupertokenPerp.js';
 import { TokenPerp } from './TokenPerp.js';
 import { type PerpCtor, setPerpClasses } from './perpRegistry.js';
 
@@ -38,7 +37,6 @@ export const perpCtors: Record<string, PerpCtor> = {
   ProjectPerp: ProjectPerp as unknown as PerpCtor,
   ProxyPerp: ProxyPerp as unknown as PerpCtor,
   PusherPerp: PusherPerp as unknown as PerpCtor,
-  SupertokenPerp: SupertokenPerp as unknown as PerpCtor,
   TokenPerp: TokenPerp as unknown as PerpCtor,
 };
 

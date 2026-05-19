@@ -207,7 +207,7 @@ export class Database extends GameNode {
     return handle;
   }
 
-  private getRenderModule(): Pick<RenderApi, 'Popup' | 'DBQueue' | 'DecoratorNew' | 'getById'> {
+  private getRenderModule(): Pick<RenderApi, 'DBQueue' | 'DecoratorNew' | 'getById'> {
     return getRender();
   }
 

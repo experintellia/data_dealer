@@ -6,9 +6,6 @@
  *    `visibilitychange` recovery handlers funneling into `dragend`,
  *    and tracks them so `dispose()` can detach. ViewMap.remove() now
  *    calls `dragHandler.dispose()`.
- *  - `RenderPopup.close()` uses a one-shot transitionend handler that
- *    self-detaches and cancels the 500ms fallback when either path
- *    fires.
  *
  * Render-layer code cannot be instantiated under vitest (no createjs /
  * Scroller globals, no real DOM); these are pattern guards rather than
@@ -20,13 +17,11 @@ import { readRenderSrc } from './_helpers.js';
 
 const DRAG_SRC = readRenderSrc('RenderDragHandler.ts');
 const VIEWS_SRC = readRenderSrc('RenderViews.ts');
-const POPUP_SRC = readRenderSrc('RenderTopLevelUI.ts');
 
 const INIT_BODY = DRAG_SRC.match(/init\(\)\s*:\s*void\s*\{[\s\S]*?\n {2}\}/)?.[0] ?? '';
 const DISPOSE_BODY = DRAG_SRC.match(/dispose\(\)\s*:\s*void\s*\{[\s\S]*?\n {2}\}/)?.[0] ?? '';
 const VIEW_REMOVE_BODY =
   VIEWS_SRC.match(/override\s+remove\s*\(\)\s*:\s*void\s*\{[\s\S]*?\n {2}\}/)?.[0] ?? '';
-const CLOSE_BODY = POPUP_SRC.match(/close\(cb\?[\s\S]*?\n {2}\}/)?.[0] ?? '';
 
 describe('RenderDragHandler — recovery handlers', () => {
   it('init() body is locatable', () => {
@@ -56,20 +51,5 @@ describe('RenderViewMap.remove — disposes the dragHandler', () => {
     const superIdx = VIEW_REMOVE_BODY.indexOf('super.remove');
     expect(disposeIdx).toBeGreaterThan(-1);
     expect(superIdx).toBeGreaterThan(disposeIdx);
-  });
-});
-
-describe('RenderPopup.close — one-shot transitionend', () => {
-  it('close() body is locatable', () => {
-    expect(CLOSE_BODY).not.toBe('');
-  });
-
-  it('binds AND unbinds the transitionend handler', () => {
-    expect(CLOSE_BODY).toMatch(/jq\.on\(/);
-    expect(CLOSE_BODY).toMatch(/jq\.off\(/);
-  });
-
-  it('clears the fallback timer when the early path fires', () => {
-    expect(CLOSE_BODY).toMatch(/clearTimeout\s*\(\s*removeFallback/);
   });
 });
