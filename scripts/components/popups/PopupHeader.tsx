@@ -1,15 +1,16 @@
 // Shared `.PopupHeader` chrome — the close button + logo + title +
-// optional subtitle/description block that every non-trivial dialog
-// (Contact / Client / ProfileSet / City / Token / ProvidedPerp / …)
-// reproduced verbatim, each with its own identical `closeX` handler.
-// One component so the header markup + close behaviour lives in a
-// single place (notably: one spot to restyle for the mobile port).
+// optional subtitle/description block that Contact / Client /
+// ProfileSet / City / Token / ProvidedPerp reproduced verbatim, each
+// with its own identical `closeX` handler.  One component so the
+// header markup + close behaviour lives in a single place (notably:
+// one spot to restyle for the mobile port).  ProjectPopup keeps its
+// own header — its per-tab `.PopupText.TabText` descriptions render
+// between title and menu, which this layout doesn't model.
 //
-// Every field is opt-in so each caller's exact DOM is preserved: a
-// prop that's omitted renders no element (callers that always emitted
-// an empty `.PopupSubTitle` pass `subtitle=""`).  `children` render
-// after the description for headers that carry extra content
-// (City's `.PopupMenu` tab strip, Token's `.PopupButtons`).
+// Every field is opt-in so each caller's exact DOM is preserved: an
+// omitted prop renders no element.  `children` render after the
+// description for headers that carry extra content (City's
+// `.PopupMenu` tab strip, Token's `.PopupButtons`).
 
 import type { ComponentChildren, JSX } from 'preact';
 
