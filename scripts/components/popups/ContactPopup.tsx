@@ -8,7 +8,7 @@ import type { ContactPopupVM } from '../../game/contactView.js';
 import i18n from '../../i18n.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
-import { PageArrows, TokenSubpop, TokenTile, fireAction } from './perpShared.js';
+import { TokenGrid, TokenSubpop, fireAction } from './perpShared.js';
 
 export interface ContactPopupProps {
   vm: ContactPopupVM;
@@ -19,11 +19,7 @@ export interface ContactPopupProps {
 }
 
 export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
-  const [page, setPage] = useState(0);
   const [openToken, setOpenToken] = useState<string | null>(null);
-
-  const pageCount = Math.max(1, Math.ceil(vm.tokens.length / vm.pageSize));
-  const pageTokens = vm.tokens.slice(page * vm.pageSize, page * vm.pageSize + vm.pageSize);
 
   return (
     <div class="PopupBody">
@@ -49,18 +45,13 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
               />
             ))}
           </div>
-          <div class="Pagination">
-            <div class="PopupTokens">
-              <div class="PopupPageWrap">
-                <div class="PopupPage" data-page-id={page}>
-                  {pageTokens.map((t) => (
-                    <TokenTile key={t.gestalt} token={t} onOpen={setOpenToken} />
-                  ))}
-                </div>
-              </div>
-            </div>
-            <PageArrows page={page} pageCount={pageCount} setPage={setPage} />
-          </div>
+          <TokenGrid
+            tokens={vm.tokens}
+            pageSize={vm.pageSize}
+            paginationClass="Pagination"
+            tokensClass="PopupTokens"
+            onOpen={setOpenToken}
+          />
           <div class="PopupSummary">
             <div class="PopupSummaryItem Profiles">
               <div class="RenderSprite Tobi" />

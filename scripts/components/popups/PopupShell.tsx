@@ -7,7 +7,8 @@
 // framework-injected prop) and call `stopPropagation` so the
 // dialog-manager backdrop click handler doesn't double-fire.
 
-import type { ComponentChildren, JSX } from 'preact';
+import type { ComponentChildren } from 'preact';
+import { stopAndClose } from './dialogManager.js';
 
 export interface PopupShellProps {
   /**
@@ -36,10 +37,7 @@ export function PopupShell({
   children,
   onClose,
 }: PopupShellProps) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   return (
     <div class={bodyClass ? `PopupBody ${bodyClass}` : 'PopupBody'}>
       <div class="PopupHeader">

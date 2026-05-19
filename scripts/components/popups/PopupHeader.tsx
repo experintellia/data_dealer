@@ -12,7 +12,8 @@
 // description for headers that carry extra content (City's
 // `.PopupMenu` tab strip, Token's `.PopupButtons`).
 
-import type { ComponentChildren, JSX } from 'preact';
+import type { ComponentChildren } from 'preact';
+import { stopAndClose } from './dialogManager.js';
 
 export interface PopupHeaderProps {
   /** Framework `onClose`; the X stops propagation so the backdrop
@@ -45,10 +46,7 @@ export function PopupHeader({
   description,
   children,
 }: PopupHeaderProps) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   return (
     <div class="PopupHeader">
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}

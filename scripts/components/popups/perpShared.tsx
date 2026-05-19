@@ -6,11 +6,12 @@
 // once here instead of being duplicated per perp component.
 
 import type { JSX } from 'preact';
+import { useState } from 'preact/hooks';
 import type { ProvidedSubpopVM, ProvidedTileVM } from '../../game/providedView.js';
 import type { TokenUpgradeSubpopVM } from '../../game/tokenPopupView.js';
 import type { TokenVM } from '../../game/tokenView.js';
 import i18n from '../../i18n.js';
-import { type PreactDialogHandle, toFXTarget } from './dialogManager.js';
+import { type PreactDialogHandle, stopAndClose, toFXTarget } from './dialogManager.js';
 
 /** Fire the legacy `.Button` seam: park the clicked element +
  *  click point on the handle, then `popup.trigger('button_click.X')`
@@ -71,10 +72,7 @@ export function TokenSubpop({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   const sub = token.subpop.subTitleHtml;
   return (
     <div class={isOpen ? 'Subpop open' : 'Subpop'} data-subpop-id={`token${token.gestalt}`}>
@@ -132,6 +130,43 @@ export function PageArrows({
   );
 }
 
+/** One paged token grid — `token.html` inside `profileset*.html`.
+ *  Owns its own page state; the wrapper classes + page size vary per
+ *  caller (Contact/ProfileSet `Pagination`/`PopupTokens`, Client's
+ *  provided/consumed halves, TokenPopup's SuperToken `Pagination
+ *  half`).  The subpop overlay + open-state stay with the caller. */
+export function TokenGrid({
+  tokens,
+  pageSize,
+  paginationClass,
+  tokensClass,
+  onOpen,
+}: {
+  tokens: TokenVM[];
+  pageSize: number;
+  paginationClass: string;
+  tokensClass: string;
+  onOpen: (gestalt: string) => void;
+}) {
+  const [page, setPage] = useState(0);
+  const pageCount = Math.max(1, Math.ceil(tokens.length / pageSize));
+  const pageTokens = tokens.slice(page * pageSize, page * pageSize + pageSize);
+  return (
+    <div class={paginationClass}>
+      <div class={tokensClass}>
+        <div class="PopupPageWrap">
+          <div class="PopupPage" data-page-id={page}>
+            {pageTokens.map((t) => (
+              <TokenTile key={t.gestalt} token={t} onOpen={onOpen} />
+            ))}
+          </div>
+        </div>
+      </div>
+      <PageArrows page={page} pageCount={pageCount} setPage={setPage} />
+    </div>
+  );
+}
+
 /** One provided-perp grid tile (`client.html` / `perp.html`).  Opens
  *  its detail subpop by the legacy row key (`data-subpop-id`). */
 export function PerpProvidedTile({
@@ -182,10 +217,7 @@ export function PerpProvidedSubpop({
   onClose: () => void;
   popup: PreactDialogHandle;
 }) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   const vd = subpop.valuesDetailsHtml;
   return (
     <div class={isOpen ? 'Subpop open' : 'Subpop'} data-subpop-id={subpop.key}>
@@ -254,10 +286,7 @@ export function TokenUpgradeSubpop({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   return (
     <div
       class={isOpen ? 'Subpop TokenUpgrade open' : 'Subpop TokenUpgrade'}
