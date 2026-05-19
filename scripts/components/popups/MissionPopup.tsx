@@ -7,55 +7,7 @@
 
 import type { JSX } from 'preact';
 import i18n from '../../i18n.js';
-import { renderSpriteHtml } from '../../render/renderSpriteHelper.js';
-
-export interface MissionGoalVM {
-  /** Target sprite config — rendered via `renderSpriteHtml`, same
-   *  pattern as `NewItemsNotification`, keeping the view-model builder
-   *  out of render-land. */
-  spriteConfig: unknown;
-  /** Computed goal text — may contain `<span>` highlights. */
-  textHtml: string;
-  /** Pre-formatted "current / goal" progress HTML. */
-  progressHtml: string;
-  complete: boolean;
-}
-
-export interface MissionRewardVM {
-  /** `MissionReward PopupSummaryItem <classMap[target]>`. */
-  cssClass: string;
-  amount: string;
-}
-
-/** One mission-goal row.  Shared by the briefing/complete dialog
- *  (`MissionPopup`, full variant) and the Missions-tab card
- *  (`MissionCard`, `small` variant — legacy `mission_goal_small.html`:
- *  the `.MissionGoal.small` modifier, no `.MissionGoalText`).  The
- *  per-goal view-model is computed once in `missionView.ts`, so the
- *  two render paths can't drift. */
-export function MissionGoalRow({
-  goal,
-  small = false,
-}: {
-  goal: MissionGoalVM;
-  small?: boolean;
-}): JSX.Element {
-  const sp = renderSpriteHtml(goal.spriteConfig as Parameters<typeof renderSpriteHtml>[0]);
-  const base = small ? 'MissionGoal small' : 'MissionGoal';
-  return (
-    <div class={goal.complete ? `${base} complete` : base}>
-      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
-      <div class="MissionGoalSprite" dangerouslySetInnerHTML={{ __html: sp }} />
-      {!small && (
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string
-        <div class="MissionGoalText" dangerouslySetInnerHTML={{ __html: goal.textHtml }} />
-      )}
-      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally formatted progress markup */}
-      <div class="MissionGoalProgress" dangerouslySetInnerHTML={{ __html: goal.progressHtml }} />
-      <div class="MissionGoalStatus" />
-    </div>
-  );
-}
+import { MissionGoalRow, type MissionGoalVM, type MissionRewardVM } from '../MissionGoal.js';
 
 export interface MissionPopupProps {
   /** `complete` renders the `.Complete` body modifier + the

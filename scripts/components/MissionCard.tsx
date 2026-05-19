@@ -9,7 +9,7 @@
 // place instead of drifting between card and dialog.
 
 import type { JSX } from 'preact';
-import { MissionGoalRow, type MissionGoalVM } from './popups/MissionPopup.js';
+import { MissionGoalRow, type MissionGoalVM } from './MissionGoal.js';
 
 export interface MissionCardProps {
   /** Raw mission title HTML — legacy `mission.html` used

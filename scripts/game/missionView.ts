@@ -16,11 +16,8 @@
 // Both feed the same `buildGoal`; the Preact components just render.
 
 import type { MissionCardProps } from '../components/MissionCard.js';
-import type {
-  MissionGoalVM,
-  MissionPopupProps,
-  MissionRewardVM,
-} from '../components/popups/MissionPopup.js';
+import type { MissionGoalVM, MissionRewardVM } from '../components/MissionGoal.js';
+import type { MissionPopupProps } from '../components/popups/MissionPopup.js';
 import { span, sprintf, toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
 
