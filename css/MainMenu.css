@@ -109,13 +109,12 @@
   transform: scale(0.97);
 }
 
-/* While a Preact dialog is open (`dialogManager` adds `.DialogLock` to
-   `#GameContainer`) the game-tab nav is part of the locked-out
-   backdrop: dim it to read as covered and swallow pointer events so a
-   tab can't be switched from under the dialog.  Dismiss the dialog (X
-   or backdrop click) to interact with the menu again. */
-#GameContainer.DialogLock .MainMenu {
-  pointer-events: none;
+/* While a dialog is open `dialogManager` adds `.DialogLock` to the
+   `.MainMenu` (the Stage backdrop can't reach past the engine's
+   Stage transform to cover this header).  Darken it so it reads as
+   part of the backdrop; clicks are captured by dialogManager and
+   dismiss the dialog (so a tab can't be switched from under it). */
+.MainMenu.DialogLock {
   filter: brightness(0.5);
   transition: filter 0.15s linear;
 }

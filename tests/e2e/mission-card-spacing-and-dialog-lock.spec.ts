@@ -9,11 +9,14 @@
  *     margin (css/Render.css) — guarded here so it can't silently
  *     regress back to whitespace-dependent spacing.
  *
- *  2. Dialog modality — the dialog backdrop only covers the game
- *     `.Stage`; the `.MainMenu` game-tab nav is a sibling above it, so
- *     tabs were clickable from under an open dialog.  `dialogManager`
- *     now marks `#GameContainer.DialogLock`; CSS makes the menu
- *     non-interactive while a dialog is open.
+ *  2. Dialog modality — the Stage-internal `.PopupContainer` backdrop
+ *     only spans the `.Stage`; the `.MainMenu` game-tab header is a
+ *     sibling above it and can't be covered (the engine puts an inline
+ *     transform on `.Stage`, trapping any fixed/absolute overlay).
+ *     `dialogManager` instead dims the header (`.MainMenu.DialogLock`)
+ *     and captures clicks on it to dismiss the dialog, so a tab can't
+ *     be switched from under it and the darkened header behaves like
+ *     the rest of the backdrop.
  */
 
 import { expect, test } from '@playwright/test';
@@ -49,9 +52,18 @@ test('mission-card small goal pills keep explicit horizontal spacing', async ({ 
   expect(margins.right, 'small pill needs right margin').toBeGreaterThan(0);
 });
 
-test('an open dialog locks the game-tab nav until dismissed', async ({ page }) => {
+test('an open dialog dims the header and a tab click dismisses it without switching', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1024, height: 800 });
   await bootGame(page);
+
+  const activeTabId = await page.locator('.mm-tab.active').first().getAttribute('data-button-id');
+  expect(activeTabId, 'a game tab should be active on boot').toBeTruthy();
+  // Pick a different tab to attempt switching to from under the dialog.
+  const otherTab = page.locator('.mm-tab:not(.active):not(.disabled)').first();
+  const otherTabId = await otherTab.getAttribute('data-button-id');
+  expect(otherTabId, 'a second selectable tab should exist').toBeTruthy();
 
   // Open a real Mission dialog through the notification cue (same
   // trigger dialog-lifecycle.spec uses — a raw DOM click on the board
@@ -70,28 +82,28 @@ test('an open dialog locks the game-tab nav until dismissed', async ({ page }) =
   await expect(page.locator('.PopupContainer.lockOn.Mission')).toBeVisible({ timeout: 5_000 });
   await expect(page.locator('.PopupBody.MissionBody')).toBeVisible();
 
-  const locked = await page.evaluate(() => {
-    const root = document.querySelector('#GameContainer');
+  const dimmed = await page.evaluate(() => {
     const menu = document.querySelector<HTMLElement>('.MainMenu');
     return {
-      hasClass: !!root?.classList.contains('DialogLock'),
-      pointerEvents: menu ? getComputedStyle(menu).pointerEvents : null,
+      hasClass: !!menu?.classList.contains('DialogLock'),
+      filter: menu ? getComputedStyle(menu).filter : null,
     };
   });
-  expect(locked.hasClass, '#GameContainer gets .DialogLock while a dialog is open').toBe(true);
-  expect(locked.pointerEvents, '.MainMenu is non-interactive while locked').toBe('none');
+  expect(dimmed.hasClass, '.MainMenu gets .DialogLock while a dialog is open').toBe(true);
+  expect(dimmed.filter, '.MainMenu is visibly darkened').not.toBe('none');
 
-  await page.locator('.PopupContainer.lockOn .PopupClose').first().click();
+  // Clicking a tab from under the dialog must dismiss it and NOT switch
+  // the view (capture-phase listener stops the jQuery .mm-tab delegate).
+  await otherTab.click();
   await expect(page.locator('.PopupBody.MissionBody')).toHaveCount(0);
+  expect(
+    await page.locator('.mm-tab.active').first().getAttribute('data-button-id'),
+    'tab switch was suppressed — still on the original view'
+  ).toBe(activeTabId);
 
-  const unlocked = await page.evaluate(() => {
-    const root = document.querySelector('#GameContainer');
-    const menu = document.querySelector<HTMLElement>('.MainMenu');
-    return {
-      hasClass: !!root?.classList.contains('DialogLock'),
-      pointerEvents: menu ? getComputedStyle(menu).pointerEvents : null,
-    };
-  });
-  expect(unlocked.hasClass, '.DialogLock cleared on close').toBe(false);
-  expect(unlocked.pointerEvents, '.MainMenu interactive again after close').not.toBe('none');
+  // Header is functional again: the lock is cleared and the same tab
+  // now actually switches the view.
+  await expect(page.locator('.MainMenu.DialogLock')).toHaveCount(0);
+  await page.locator(`.mm-tab[data-button-id="${otherTabId}"]`).click();
+  await expect(page.locator(`.mm-tab.active[data-button-id="${otherTabId}"]`)).toBeVisible();
 });
