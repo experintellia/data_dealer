@@ -1302,10 +1302,23 @@ export function sellPowerup(
 
   var idata: NodeInstanceData = node.instance_data || {};
   var powerups: PowerupDef[] = idata.powerups || [];
+
+  // Slot indices are per-category (Upgrade / Ad / TeamMember each keep
+  // their own 0-based slot grid) but `powerups` is one flat array, so a
+  // bare `p.slot === slot` match resolves the wrong category's entry and
+  // the removal filter drops every entry sharing that slot index.  Scope
+  // the match to the sold powerup's game type — same `full_type`-derived
+  // guard buyPowerup uses for its slot-occupied check above.
+  var soldDef = _findPowerupDef(perpTypeData, gestalt);
+  var soldGameType = soldDef ? _gameTypeFrom(soldDef.full_type) : '';
+  var isSold = function (p: PowerupDef | null | undefined): boolean {
+    return !!p && p.slot === slot && _gameTypeFrom(p.full_type) === soldGameType;
+  };
+
   var puEntry: PowerupDef | null = null;
   for (var i = 0; i < powerups.length; i++) {
     var p0 = powerups[i];
-    if (p0 && p0.slot === slot) {
+    if (p0 && isSold(p0)) {
       puEntry = p0;
       break;
     }
@@ -1317,7 +1330,7 @@ export function sellPowerup(
   var refund = Math.floor(price * 0.75);
 
   var newPowerups: PowerupDef[] = powerups.filter(function (p) {
-    return p && p.slot !== slot;
+    return p && !isSold(p);
   });
   var mods = _computeModifiers(perpTypeData, newPowerups);
 

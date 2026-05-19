@@ -1050,6 +1050,24 @@ test.describe('Section J — in-popup action handlers', () => {
       bodySelector: '.PopupContainer.lockOn .PopupMenu',
       boost: { cash: 5_000, xp_level: 2, xp_value: 20 },
     });
+    // Drive fetchPowerups so `powerupsCached` is set and the powerup
+    // grid renders (real open path).  Without this the harness opens via
+    // bare openPopup(), the grid is never fetched, and the spinner is
+    // present regardless of Bug B — the regression guard below needs the
+    // non-spinner baseline to be meaningful.
+    await page.evaluate(() => {
+      const game = (window as any).__dd?._app?.game;
+      const gnode = game.getById('project001');
+      gnode.fetchPowerups(function () {
+        gnode.compilePowerups();
+        gnode.compileProfileSet?.();
+        if (gnode.renderPopup) gnode.updatePopup();
+      });
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupTab.Powerups').first()).toBeAttached({
+      timeout: 3_000,
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupContentLoading')).toHaveCount(0);
     // Buy through the popup's button_click first so the rest of the flow
     // (compilePowerups, slot taken) goes through the same wiring.  Use a
     // numeric slot so the engine's strict-equals slot match in
@@ -1107,6 +1125,18 @@ test.describe('Section J — in-popup action handlers', () => {
       return (state.nodes || []).find((n: any) => n.full_path === 'Imperium.project001');
     });
     expect(node?.instance_data?.powerups || []).toHaveLength(0);
+
+    // Regression: a post-sell perp-data rebuild that drops the runtime
+    // `powerupsCached` flag makes the rebuilt VM fall back to
+    // `cached:false`, hanging the dialog forever on the loading spinner.
+    // The buggy spinner only appears *after* the graceful slot-swap
+    // (`close_powerup` 400ms → out 400ms → setVm → in 400ms) and is then
+    // permanent, so an auto-retrying assertion would pass on the
+    // pre-rebuild DOM and miss it — a fixed settle past that ~1.2s chain
+    // is required before asserting the dialog rebuilt into the grid.
+    await page.waitForTimeout(2_000);
+    await expect(page.locator('.PopupContainer.lockOn .PopupContentLoading')).toHaveCount(0);
+    await expect(page.locator('.PopupContainer.lockOn .PopupTab.Powerups').first()).toBeAttached();
 
     await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupMenu', 'x');
   });
