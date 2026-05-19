@@ -1287,6 +1287,55 @@
   line-height: 26px;
   margin: 8px 0px 4px 0px;
 }
+.TopscoreLabelLine {
+  line-height: 26px;
+}
+.TopscoreLabel .TopscoreLabelLine:last-child {
+  padding: 14px 0px 10px 0px;
+}
+.TopscoreLabelIcon {
+  margin: 24px 0px 0px 0px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.TopscoreLabelCash,
+.TopscoreLabelToken,
+.TopscoreLabelStar {
+  background-image: url(../img/MainSprites.png);
+  background-repeat: no-repeat;
+}
+.TopscoreLabelCash {
+  width: 45px;
+  height: 34px;
+  background-position: -369px -616px;
+  transform: scale(1.3);
+}
+.TopscoreLabelToken {
+  width: 38px;
+  height: 38px;
+  background-position: -331px -616px;
+  transform: scale(1.3);
+}
+.TopscoreLabelStar {
+  position: relative;
+  width: 47px;
+  height: 46px;
+  background-position: -325px -655px;
+  transform: scale(1.38);
+}
+.TopscoreLabelStar span {
+  position: absolute;
+  left: 19.5px;
+  top: 20.5px;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1;
+  color: #333;
+  font-family: Bowlby;
+}
 
 .small .PopupToken {
   width:67px;

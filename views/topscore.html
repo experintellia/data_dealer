@@ -3,10 +3,23 @@
   var data = D.gameNode.data || {};
   var type = D.gameNode.scoretype || 'cash';
   var type_headline = data.type_headlines[type];
+  var icon_map = {
+    cash: '<div class="TopscoreLabelCash"></div>',
+    profiles: '<div class="TopscoreLabelToken"></div>',
+    xp: '<div class="TopscoreLabelStar"><span>XP</span></div>',
+    spent: '<div class="TopscoreLabelCash"></div>',
+  };
+  var headline_parts = String(type_headline).split(/<br\s*\/?>/i);
+  var headline_top = headline_parts.shift();
+  var headline_bottom = headline_parts.join(' ');
 %>
 
 <div class="TopscoreInline">
-  <div class="TopscoreLabel"><% print(type_headline); %></div>
+  <div class="TopscoreLabel">
+    <div class="TopscoreLabelLine"><% print(headline_top); %></div>
+    <div class="TopscoreLabelIcon"><%= icon_map[type] %></div>
+    <div class="TopscoreLabelLine"><% print(headline_bottom); %></div>
+  </div>
   <div class="LoadingSpinner"></div>
   <div class="TopscoreRank">
     <% print(_.renderView('topscore_rank.html', { data: data, parentdata: parentdata, type:type })); %>
