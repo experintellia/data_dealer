@@ -555,7 +555,7 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
         </div>
       </div>
       <div class="PopupContent">
-        <div class="PopupTab data" data-tab="data" style={dataActive ? undefined : 'display:none'}>
+        <div class={dataActive ? 'PopupTab data' : 'PopupTab data hidden'} data-tab="data">
           <div class={openToken ? 'SubpopContainer open' : 'SubpopContainer'}>
             {vm.tokens.map((t) => (
               <TokenSubpop
@@ -650,13 +650,8 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
               return (
                 <div
                   key={cat.pkey}
-                  class={
-                    containerOpen
-                      ? `PopupTab Powerups ${cat.pkey} hasPopup`
-                      : `PopupTab Powerups ${cat.pkey}`
-                  }
+                  class={`PopupTab Powerups ${cat.pkey}${containerOpen ? ' hasPopup' : ''}${tabOpen ? '' : ' hidden'}`}
                   data-tab={cat.pkey}
-                  style={tabOpen ? undefined : 'display:none'}
                 >
                   <div class={containerOpen ? 'SubpopContainer open' : 'SubpopContainer'}>
                     {cat.sellSubpops.map((s) => (

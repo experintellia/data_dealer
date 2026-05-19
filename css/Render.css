@@ -1748,6 +1748,12 @@
 .Selector.standalone {
 
 }
+/* Inactive tab — Preact tabs render via display-toggle (not unmount)
+   so the lastTab / getComputedStyle contract holds; the class drives
+   it instead of an inline style. */
+.PopupTab.hidden {
+  display: none;
+}
 .PopupTab.hasPopup .PopupPageArrowL,
 .PopupTab.hasPopup .PopupPageArrowR {
   display: none;

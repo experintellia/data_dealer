@@ -59,12 +59,7 @@ export function CityPopup({ vm, onClose, popup }: CityPopupProps) {
           const tabActive = activeTab === t.pkey;
           const containerOpen = tabActive && openKey !== null;
           return (
-            <div
-              key={t.pkey}
-              class="PopupTab"
-              data-tab={t.pkey}
-              style={tabActive ? undefined : 'display:none'}
-            >
+            <div key={t.pkey} class={tabActive ? 'PopupTab' : 'PopupTab hidden'} data-tab={t.pkey}>
               <div class={containerOpen ? 'SubpopContainer open' : 'SubpopContainer'}>
                 {t.subpops.map((s) => (
                   <PerpProvidedSubpop
