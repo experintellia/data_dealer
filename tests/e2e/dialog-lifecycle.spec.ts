@@ -1050,6 +1050,24 @@ test.describe('Section J — in-popup action handlers', () => {
       bodySelector: '.PopupContainer.lockOn .PopupMenu',
       boost: { cash: 5_000, xp_level: 2, xp_value: 20 },
     });
+    // Drive fetchPowerups so `powerupsCached` is set and the powerup
+    // grid renders (real open path).  Without this the harness opens via
+    // bare openPopup(), the grid is never fetched, and the spinner is
+    // present regardless of Bug B — the regression guard below needs the
+    // non-spinner baseline to be meaningful.
+    await page.evaluate(() => {
+      const game = (window as any).__dd?._app?.game;
+      const gnode = game.getById('project001');
+      gnode.fetchPowerups(function () {
+        gnode.compilePowerups();
+        gnode.compileProfileSet?.();
+        if (gnode.renderPopup) gnode.updatePopup();
+      });
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupTab.Powerups').first()).toBeAttached({
+      timeout: 3_000,
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupContentLoading')).toHaveCount(0);
     // Buy through the popup's button_click first so the rest of the flow
     // (compilePowerups, slot taken) goes through the same wiring.  Use a
     // numeric slot so the engine's strict-equals slot match in
@@ -1107,6 +1125,18 @@ test.describe('Section J — in-popup action handlers', () => {
       return (state.nodes || []).find((n: any) => n.full_path === 'Imperium.project001');
     });
     expect(node?.instance_data?.powerups || []).toHaveLength(0);
+
+    // Regression (Bug B): SellPowerup rebuilt gnode.data from
+    // `getTypeData`, dropping the runtime `powerupsCached` flag, so the
+    // post-sell VM fell back to `cached:false` — the popup hung forever
+    // on the loading spinner with no powerup tabs (unresponsive dialog).
+    // The graceful slot-swap is `close_powerup` (400ms) → out (400ms) →
+    // setVm → in (400ms); settle well past that, then assert the dialog
+    // rebuilt into the *grid* (not the permanent spinner).  Verified to
+    // fail (`spinner:1, cat:0`) when the fix is reverted.
+    await page.waitForTimeout(2_000);
+    await expect(page.locator('.PopupContainer.lockOn .PopupContentLoading')).toHaveCount(0);
+    await expect(page.locator('.PopupContainer.lockOn .PopupTab.Powerups').first()).toBeAttached();
 
     await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupMenu', 'x');
   });

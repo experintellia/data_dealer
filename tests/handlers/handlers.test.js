@@ -939,6 +939,77 @@ describe('sellPowerup — failure: slot empty', () => {
   });
 });
 
+// Regression: slot indices are per-category (Upgrade / Ad / TeamMember
+// each keep their own 0-based grid), so all three can occupy slot 0 at
+// once.  sellPowerup must disambiguate by the sold gestalt's game type —
+// a bare slot match would remove the wrong category's entry (and the
+// removal filter would drop every entry at that slot index).
+describe('sellPowerup — cross-category slot-0 collision', () => {
+  // upgrade001 price 160, ad002 price 90, teammember020 price 110 —
+  // all valid project001 provided powerups, all seeded at slot 0.
+  function mkCollisionState() {
+    const nodeWithPus = Object.assign({}, PROJECT_NODE, {
+      instance_data: {
+        x: 100,
+        y: 100,
+        powerups: [
+          { slot: 0, gestalt: 'teammember020', full_type: 'TeamMemberPowerup:teammember020' },
+          { slot: 0, gestalt: 'upgrade001', full_type: 'UpgradePowerup:upgrade001' },
+          { slot: 0, gestalt: 'ad002', full_type: 'AdPowerup:ad002' },
+        ],
+      },
+    });
+    return Object.assign({}, freshState('test@local'), { nodes: [nodeWithPus] });
+  }
+
+  const remaining = (result) => result.node.instance_data.powerups.map((p) => p.gestalt).sort();
+
+  it('selling the upgrade removes ONLY the upgrade (ad + team stay)', async () => {
+    setState(mkCollisionState());
+    const before = getState().game_values.cash_value;
+    const { result } = await sellPowerup(PROJECT_NODE.full_path, 0, 'upgrade001');
+    expect(result).not.toHaveProperty('error');
+    expect(remaining(result)).toEqual(['ad002', 'teammember020']);
+    expect(result.game_values.cash_value).toBe(before + Math.floor(160 * 0.75));
+  });
+
+  it('selling the ad removes ONLY the ad (upgrade + team stay)', async () => {
+    setState(mkCollisionState());
+    const before = getState().game_values.cash_value;
+    const { result } = await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result).not.toHaveProperty('error');
+    expect(remaining(result)).toEqual(['teammember020', 'upgrade001']);
+    expect(result.game_values.cash_value).toBe(before + Math.floor(90 * 0.75));
+  });
+
+  it('selling the team member removes ONLY the team member (upgrade + ad stay)', async () => {
+    setState(mkCollisionState());
+    const before = getState().game_values.cash_value;
+    const { result } = await sellPowerup(PROJECT_NODE.full_path, 0, 'teammember020');
+    expect(result).not.toHaveProperty('error');
+    expect(remaining(result)).toEqual(['ad002', 'upgrade001']);
+    expect(result.game_values.cash_value).toBe(before + Math.floor(110 * 0.75));
+  });
+
+  it('returns error:1 when (slot, gestalt) names a category not at that slot', async () => {
+    // Only team member sits at slot 1; selling an ad at slot 1 must not
+    // fall back to a bare slot match and wipe the team member.
+    const node = Object.assign({}, PROJECT_NODE, {
+      instance_data: {
+        x: 100,
+        y: 100,
+        powerups: [
+          { slot: 1, gestalt: 'teammember020', full_type: 'TeamMemberPowerup:teammember020' },
+        ],
+      },
+    });
+    setState(Object.assign({}, freshState('test@local'), { nodes: [node] }));
+    const { result } = await sellPowerup(PROJECT_NODE.full_path, 1, 'ad002');
+    expect(result.error).toBe(1);
+    expect(getState().nodes[0].instance_data.powerups).toHaveLength(1);
+  });
+});
+
 // ── buyPerp ───────────────────────────────────────────────────────────────────
 //
 // Ruleset fixtures used:

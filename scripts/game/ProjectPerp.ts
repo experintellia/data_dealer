@@ -352,7 +352,12 @@ export class ProjectPerp extends GamePerp {
           return;
         }
         groot.updateGameValues(r.game_values || {}, r.levelup === true, r.missions);
-        gnode.data = mergeData(groot.getTypeData(gnode.gestalt), r.node?.instance_data);
+        // Merge into the live `gnode.data` (like BuyPowerup/BuySlots) —
+        // rebuilding from `getTypeData` drops runtime flags such as
+        // `powerupsCached`, which leaves the rebuilt VM stuck on the
+        // loading spinner.  `instance_data` wins in mergeData, so the
+        // post-sell (shorter) powerups array still replaces cleanly.
+        gnode.data = mergeData(gnode.data, r.node?.instance_data);
         gnode.addProvidedPowerup(bgestalt);
         gnode.compilePowerups();
         gnode.compileProfileSet();
