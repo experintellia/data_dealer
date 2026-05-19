@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { type Page, expect } from '@playwright/test';
 
 /**
  * Install `window.__ddSettle` — an in-page async poll that resolves once the
@@ -44,4 +44,110 @@ export async function installSettle(page: Page): Promise<void> {
       }
     };
   });
+}
+
+/**
+ * Boot the game and drain the first-run notification queue so a spec
+ * starts from a quiescent, popup-free state.  Shared by every spec that
+ * needs to drive dialogs without a stray boot briefing/tutorial landing
+ * mid-test.  See the inline notes for why a single empty poll isn't
+ * proof of quiescence (RenderPopup.close re-mounts the next queued cue
+ * through a 250–500ms timer).
+ */
+export async function bootGame(page: Page): Promise<void> {
+  await page.goto('/?devtools=1');
+  await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
+    timeout: 50_000,
+  });
+
+  // Dismiss the first-launch locale picker if it appears.  Picking EN persists
+  // the locale and reloads the page, so we re-wait for the game container.
+  const picker = page.locator('.LangSelectOverlay');
+  if (await picker.isVisible().catch(() => false)) {
+    await picker.locator('.lang-pick[data-locale="en"]').click();
+    await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
+      timeout: 50_000,
+    });
+  }
+
+  // Wait for the GameRoot to be reachable.  app.ts assigns it to
+  // `window.__dd._app` after `Application.start()` finishes.
+  await page.waitForFunction(() => {
+    return !!(window as any).__dd?._app?.game;
+  });
+
+  // First-run boot auto-queues a tutorial briefing for the first mission.
+  // Pre-mark all known mission briefings as seen so subsequent loadGame
+  // replays don't re-queue them, then keep firing popup_close on whatever
+  // is open until the queue + the renderPopup slot drain.  Tearing down
+  // the popup DOM directly doesn't work — `openNotification` mounts each
+  // popup through a setTimeout(delay) that captures the popup reference,
+  // so even after deleting the object the next tick re-mounts it.  Going
+  // through the actual close path lets RenderPopup's lifecycle release the
+  // queue cleanly.
+  await page.evaluate(() => {
+    const groot = (window as any).__dd?._app?.game;
+    if (!groot?.raw_data) return;
+    groot.raw_data.mission_briefings_seen = groot.raw_data.mission_briefings_seen || {};
+    const missions = groot.Missions?.Missions ?? {};
+    for (const g of Object.keys(missions)) {
+      groot.raw_data.mission_briefings_seen[g] = true;
+    }
+  });
+
+  // RenderPopup.close() schedules DOM removal + the next queued open through a
+  // 250–500ms setTimeout that captured the popup ref, so a single momentarily
+  // empty poll is not proof the system is quiescent: a re-mount timer can still
+  // be in flight and fire *after* bootGame returns, landing a stray popup in
+  // the middle of the test (under 2-worker CPU contention this is when the
+  // dialog-lifecycle flakes — a different test each run depending on when the
+  // timer lands). Keep actively draining, but only return once "empty" has
+  // held across consecutive polls spanning longer than that timer window, so
+  // any pending re-mount has had time to fire and be drained first.
+  const STABLE_POLLS_REQUIRED = 3; // 3 × 300ms ≈ 900ms > the 500ms timer ceiling
+  const MAX_ATTEMPTS = 40; // ~12s ceiling for slow/contended CI
+  let consecutiveSettled = 0;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const settled = await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      if (!groot) return false;
+      // Drop any queued cues so the queue can't refill after the current
+      // popup closes.
+      if (Array.isArray(groot.NotificationQueue)) {
+        groot.NotificationQueue.length = 0;
+      }
+      const open = groot.notificationPopup;
+      if (open) {
+        try {
+          open.trigger('popup_close');
+        } catch {
+          /* fall back to direct teardown below */
+        }
+      }
+      // Belt-and-braces teardown of any stray popup that doesn't go through
+      // the GameRoot's notificationPopup slot (e.g. status info popups).
+      document.querySelectorAll<HTMLElement>('.Popup').forEach((el) => {
+        try {
+          el.remove();
+        } catch {
+          /* ignore */
+        }
+      });
+      document
+        .querySelectorAll<HTMLElement>('.PopupContainer.lockOn')
+        .forEach((el) => el.classList.remove('lockOn'));
+      return (
+        (!Array.isArray(groot.NotificationQueue) || groot.NotificationQueue.length === 0) &&
+        !groot.notificationPopup &&
+        document.querySelectorAll('.PopupContainer.lockOn').length === 0
+      );
+    });
+    consecutiveSettled = settled ? consecutiveSettled + 1 : 0;
+    if (consecutiveSettled >= STABLE_POLLS_REQUIRED) return;
+    // Wait above the 250–500ms close/re-mount timer floor before re-checking
+    // so an in-flight openNotification chain either finishes or dispatches the
+    // next item we then drain on the following iteration.
+    await page.waitForTimeout(300);
+  }
+  throw new Error('bootGame: notification queue did not stay drained after 40 attempts');
 }

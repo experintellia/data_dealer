@@ -109,6 +109,17 @@
   transform: scale(0.97);
 }
 
+/* While a Preact dialog is open (`dialogManager` adds `.DialogLock` to
+   `#GameContainer`) the game-tab nav is part of the locked-out
+   backdrop: dim it to read as covered and swallow pointer events so a
+   tab can't be switched from under the dialog.  Dismiss the dialog (X
+   or backdrop click) to interact with the menu again. */
+#GameContainer.DialogLock .MainMenu {
+  pointer-events: none;
+  filter: brightness(0.5);
+  transition: filter 0.15s linear;
+}
+
 /* ── Mobile / responsive layout ─────────────────────────────────────── */
 
 /* ≤ 980 px: hide the brand logo so the tabs reclaim its space. */

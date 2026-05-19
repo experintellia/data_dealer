@@ -163,6 +163,13 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
 
   let isOpen = true;
 
+  // The dialog backdrop only covers the game `.Stage` (it mounts into
+  // the Stage-internal `.PopupContainer`); the `.MainMenu` game-tab nav
+  // is a sibling above the Stage in `#GameContainer`, so without this it
+  // stays clickable and you could switch tabs from under an open dialog.
+  // Mark the shared container so CSS locks the menu out until dismissed.
+  const lockRoot = opts.container.closest(setup.renderContainer);
+
   // Subpop block below duplicates `RenderTopLevelUI.ts:816` (the legacy
   // jQuery delegated handler on RenderPopup's jdomelem doesn't fire on
   // Preact popups).  Both go away in tier-8 when subpops become Preact
@@ -208,6 +215,7 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
     for (const b of opts.container.querySelectorAll('.FXBling')) b.remove();
     opts.container.classList.remove('lockOn', 'PopupPreact', 'PopupPreactBottom');
     if (opts.extendClass) opts.container.classList.remove(opts.extendClass);
+    lockRoot?.classList.remove('DialogLock');
     active = null;
     opts.onAfterClose?.();
   };
@@ -259,6 +267,7 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
   opts.container.classList.add('lockOn', 'PopupPreact');
   if (opts.placeBottom) opts.container.classList.add('PopupPreactBottom');
   if (opts.extendClass) opts.container.classList.add(opts.extendClass);
+  lockRoot?.classList.add('DialogLock');
 
   // `onClose` + the live `popup` handle are framework-injected.  Perp
   // components fire `popup.trigger('button_click.ChargeButton',[g,d])`
