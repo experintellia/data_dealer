@@ -27,6 +27,7 @@ import type {
   LocalState,
   MissionGoal,
 } from './state.js';
+import { getAvatarUrl } from './webxdc-avatars.js';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -699,6 +700,10 @@ interface RankingRow {
   display_name: string;
   value: number;
   self: boolean;
+  /** Speculative webxdc avatar URL; the row template always emits the
+   *  <img> and the .TopscoreList container only reserves slot space
+   *  after at least one image has fired onload. */
+  avatar?: string;
 }
 
 export function getRanking(
@@ -716,12 +721,15 @@ export function getRanking(
   var rows: RankingRow[] = Object.keys(peers).map(function (addr) {
     var p = peers[addr] || {};
     var v = p[field];
-    return {
+    var row: RankingRow = {
       addr: addr,
       display_name: p.display_name || addr,
       value: typeof v === 'number' ? v : 0,
       self: addr === selfAddr,
     };
+    var url = getAvatarUrl(addr);
+    if (url) row.avatar = url;
+    return row;
   });
 
   rows.sort(function (a, b) {
