@@ -2379,6 +2379,9 @@
   line-height: 22px;
   font-size: 19px;
   color: #FFF;
+  /* Min 3 lines (3 × 22 + 4 + 8 padding) so the bubble's tail reaches
+   * down to the avatar's mouth even when the message is one line. */
+  min-height: 78px;
   width: 440px;
 }
 .NotificationText .highlight {
@@ -3123,6 +3126,9 @@ button {
     height: 96px;
     background-size: 576px 614.4px;
     background-position: -504px -457.8px;
+    /* Nudge Marco a few px right so he gets a left margin AND so his
+     * right edge meets the speech bubble at left: 79 — no gap. */
+    left: 8px;
   }
 
   .NotificationSays, .NotificationText {
