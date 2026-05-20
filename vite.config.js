@@ -163,7 +163,16 @@ function mockWebxdc() {
 // file — it is only produced by `vite build`.  Index.html references
 // it as a `<script>` tag, so this plugin runs the same Rollup pipeline
 // the prod build uses, in-memory, and serves the result via middleware.
+//
+// When PREACT_DEBUG=1 (set by `pnpm dev:debug`) the entry is swapped
+// to `esm-entry-debug.js` (which side-effect-imports `preact/debug`)
+// and minification is disabled so the Preact devtools extension shows
+// real component names instead of mangled `ji` / `ki`.  The production
+// `vite build` config below is untouched, so the debug surface cannot
+// reach the shipped .xdc.
 function bundleEsmDev() {
+  const preactDebug = process.env.PREACT_DEBUG === '1';
+  const entry = preactDebug ? 'scripts/esm-entry-debug.js' : 'scripts/esm-entry.js';
   let bundleSrc = null;
   let buildPromise = null;
 
@@ -182,8 +191,9 @@ function bundleEsmDev() {
           build: {
             write: false,
             emptyOutDir: false,
+            minify: !preactDebug,
             rollupOptions: {
-              input: 'scripts/esm-entry.js',
+              input: entry,
               output: {
                 format: 'iife',
                 name: '__DD',
