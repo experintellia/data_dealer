@@ -2454,56 +2454,56 @@
 .PopupBody.Status .PopupHeader {
   height:260px;
 }
-/* Tutorial / LevelUp dialog white card.  Clean flex row:
- *
- *   .PopupBody.TutorialBody   (white box, flex row, padding)
- *   ├─ .NotificationAvatar    (Marco, align-self: end → bottom-aligned)
- *   └─ .NotificationContent   (flex column: says + speech bubble)
- *       ├─ .NotificationSays  ("Marco says:" label)
- *       └─ .NotificationText  (blue speech bubble)
- *
- * Marco's tail-sprite anchors at his mouth and the bubble's tail
- * anchors at its bottom-left: with Marco bottom-aligned and the
- * bubble below the says-label in the flex column, the two visually
- * connect for any message length.  Replaces the previous
- * absolute-positioning maze (`.NotificationText { position:
- * absolute; top: 24; left: 112; width: 440; height: 119 }` and
- * friends) — the rules below override those for the Tutorial scope. */
+/* Tutorial / LevelUp dialog white card. */
 .PopupBody.TutorialBody {
   background: #FFF;
   -webkit-animation: AniScaleOpacity 0.2s reverse;
   -moz-animation: AniScaleOpacity 0.2s reverse;
   animation: AniScaleOpacity 0.2s reverse;
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  gap: 0;
   padding: 0 12px 12px 12px;
   cursor: pointer;
 }
-.PopupBody.TutorialBody .NotificationAvatar {
-  /* Bottom-aligned so a longer speech bubble grows upward while
-   * Marco stays anchored at the card's bottom — keeps the tail
-   * connecting to his mouth regardless of message length. */
+
+/* Shared Marco speech-bubble component used by Tutorial / LevelUp /
+ * Mission popups (`scripts/components/MarcoSpeech.tsx`):
+ *
+ *   .MarcoSpeech              (flex row)
+ *   ├─ .NotificationAvatar    (Marco, align-self: end → bottom-aligned)
+ *   ├─ .MarcoSpeechContent    (flex column: says + speech bubble)
+ *   │   ├─ .NotificationSays  ("Marco says:" label)
+ *   │   └─ .NotificationText  (blue speech bubble)
+ *   └─ {optional footer}      (Mission's "OK, sounds good!" button)
+ *
+ * Marco's tail-sprite anchors at his mouth and the bubble's tail
+ * anchors at its bottom-left: with Marco bottom-aligned and the
+ * bubble below the says-label in the flex column, the two visually
+ * connect for any message length.  Replaces the previous
+ * absolute-positioning maze (`.NotificationText { position: absolute;
+ * top: 24; left: 112; width: 440; height: 119 }` etc.) — the rules
+ * below override those base styles for everything inside .MarcoSpeech. */
+.MarcoSpeech {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+}
+.MarcoSpeech .NotificationAvatar {
   align-self: flex-end;
   flex: 0 0 auto;
-  /* Reset the legacy absolute/relative positioning. */
   position: static;
   top: auto;
   left: auto;
-  /* Marco's sprite has ~24 px of transparent padding to the right
-   * of his tail at desktop scale (120 wide); pull the bubble left
-   * so the tail tucks under the bubble's left edge with no visible
-   * seam. */
+  /* Marco's sprite has ~24 px of transparent padding to the right of
+   * his tail at desktop scale (120 wide); pull the bubble left so
+   * the tail tucks under the bubble's left edge with no visible seam. */
   margin-right: -24px;
 }
-.PopupBody.TutorialBody .TutorialContent {
+.MarcoSpeechContent {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-width: 0;
 }
-.PopupBody.TutorialBody .NotificationSays {
+.MarcoSpeech .NotificationSays {
   /* Reset absolute positioning from the base rule.  Keep typography. */
   position: static;
   top: auto;
@@ -2511,7 +2511,7 @@
   width: auto;
   flex: 0 0 auto;
 }
-.PopupBody.TutorialBody .NotificationText {
+.MarcoSpeech .NotificationText {
   /* Reset absolute positioning + fixed width/height from the base
    * rule.  Keep the gradient background, border-radius, padding,
    * font, color. */
@@ -2522,7 +2522,6 @@
   bottom: auto;
   width: auto;
   height: auto;
-  min-height: 0;
   flex: 0 0 auto;
 }
 
@@ -3525,30 +3524,10 @@ button {
     width: 100%;
     box-sizing: border-box;
   }
-  /* Speech bubble: 588 px-design absolute positioning broke when the
-   * wrapper shrank.  Pull it flush to the popup body and anchor the
-   * text against the right edge so the bubble fills the available
-   * width naturally. */
-  .PopupBody.MissionBody .NotificationBubble {
-    left: 0;
-    bottom: 0;
-    width: 100%;
-  }
-  /* Pull the speech bubble + says label in to meet the shrunk
-   * 72-px-wide mobile avatar.  Base CSS positions them at
-   * `left: 112 / 120` (designed for the 120-px desktop avatar);
-   * on mobile that left a 40-px gap between Marco and the bubble.
-   * `left: 68` lands the bubble flush against the avatar's tail. */
-  .PopupBody.MissionBody .NotificationText {
-    width: auto;
-    left: 68px;
-    right: 12px;
-  }
-  .PopupBody.MissionBody .NotificationSays {
-    width: auto;
-    left: 76px;
-    right: 12px;
-  }
+  /* MarcoSpeech (the shared speech-bubble component, replacing the
+   * legacy `.NotificationBubble` wrapper) handles its own flex
+   * layout via the `.MarcoSpeech` rules above; no per-popup
+   * positioning hacks needed on mobile. */
 
   /* Rewards section: title on its own line, rewards as a wrapping
    * flex row so multiple rewards spill onto the next line instead of
@@ -3589,9 +3568,10 @@ button {
   .PopupBody.MissionBody .MissionWrap {
     padding-bottom: 8px;
   }
-  .PopupBody.MissionBody .NotificationBubble {
-    padding-bottom: 80px;
-  }
+  /* MarcoSpeech is no longer a child container of the floating OK
+   * button (the button is its sibling inside MissionContent now);
+   * no padding-bottom reservation needed on .MarcoSpeech itself —
+   * MissionWrap's padding-bottom handles clearance below. */
 
   /* Mission goal cards: keep the original block layout (so text +
    * progress flow naturally and progress sits where it always did),

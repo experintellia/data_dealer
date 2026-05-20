@@ -3,6 +3,7 @@
 
 import { sprintf, toKSNum } from '../../dd-helpers.js';
 import i18n from '../../i18n.js';
+import { MarcoSpeech } from '../MarcoSpeech.js';
 
 export interface LevelUpNotificationProps {
   /** Current level. */
@@ -35,12 +36,7 @@ export function LevelUpNotification({
     // biome-ignore lint/a11y/useKeyWithClickEvents: tutorial-class popup is tap-to-advance UX; keyboard support is a separate a11y pass
     <div class="TutorialWrap" onClick={onClose}>
       <div class="PopupBody TutorialBody">
-        <div class="NotificationAvatar" />
-        <div class="TutorialContent">
-          <div class="NotificationSays">{says}</div>
-          {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
-          <div class="NotificationText" dangerouslySetInnerHTML={{ __html: textHtml }} />
-        </div>
+        <MarcoSpeech says={says} bodyHtml={textHtml} />
       </div>
       <div class="TutorialTapHint">tap anywhere to continue</div>
     </div>

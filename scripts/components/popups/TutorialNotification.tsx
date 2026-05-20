@@ -2,6 +2,7 @@
 // dismissed by tapping anywhere (the body's own `onClick={onClose}`).
 
 import i18n from '../../i18n.js';
+import { MarcoSpeech } from '../MarcoSpeech.js';
 
 export interface TutorialNotificationProps {
   /** Speaker label.  Defaults to the localized "Mark says:" string. */
@@ -29,12 +30,7 @@ export function TutorialNotification({
     // biome-ignore lint/a11y/useKeyWithClickEvents: tutorial-class popup is tap-to-advance UX; keyboard support is a separate a11y pass
     <div class="TutorialWrap" onClick={onClose}>
       <div class="PopupBody TutorialBody">
-        <div class="NotificationAvatar" />
-        <div class="TutorialContent">
-          <div class="NotificationSays">{speaker}</div>
-          {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
-          <div class="NotificationText" dangerouslySetInnerHTML={{ __html: descriptionHtml }} />
-        </div>
+        <MarcoSpeech says={speaker} bodyHtml={descriptionHtml} />
       </div>
       <div class="TutorialTapHint">tap anywhere to continue</div>
     </div>
