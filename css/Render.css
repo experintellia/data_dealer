@@ -2522,7 +2522,15 @@
   bottom: auto;
   width: auto;
   height: auto;
-  flex: 0 0 auto;
+  /* Allow shrinking + cap at the column width.  Without
+   * `min-width: 0` the flex child refuses to shrink below its
+   * content's intrinsic width and overflows the popup body when
+   * the message has long unbreakable spans. */
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 .PopupBody a {
