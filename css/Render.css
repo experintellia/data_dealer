@@ -2450,7 +2450,8 @@
   -webkit-animation: AniScaleOpacity 0.2s reverse;
   -moz-animation: AniScaleOpacity 0.2s reverse;
   animation: AniScaleOpacity 0.2s reverse;
-  height: 174px;
+  height: auto;
+  min-height: 174px;
   padding:0px;
   cursor: pointer;
 }
@@ -3108,8 +3109,20 @@ button {
     margin-bottom: 0px;
   }
 
+  /* Shrink Marco's avatar to 60 % on narrow phones — shrink the
+   * actual box (not via `transform: scale`, which only shrinks
+   * visually and leaves the layout claiming the original 120×160).
+   * MainSprites.png is 960×1024; `background-size` is set to 0.6x
+   * those dimensions and `background-position` is the desktop
+   * offset (`-840 -763`) multiplied by 0.6 so the same sprite
+   * frame lands inside the smaller box.  The bubble + body now
+   * size to content naturally because the avatar's flow height
+   * is 96 px instead of 160. */
   .NotificationAvatar {
-    transform: scale(0.6) translateX(-24px) translateY(40px);
+    width: 72px;
+    height: 96px;
+    background-size: 576px 614.4px;
+    background-position: -504px -457.8px;
   }
 
   .NotificationSays, .NotificationText {
