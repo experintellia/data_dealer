@@ -640,10 +640,7 @@ export class RenderViewMap extends RenderNode {
         // because their touches don't originate inside a `.lockOn`
         // overlay.
         const t0target = touchEvt.touches[0]?.target;
-        if (
-          t0target instanceof Element &&
-          t0target.closest('.PopupContainer.lockOn')
-        ) {
+        if (t0target instanceof Element && t0target.closest('.PopupContainer.lockOn')) {
           return;
         }
         const touch = touchEvt.touches[0];

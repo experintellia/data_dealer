@@ -172,13 +172,11 @@ test.describe('iPhone SE (375×667) — dialogs fit the viewport', () => {
         data.ProfileSet = { tokens_set: enriched };
         gnode.openPopup();
       });
-      await expect(
-        page.locator('.PopupContainer.lockOn .PopupBody').first()
-      ).toBeVisible({ timeout: 5_000 });
+      await expect(page.locator('.PopupContainer.lockOn .PopupBody').first()).toBeVisible({
+        timeout: 5_000,
+      });
 
-      const cashBefore = await page.evaluate(
-        () => (window as any).__dd?._app?.game?.cash_value
-      );
+      const cashBefore = await page.evaluate(() => (window as any).__dd?._app?.game?.cash_value);
 
       // Real touch tap on the Charge button.
       const chargeBtn = page
@@ -192,10 +190,9 @@ test.describe('iPhone SE (375×667) — dialogs fit the viewport', () => {
       // the fix because the synthesized click never reaches the
       // button.
       await expect
-        .poll(
-          () => page.evaluate(() => (window as any).__dd?._app?.game?.cash_value),
-          { timeout: 5_000 }
-        )
+        .poll(() => page.evaluate(() => (window as any).__dd?._app?.game?.cash_value), {
+          timeout: 5_000,
+        })
         .toBeLessThan(cashBefore);
     } finally {
       await context.close();
