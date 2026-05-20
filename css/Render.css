@@ -3471,29 +3471,43 @@ button {
     margin: 0 0 6px 0;
   }
   .PopupBody.MissionBody .MissionRewards .MissionReward {
-    /* Desktop overhangs the icon outside the pill (Cash `left: -33`,
-     * Profiles `-18`, etc.) — on a phone two adjacent chips overlap
-     * because the flex gap can't absorb that.  Rehouse the icon
-     * inside the chip: bump the left padding to fit the widest icon
-     * (Cash @ 56 px), grow the chip vertically so the icon's natural
-     * height fits, and reset the margin so the flex `gap` controls
-     * inter-chip spacing.  The per-icon override below replants each
-     * sprite flush-left inside the new padding. */
+    /* Keep the desktop chip silhouette — same pill height (22 px),
+     * same text styling, same icon sprite sizes / vertical anchoring.
+     * Only reset the margin so the wrapping flex `gap` controls
+     * inter-chip spacing (desktop `margin: 0px 20px 0px 4px` would
+     * compound with the gap and visually crowd / drift). */
     margin: 0;
     flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    height: auto;
-    min-height: 48px;
-    line-height: 22px;
-    padding-top: 4px;
-    padding-bottom: 4px;
-    padding-left: 58px;
   }
+  /* Snip the icon's negative-left overhang so it sits flush with the
+   * chip's left edge (was `left: -33` for Cash, `-18` for Profiles,
+   * etc. — peeked outside the pill).  Vertically centre instead of
+   * the per-variant `top: -7 / -10` shift; icon size is unchanged
+   * (still wider/taller than the 22-px chip, so it still overhangs
+   * top/bottom — same silhouette as desktop without the left poke-out). */
   .PopupBody.MissionBody .MissionRewards .MissionReward .RenderSprite.Tobi {
-    left: 2px;
+    left: 0;
     top: 50%;
     transform: translateY(-50%);
+  }
+  /* Per-variant padding-left = icon-width + small gap.  Without this
+   * the amount text ("800", "3", etc.) renders behind the icon at the
+   * desktop padding-left of 24-26 px. */
+  .PopupBody.MissionBody .MissionRewards .MissionReward.Profiles {
+    padding-left: 42px;
+  }
+  .PopupBody.MissionBody .MissionRewards .MissionReward.Risk,
+  .PopupBody.MissionBody .MissionRewards .MissionReward.Risk.Up {
+    padding-left: 38px;
+  }
+  .PopupBody.MissionBody .MissionRewards .MissionReward.Cash {
+    padding-left: 60px;
+  }
+  .PopupBody.MissionBody .MissionRewards .MissionReward.XP {
+    padding-left: 51px;
+  }
+  .PopupBody.MissionBody .MissionRewards .MissionReward.Penalty {
+    padding-left: 50px;
   }
 
   /* C10 — floating OK button.  The bottom `MainButton` is the user's
