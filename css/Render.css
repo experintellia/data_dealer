@@ -1203,47 +1203,57 @@
 .TopscorePerp:hover {
 }
 .TopscoreRow {
-  position: relative;
   font-family: Bowlby;
   font-size: 18px;
-  margin: 0px 0px 4px 0px;
+  margin: 0 0 4px 0;
   color: #333;
   line-height: 34px;
   border-radius: 6px;
   background: #FFF;
   height: 32px;
   width: 542px;
-  display: inline-block;
-  padding-left: 32px;
+  box-sizing: border-box;
+  padding: 0 6px 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .TopscoreRow.user {
   background: #FF0;
 }
 
-/* Avatar slot — collapsed by default; the .TopscoreList container flips
-   `hasAvatars` from inline onload="…" once any one <img> succeeds, at
-   which point every row reserves the slot so the names stay aligned.
-   Rows whose <img> 404s remove themselves via onerror; the .Buy.Token
-   placeholder (::before) shows through.
-   The slot stays display:none until first success, so messengers that
-   don't serve avatars at all keep the original row layout. */
+.TopscoreNum {
+  flex: 0 0 24px;
+  text-align: right;
+}
+.TopscoreDisplayname {
+  flex: 1 1 auto;
+  color: #009fd9;
+  min-width: 0;
+}
+.TopscoreValue {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+/* Avatar slot — collapsed by default; .TopscoreList flips `hasAvatars`
+   from each <img>'s inline onload once any one succeeds, after which
+   every row reserves the slot so names stay aligned. Rows whose <img>
+   404s remove the broken element via onerror and add `.failed`, which
+   reveals the ::before placeholder (the in-game Profiles token sprite,
+   scaled up). On messengers that never serve avatars the container
+   class is never set and the slot stays display:none. */
 .TopscoreAvatar {
-  display: none;
-}
-.TopscoreList.hasAvatars .TopscoreRow {
-  padding-left: 63px;
-}
-.TopscoreList.hasAvatars .TopscoreAvatar {
-  display: block;
-  position: absolute;
-  top: 4px;
-  left: 32px;
-  width: 26px;
+  flex: 0 0 26px;
   height: 26px;
   border-radius: 50%;
   overflow: hidden;
-  background: #ddd;
+  position: relative;
+  display: none;
+}
+.TopscoreList.hasAvatars .TopscoreAvatar {
+  display: block;
 }
 .TopscoreAvatar img {
   width: 100%;
@@ -1251,38 +1261,15 @@
   display: block;
   object-fit: cover;
 }
-/* Placeholder: the in-game Profiles token icon, scaled up to fill the
-   slot. Rendered only after the row's <img> has hit onerror and added
-   `.failed` — so successful avatars don't briefly flash the placeholder
-   while they're loading. */
-.TopscoreList.hasAvatars .TopscoreAvatar.failed::before {
+.TopscoreAvatar.failed::before {
   content: '';
   position: absolute;
-  top: 5px;
-  left: 5px;
+  top: 50%;
+  left: 50%;
   width: 16px;
   height: 16px;
   background: url(../img/MainSprites.png) no-repeat -436px -616px;
-  transform: scale(1.5);
-  transform-origin: center;
-}
-
-.TopscoreDisplayname {
-  color:#009fd9;
-}
-.TopscoreValue {
-  position:absolute;
-  top:0px;
-  right:0px;
-  text-align:right;
-  padding-right:6px;
-}
-.TopscoreNum {
-  width: 24px;
-  position: absolute;
-  top: 0px;
-  left: 2px;
-  text-align: right;
+  transform: translate(-50%, -50%) scale(1.5);
 }
 .TopscoreRankBarPerc {
   position: absolute;
@@ -3383,8 +3370,6 @@ button {
   .TopscoreRow {
     width: auto;
     max-width: 100%;
-    box-sizing: border-box;
-    display: block;
   }
   .TopscoreRankBarWrap {
     max-width: 100%;
