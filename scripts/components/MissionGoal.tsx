@@ -67,8 +67,11 @@ export function MissionGoalRow({
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
         <div class="MissionGoalText" dangerouslySetInnerHTML={{ __html: goal.textHtml }} />
         {goal.progressHtml && (
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: locally formatted progress markup
-          <div class="MissionGoalProgress" dangerouslySetInnerHTML={{ __html: goal.progressHtml }} />
+          <div
+            class="MissionGoalProgress"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: locally formatted progress markup
+            dangerouslySetInnerHTML={{ __html: goal.progressHtml }}
+          />
         )}
       </div>
       <div class="MissionGoalStatus" />

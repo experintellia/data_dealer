@@ -129,13 +129,19 @@ export class RenderViewTab extends RenderNode {
     // Check `currentTarget` (= the element the listener is bound to)
     // vs `target` (= the event's original target).  Using `this` would
     // also work in classic jQuery, but the shim might re-bind.
-    jdomelem3.on('mousedown mouseup touchstart touchend dblclick dbltap tap', (
-      e: { target?: unknown; currentTarget?: unknown; preventDefault(): void; stopPropagation(): void }
-    ) => {
-      if (e.target !== e.currentTarget) return;
-      e.preventDefault();
-      e.stopPropagation();
-    });
+    jdomelem3.on(
+      'mousedown mouseup touchstart touchend dblclick dbltap tap',
+      (e: {
+        target?: unknown;
+        currentTarget?: unknown;
+        preventDefault(): void;
+        stopPropagation(): void;
+      }) => {
+        if (e.target !== e.currentTarget) return;
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    );
 
     super({
       ...config,
@@ -335,13 +341,19 @@ export class RenderViewMap extends RenderNode {
     // See ViewMap (above) for the rationale — must NOT preventDefault
     // events bubbled from descendant buttons or the synthesised click
     // gets suppressed and every popup button is inert on touchscreens.
-    jdomelem3.on('mousedown mouseup touchstart touchend dblclick dbltap tap', (
-      e: { target?: unknown; currentTarget?: unknown; preventDefault(): void; stopPropagation(): void }
-    ) => {
-      if (e.target !== e.currentTarget) return;
-      e.preventDefault();
-      e.stopPropagation();
-    });
+    jdomelem3.on(
+      'mousedown mouseup touchstart touchend dblclick dbltap tap',
+      (e: {
+        target?: unknown;
+        currentTarget?: unknown;
+        preventDefault(): void;
+        stopPropagation(): void;
+      }) => {
+        if (e.target !== e.currentTarget) return;
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    );
 
     super({
       ...config,

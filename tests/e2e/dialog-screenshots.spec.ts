@@ -43,7 +43,8 @@ async function boot(page: Page, vp: { width: number; height: number }): Promise<
   // covers the bottom-left of the viewport — including the corner of
   // the dialog under test on phone viewports.
   await page.addStyleTag({
-    content: 'body > div[style*="z-index: 9999"][style*="position: fixed"] { display: none !important; }',
+    content:
+      'body > div[style*="z-index: 9999"][style*="position: fixed"] { display: none !important; }',
   });
   // Pre-mark mission briefings as seen so the auto-queued boot tutorial
   // doesn't refill the queue while we're trying to open a specific
@@ -238,7 +239,8 @@ async function openContactJessica(page: Page): Promise<void> {
     await page.waitForTimeout(300);
   }
   await page.addStyleTag({
-    content: 'body > div[style*="z-index: 9999"][style*="position: fixed"] { display: none !important; }',
+    content:
+      'body > div[style*="z-index: 9999"][style*="position: fixed"] { display: none !important; }',
   });
 
   // Mirror the canvas vclick handler in ContactPerp.extendEventHandlers:

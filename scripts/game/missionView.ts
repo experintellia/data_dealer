@@ -141,9 +141,7 @@ function buildGoal(
   // on its own.  Skipping the empty `0 / 1` removes visual noise on
   // the narrow phone goal card.
   const progressHtml =
-    goalAmount > 1
-      ? `${toKSNum(currentAmount)} / ${span(toKSNum(goalAmount), 'highlight')}`
-      : '';
+    goalAmount > 1 ? `${toKSNum(currentAmount)} / ${span(toKSNum(goalAmount), 'highlight')}` : '';
   return {
     spriteConfig: targetSprite,
     textHtml: text,

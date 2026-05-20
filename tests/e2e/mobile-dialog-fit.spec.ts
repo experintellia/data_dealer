@@ -181,8 +181,7 @@ test.describe('iPhone SE (375×667) — dialogs fit the viewport', () => {
           (window as any).require(['LocalEngine'], res, rej)
         );
         const r = await eng.buyPerp('Imperium', 'contact035');
-        if (r?.result?.error !== undefined)
-          throw new Error(`buyPerp failed: ${JSON.stringify(r)}`);
+        if (r?.result?.error !== undefined) throw new Error(`buyPerp failed: ${JSON.stringify(r)}`);
       });
       await page.reload();
       await page.waitForFunction(() => !!(window as any).__dd?._app?.game);
@@ -211,9 +210,7 @@ test.describe('iPhone SE (375×667) — dialogs fit the viewport', () => {
         timeout: 5_000,
       });
 
-      const cashBefore = await page.evaluate(
-        () => (window as any).__dd?._app?.game?.cash_value
-      );
+      const cashBefore = await page.evaluate(() => (window as any).__dd?._app?.game?.cash_value);
 
       // Simulate a real touchscreen tap by dispatching the touchstart
       // + touchend sequence directly, then the synthesised click chain
@@ -230,10 +227,9 @@ test.describe('iPhone SE (375×667) — dialogs fit the viewport', () => {
       // contact035 charge_cost is 60.  Wait for the engine reply +
       // state replay to land the cash deduction.
       await expect
-        .poll(
-          () => page.evaluate(() => (window as any).__dd?._app?.game?.cash_value),
-          { timeout: 5_000 }
-        )
+        .poll(() => page.evaluate(() => (window as any).__dd?._app?.game?.cash_value), {
+          timeout: 5_000,
+        })
         .toBeLessThan(cashBefore);
     } finally {
       await context.close();
@@ -331,9 +327,7 @@ test.describe('iPhone SE (375×667) — dialogs fit the viewport', () => {
     if (!geom.body) return;
     expect(geom.body.l, 'MissionBody left inside viewport').toBeGreaterThanOrEqual(0);
     expect(geom.body.r, 'MissionBody right inside viewport').toBeLessThanOrEqual(IPHONE_SE.width);
-    expect(geom.body.b, 'MissionBody bottom inside viewport').toBeLessThanOrEqual(
-      IPHONE_SE.height
-    );
+    expect(geom.body.b, 'MissionBody bottom inside viewport').toBeLessThanOrEqual(IPHONE_SE.height);
     // The decorator banner sits above the body; it must stay below the
     // statusbar (the Stage's top edge) so the chrome doesn't visually
     // cover the dialog header.
