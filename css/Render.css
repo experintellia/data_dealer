@@ -341,14 +341,18 @@
   -webkit-transition: none;
   -moz-transition: none;
   transition: none;
-  /* Sit above the in-Stage `.Statusbar` (z=10000, set in
-   * scripts/render/RenderTopLevelUI.ts:133 via
-   * `RenderStatusbar.prototype.z`).  Without this, the four status
-   * indicators paint over the top portion of any open perp / mission
-   * popup — taps in the y=96..160 strip land on `.StatusItem` icons
-   * instead of the popup header.  Stays below `.PopupContainer.Top`
-   * (z=100000) so the Stage-level status / karma / About overlays
-   * still sit on top. */
+  /* Sit above MainMenu (z=1000) and the in-Stage `.Statusbar`
+   * (z=10000, set in scripts/render/RenderTopLevelUI.ts:133); stays
+   * below `.PopupContainer.Top` (z=100000) so the Stage-level
+   * status / karma / About overlays still sit on top.
+   *
+   * Note: an attempt at making this container `position: fixed`
+   * with 100vw/100vh to cover the MainMenu tab strip is blocked by
+   * the render engine, which writes a non-`none` (identity) inline
+   * transform onto `.Stage` every frame.  A non-`none` transform on
+   * an ancestor creates a new containing block that traps `position:
+   * fixed` descendants at the Stage box — see task J for the JS
+   * re-parenting fix that would let this work cleanly. */
   z-index: 20000;
 }
 .PopupContainer.Top {
@@ -3133,24 +3137,31 @@ button {
    * frame lands inside the smaller box.  The bubble + body now
    * size to content naturally because the avatar's flow height
    * is 96 px instead of 160. */
-  /* Anchor Marco to the bottom-left of the bubble so a longer message
-   * (which grows the speech bubble downward via `.NotificationText`'s
-   * min-height: 78 + content) doesn't leave him floating at the top
-   * with empty space below. */
+  /* Bare `.NotificationAvatar` — applies to BOTH Tutorial and Mission
+   * popups.  Keep the dimensional scaling (and left-nudge so the tail
+   * meets the bubble) but do NOT change its layout positioning here.
+   * Mission's avatar lives inside a much taller NotificationBubble
+   * with NotificationButtons sharing the same container; absolute
+   * bottom-anchoring would drop Marco to the floor of that region. */
   .NotificationAvatar {
-    position: absolute;
-    bottom: 0;
-    left: 8px;
-    top: auto;
     width: 72px;
     height: 96px;
     background-size: 576px 614.4px;
     background-position: -504px -457.8px;
+    left: 8px;
   }
 
-  /* Bubble container: height follows the speech bubble's content;
-   * `min-height` is the avatar's flow height so a one-line message
-   * still gives Marco somewhere to stand. */
+  /* Tutorial-only: anchor Marco to the bottom-left of the bubble so a
+   * longer message (bubble grows down via `.NotificationText`'s
+   * min-height + content) keeps him at the bubble's base instead of
+   * leaving empty space below him.  Scoped to TutorialBody so the
+   * Mission popup's avatar isn't dragged to its own floor. */
+  .PopupBody.TutorialBody .NotificationAvatar {
+    position: absolute;
+    bottom: 0;
+    left: 8px;
+    top: auto;
+  }
   .PopupBody.TutorialBody .NotificationBubble {
     height: auto;
     min-height: 102px;
@@ -3473,6 +3484,7 @@ button {
      * (see below). */
     max-height: calc(100vh - 24px);
     margin-top: 24px;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: visible;
