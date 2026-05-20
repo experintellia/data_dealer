@@ -2359,20 +2359,18 @@
   animation: AniNewRot 0.3s linear infinite alternate;
 }
 
+/* `.NotificationSays` + `.NotificationText` only appear inside
+ * `<MarcoSpeech>` (see scripts/components/MarcoSpeech.tsx); the flex
+ * layout in `.MarcoSpeech` / `.MarcoSpeechContent` handles
+ * positioning.  Base rules carry only the visual styling
+ * (typography, gradient, padding). */
 .NotificationSays {
-  position: absolute;
-  top: 0px;
-  left: 120px;
   font-family: Bowlby;
   font-size: 15px;
   line-height: 30px;
   color: #E5892F;
-  width:200px;
 }
 .NotificationText {
-  position: absolute;
-  top: 24px;
-  left: 112px;
   background: #009fd9;
   background: -moz-linear-gradient(-45deg, #009fd9 0%, #00739e 100%);
   background: -webkit-gradient(linear, left top, right bottom, color-stop(0%,#009fd9), color-stop(100%,#00739e));
@@ -2386,10 +2384,9 @@
   line-height: 22px;
   font-size: 19px;
   color: #FFF;
-  /* Min 3 lines (3 × 22 + 4 + 8 padding) so the bubble's tail reaches
-   * down to the avatar's mouth even when the message is one line. */
+  /* Min 3 lines (3 × 22 + 4 + 8 padding) so the bubble's tail
+   * reaches down to the avatar's mouth even on short messages. */
   min-height: 78px;
-  width: 440px;
 }
 .NotificationText .highlight {
   color:#FF0;
@@ -2407,24 +2404,14 @@
   font-size:24px;
 }
 
-.NotificationBubble {
-  height: 160px;
-  position: relative;
-  left: 14px;
-  bottom: 14px;
-  width:100%;
-}
-.Tutorial .NotificationBubble {
-  left:6px;
-  top:0px;
-}
+/* `.NotificationAvatar` only appears inside `<MarcoSpeech>` —
+ * `.MarcoSpeech` (flex row) and the `.MarcoSpeech .NotificationAvatar`
+ * override handle positioning.  Base rule carries only the sprite. */
 .NotificationAvatar {
   background: url(../img/MainSprites.png) no-repeat;
-  background-position:-840px -763px;
-  width:120px;
-  height:160px;
-  position:relative;
-  top:10px;
+  background-position: -840px -763px;
+  width: 120px;
+  height: 160px;
 }
 
 .warn {
@@ -2489,9 +2476,6 @@
 .MarcoSpeech .NotificationAvatar {
   align-self: flex-end;
   flex: 0 0 auto;
-  position: static;
-  top: auto;
-  left: auto;
   /* Marco's sprite has ~24 px of transparent padding to the right of
    * his tail at desktop scale (120 wide); pull the bubble left so
    * the tail tucks under the bubble's left edge with no visible seam. */
@@ -2504,24 +2488,9 @@
   min-width: 0;
 }
 .MarcoSpeech .NotificationSays {
-  /* Reset absolute positioning from the base rule.  Keep typography. */
-  position: static;
-  top: auto;
-  left: auto;
-  width: auto;
   flex: 0 0 auto;
 }
 .MarcoSpeech .NotificationText {
-  /* Reset absolute positioning + fixed width/height from the base
-   * rule.  Keep the gradient background, border-radius, padding,
-   * font, color. */
-  position: static;
-  top: auto;
-  left: auto;
-  right: auto;
-  bottom: auto;
-  width: auto;
-  height: auto;
   /* Allow shrinking + cap at the column width.  Without
    * `min-width: 0` the flex child refuses to shrink below its
    * content's intrinsic width and overflows the popup body when
