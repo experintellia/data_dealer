@@ -1232,10 +1232,9 @@ export function buyPowerup(
   var puMissionResult = _advanceBuyPowerupMissions(preMissionStatePu, gestalt);
   newGameValues = _applyRewardsToGv(newGameValues, puMissionResult.rewards);
   // Mission rewards may add XP that crosses another level threshold — check again.
-  var postRewardLevel = _getLevelByXP(newGameValues.xp_value || 0);
-  if (postRewardLevel > (newGameValues.xp_level || 1)) {
+  if (_checkLevelup(newGameValues.xp_level || 1, newGameValues.xp_value || 0)) {
     levelup = true;
-    newGameValues = _applyLevelUp(newGameValues, postRewardLevel);
+    newGameValues = _applyLevelUp(newGameValues, _getLevelByXP(newGameValues.xp_value || 0));
   }
 
   var responseNode = {
@@ -3010,6 +3009,10 @@ export function recheckMissions(): Promise<{
   // Reward XP may push the player into a new level — apply energy refill if so.
   var rewardLevelup = _checkLevelup(state.game_values.xp_level || 1, newGv.xp_value || 0);
   if (rewardLevelup) newGv = _applyLevelUp(newGv, _getLevelByXP(newGv.xp_value || 0));
+  // `levelup` is intentionally not included in the persisted delta payload:
+  // game_values (which already carries the updated ap_max/ap_snapshot/xp_level)
+  // is the authoritative source for replay. Callers that need to show a
+  // level-up notification should read it from the returned result, not replay.
   _persistDelta(
     _mkDelta(state.addr, 'recheckMissions', [], {
       game_values: newGv,
