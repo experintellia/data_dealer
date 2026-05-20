@@ -123,6 +123,7 @@ export class RenderStatusbar extends RenderNode {
   XP_active = 0;
 
   loop?: number;
+  autoLoop?: number;
 
   declare template: string;
   static readonly textMoreIn: () => string = () => i18n.gettext('More Energy in') + ' ';
@@ -200,6 +201,9 @@ export class RenderStatusbar extends RenderNode {
     if (groot?.renderMenu?.renderXP) {
       groot.renderMenu.renderXP(this);
     }
+
+    // Keep refill timer always visible when AP is empty (no hover needed on mobile).
+    this.refreshAPRemainIfEmpty();
   }
 
   override tick(): void {
@@ -312,6 +316,46 @@ export class RenderStatusbar extends RenderNode {
     }
   }
 
+  startAutoLoop(func: () => void, time = 1000): void {
+    if (this.autoLoop) {
+      window.clearTimeout(this.autoLoop);
+    }
+    if (func) func();
+    this.autoLoop = window.setTimeout(() => {
+      this.startAutoLoop(func, time);
+    }, time);
+  }
+
+  stopAutoLoop(): void {
+    if (this.autoLoop) {
+      window.clearTimeout(this.autoLoop);
+      delete this.autoLoop;
+    }
+  }
+
+  /** Shows the "More Energy in …" refill timer permanently when AP is 0
+   *  (no hover required — essential for mobile). Called at the end of
+   *  every render() so the newly-created DOM always reflects AP state. */
+  refreshAPRemainIfEmpty(): void {
+    if (this.AP_val > 0) {
+      this.stopAutoLoop();
+      return;
+    }
+    const groot = this.gameNode?.GameRoot;
+    if (!groot) return;
+    const APT = groot.APTicker;
+    if (!APT) return;
+    const jq = this.jdomelem;
+    const $ = getRenderJQuery('RenderTopLevelUI');
+    this.startAutoLoop(() => {
+      // Look up .StatusRemain each fire: render() calls jq.empty() between ticks,
+      // so the element captured at startAutoLoop time would be stale.
+      const jtext = jq.find('.StatusRemain');
+      jtext.show();
+      jtext.html(RenderStatusbar.textMoreIn() + span(toTime(APT.getRemainingTime?.() ?? 0)));
+    }, 1000);
+  }
+
   initUI(): void {
     const node = this;
     const $ = getRenderJQuery('RenderTopLevelUI');
@@ -340,6 +384,8 @@ export class RenderStatusbar extends RenderNode {
 
     jq.on('mouseleave', '.StatusItem.AP', function (this: HTMLElement, e: UIEventLike) {
       e.stopPropagation();
+      const groot = node.gameNode?.GameRoot;
+      if (groot && groot.ap_value === 0) return;
       node.stopLoop();
       const jtext = $(this).find('.StatusRemain');
       jtext.hide();
