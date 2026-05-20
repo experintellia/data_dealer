@@ -2379,7 +2379,6 @@
   line-height: 22px;
   font-size: 19px;
   color: #FFF;
-  height: 119px;
   width: 440px;
 }
 .NotificationText .highlight {
@@ -3497,7 +3496,7 @@ button {
     padding-bottom: 8px;
   }
   .PopupBody.MissionBody .NotificationBubble {
-    padding-bottom: 56px;
+    padding-bottom: 80px;
   }
 
   /* Mission goal cards: keep the original block layout (so text +

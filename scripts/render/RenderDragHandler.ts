@@ -296,8 +296,17 @@ export class RenderDragHandler {
     // caller, but the recovery listeners would double up otherwise).
     if (this._recoveryHandlers.length > 0) return;
     this.on('mouseup touchend', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+      // The drag handler is bound to `window`, so every touchend on the
+      // page reaches this listener.  Unconditional `preventDefault` on
+      // touchend suppresses the synthesised compatibility click chain
+      // for the entire document — every popup button, every link,
+      // every input becomes inert on a real touchscreen.  Only block
+      // when a drag is actually in flight; non-drag taps fall through
+      // so the browser delivers the click as normal.
+      if (this.dragging) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       this.dragend(e);
     });
     // Releasing the pointer outside the canvas, an OS gesture cancellation,
