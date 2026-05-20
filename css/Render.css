@@ -341,6 +341,15 @@
   -webkit-transition: none;
   -moz-transition: none;
   transition: none;
+  /* Sit above the in-Stage `.Statusbar` (z=10000, set in
+   * scripts/render/RenderTopLevelUI.ts:133 via
+   * `RenderStatusbar.prototype.z`).  Without this, the four status
+   * indicators paint over the top portion of any open perp / mission
+   * popup — taps in the y=96..160 strip land on `.StatusItem` icons
+   * instead of the popup header.  Stays below `.PopupContainer.Top`
+   * (z=100000) so the Stage-level status / karma / About overlays
+   * still sit on top. */
+  z-index: 20000;
 }
 .PopupContainer.Top {
   z-index:100000;
@@ -3318,6 +3327,24 @@ button {
  * `.PopupBody.TutorialBody` + the same NotificationBubble subtree.
  * --------------------------------------------------------------------- */
 @media (max-width: 768px) {
+  /* Generic `.Popup` / `.PopupBody` width fit: `.PopupBody { width:
+   * 588px }` (Render.css:1412) and `.Popup { width: 600px }`
+   * (Render.css:649) would force every perp / status / karma / About
+   * popup wider than the viewport.  Apply the same shrink-the-wrapper
+   * + size-the-body pattern we use for Tutorial / Mission to ALL
+   * popups; per-variant overrides below still pin tighter rules
+   * (e.g. flex layout for the speech bubble) on top. */
+  .Popup {
+    width: auto;
+    margin: 0;
+  }
+  .PopupBody {
+    width: calc(100vw - 12px);
+    max-width: 588px;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
   /* `.Popup { width: 600px }` would force the wrapper wider than the
    * viewport, and its 6 px outer margin offsets the body inside it, so
    * a `max-width`-only fix leaves an asymmetric strip on the right.

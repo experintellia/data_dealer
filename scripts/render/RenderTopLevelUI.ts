@@ -319,6 +319,19 @@ export class RenderStatusbar extends RenderNode {
 
     jq.on('click touchend', '.StatusItem', function (this: HTMLElement, e: UIEventLike) {
       e.stopPropagation();
+      // On a touchscreen the browser dispatches BOTH `touchend` and a
+      // synthesised `click` ~7 ms later at the same coordinate.  The
+      // handler runs on touchend, opens the popup, and the synthesised
+      // click then hits the just-mounted `.PopupContainer.lockOn`
+      // overlay — which `dialogManager.handleInteraction` treats as a
+      // backdrop tap and closes the popup we just opened.  Calling
+      // `preventDefault()` on the touchend (per W3C touch-events spec)
+      // suppresses the synthesised mouse event chain at the source, so
+      // no stale click can sneak through.  No-op on the desktop click
+      // branch — there is no synthesised event to suppress.
+      if (e.type === 'touchend') {
+        e.preventDefault();
+      }
       const statusid = $(this).attr('data-status-id') as string | undefined;
       node.trigger('click_status.' + (statusid ?? ''));
     });

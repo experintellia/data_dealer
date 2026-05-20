@@ -112,6 +112,45 @@ test.describe('iPhone SE (375×667) — dialogs fit the viewport', () => {
     );
   });
 
+  test('Status popup stays open after a real touch tap (no synthesised-click self-close)', async ({
+    browser,
+  }) => {
+    // E (open-then-close) regression: the .StatusItem touchend
+    // handler in RenderTopLevelUI.ts didn't preventDefault, so on a
+    // touchscreen the synthesised compatibility click fired ~7 ms
+    // later at the same coordinate, hit the just-mounted popup
+    // container, and dialogManager treated it as a backdrop tap.
+    // This test uses a touch-enabled browser context to fire a real
+    // touch sequence (touchstart + touchend + the synthesised click)
+    // and asserts the popup stays open after the dust settles.
+    const context = await browser.newContext({
+      viewport: IPHONE_SE,
+      hasTouch: true,
+      isMobile: true,
+    });
+    const page = await context.newPage();
+    try {
+      await bootAt(page, IPHONE_SE);
+      await drainBootPopups(page);
+
+      // Tap the Cash StatusItem with a real touch event.  The browser
+      // will then dispatch the synthesised mouse/click events too.
+      const cashItem = page.locator('.StatusItem[data-status-id="Cash"]').first();
+      await expect(cashItem).toBeVisible();
+      await cashItem.tap();
+
+      // Wait past the synthesised-click window before asserting.
+      await page.waitForTimeout(200);
+
+      await expect(
+        page.locator('.PopupBody.Status').first(),
+        'Cash popup should remain open after the touch tap; the synthesised click must not self-close it'
+      ).toBeVisible({ timeout: 1_000 });
+    } finally {
+      await context.close();
+    }
+  });
+
   test('Mission briefing PopupBody fits the viewport + decorator clears the statusbar', async ({
     page,
   }) => {

@@ -163,3 +163,106 @@ test.describe('Mission briefing — mission006 (3 goals, scrollable on mobile)',
     await expect(page).toHaveScreenshot('mission006-desktop.png', { fullPage: false });
   });
 });
+
+/** Cash status popup — opened via `click_status.Cash`.  Uses the
+ *  Stage-level `.PopupContainer.Top.NoClose` overlay (z-index 100000)
+ *  with the same generic `.PopupBody` (width:588 on desktop) every
+ *  other status info popup uses.  Mobile baseline pins the
+ *  generic-`.PopupBody` width fit (D-2). */
+async function openStatusCash(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const groot = (window as any).__dd?._app?.game;
+    groot.trigger('click_status.Cash');
+  });
+  await expect(page.locator('.PopupBody.Status').first()).toBeVisible({ timeout: 5_000 });
+  await waitForPopupSettle(page);
+}
+
+test.describe('Status info popup — Cash', () => {
+  test('mobile (iPhone SE)', async ({ page }) => {
+    await boot(page, IPHONE_SE);
+    await openStatusCash(page);
+    await expect(page).toHaveScreenshot('status-cash-iphone-se.png', { fullPage: false });
+  });
+
+  test('desktop (1280×800)', async ({ page }) => {
+    await boot(page, DESKTOP);
+    await openStatusCash(page);
+    await expect(page).toHaveScreenshot('status-cash-desktop.png', { fullPage: false });
+  });
+});
+
+/** Contact perp popup — buys contact035 (Jessica) and opens the
+ *  resulting perp popup, the dialog the user flagged in task D for
+ *  both the statusbar-overlap and the generic-width issue. */
+async function openContactJessica(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const eng = await new Promise<any>((res, rej) =>
+      (window as any).require(['LocalEngine'], res, rej)
+    );
+    const r = await eng.buyPerp('Imperium', 'contact035');
+    if (r?.result?.error !== undefined) {
+      throw new Error(`buyPerp failed: error=${r.result.error}`);
+    }
+  });
+  await page.reload();
+  // re-run the boot drain — the page just reloaded.
+  await page.waitForFunction(() => !!(window as any).__dd?._app?.game);
+  await page.evaluate(() => {
+    const groot = (window as any).__dd?._app?.game;
+    if (!groot?.raw_data) return;
+    groot.raw_data.mission_briefings_seen = groot.raw_data.mission_briefings_seen || {};
+    for (const g of Object.keys(groot.Missions?.Missions ?? {})) {
+      groot.raw_data.mission_briefings_seen[g] = true;
+    }
+  });
+  let stable = 0;
+  for (let i = 0; i < 40; i++) {
+    const settled = await page.evaluate(() => {
+      const g = (window as any).__dd?._app?.game;
+      if (!g) return false;
+      if (Array.isArray(g.NotificationQueue)) g.NotificationQueue.length = 0;
+      g?.notificationPopup?.trigger?.('popup_close');
+      document.querySelectorAll<HTMLElement>('.Popup').forEach((el) => el.remove());
+      document
+        .querySelectorAll<HTMLElement>('.PopupContainer.lockOn')
+        .forEach((el) => el.classList.remove('lockOn'));
+      return (
+        (!Array.isArray(g.NotificationQueue) || g.NotificationQueue.length === 0) &&
+        !g.notificationPopup &&
+        document.querySelectorAll('.PopupContainer.lockOn').length === 0
+      );
+    });
+    stable = settled ? stable + 1 : 0;
+    if (stable >= 3) break;
+    await page.waitForTimeout(300);
+  }
+  await page.addStyleTag({
+    content: 'body > div[style*="z-index: 9999"][style*="position: fixed"] { display: none !important; }',
+  });
+
+  await page.evaluate(() => {
+    const game = (window as any).__dd?._app?.game;
+    const gnode = game.getById('contact035');
+    if (!gnode) throw new Error('contact035 gnode not registered');
+    gnode.openPopup();
+  });
+  await expect(page.locator('.PopupContainer.lockOn .PopupBody').first()).toBeVisible({
+    timeout: 5_000,
+  });
+  await waitForPopupSettle(page);
+}
+
+test.describe('Contact perp popup — contact035 (Jessica)', () => {
+  test('mobile (iPhone SE)', async ({ page }) => {
+    await boot(page, IPHONE_SE);
+    await openContactJessica(page);
+    await expect(page).toHaveScreenshot('contact035-iphone-se.png', { fullPage: false });
+  });
+
+  test('desktop (1280×800)', async ({ page }) => {
+    await boot(page, DESKTOP);
+    await openContactJessica(page);
+    await expect(page).toHaveScreenshot('contact035-desktop.png', { fullPage: false });
+  });
+});
