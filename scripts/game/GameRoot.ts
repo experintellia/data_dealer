@@ -2132,9 +2132,15 @@ export class GameRoot extends GameNode {
     });
 
     this.on('click_status.AP', () => {
+      let apRemaining: number | undefined;
+      if (this.ap_value < this.xp_level.ap_max) {
+        const remaining = this.APTicker?.getRemainingTime?.();
+        if (remaining != null) apRemaining = +remaining;
+      }
       this.openPreactDialog(APStatusPopup, {
         apValue: this.ap_value,
         apMax: this.xp_level.ap_max,
+        apRemaining,
       });
     });
 

@@ -2431,6 +2431,13 @@
 .PopupBody.Status .PopupHeader {
   height:260px;
 }
+.PopupText.APRemain {
+  margin-top: 6px;
+  color: #ffd800;
+}
+.PopupText.APRemain .highlight {
+  color: #fff;
+}
 .PopupBody.TutorialBody {
   background: #FFF;
   box-shadow: 0px 3px 12px rgba(0,0,0,0.3);
