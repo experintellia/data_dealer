@@ -333,8 +333,9 @@
 }
 .PopupContainer.lockOn {
   display: block;
-  background: rgba(0, 0, 0, 0.4);
+  background: transparent;
   visibility: visible;
+  box-shadow: 0px 0px 256px #000 inset;
   -webkit-transition: none;
   -moz-transition: none;
   transition: none;
@@ -2385,6 +2386,9 @@
   line-height: 22px;
   font-size: 19px;
   color: #FFF;
+  /* Min 3 lines (3 × 22 + 4 + 8 padding) so the bubble's tail reaches
+   * down to the avatar's mouth even when the message is one line. */
+  min-height: 78px;
   width: 440px;
 }
 .NotificationText .highlight {
