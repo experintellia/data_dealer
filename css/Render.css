@@ -3103,6 +3103,23 @@ button {
     margin-right: 4px;
     font-size: 14px;
   }
+
+  .MissionRewards {
+    margin-bottom: 0px;
+  }
+
+  .NotificationAvatar {
+    transform: scale(0.6) translateX(-24px) translateY(40px);
+  }
+
+  .NotificationSays, .NotificationText {
+    left: 93px;
+    left: 79px;
+  }
+
+  .NotificationText {
+    height: unset;
+  }
 }
 
 /* ── Tap targets (≥ 44 px), legibility (≥ 16 px body), :active feedback. */
