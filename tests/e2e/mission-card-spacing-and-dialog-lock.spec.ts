@@ -1,22 +1,21 @@
 /**
- * Two follow-up fixes on the mission-card Preact port (PR #312):
+ * Two mission-card / dialog regression guards:
  *
- *  1. Spacing regression — the legacy `mission_goal_small.html` loop
- *     emitted newlines between the inline-block `.MissionGoal.small`
- *     pills and leaned on the resulting whitespace gap.  The Preact
- *     card renders adjacent siblings with no whitespace, so the pills
- *     became flush.  Fixed with an explicit `.MissionGoal.small`
- *     margin (css/Render.css) — guarded here so it can't silently
- *     regress back to whitespace-dependent spacing.
+ *  1. Spacing — `.MissionGoal.small` is `display:inline-block` with no
+ *     horizontal margin on desktop.  The legacy `mission_goal_small.html`
+ *     loop emitted newlines between elements and leaned on the
+ *     inline-block whitespace gap; a Preact `.map()` renders adjacent
+ *     siblings with no whitespace, so the pills collapse flush.  Spacing
+ *     must come from an explicit `margin`, not source whitespace.
  *
  *  2. Dialog modality — the Stage-internal `.PopupContainer` backdrop
- *     only spans the `.Stage`; the `.MainMenu` game-tab header is a
- *     sibling above it and can't be covered (the engine puts an inline
- *     transform on `.Stage`, trapping any fixed/absolute overlay).
- *     `dialogManager` instead dims the header (`.MainMenu.DialogLock`)
- *     and captures clicks on it to dismiss the dialog, so a tab can't
- *     be switched from under it and the darkened header behaves like
- *     the rest of the backdrop.
+ *     only spans the `.Stage`; the `.MainMenu` header is a sibling above
+ *     it and can't be covered (the engine puts an inline transform on
+ *     `.Stage`, trapping any fixed/absolute overlay).  `dialogManager`
+ *     instead dims the header (`.MainMenu.DialogLock`) and captures
+ *     clicks on it to dismiss the dialog, so a tab can't be switched
+ *     from under it and the darkened header behaves like the rest of
+ *     the backdrop.
  */
 
 import { expect, test } from '@playwright/test';
@@ -35,7 +34,12 @@ test('mission-card small goal pills keep explicit horizontal spacing', async ({ 
   await page.setViewportSize({ width: 1024, height: 800 });
   await bootGame(page);
   await page.locator('.mm-tab[data-button-id="Missions"]').dispatchEvent('click');
-  await page.waitForTimeout(800);
+  // Wait for the view switch to commit — the menu marks the clicked tab
+  // active synchronously with the view becoming `.ViewTab.active`.
+  // Pills inside non-active mission cards are `display:none`, so we
+  // can't `toBeVisible` on them; we read computed margin via
+  // `querySelector` below (resolves regardless of ancestor visibility).
+  await expect(page.locator('.mm-tab.active[data-button-id="Missions"]')).toBeVisible();
 
   const margins = await page.evaluate(() => {
     const pill = document.querySelector<HTMLElement>('.ViewTab.active .MissionGoal.small');
