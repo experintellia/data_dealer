@@ -1231,7 +1231,7 @@ export function buyPowerup(
     xp_value: newXp,
     karma_value: (state.game_values.karma_value || 0) + 1,
   });
-  if (levelup) newGameValues.xp_level = _getLevelByXP(newXp);
+  if (levelup) newGameValues = _applyLevelUp(newGameValues, _getLevelByXP(newXp));
 
   var newNodes = state.nodes.slice();
   newNodes[nodeIdx] = Object.assign({}, node, { instance_data: newInstanceData });
@@ -1239,6 +1239,11 @@ export function buyPowerup(
   var preMissionStatePu = Object.assign({}, state, { nodes: newNodes, game_values: newGameValues });
   var puMissionResult = _advanceBuyPowerupMissions(preMissionStatePu, gestalt);
   newGameValues = _applyRewardsToGv(newGameValues, puMissionResult.rewards);
+  // Mission rewards may add XP that crosses another level threshold — check again.
+  if (_checkLevelup(newGameValues.xp_level || 1, newGameValues.xp_value || 0)) {
+    levelup = true;
+    newGameValues = _applyLevelUp(newGameValues, _getLevelByXP(newGameValues.xp_value || 0));
+  }
 
   var responseNode = {
     game_id: node.game_id,
@@ -1357,7 +1362,7 @@ export function sellPowerup(
     cash_value: (state.game_values.cash_value || 0) + refund,
     xp_value: newXp,
   });
-  if (levelup) newGameValues.xp_level = _getLevelByXP(newXp);
+  if (levelup) newGameValues = _applyLevelUp(newGameValues, _getLevelByXP(newXp));
 
   var newNodes = state.nodes.slice();
   newNodes[nodeIdx] = Object.assign({}, node, { instance_data: newInstanceData });
@@ -1442,7 +1447,7 @@ export function buySlots(
     cash_spent: (state.game_values.cash_spent || 0) + totalCost,
     xp_value: newXp,
   });
-  if (levelup) newGameValues.xp_level = _getLevelByXP(newXp);
+  if (levelup) newGameValues = _applyLevelUp(newGameValues, _getLevelByXP(newXp));
 
   var newNodes = state.nodes.slice();
   newNodes[nodeIdx] = Object.assign({}, node, { instance_data: newInstanceData });
@@ -3001,7 +3006,7 @@ export function dismissMissionBriefing(
 export function recheckMissions(): Promise<{
   result:
     | { repaired: false }
-    | { repaired: true; missions: MissionUpdate; game_values: GameValues; levelup: false };
+    | { repaired: true; missions: MissionUpdate; game_values: GameValues; levelup: boolean };
 }> {
   var state = getState();
   var repair = _repairStuckMissionGoals(state);
@@ -3009,6 +3014,13 @@ export function recheckMissions(): Promise<{
     return Promise.resolve({ result: { repaired: false } });
   }
   var newGv = _applyRewardsToGv(state.game_values || {}, repair.rewards);
+  // Reward XP may push the player into a new level — apply energy refill if so.
+  var rewardLevelup = _checkLevelup(state.game_values.xp_level || 1, newGv.xp_value || 0);
+  if (rewardLevelup) newGv = _applyLevelUp(newGv, _getLevelByXP(newGv.xp_value || 0));
+  // `levelup` is intentionally not included in the persisted delta payload:
+  // game_values (which already carries the updated ap_max/ap_snapshot/xp_level)
+  // is the authoritative source for replay. Callers that need to show a
+  // level-up notification should read it from the returned result, not replay.
   _persistDelta(
     _mkDelta(state.addr, 'recheckMissions', [], {
       game_values: newGv,
@@ -3016,7 +3028,12 @@ export function recheckMissions(): Promise<{
     })
   );
   return Promise.resolve({
-    result: { repaired: true, missions: repair.missions, game_values: newGv, levelup: false },
+    result: {
+      repaired: true,
+      missions: repair.missions,
+      game_values: newGv,
+      levelup: rewardLevelup,
+    },
   });
 }
 

@@ -867,6 +867,42 @@ describe('buyPowerup — failure: insufficient cash', () => {
   });
 });
 
+// project001 xp_inc=2; starting at xp_value=9/xp_level=1 a single
+// buyPowerup lands at xp=11, crossing to level 2 (xp_min=11, ap_max=8).
+describe('buyPowerup — level-up refills ap_snapshot and raises ap_max', () => {
+  beforeEach(() => {
+    setOverride(FIXED_NOW);
+    setState(
+      mkProjectState({
+        game_values: Object.assign({}, freshState('test@local').game_values, {
+          xp_value: 9,
+          xp_level: 1,
+          ap_snapshot: 2,
+          ap_max: 6,
+          ap_update: FIXED_NOW,
+          cash_value: 1000,
+        }),
+      })
+    );
+  });
+  afterEach(() => clearOverride());
+
+  it('returns levelup=true and refills ap_snapshot to the new ap_max', async () => {
+    const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.levelup).toBe(true);
+    expect(result.game_values.xp_level).toBe(2);
+    expect(result.game_values.ap_snapshot).toBe(8);
+    expect(result.game_values.ap_max).toBe(8);
+  });
+
+  it('keeps the refill across a subsequent materialize() pass', async () => {
+    await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
+    const mat = materialize(getState(), FIXED_NOW + 1);
+    expect(mat.state.game_values.ap_snapshot).toBe(8);
+    expect(mat.state.game_values.ap_max).toBe(8);
+  });
+});
+
 // ── sellPowerup ───────────────────────────────────────────────────────────────
 
 // State with ad002 already occupying slot 0.
@@ -936,6 +972,42 @@ describe('sellPowerup — failure: slot empty', () => {
     setState(mkProjectState());
     const { result } = await sellPowerup(PROJECT_NODE.full_path, 99, 'ad002');
     expect(result.error).toBe(1);
+  });
+});
+
+// sellPowerup xp_inc=1; starting at xp_value=9/xp_level=1 lands at xp=10,
+// which meets L1's xp_max threshold and promotes to level 2 (ap_max=8).
+describe('sellPowerup — level-up refills ap_snapshot and raises ap_max', () => {
+  beforeEach(() => {
+    setOverride(FIXED_NOW);
+    var base = mkStateWithPowerup();
+    setState(
+      Object.assign({}, base, {
+        game_values: Object.assign({}, base.game_values, {
+          xp_value: 9,
+          xp_level: 1,
+          ap_snapshot: 2,
+          ap_max: 6,
+          ap_update: FIXED_NOW,
+        }),
+      })
+    );
+  });
+  afterEach(() => clearOverride());
+
+  it('returns levelup=true and refills ap_snapshot to the new ap_max', async () => {
+    const { result } = await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.levelup).toBe(true);
+    expect(result.game_values.xp_level).toBe(2);
+    expect(result.game_values.ap_snapshot).toBe(8);
+    expect(result.game_values.ap_max).toBe(8);
+  });
+
+  it('keeps the refill across a subsequent materialize() pass', async () => {
+    await sellPowerup(PROJECT_NODE.full_path, 0, 'ad002');
+    const mat = materialize(getState(), FIXED_NOW + 1);
+    expect(mat.state.game_values.ap_snapshot).toBe(8);
+    expect(mat.state.game_values.ap_max).toBe(8);
   });
 });
 
@@ -1288,6 +1360,42 @@ describe('buySlots — failure: insufficient cash', () => {
   });
 });
 
+// buySlots xp_inc=1; starting at xp_value=9/xp_level=1 lands at xp=10,
+// which meets L1's xp_max threshold and promotes to level 2 (ap_max=8).
+describe('buySlots — level-up refills ap_snapshot and raises ap_max', () => {
+  beforeEach(() => {
+    setOverride(FIXED_NOW);
+    setState(
+      mkProjectState({
+        game_values: Object.assign({}, freshState('test@local').game_values, {
+          xp_value: 9,
+          xp_level: 1,
+          ap_snapshot: 2,
+          ap_max: 6,
+          ap_update: FIXED_NOW,
+          cash_value: 1000,
+        }),
+      })
+    );
+  });
+  afterEach(() => clearOverride());
+
+  it('returns levelup=true and refills ap_snapshot to the new ap_max', async () => {
+    const { result } = await buySlots(PROJECT_NODE.full_path, 'ad', 1);
+    expect(result.levelup).toBe(true);
+    expect(result.game_values.xp_level).toBe(2);
+    expect(result.game_values.ap_snapshot).toBe(8);
+    expect(result.game_values.ap_max).toBe(8);
+  });
+
+  it('keeps the refill across a subsequent materialize() pass', async () => {
+    await buySlots(PROJECT_NODE.full_path, 'ad', 1);
+    const mat = materialize(getState(), FIXED_NOW + 1);
+    expect(mat.state.game_values.ap_snapshot).toBe(8);
+    expect(mat.state.game_values.ap_max).toBe(8);
+  });
+});
+
 describe('buyPerp — failure: ProxyPerp slot full', () => {
   it('returns error 3 when proxy max_slots is reached', async () => {
     // proxy001 has max_slots=3.  Pre-fill 3 project children.
@@ -1635,6 +1743,79 @@ describe('recheckMissions — recovers stuck goals (current_amount >= amount)', 
     // Second recheck after the first persisted: nothing left to repair.
     await recheckMissions();
     expect(getState().game_values.xp_value).toBe(xpAfterFirst);
+  });
+});
+
+// mission007 reward is +10 XP. Starting at xp_value=1/xp_level=1, repairing
+// the stuck goal brings xp to 11, crossing to level 2 (ap_max=8).
+describe('recheckMissions — level-up from XP reward refills ap_snapshot', () => {
+  beforeEach(() => {
+    setOverride(FIXED_NOW);
+    setState(
+      Object.assign(mkBuyPerpState(), {
+        game_values: {
+          xp_value: 1,
+          xp_level: 1,
+          cash_value: 0,
+          cash_spent: 0,
+          karma_value: 0,
+          profiles_value: 0,
+          profiles_max: 1,
+          ap_snapshot: 2,
+          ap_max: 6,
+          ap_update: FIXED_NOW,
+          ap_inc_value: 1,
+          ap_inc_interval: 120000,
+        },
+        active_missions: ['mission007'],
+        mission_goals: [
+          {
+            mission: 'mission007',
+            workflow: 'buy_perp',
+            target: 'contact001',
+            amount: null,
+            position: 1,
+            current_amount: 1,
+            complete: true,
+          },
+          {
+            mission: 'mission007',
+            workflow: 'collect_profiles',
+            target: 'contact001',
+            amount: 3000,
+            position: 2,
+            current_amount: 3000,
+            complete: true,
+          },
+          {
+            mission: 'mission007',
+            workflow: 'integrate_profiles',
+            target: 'token017',
+            amount: 3000,
+            position: 3,
+            current_amount: 3000,
+            complete: false,
+          },
+        ],
+      })
+    );
+  });
+  afterEach(() => clearOverride());
+
+  it('returns levelup=true and refills ap_snapshot to the new ap_max', async () => {
+    const { result } = await recheckMissions();
+    expect(result.repaired).toBe(true);
+    expect(result.levelup).toBe(true);
+    expect(result.game_values.xp_level).toBe(2);
+    expect(result.game_values.ap_snapshot).toBe(8);
+    expect(result.game_values.ap_max).toBe(8);
+  });
+
+  it('keeps the refill across a subsequent materialize() pass', async () => {
+    await recheckMissions();
+    const mat = materialize(getState(), FIXED_NOW + 1);
+    expect(mat.state.game_values.ap_snapshot).toBe(8);
+    expect(mat.state.game_values.ap_max).toBe(8);
   });
 });
 
