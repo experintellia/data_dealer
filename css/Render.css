@@ -3548,30 +3548,23 @@ button {
     margin: 0 0 4px 0;
   }
 
-  /* C10 — floating OK button.  The bottom `MainButton` is the user's
-   * primary close affordance on a touch screen; pop it out of the
-   * scroll container's flex flow with `position: absolute` so it
-   * stays pinned to the popup body's bottom edge regardless of how
-   * much briefing copy Marco has.  Then reserve the same height as
-   * padding-bottom on the scroll wrapper so scrolled content never
-   * tucks beneath it. */
+  /* OK button is a sibling of MarcoSpeech inside MissionContent —
+   * flow naturally in the flex column (was `position: absolute;
+   * bottom: 12` which overlayed the speech bubble now that
+   * MarcoSpeech doesn't reserve `padding-bottom: 80` for it).
+   * Reset every legacy `.NotificationButtons` and `.PopupButtons`
+   * base style that assumed the absolute-positioned legacy layout. */
   .PopupBody.MissionBody .NotificationButtons {
-    position: absolute;
-    bottom: 12px;
-    left: 0;
-    right: 0;
-    margin-left: 0;
+    position: static;
+    bottom: auto;
+    margin: 8px 0 0 0;
     height: auto;
     text-align: center;
-    z-index: 10;
+    flex: 0 0 auto;
   }
   .PopupBody.MissionBody .MissionWrap {
-    padding-bottom: 8px;
+    padding-bottom: 0;
   }
-  /* MarcoSpeech is no longer a child container of the floating OK
-   * button (the button is its sibling inside MissionContent now);
-   * no padding-bottom reservation needed on .MarcoSpeech itself —
-   * MissionWrap's padding-bottom handles clearance below. */
 
   /* Mission goal cards: keep the original block layout (so text +
    * progress flow naturally and progress sits where it always did),
