@@ -96,7 +96,16 @@ function buildGoal(
     const pdata = ptype.type_data ?? {};
     projectTitle = span((pdata.title as string | undefined) ?? '');
     powerupdata = { title: goal.target };
-    const sub = goal.target ? (ptype[goal.target] as TypeLike | undefined) : undefined;
+    // First try the project type's keyed sub-object (legacy template
+    // path).  Powerups in the current ruleset don't live there —
+    // they're registered as top-level type entries with their own
+    // `popup_sprite` — so fall back to `getType(goal.target)` when the
+    // project-scoped lookup misses.  Without the fallback, every
+    // `buy_powerup` mission goal renders without its target sprite.
+    let sub: TypeLike | undefined = goal.target
+      ? (ptype[goal.target] as TypeLike | undefined)
+      : undefined;
+    if (!sub && goal.target) sub = getType(goal.target);
     if (sub) powerupdata = sub.type_data ?? powerupdata;
     targetSprite = powerupdata.popup_sprite;
     targetTitle = powerupdata.title as string | undefined;

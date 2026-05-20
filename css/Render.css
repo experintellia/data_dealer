@@ -3456,58 +3456,20 @@ button {
    * flex row so multiple rewards spill onto the next line instead of
    * pushing past the popup's right edge.  Slightly more generous
    * padding + gap on mobile so the chips have breathing room. */
+  /* Mission rewards on mobile: keep every desktop chip rule intact
+   * (the per-variant `.PopupSummaryItem.<type>` styles already give
+   * each pill its proper color, border, margin and icon overhang).
+   * Only change the rewards row to wrap so a tall popup doesn't
+   * push chips past the right edge of the body, and put the
+   * "Rewards" title on its own line. */
   .PopupBody.MissionBody .MissionRewards {
     height: auto;
-    padding: 10px 14px 12px 14px;
-    margin: 12px 16px 16px 16px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
+    display: block;
   }
   .PopupBody.MissionBody .MissionRewards .MissionRewardsTitle {
     display: block;
-    flex: 0 0 100%;
-    margin: 0 0 6px 0;
+    margin: 0 0 4px 0;
   }
-  .PopupBody.MissionBody .MissionRewards .MissionReward {
-    /* Keep the desktop chip silhouette — same pill height (22 px),
-     * same text styling, same icon sprite sizes / vertical anchoring.
-     * Only reset the margin so the wrapping flex `gap` controls
-     * inter-chip spacing (desktop `margin: 0px 20px 0px 4px` would
-     * compound with the gap and visually crowd / drift). */
-    margin: 0;
-    flex: 0 0 auto;
-  }
-  /* Snip the icon's negative-left overhang so it sits flush with the
-   * chip's left edge (was `left: -33` for Cash, `-18` for Profiles,
-   * etc. — peeked outside the pill).  Vertically centre instead of
-   * the per-variant `top: -7 / -10` shift; icon size is unchanged
-   * (still wider/taller than the 22-px chip, so it still overhangs
-   * top/bottom — same silhouette as desktop without the left poke-out). */
-  .PopupBody.MissionBody .MissionRewards .MissionReward .RenderSprite.Tobi {
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-  }
-  /* Per-variant padding-left = icon-width + small gap.  Without this
-   * the amount text ("800", "3", etc.) renders behind the icon at the
-   * desktop padding-left of 24-26 px. */
-  .PopupBody.MissionBody .MissionRewards .MissionReward.Profiles {
-    padding-left: 42px;
-  }
-  .PopupBody.MissionBody .MissionRewards .MissionReward.Risk,
-  .PopupBody.MissionBody .MissionRewards .MissionReward.Risk.Up {
-    padding-left: 38px;
-  }
-  .PopupBody.MissionBody .MissionRewards .MissionReward.Cash {
-    padding-left: 60px;
-  }
-  .PopupBody.MissionBody .MissionRewards .MissionReward.XP {
-    padding-left: 51px;
-  }
-  .PopupBody.MissionBody .MissionRewards .MissionReward.Penalty {
-    padding-left: 50px;
   }
 
   /* C10 — floating OK button.  The bottom `MainButton` is the user's
