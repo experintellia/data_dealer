@@ -22,6 +22,18 @@ export default defineConfig({
   retries: 0,
   forbidOnly: !!process.env.CI,
 
+  // `toHaveScreenshot` defaults to a pixel-perfect match; tiny
+  // anti-aliasing differences between local Chromium and CI's
+  // (also-Chromium-but-rebuilt-from-source) flag the dialog-screenshot
+  // baselines as diffs.  Allow up to 1% of pixels to differ before
+  // failing — well below the threshold for an actual visual
+  // regression (a missing icon, a moved chip, a clipped header).
+  expect: {
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.01,
+    },
+  },
+
   use: {
     baseURL: 'http://localhost:3000',
     // Traces and screenshots are captured on failure for CI artifact upload.
