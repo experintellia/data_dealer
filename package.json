@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:debug": "PREACT_DEBUG=1 vite",
     "build": "vite build",
     "build:hq": "BUILD_VARIANT=hq vite build",
     "build:casual": "BUILD_VARIANT=casual vite build",
