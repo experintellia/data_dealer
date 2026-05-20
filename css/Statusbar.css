@@ -293,10 +293,17 @@
  * minimum, so switch to a 2-column × 2-row grid.  DOM order is
  * Profiles, Cash, AP, Karma; `order` reshuffles them so the rows pair
  * Profiles | Karma (long bars on top) and Cash | AP (short bars
- * below).  Items keep their natural sizes — the grid's two columns
- * each shrink to the wider item's `max-content` (142 + 144 + 12 px
- * gap = 298 px), which fits even a 320 px viewport with comfortable
- * side padding. */
+ * below).
+ *
+ * Visual-centering note: the Profiles and Cash icons are positioned
+ * absolute at left −18 px and −14 px respectively, so they protrude
+ * outside their StatusItem box to the left.  The CSS box model would
+ * centre the raw 298 px grid (142 + 12 + 144), but that leaves the
+ * visual content ~9 px left of centre.  A margin-left on the left-
+ * column items shifts them right by the same amount, widening column 1
+ * from 142 px to 164 px (142 + 22), giving a total grid of 320 px.
+ * At 320 px viewport the grid fills edge-to-edge with 4 px icon
+ * clearance; at 360 px+ the visual centre error is ≤ 2 px. */
 
 @media (max-width: 926px) {
   .Statusbar .StatusItem.Profiles,
@@ -327,6 +334,16 @@
     align-items: start;
     column-gap: 12px;
     row-gap: 14px;
+  }
+
+  /* Shift left-column items right so their left-protruding icons
+   * (Profiles −18 px, Cash −14 px) clear the stage edge and the grid
+   * is visually centred.  22 px widens column 1 by 22 px, making the
+   * total grid 320 px — a safe fit for 320 px viewports with ≥ 4 px
+   * icon clearance and ≤ 2 px visual-centre error at 360 px+. */
+  .Statusbar .StatusItem.Profiles,
+  .Statusbar .StatusItem.Cash {
+    margin-left: 22px;
   }
 
   .Statusbar .StatusItem.Karma {

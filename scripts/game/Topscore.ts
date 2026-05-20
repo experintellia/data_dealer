@@ -21,6 +21,9 @@ interface RankingRow {
   display_name: string;
   value: number;
   self: boolean;
+  /** Avatar URL when the boot probe found that the messenger serves
+   *  __webxdc__/avatar/<addr>.jpg images (see webxdc-avatars.ts). */
+  avatar?: string;
 }
 
 /** Result payload for `app.remote.getRanking(scoretype)`.  Exported so
