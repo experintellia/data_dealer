@@ -2491,12 +2491,11 @@
   position: static;
   top: auto;
   left: auto;
-  /* Marco's sprite has transparent padding to the right of his
-   * tail; pull the bubble left so it tucks under the tail with no
-   * visible seam.  Desktop avatar is 120 wide → -10 closes the
-   * sprite's right-side whitespace; mobile (`@media max-width:
-   * 480` shrinks the avatar to 72 wide, so the overlap scales). */
-  margin-right: -10px;
+  /* Marco's sprite has ~24 px of transparent padding to the right
+   * of his tail at desktop scale (120 wide); pull the bubble left
+   * so the tail tucks under the bubble's left edge with no visible
+   * seam. */
+  margin-right: -24px;
 }
 .PopupBody.TutorialBody .TutorialContent {
   display: flex;
@@ -3194,6 +3193,11 @@ button {
     height: 96px;
     background-size: 576px 614.4px;
     background-position: -504px -457.8px;
+  }
+  /* Mobile avatar is 0.6x desktop scale, so the sprite's right-side
+   * transparency is ~14 px instead of 24 — soften the overlap. */
+  .PopupBody.TutorialBody .NotificationAvatar {
+    margin-right: -4px;
   }
 }
 
