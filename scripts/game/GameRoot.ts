@@ -2133,14 +2133,20 @@ export class GameRoot extends GameNode {
 
     this.on('click_status.AP', () => {
       let apRemaining: number | undefined;
+      let apInterval: number | undefined;
       if (this.ap_value < this.xp_level.ap_max) {
-        const remaining = this.APTicker?.getRemainingTime?.();
-        if (remaining != null) apRemaining = +remaining;
+        const apt = this.APTicker;
+        const remaining = apt?.getRemainingTime?.();
+        if (remaining != null) {
+          apRemaining = +remaining;
+          apInterval = apt?.interval;
+        }
       }
       this.openPreactDialog(APStatusPopup, {
         apValue: this.ap_value,
         apMax: this.xp_level.ap_max,
         apRemaining,
+        apInterval,
       });
     });
 

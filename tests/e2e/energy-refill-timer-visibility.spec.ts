@@ -113,11 +113,11 @@ test('energy dialog: shows refill countdown when AP is not full', async ({ page 
   await expect(page.locator('.PopupContainer.lockOn')).toBeVisible({ timeout: 2_000 });
   await expect(page.locator('.PopupBody.Status .MainSpritesPopup.AP')).toBeVisible();
 
-  // The dialog must contain the refill line with a countdown timer.
-  // Use a locale-agnostic check — the prefix varies by language.
-  const refillLine = page.locator('.PopupText.APRemain');
-  await expect(refillLine).toBeVisible({ timeout: 2_000 });
-  const refillText = await refillLine.innerText();
+  // The dialog must contain the animated progress bar with a countdown timer.
+  // Use a locale-agnostic check — the prefix label varies by language.
+  const refillBar = page.locator('.APRefillBar');
+  await expect(refillBar).toBeVisible({ timeout: 2_000 });
+  const refillText = await page.locator('.APRefillBarText').innerText();
   expect(refillText).toMatch(/\d{2}:\d{2}/);
 
   // Close dialog.
@@ -125,7 +125,7 @@ test('energy dialog: shows refill countdown when AP is not full', async ({ page 
   await expect(page.locator('.PopupBody.Status')).toBeHidden({ timeout: 3_000 });
 });
 
-test('energy dialog: no refill line when AP is full', async ({ page }) => {
+test('energy dialog: no refill bar when AP is full', async ({ page }) => {
   await bootGame(page);
 
   // Default game starts with full AP — just open the dialog.
@@ -137,8 +137,8 @@ test('energy dialog: no refill line when AP is full', async ({ page }) => {
   await expect(page.locator('.PopupContainer.lockOn')).toBeVisible({ timeout: 2_000 });
   await expect(page.locator('.PopupBody.Status .MainSpritesPopup.AP')).toBeVisible();
 
-  // No refill line when energy is full.
-  await expect(page.locator('.PopupText.APRemain')).not.toBeVisible();
+  // No progress bar when energy is full.
+  await expect(page.locator('.APRefillBar')).not.toBeVisible();
 
   await page.locator('.PopupContainer.lockOn .PopupClose').first().click();
   await expect(page.locator('.PopupBody.Status')).toBeHidden({ timeout: 3_000 });
