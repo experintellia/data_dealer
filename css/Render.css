@@ -3534,12 +3534,19 @@ button {
     bottom: 0;
     width: 100%;
   }
+  /* Pull the speech bubble + says label in to meet the shrunk
+   * 72-px-wide mobile avatar.  Base CSS positions them at
+   * `left: 112 / 120` (designed for the 120-px desktop avatar);
+   * on mobile that left a 40-px gap between Marco and the bubble.
+   * `left: 68` lands the bubble flush against the avatar's tail. */
   .PopupBody.MissionBody .NotificationText {
     width: auto;
+    left: 68px;
     right: 12px;
   }
   .PopupBody.MissionBody .NotificationSays {
     width: auto;
+    left: 76px;
     right: 12px;
   }
 
