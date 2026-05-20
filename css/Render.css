@@ -3308,6 +3308,29 @@ button {
   }
 }
 
+/* --- Tutorial / LevelUp dialog: fit narrow phone viewports -----------------
+ * `.PopupBody` is hard-pinned at 588 px and `.NotificationText` at 440 px,
+ * so on an iPhone SE-sized viewport (375 px) the bubble overflows by
+ * ~106 px on each side.  Shrink the popup body to fit the viewport and
+ * anchor the absolutely-positioned children to the right edge so the
+ * blue speech bubble and the "Marco says:" label reflow with it.
+ * Same selectors cover the LevelUp variant — both use
+ * `.PopupBody.TutorialBody` + the same NotificationBubble subtree.
+ * --------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  .PopupBody.TutorialBody {
+    width: auto;
+    max-width: calc(100vw - 16px);
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .PopupBody.TutorialBody .NotificationText,
+  .PopupBody.TutorialBody .NotificationSays {
+    width: auto;
+    right: 12px;
+  }
+}
+
 /* --- Mission + Topscore tab content: centre via margin auto + max-width --
  * Both views render their content into a tab-wide container.  On desktop
  * they have a fixed width (570 px etc.) which overflows on phone widths.
