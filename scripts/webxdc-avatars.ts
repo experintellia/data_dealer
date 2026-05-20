@@ -1,135 +1,74 @@
-// Avatar support via the experimental webxdc API proposed in
+// Avatar URLs for the experimental webxdc avatar API proposed in
 // chatmail/core#6429 + deltachat-desktop#4481.
 //
-// The API exposes two pieces:
-//   - `webxdc.getMemberList()` returns `[user_id, display_name][]`
-//   - Avatars are served at `__webxdc__/avatar/<user_id>.jpg` (404 if none)
+// Avatars live in a virtual directory served by the messenger:
+//   __webxdc__/avatar/<addr>.jpg   (404 when the contact has no picture)
 //
-// `user_id` is derived from a contact's public-key fingerprint, so it is
-// stable across messages but is NOT the same as `webxdc.selfAddr` (which
-// is the email address). To map peers to avatars we therefore need to
-// learn each peer's user_id — currently done by attaching it to every
-// delta we send. Self's user_id is resolved at boot time by matching
-// `webxdc.selfName` against the member list.
-//
-// Both pieces of the API are experimental and currently unavailable in
-// any released client. All entry points here degrade silently when the
-// API is missing.
-
-type MemberListEntry = [string, string];
-
-interface MemberListWebxdc {
-  getMemberList?: () => MemberListEntry[] | Promise<MemberListEntry[]>;
-  selfName?: string;
-}
+// Per the PR, the user_id is "basically the (self)addr" — so we use
+// `webxdc.selfAddr` for self and `delta.addr` for peers without any
+// extra plumbing. The API is experimental and absent in most clients;
+// we probe support once at boot by fetching our own avatar, and the
+// leaderboard skips the <img> slot entirely when the probe fails so the
+// row layout never shifts on a delayed 404.
 
 const AVATAR_DIR = '__webxdc__/avatar/';
 
-let _selfUserId: string | undefined;
-let _memberListCache: MemberListEntry[] | undefined;
-let _resolveAttempted = false;
+type SupportState = 'unknown' | 'supported' | 'unsupported';
+let _support: SupportState = 'unknown';
+let _probePromise: Promise<boolean> | null = null;
 
-function _webxdc(): MemberListWebxdc | undefined {
-  return typeof webxdc !== 'undefined' && webxdc ? (webxdc as MemberListWebxdc) : undefined;
-}
-
-// Best-effort synchronous fetch of the member list. The experimental API
-// might be async (Promise<...>); we only use the cached value if the call
-// returned synchronously. resolveSelfUserId() handles the Promise case.
-function _readMemberListSync(): MemberListEntry[] | undefined {
-  if (_memberListCache) return _memberListCache;
-  const w = _webxdc();
-  if (!w || typeof w.getMemberList !== 'function') return undefined;
-  try {
-    const result = w.getMemberList();
-    if (Array.isArray(result)) {
-      _memberListCache = result;
-      return result;
-    }
-  } catch (_) {
-    /* API missing or threw — fall through */
-  }
-  return undefined;
+/** Returns the avatar URL for an addr, or null when the addr is missing. */
+export function getAvatarUrl(addr: string | undefined | null): string | null {
+  if (typeof addr !== 'string' || addr.length === 0) return null;
+  return AVATAR_DIR + encodeURIComponent(addr) + '.jpg';
 }
 
 /**
- * Resolve self's user_id once the messenger has a member list available.
- * Safe to call multiple times: caches the first non-empty result and is
- * a no-op afterwards. Matches by `webxdc.selfName`; collisions on
- * display-name fall to the first hit (best-effort — there is no public
- * `selfUserId` in the proposed API).
- *
- * Returns the resolved id or undefined if the API/member entry is missing.
+ * Sync accessor for the cached probe result. Returns false until
+ * probeAvatarSupport() has resolved successfully, so renderers default
+ * to the no-avatar layout and never reflow when the probe completes.
  */
-export async function resolveSelfUserId(): Promise<string | undefined> {
-  if (_selfUserId) return _selfUserId;
-  const w = _webxdc();
-  if (!w || typeof w.getMemberList !== 'function') {
-    _resolveAttempted = true;
-    return undefined;
-  }
-  let list: MemberListEntry[] | undefined;
-  try {
-    const result = w.getMemberList();
-    list = await Promise.resolve(result);
-  } catch (_) {
-    _resolveAttempted = true;
-    return undefined;
-  }
-  if (!Array.isArray(list)) {
-    _resolveAttempted = true;
-    return undefined;
-  }
-  _memberListCache = list;
-  _resolveAttempted = true;
-  const selfName = w.selfName;
-  if (typeof selfName !== 'string' || selfName.length === 0) return undefined;
-  for (const entry of list) {
-    if (Array.isArray(entry) && entry[1] === selfName) {
-      _selfUserId = entry[0];
-      return _selfUserId;
-    }
-  }
-  return undefined;
+export function isAvatarSupported(): boolean {
+  return _support === 'supported';
 }
 
 /**
- * Synchronous accessor for self's user_id. Returns the cached value if
- * resolveSelfUserId() has already run, or attempts a synchronous resolve
- * if the proposed API returns a plain array. Returns undefined when the
- * API isn't available or self isn't in the member list.
+ * Fire a HEAD request for the local user's avatar and remember whether
+ * it returned a real image. Cached: subsequent calls return the in-flight
+ * promise or the resolved value. Safe in Node (no fetch / no addr) — falls
+ * back to unsupported.
  */
-export function getSelfUserId(): string | undefined {
-  if (_selfUserId) return _selfUserId;
-  const list = _readMemberListSync();
-  if (!list) return undefined;
-  const w = _webxdc();
-  const selfName = w?.selfName;
-  if (typeof selfName !== 'string' || selfName.length === 0) return undefined;
-  for (const entry of list) {
-    if (Array.isArray(entry) && entry[1] === selfName) {
-      _selfUserId = entry[0];
-      return _selfUserId;
-    }
+export function probeAvatarSupport(selfAddr?: string): Promise<boolean> {
+  if (_support !== 'unknown') return Promise.resolve(_support === 'supported');
+  if (_probePromise) return _probePromise;
+
+  const addr = selfAddr || (typeof webxdc !== 'undefined' && webxdc ? webxdc.selfAddr : '') || '';
+  const url = getAvatarUrl(addr);
+  if (!url || typeof fetch !== 'function') {
+    _support = 'unsupported';
+    return Promise.resolve(false);
   }
-  return undefined;
+
+  _probePromise = fetch(url, { method: 'HEAD' })
+    .then(function (resp) {
+      _support = resp && resp.ok ? 'supported' : 'unsupported';
+      return _support === 'supported';
+    })
+    .catch(function () {
+      _support = 'unsupported';
+      return false;
+    });
+  return _probePromise;
 }
 
-/** Returns the avatar URL for a user_id, or null when the id is missing. */
-export function getAvatarUrl(userId: string | undefined | null): string | null {
-  if (typeof userId !== 'string' || userId.length === 0) return null;
-  return AVATAR_DIR + encodeURIComponent(userId) + '.jpg';
-}
-
-/** Test-only: reset the cached self user_id and member list. */
+/** Test-only: clear the cached probe state. */
 export function __resetAvatarsForTest(): void {
-  _selfUserId = undefined;
-  _memberListCache = undefined;
-  _resolveAttempted = false;
+  _support = 'unknown';
+  _probePromise = null;
 }
 
-/** Test-only: seed a fixed self user_id (bypasses the member-list lookup). */
-export function __setSelfUserIdForTest(id: string | undefined): void {
-  _selfUserId = id;
-  _resolveAttempted = true;
+/** Test-only: force the probe result without issuing a fetch. */
+export function __setAvatarSupportForTest(supported: boolean): void {
+  _support = supported ? 'supported' : 'unsupported';
+  _probePromise = null;
 }

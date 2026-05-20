@@ -95,11 +95,6 @@ export interface PeerEntry {
   level?: number;
   spent?: number;
   display_name?: string;
-  /** Stable per-peer identifier learned from delta.user_id. Used to
-   *  resolve `__webxdc__/avatar/<user_id>.jpg` URLs in the leaderboard;
-   *  see scripts/webxdc-avatars.ts. Optional — only present once a
-   *  delta carrying it has been observed. */
-  user_id?: string;
   last_seen_ts?: number;
   last_seen_serial?: number | null;
 }
@@ -155,11 +150,6 @@ export interface Delta {
   ts?: number;
   /** Carried by setLocale deltas. */
   locale?: string;
-  /** Sender's webxdc user_id (per chatmail/core#6429) when available.
-   *  Distinct from `addr` (an email): user_id is derived from public-key
-   *  fingerprint and feeds avatar URL construction. Optional — old
-   *  clients and clients without the experimental API omit it. */
-  user_id?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -753,10 +743,6 @@ function _applyPeerDelta(state: LocalState, delta: Delta): LocalState {
     if (typeof dname === 'string' && dname.length > 0) {
       peer.display_name = dname;
     }
-  }
-
-  if (typeof delta.user_id === 'string' && delta.user_id.length > 0) {
-    peer.user_id = delta.user_id;
   }
 
   if (typeof delta.ts === 'number') peer.last_seen_ts = delta.ts;

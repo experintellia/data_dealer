@@ -27,7 +27,7 @@ import type {
   LocalState,
   MissionGoal,
 } from './state.js';
-import { getSelfUserId } from './webxdc-avatars.js';
+import { getAvatarUrl, isAvatarSupported } from './webxdc-avatars.js';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -700,10 +700,12 @@ interface RankingRow {
   display_name: string;
   value: number;
   self: boolean;
-  /** Optional webxdc user_id for avatar lookup; undefined on rows for
-   *  peers whose deltas predate the field, or on clients without the
-   *  experimental member-list API. */
-  user_id?: string;
+  /** Avatar URL (webxdc virtual `__webxdc__/avatar/<addr>.jpg`); only
+   *  set when the boot-time avatar probe (see webxdc-avatars.ts) found
+   *  that the messenger serves real images. Absent on unsupported
+   *  clients so the template can skip the slot entirely and avoid
+   *  layout jumps from late 404s. */
+  avatar?: string;
 }
 
 export function getRanking(
@@ -717,24 +719,21 @@ export function getRanking(
     console.warn('[getRanking] unknown type "' + type + '", falling back to xp');
   }
   var field: RankingField = _isRankingField(type) ? type : 'xp';
-
-  // Self's user_id may be known via the messenger's member list even when
-  // no own delta carrying it has been aggregated yet (e.g. the first
-  // boot before any handler fires). Fall back to that for the self row.
-  var selfUid = getSelfUserId();
+  var avatars = isAvatarSupported();
 
   var rows: RankingRow[] = Object.keys(peers).map(function (addr) {
     var p = peers[addr] || {};
     var v = p[field];
-    var isSelf = addr === selfAddr;
     var row: RankingRow = {
       addr: addr,
       display_name: p.display_name || addr,
       value: typeof v === 'number' ? v : 0,
-      self: isSelf,
+      self: addr === selfAddr,
     };
-    var uid = p.user_id || (isSelf ? selfUid : undefined);
-    if (typeof uid === 'string' && uid.length > 0) row.user_id = uid;
+    if (avatars) {
+      var url = getAvatarUrl(addr);
+      if (url) row.avatar = url;
+    }
     return row;
   });
 
@@ -775,7 +774,7 @@ export function getRanking(
  * state.ts, which the per-handler PRs (4-N) finish off.
  */
 function _mkDelta(addr: string, op: string, args: unknown[], result: unknown): Delta {
-  var delta: Delta = {
+  return {
     kind: 'delta',
     addr: addr,
     op: op,
@@ -783,12 +782,6 @@ function _mkDelta(addr: string, op: string, args: unknown[], result: unknown): D
     result: result as unknown,
     ts: clockNow(),
   } as Delta;
-  // Attach sender's webxdc user_id when the (experimental) member-list
-  // API has surfaced it. Lets peers resolve avatar URLs without needing
-  // their own member-list lookup. Omitted on clients without the API.
-  var uid = getSelfUserId();
-  if (typeof uid === 'string' && uid.length > 0) delta.user_id = uid;
-  return delta;
 }
 
 // ---------------------------------------------------------------------------

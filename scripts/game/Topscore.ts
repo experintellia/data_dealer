@@ -21,9 +21,9 @@ interface RankingRow {
   display_name: string;
   value: number;
   self: boolean;
-  /** webxdc user_id for avatar URL construction; optional because
-   *  experimental clients may not surface it (see webxdc-avatars.ts). */
-  user_id?: string;
+  /** Avatar URL when the boot probe found that the messenger serves
+   *  __webxdc__/avatar/<addr>.jpg images (see webxdc-avatars.ts). */
+  avatar?: string;
 }
 
 /** Result payload for `app.remote.getRanking(scoretype)`.  Exported so
