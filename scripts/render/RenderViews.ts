@@ -739,7 +739,20 @@ export class RenderViewMap extends RenderNode {
     root?._cancelPendingCenter?.();
     this.scroller.options.animating = duration > 0;
     this.scroller.options.animationDuration = duration;
-    this.scroller.scrollTo(pos.x - vpCenter.x, pos.y - vpCenter.y, true);
+    // `pos` is in the ViewMap's unscaled native coordinates (e.g.
+    // the Database perp at `viewmapPos: {x: 1024, y: 840}`), but
+    // `vpCenter` is in viewport screen pixels and the Zynga
+    // scroller's `scrollTo(left, top)` interprets `left`/`top` in
+    // post-zoom scaled-content space — the same space its internal
+    // `__maxScrollLeft = contentWidth * zoom - clientWidth` clamp
+    // operates in.  Without scaling `pos` by the active zoom the
+    // computed scroll-left misses by `pos * (1 - zoom)` (e.g. at
+    // Imperium zoom 0.75 the Database lands ~68 px off the left of
+    // a 375-px viewport).  Scale `pos` first, then subtract the
+    // viewport-pixel centre — the scroller's internal clamp handles
+    // the bounds.
+    const zoom = this.zoomScale ?? 1;
+    this.scroller.scrollTo(pos.x * zoom - vpCenter.x, pos.y * zoom - vpCenter.y, true);
     this.scroller.options.animating = false;
     this.scroller.options.animationDuration = 300;
   }

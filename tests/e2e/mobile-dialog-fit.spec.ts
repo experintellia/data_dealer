@@ -151,6 +151,55 @@ test.describe('iPhone SE (375×667) — dialogs fit the viewport', () => {
     }
   });
 
+  test('Tutorial camera-pan to Database perp lands the perp inside the viewport', async ({
+    page,
+  }) => {
+    // B (camera-pan coord-space) regression: `RenderViewMap.scrollTo`
+    // and `GameRoot._centerActiveView` were mixing unscaled-content
+    // coordinates with viewport-pixel coordinates.  At Imperium zoom
+    // 0.75 the Database perp at native (1024, 840) used to land at
+    // viewport x ~= -68 on iPhone SE — just off the left edge.  The
+    // fix scales `pos` (and the `_centerActiveView` home-point) by
+    // the active zoom before subtracting the viewport centre, so the
+    // scroller's scaled-content-space clamp puts the perp in view.
+    await bootAt(page, IPHONE_SE);
+    await drainBootPopups(page);
+
+    // Drive the tutorial pan the same way the ruleset's tut03 step
+    // does — fire `scrollTo` on the Imperium ViewMap with the
+    // database's native position.
+    await page.evaluate(async () => {
+      const groot = (window as any).__dd?._app?.game;
+      const im = groot.getImperium?.();
+      const vm = im?.renderNode;
+      if (!vm?.scrollTo) throw new Error('Imperium ViewMap has no scrollTo');
+      vm.scrollTo({ x: 1024, y: 840 }, 0);
+      // Give the scroller a tick to apply the new transform.
+      await new Promise((r) => setTimeout(r, 80));
+    });
+
+    // DatabasePerp is materialised as `database001` with a DOM div
+    // (`.Perp` class) under the Imperium ViewMap.
+    const dbBox = await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      const db = groot.getById?.('database001');
+      const el = (db?.renderNode as { domelem?: HTMLElement } | undefined)?.domelem;
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+    });
+
+    expect(dbBox, 'Database perp DOM element must be queryable').not.toBeNull();
+    if (!dbBox) return;
+    // The perp should be on-screen (some pixels visible inside the
+    // viewport rect).  Before the fix it sat entirely past the left
+    // edge.
+    expect(dbBox.right, 'Database right edge should be inside viewport').toBeGreaterThan(0);
+    expect(dbBox.left, 'Database left edge should be left of viewport right').toBeLessThan(
+      IPHONE_SE.width
+    );
+  });
+
   test('Mission briefing PopupBody fits the viewport + decorator clears the statusbar', async ({
     page,
   }) => {

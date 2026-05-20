@@ -127,6 +127,11 @@ interface ViewMapRenderLike extends RenderRootLike {
   updateScroller?(): void;
   parentNode?: { width?: number; height?: number };
   getPosition?(): { x: number; y: number };
+  /** Current zoom scale applied to the ViewMap content.  Default
+   *  Imperium is 0.75; needed by `_centerActiveView` so the scroll
+   *  bounds and home-point math are in the same scaled-content
+   *  space as `scroller.scrollTo`. */
+  zoomScale?: number;
   /** Direct-on-renderNode `scrollTo(pos, durationMs)` — distinct from
    *  `scroller.scrollTo(x, y, animate, zoom)` above; used by tutorial
    *  scripted-events in `makeNotifications`. */
@@ -876,8 +881,14 @@ export class GameRoot extends GameNode {
       if (!vm?.scroller || !vm.parentNode) return;
       const vw = vm.parentNode.width ?? 0;
       const vh = vm.parentNode.height ?? 0;
-      const maxX = Math.max(0, (vm.width ?? 0) - vw);
-      const maxY = Math.max(0, (vm.height ?? 0) - vh);
+      // `vm.width` / `homeX` are in unscaled native ViewMap coords;
+      // the scroller's scrollTo + its `__maxScrollLeft` clamp operate
+      // in scaled-content space.  Scale before clamping so the
+      // bounds are correct at non-1 zoom levels (default Imperium
+      // zoom is 0.75).
+      const zoom = vm.zoomScale ?? 1;
+      const maxX = Math.max(0, (vm.width ?? 0) * zoom - vw);
+      const maxY = Math.max(0, (vm.height ?? 0) * zoom - vh);
 
       // Imperium centres on the DatabasePerp (visual focal point);
       // its rendered position is offset from vm.width/2 once the
@@ -895,8 +906,8 @@ export class GameRoot extends GameNode {
         }
       }
 
-      const sx = Math.max(0, Math.min(maxX, homeX - vw / 2));
-      const sy = Math.max(0, Math.min(maxY, homeY - vh / 2));
+      const sx = Math.max(0, Math.min(maxX, homeX * zoom - vw / 2));
+      const sy = Math.max(0, Math.min(maxY, homeY * zoom - vh / 2));
       vm.scroller.scrollTo(sx, sy, animate);
     }, 50);
   }
