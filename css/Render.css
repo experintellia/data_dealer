@@ -2478,7 +2478,7 @@
   flex-direction: row;
   align-items: stretch;
   gap: 0;
-  padding: 12px;
+  padding: 0 12px 12px 12px;
   cursor: pointer;
 }
 .PopupBody.TutorialBody .NotificationAvatar {
