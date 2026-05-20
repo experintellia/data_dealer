@@ -27,6 +27,7 @@
 
 import { applyDelta, freshState } from './state.js';
 import type { GameSeed, LocalState } from './state.js';
+import { resolveSelfUserId } from './webxdc-avatars.js';
 
 export interface BootOptions {
   /** Override webxdc.selfAddr (useful for simulator / tests). */
@@ -118,6 +119,13 @@ export function boot(options?: BootOptions): Promise<LocalState> {
     const state = _state();
     if (typeof opts.materializer === 'function') opts.materializer(state);
     if (typeof opts.onReady === 'function') opts.onReady(state);
+    // Fire-and-forget: resolves self's webxdc user_id from the messenger's
+    // member list so subsequent _mkDelta calls can stamp it onto outbound
+    // deltas (avatar URLs in the leaderboard). Failures are swallowed —
+    // the API is experimental and absent in most clients today.
+    resolveSelfUserId().catch(function () {
+      /* no-op */
+    });
     return state;
   });
   return _bootPromise;

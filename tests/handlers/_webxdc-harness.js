@@ -22,6 +22,7 @@
  * payload, identical to what the old LocalEngine `_sendDelta` sink received.
  */
 import { __resetBootForTest, boot } from '../../scripts/boot.js';
+import { __resetAvatarsForTest } from '../../scripts/webxdc-avatars.js';
 
 const SELF_ADDR = 'test@local';
 
@@ -68,6 +69,7 @@ export async function installWebxdc() {
   _sent = [];
   globalThis.webxdc = _makeFakeWebxdc();
   __resetBootForTest();
+  __resetAvatarsForTest();
   await boot({ selfAddr: SELF_ADDR });
 }
 
@@ -76,6 +78,7 @@ export function uninstallWebxdc() {
   _captureCb = null;
   _sent = [];
   __resetBootForTest();
+  __resetAvatarsForTest();
   if (_savedWebxdc === undefined) {
     delete globalThis.webxdc;
   } else {

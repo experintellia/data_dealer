@@ -21,6 +21,9 @@ interface RankingRow {
   display_name: string;
   value: number;
   self: boolean;
+  /** webxdc user_id for avatar URL construction; optional because
+   *  experimental clients may not surface it (see webxdc-avatars.ts). */
+  user_id?: string;
 }
 
 /** Result payload for `app.remote.getRanking(scoretype)`.  Exported so
