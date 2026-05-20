@@ -83,12 +83,14 @@ export function MissionPopup({
                 <div class={g.complete ? 'MissionGoal complete' : 'MissionGoal'} key={i}>
                   {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
                   <div class="MissionGoalSprite" dangerouslySetInnerHTML={{ __html: sp }} />
-                  {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
-                  <div class="MissionGoalText" dangerouslySetInnerHTML={{ __html: tx }} />
-                  {pr && (
-                    // biome-ignore lint/security/noDangerouslySetInnerHtml: locally formatted progress markup
-                    <div class="MissionGoalProgress" dangerouslySetInnerHTML={{ __html: pr }} />
-                  )}
+                  <div class="MissionGoalContent">
+                    {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
+                    <div class="MissionGoalText" dangerouslySetInnerHTML={{ __html: tx }} />
+                    {pr && (
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: locally formatted progress markup
+                      <div class="MissionGoalProgress" dangerouslySetInnerHTML={{ __html: pr }} />
+                    )}
+                  </div>
                   <div class="MissionGoalStatus" />
                 </div>
               );

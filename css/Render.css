@@ -1019,6 +1019,7 @@
   background: #FFF;
   padding-left: 70px;
   height:58px;
+  display: flex;
 }
 
 .MissionGoal.complete {
@@ -1078,8 +1079,8 @@
   width: 48px;
   height: 64px;
   position: absolute;
-  top: -20px;
-  right: -8px;
+  top: -10px;
+  right: -4px;
 }
 
 .MissionGoal.small .MissionGoalStatus {
@@ -1094,6 +1095,10 @@
   background-position: -650px -776px;
 }
 
+.MissionGoalContent {
+  display: flex;
+  flex-direction: column;
+}
 
 .MissionGoalText {
   padding: 3px 45px 3px 3px;
@@ -3470,7 +3475,6 @@ button {
     display: block;
     margin: 0 0 4px 0;
   }
-  }
 
   /* C10 — floating OK button.  The bottom `MainButton` is the user's
    * primary close affordance on a touch screen; pop it out of the
@@ -3509,17 +3513,7 @@ button {
     padding-top: 2px;
     padding-bottom: 2px;
   }
-  /* Vertically centre the completion stamp inside the goal box.  On
-   * desktop it sat at `top: -20; right: -8` (a corner stamp floating
-   * above the fixed-58-px box).  On dynamic-height mobile cards that
-   * would float above the content instead of marking it, so anchor
-   * to vertical centre.  Keep `right: -8` so the stamp still sticks
-   * out 8 px past the right edge (matches desktop's silhouette). */
-  .PopupBody.MissionBody .MissionGoal .MissionGoalStatus {
-    top: 50%;
-    right: -8px;
-    transform: translateY(-50%);
-  }
+
 }
 
 /* --- Mission + Topscore tab content: centre via margin auto + max-width --
