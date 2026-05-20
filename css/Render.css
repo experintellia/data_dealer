@@ -3535,7 +3535,8 @@ button {
   .PopupBody.MissionBody .NotificationButtons {
     position: static;
     bottom: auto;
-    margin: 8px 0 0 0;
+    margin-block: 10px;
+    margin-inline: auto;
     height: auto;
     text-align: center;
     flex: 0 0 auto;
