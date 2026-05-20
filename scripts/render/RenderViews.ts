@@ -112,9 +112,16 @@ export class RenderViewTab extends RenderNode {
     const $ = getRenderJQuery('RenderViews');
     const jdomelem = $("<div class='ViewTab'></div>");
     const jdomelem1 = $("<div class='ViewTabContainer'></div>");
+    // PopupContainer lives in <body>, NOT inside the view's DOM tree.
+    // The render engine writes a non-`none` inline transform onto
+    // `.Stage` every frame, which would create a containing block for
+    // `position: fixed` descendants and trap any popup at the Stage
+    // box.  Mounting at body level lets `.PopupContainer.lockOn`
+    // anchor at the viewport so dialogs can cover the full screen
+    // (including the MainMenu tab strip and the in-Stage Statusbar).
     const jdomelem3 = $("<div class='PopupContainer'></div>");
     jdomelem.append(jdomelem1);
-    jdomelem.append(jdomelem3);
+    $('body').append(jdomelem3);
 
     // Block drag / scroll pass-through to the underlying ViewMap when
     // the user interacts with the backdrop (= the popup container
@@ -332,10 +339,12 @@ export class RenderViewMap extends RenderNode {
     const jdomelemZoom = $(
       '<div class="ZoomControls"><div class="ZoomIn"></div><div class="ZoomOut"></div><div class="Fullscreen"></div></div>'
     );
+    // PopupContainer lives in <body>, NOT inside ViewMap — see the
+    // matching comment in RenderViewTab above for why.
     const jdomelem3 = $("<div class='PopupContainer'></div>");
     jdomelem1.append(jdomelem2);
     jdomelem.append(jdomelem1);
-    jdomelem.append(jdomelem3);
+    $('body').append(jdomelem3);
     jdomelem.append(jdomelemZoom);
 
     // See ViewMap (above) for the rationale — must NOT preventDefault
@@ -883,8 +892,11 @@ export class RenderStage extends RenderNode {
     // `<div class='MainMenu'>` wrapper).  Same pattern as the
     // PR #221 jdomelem-clobber fix in RenderSprite/RenderText.
     const jdomelem = config.jdomelem ?? $("<div class='Stage'></div>");
+    // Stage-level PopupContainer (.Top.NoClose — status / karma /
+    // About) — also lives in <body> so position:fixed works.  See the
+    // matching comment in RenderViewTab above.
     const jdomelem2 = $("<div class='PopupContainer Top NoClose'></div>");
-    jdomelem.append(jdomelem2);
+    $('body').append(jdomelem2);
 
     super({
       ...config,

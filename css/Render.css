@@ -319,40 +319,34 @@
 
 
 .PopupContainer {
-  z-index:100;
-  background:rgba(0,0,0,0);
-  width:inherit;
-  height:inherit;
-  position:absolute;
+  /* PopupContainer is appended directly to <body> (see
+   * RenderViewTab / RenderViewMap / RenderStage constructors), so
+   * `position: fixed` anchors at the viewport — no Stage-transform
+   * containing-block trap.  Hidden by default (visibility flips on
+   * `.lockOn`). */
+  z-index: 100;
+  background: rgba(0, 0, 0, 0);
+  position: fixed;
   visibility: hidden;
-  top:0px;
-  left:0px;
-  width: 100%;
-  height: 100%;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   -webkit-transition: background 0.25s linear, visibility 0.25s linear, box-shadow 0.25s;
   -moz-transition: background 0.25s linear, visibility 0.25s linear, box-shadow 0.25s;
   transition: background 0.25s;
 }
 .PopupContainer.lockOn {
-  display:block;
+  display: block;
   background: transparent;
   visibility: visible;
   box-shadow: 0px 0px 256px #000 inset;
   -webkit-transition: none;
   -moz-transition: none;
   transition: none;
-  /* Sit above MainMenu (z=1000) and the in-Stage `.Statusbar`
-   * (z=10000, set in scripts/render/RenderTopLevelUI.ts:133); stays
-   * below `.PopupContainer.Top` (z=100000) so the Stage-level
-   * status / karma / About overlays still sit on top.
-   *
-   * Note: an attempt at making this container `position: fixed`
-   * with 100vw/100vh to cover the MainMenu tab strip is blocked by
-   * the render engine, which writes a non-`none` (identity) inline
-   * transform onto `.Stage` every frame.  A non-`none` transform on
-   * an ancestor creates a new containing block that traps `position:
-   * fixed` descendants at the Stage box — see task J for the JS
-   * re-parenting fix that would let this work cleanly. */
+  /* Covers MainMenu (z=1000) and the in-Stage `.Statusbar` (z=10000).
+   * Stays below `.PopupContainer.Top` (z=100000) so the Stage-level
+   * status / karma / About overlays sit on top of perp popups. */
   z-index: 20000;
 }
 .PopupContainer.Top {

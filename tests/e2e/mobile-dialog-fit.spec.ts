@@ -415,14 +415,16 @@ test.describe('iPhone SE (375×667) — dialogs fit the viewport', () => {
     expect(geom.body.l, 'MissionBody left inside viewport').toBeGreaterThanOrEqual(0);
     expect(geom.body.r, 'MissionBody right inside viewport').toBeLessThanOrEqual(IPHONE_SE.width);
     expect(geom.body.b, 'MissionBody bottom inside viewport').toBeLessThanOrEqual(IPHONE_SE.height);
-    // The decorator banner sits above the body; it must stay below the
-    // statusbar (the Stage's top edge) so the chrome doesn't visually
-    // cover the dialog header.
-    if (geom.deco && geom.stageTop !== null) {
+    // The decorator banner sits above the body.  Task J moved the
+    // popup container out of `.Stage` into <body>, so dialogs can
+    // (and do) extend above the menu strip — the decorator no longer
+    // has to clear the Stage's top edge.  We only require it stays
+    // inside the viewport.
+    if (geom.deco) {
       expect(
         geom.deco.t,
-        'MissionDecorator should not overlap the statusbar/menu area above the Stage'
-      ).toBeGreaterThanOrEqual(geom.stageTop);
+        'MissionDecorator should stay inside the viewport'
+      ).toBeGreaterThanOrEqual(0);
     }
   });
 });
