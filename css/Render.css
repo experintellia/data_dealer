@@ -3171,9 +3171,10 @@ button {
     background-position: -504px -457.8px;
   }
   /* Mobile avatar is 0.6x desktop scale, so the sprite's right-side
-   * transparency is ~14 px instead of 24 — soften the overlap. */
-  .PopupBody.TutorialBody .NotificationAvatar {
-    margin-right: -4px;
+   * transparency shrinks proportionally — minimal overlap is enough
+   * for the tail to tuck under the bubble's left edge. */
+  .MarcoSpeech .NotificationAvatar {
+    margin-right: -2px;
   }
 }
 
