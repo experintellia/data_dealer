@@ -30,7 +30,7 @@ export function TutorialNotification({
     <div class="TutorialWrap" onClick={onClose}>
       <div class="PopupBody TutorialBody">
         <div class="NotificationAvatar" />
-        <div class="NotificationContent">
+        <div class="TutorialContent">
           <div class="NotificationSays">{speaker}</div>
           {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
           <div class="NotificationText" dangerouslySetInnerHTML={{ __html: descriptionHtml }} />

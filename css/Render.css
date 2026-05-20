@@ -2492,7 +2492,7 @@
   top: auto;
   left: auto;
 }
-.PopupBody.TutorialBody .NotificationContent {
+.PopupBody.TutorialBody .TutorialContent {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
