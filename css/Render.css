@@ -319,19 +319,14 @@
 
 
 .PopupContainer {
-  /* PopupContainer is appended directly to <body> (see
-   * RenderViewTab / RenderViewMap / RenderStage constructors), so
-   * `position: fixed` anchors at the viewport — no Stage-transform
-   * containing-block trap.  Hidden by default (visibility flips on
-   * `.lockOn`). */
   z-index: 100;
   background: rgba(0, 0, 0, 0);
-  position: fixed;
+  position: absolute;
   visibility: hidden;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   -webkit-transition: background 0.25s linear, visibility 0.25s linear, box-shadow 0.25s;
   -moz-transition: background 0.25s linear, visibility 0.25s linear, box-shadow 0.25s;
   transition: background 0.25s;
@@ -344,9 +339,11 @@
   -webkit-transition: none;
   -moz-transition: none;
   transition: none;
-  /* Covers MainMenu (z=1000) and the in-Stage `.Statusbar` (z=10000).
-   * Stays below `.PopupContainer.Top` (z=100000) so the Stage-level
-   * status / karma / About overlays sit on top of perp popups. */
+  /* Sit above the in-Stage `.Statusbar` (z=10000) so its status
+   * indicators don't paint over the popup header.  Stays below
+   * `.PopupContainer.Top` (z=100000) and below `.MainMenu`
+   * (lifted to 30000 in MainMenu.css so master's DialogLock
+   * dim-and-click-through still works). */
   z-index: 20000;
 }
 .PopupContainer.Top {
@@ -2457,16 +2454,74 @@
 .PopupBody.Status .PopupHeader {
   height:260px;
 }
+/* Tutorial / LevelUp dialog white card.  Clean flex row:
+ *
+ *   .PopupBody.TutorialBody   (white box, flex row, padding)
+ *   ├─ .NotificationAvatar    (Marco, align-self: end → bottom-aligned)
+ *   └─ .NotificationContent   (flex column: says + speech bubble)
+ *       ├─ .NotificationSays  ("Marco says:" label)
+ *       └─ .NotificationText  (blue speech bubble)
+ *
+ * Marco's tail-sprite anchors at his mouth and the bubble's tail
+ * anchors at its bottom-left: with Marco bottom-aligned and the
+ * bubble below the says-label in the flex column, the two visually
+ * connect for any message length.  Replaces the previous
+ * absolute-positioning maze (`.NotificationText { position:
+ * absolute; top: 24; left: 112; width: 440; height: 119 }` and
+ * friends) — the rules below override those for the Tutorial scope. */
 .PopupBody.TutorialBody {
   background: #FFF;
   box-shadow: 0px 3px 12px rgba(0,0,0,0.3);
   -webkit-animation: AniScaleOpacity 0.2s reverse;
   -moz-animation: AniScaleOpacity 0.2s reverse;
   animation: AniScaleOpacity 0.2s reverse;
-  height: auto;
-  min-height: 174px;
-  padding:0px;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 12px;
+  padding: 12px;
   cursor: pointer;
+}
+.PopupBody.TutorialBody .NotificationAvatar {
+  /* Bottom-aligned so a longer speech bubble grows upward while
+   * Marco stays anchored at the card's bottom — keeps the tail
+   * connecting to his mouth regardless of message length. */
+  align-self: flex-end;
+  flex: 0 0 auto;
+  /* Reset the legacy absolute/relative positioning. */
+  position: static;
+  top: auto;
+  left: auto;
+}
+.PopupBody.TutorialBody .NotificationContent {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.PopupBody.TutorialBody .NotificationSays {
+  /* Reset absolute positioning from the base rule.  Keep typography. */
+  position: static;
+  top: auto;
+  left: auto;
+  width: auto;
+  flex: 0 0 auto;
+}
+.PopupBody.TutorialBody .NotificationText {
+  /* Reset absolute positioning + fixed width/height from the base
+   * rule.  Keep the gradient background, border-radius, padding,
+   * font, color. */
+  position: static;
+  top: auto;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  flex: 0 0 auto;
 }
 
 .PopupBody a {
@@ -3122,61 +3177,20 @@ button {
     margin-bottom: 0px;
   }
 
-  /* Shrink Marco's avatar to 60 % on narrow phones — shrink the
-   * actual box (not via `transform: scale`, which only shrinks
-   * visually and leaves the layout claiming the original 120×160).
-   * MainSprites.png is 960×1024; `background-size` is set to 0.6x
-   * those dimensions and `background-position` is the desktop
-   * offset (`-840 -763`) multiplied by 0.6 so the same sprite
-   * frame lands inside the smaller box.  The bubble + body now
-   * size to content naturally because the avatar's flow height
-   * is 96 px instead of 160. */
-  /* Bare `.NotificationAvatar` — applies to BOTH Tutorial and Mission
-   * popups.  Keep the dimensional scaling (and left-nudge so the tail
-   * meets the bubble) but do NOT change its layout positioning here.
-   * Mission's avatar lives inside a much taller NotificationBubble
-   * with NotificationButtons sharing the same container; absolute
-   * bottom-anchoring would drop Marco to the floor of that region. */
+  /* Shrink Marco's avatar to 60 % on narrow phones via dimensional
+   * scaling (NOT `transform: scale`, which only shrinks visually
+   * and leaves the layout claiming the original 120×160).
+   * MainSprites.png is 960×1024; `background-size` = 0.6 × those
+   * and `background-position` is the desktop offset (`-840 -763`)
+   * multiplied by 0.6 so the same sprite frame lands inside the
+   * smaller box.  Applies to Tutorial AND Mission (both use the
+   * shared `.NotificationAvatar` rule); Mission keeps its own
+   * positioning via the absolute children layout. */
   .NotificationAvatar {
     width: 72px;
     height: 96px;
     background-size: 576px 614.4px;
     background-position: -504px -457.8px;
-    left: 8px;
-  }
-
-  /* Tutorial-only: anchor Marco to the bottom-left of the bubble so a
-   * longer message (bubble grows down via `.NotificationText`'s
-   * min-height + content) keeps him at the bubble's base instead of
-   * leaving empty space below him.  Scoped to TutorialBody so the
-   * Mission popup's avatar isn't dragged to its own floor. */
-  .PopupBody.TutorialBody .NotificationAvatar {
-    position: absolute;
-    bottom: 0;
-    left: 8px;
-    top: auto;
-  }
-  .PopupBody.TutorialBody .NotificationBubble {
-    height: auto;
-    min-height: 102px;
-    left: 0;
-    bottom: 0;
-  }
-
-  /* Pad the white card so it's visibly larger than the bubble inside —
-   * 12 px of white margin reads as a card, not a tight crop. */
-  .PopupBody.TutorialBody {
-    min-height: 0;
-    padding: 12px;
-  }
-
-  .NotificationSays, .NotificationText {
-    left: 93px;
-    left: 79px;
-  }
-
-  .NotificationText {
-    height: unset;
   }
 }
 
@@ -3435,23 +3449,13 @@ button {
     width: auto;
     margin: 0;
   }
+  /* TutorialBody width fit on narrow viewports.  Flex layout
+   * inherited from the base rule does the rest. */
   .PopupBody.TutorialBody {
     width: calc(100vw - 12px);
     max-width: 588px;
     min-width: 0;
     box-sizing: border-box;
-  }
-  .PopupBody.TutorialBody .NotificationText,
-  .PopupBody.TutorialBody .NotificationSays {
-    width: auto;
-    right: 12px;
-  }
-  /* `.Tutorial .NotificationBubble` is positioned at `left: 6px` with
-   * `width: 100%`, so it visually overflows the body's right edge by
-   * 6 px — on a phone viewport that misaligns the bubble vs. the popup
-   * wrapper.  Pull it back flush so margins look symmetric. */
-  .PopupBody.TutorialBody .NotificationBubble {
-    left: 0;
   }
 
   /* Mission briefing / Mission complete popup: same 588 / 600 / 440 px

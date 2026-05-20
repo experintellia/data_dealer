@@ -10,6 +10,13 @@
  */
 
 .MainMenu {
+  /* Sit above the `.PopupContainer.lockOn` overlay (z=20000) so the
+   * `DialogLock` dim-filter is visible AND tab clicks land on the
+   * capture-phase dismiss handler instead of being swallowed by the
+   * popup container's backdrop.  PopupContainer.Top (z=100000) still
+   * sits on top for status / karma / About overlays. */
+  position: relative;
+  z-index: 30000;
   height: 48px;
   overflow: hidden;
   margin: 0 auto;
