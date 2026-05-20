@@ -337,18 +337,22 @@ export class RenderStatusbar extends RenderNode {
    *  (no hover required — essential for mobile). Called at the end of
    *  every render() so the newly-created DOM always reflects AP state. */
   refreshAPRemainIfEmpty(): void {
-    this.stopAutoLoop();
-    if (this.AP_val > 0) return;
-    const $ = getRenderJQuery('RenderTopLevelUI');
-    const jq = this.jdomelem;
+    if (this.AP_val > 0) {
+      this.stopAutoLoop();
+      return;
+    }
     const groot = this.gameNode?.GameRoot;
     if (!groot) return;
     const APT = groot.APTicker;
     if (!APT) return;
-    const jtext = jq.find('.StatusRemain');
+    const jq = this.jdomelem;
+    const $ = getRenderJQuery('RenderTopLevelUI');
     this.startAutoLoop(() => {
+      // Look up .StatusRemain each fire: render() calls jq.empty() between ticks,
+      // so the element captured at startAutoLoop time would be stale.
+      const jtext = jq.find('.StatusRemain');
       jtext.show();
-      jtext.html(RenderStatusbar.textMoreIn() + span(toTime(APT?.getRemainingTime?.() ?? 0)));
+      jtext.html(RenderStatusbar.textMoreIn() + span(toTime(APT.getRemainingTime?.() ?? 0)));
     }, 1000);
   }
 
@@ -380,7 +384,6 @@ export class RenderStatusbar extends RenderNode {
 
     jq.on('mouseleave', '.StatusItem.AP', function (this: HTMLElement, e: UIEventLike) {
       e.stopPropagation();
-      // Keep the refill timer visible when AP is 0 — don't require hover on mobile.
       const groot = node.gameNode?.GameRoot;
       if (groot && groot.ap_value === 0) return;
       node.stopLoop();

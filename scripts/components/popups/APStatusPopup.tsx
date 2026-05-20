@@ -61,7 +61,6 @@ export function APStatusPopup({
     span(toKSNum(apValue)),
     span(toKSNum(apMax))
   );
-  const showRefill = apValue < apMax && apRemaining != null;
   return (
     <PopupShell
       spriteClass="AP"
