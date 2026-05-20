@@ -3471,36 +3471,77 @@ button {
     margin: 0 0 6px 0;
   }
   .PopupBody.MissionBody .MissionRewards .MissionReward {
-    /* Keep the variant-specific padding from .PopupSummaryItem.<type>
-     * intact (Profiles `0 8 0 24`, Risk / Cash / XP `0 8 0 26`) — that
-     * left padding reserves space for the absolutely-positioned
-     * `.RenderSprite` icon at `top:0 left:0`.  We only reset margin
-     * because the flex gap now controls inter-chip spacing. */
+    /* Desktop overhangs the icon outside the pill (Cash `left: -33`,
+     * Profiles `-18`, etc.) — on a phone two adjacent chips overlap
+     * because the flex gap can't absorb that.  Rehouse the icon
+     * inside the chip: bump the left padding to fit the widest icon
+     * (Cash @ 56 px), grow the chip vertically so the icon's natural
+     * height fits, and reset the margin so the flex `gap` controls
+     * inter-chip spacing.  The per-icon override below replants each
+     * sprite flush-left inside the new padding. */
     margin: 0;
     flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    height: auto;
+    min-height: 48px;
+    line-height: 22px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    padding-left: 58px;
+  }
+  .PopupBody.MissionBody .MissionRewards .MissionReward .RenderSprite.Tobi {
+    left: 2px;
+    top: 50%;
+    transform: translateY(-50%);
   }
 
-  /* Mission goal cards: let the box height grow with content (longer
-   * goal copy wraps to 2-3 lines, especially on a narrow phone).  The
-   * sprite is scale(0.4) on a 180×180 source = 72 px tall; use that as
-   * the floor so a single-line goal still gives the sprite enough
-   * vertical room. */
+  /* C10 — floating OK button.  The bottom `MainButton` is the user's
+   * primary close affordance on a touch screen; pop it out of the
+   * scroll container's flex flow with `position: absolute` so it
+   * stays pinned to the popup body's bottom edge regardless of how
+   * much briefing copy Marco has.  Then reserve the same height as
+   * padding-bottom on the scroll wrapper so scrolled content never
+   * tucks beneath it. */
+  .PopupBody.MissionBody .NotificationButtons {
+    position: absolute;
+    bottom: 12px;
+    left: 0;
+    right: 0;
+    margin-left: 0;
+    height: auto;
+    text-align: center;
+    z-index: 10;
+  }
+  .PopupBody.MissionBody .MissionWrap {
+    padding-bottom: 8px;
+  }
+  .PopupBody.MissionBody .NotificationBubble {
+    padding-bottom: 56px;
+  }
+
+  /* Mission goal cards: keep the original block layout (so text +
+   * progress flow naturally and progress sits where it always did),
+   * but lift the hard `height: 58px` so longer goal copy can wrap to
+   * 2-3 lines on a narrow phone.  Reduce the text padding a touch on
+   * mobile so a single-line goal isn't loose vertically. */
   .PopupBody.MissionBody .MissionGoal {
     height: auto;
-    min-height: 72px;
-    display: flex;
-    align-items: center;
+    min-height: 58px;
   }
   .PopupBody.MissionBody .MissionGoal .MissionGoalText {
-    flex: 1 1 auto;
+    padding-top: 2px;
+    padding-bottom: 2px;
   }
-  /* Vertically centre the completion checkmark in the goal box (it was
-   * pinned at `top: -20` which sat above the box top — fine when the
-   * box was a fixed 58 px on desktop, but on dynamic-height mobile
-   * cards it floats above the content). */
+  /* Vertically centre the completion stamp inside the goal box.  On
+   * desktop it sat at `top: -20; right: -8` (a corner stamp floating
+   * above the fixed-58-px box).  On dynamic-height mobile cards that
+   * would float above the content instead of marking it, so anchor
+   * to vertical centre.  Keep `right: -8` so the stamp still sticks
+   * out 8 px past the right edge (matches desktop's silhouette). */
   .PopupBody.MissionBody .MissionGoal .MissionGoalStatus {
     top: 50%;
-    right: 4px;
+    right: -8px;
     transform: translateY(-50%);
   }
 }

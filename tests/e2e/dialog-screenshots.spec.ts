@@ -241,10 +241,26 @@ async function openContactJessica(page: Page): Promise<void> {
     content: 'body > div[style*="z-index: 9999"][style*="position: fixed"] { display: none !important; }',
   });
 
+  // Mirror the canvas vclick handler in ContactPerp.extendEventHandlers:
+  // before opening, it materialises `data.ProfileSet` from
+  // `data.tokens`.  We don't need the real ProfileSet class here — the
+  // popup VM only reads `data.ProfileSet?.tokens_set` (see
+  // contactView.ts:46), and per-token rendering in tokenView.ts reads
+  // `token.data` (set by ProfileSet's constructor to
+  // `groot.getTypeData(gestalt)`).  Inline the same enrichment so the
+  // token sprite grid renders with proper labels + logos, matching a
+  // real canvas tap.
   await page.evaluate(() => {
     const game = (window as any).__dd?._app?.game;
     const gnode = game.getById('contact035');
     if (!gnode) throw new Error('contact035 gnode not registered');
+    const data = gnode.data as any;
+    const groot = (window as any).__dd?._app?.game;
+    const enriched = (data.tokens ?? []).map((t: { gestalt?: string }) => ({
+      ...t,
+      data: t.gestalt ? groot.getTypeData(t.gestalt) : undefined,
+    }));
+    data.ProfileSet = { tokens_set: enriched };
     gnode.openPopup();
   });
   await expect(page.locator('.PopupContainer.lockOn .PopupBody').first()).toBeVisible({
