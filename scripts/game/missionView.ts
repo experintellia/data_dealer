@@ -1,21 +1,23 @@
-// Mission popup view-model builder.  Ports the per-goal text /
-// sprite / progress computation from `views/mission_goal.html` +
-// `mission_rewards.html` (the goal template even carried a "MOVE
-// THIS TO GAME" FIXME).  Both the notification cue path
-// (`GameRoot.makeNotifications`) and the direct open
-// (`Mission.openMissionPopup`) feed this; the Preact `MissionPopup`
-// component just renders the result.
+// Mission view-model builder — the single source for the per-goal
+// text / sprite / progress (and reward classMap) computation that the
+// deleted `views/mission_goal.html`, `mission_goal_small.html`,
+// `mission_rewards.html` and `mission.html` templates used to carry
+// (the goal template even carried a "MOVE THIS TO GAME" FIXME).
 //
-// NOTE: the two partials still exist — `views/mission.html` (the
-// not-yet-ported mission-perp card in the Missions tab) renders them
-// too.  This logic is therefore duplicated with them during the
-// transition; both go away in tier 8 when the card ports.
+// Two consumers share this logic so a ruleset/i18n change lands in
+// one place:
+//   - `buildMissionPopupProps` → the briefing/complete dialog
+//     (`MissionPopup`), fed by the notification cue path
+//     (`GameRoot.makeNotifications`) and the direct open
+//     (`Mission.openMissionPopup`).
+//   - `buildMissionCardProps` → the Missions-tab board card
+//     (`MissionCard`, the `mission_goal_small.html` variant), fed by
+//     `RenderMissionPerp`.
+// Both feed the same `buildGoal`; the Preact components just render.
 
-import type {
-  MissionGoalVM,
-  MissionPopupProps,
-  MissionRewardVM,
-} from '../components/popups/MissionPopup.js';
+import type { MissionCardProps } from '../components/MissionCard.js';
+import type { MissionGoalVM, MissionRewardVM } from '../components/MissionGoal.js';
+import type { MissionPopupProps } from '../components/popups/MissionPopup.js';
 import { span, sprintf, toKSNum } from '../dd-helpers.js';
 import i18n from '../i18n.js';
 
@@ -167,5 +169,23 @@ export function buildMissionPopupProps(
     buttonLabel,
     goals,
     rewards,
+  };
+}
+
+export interface BuildMissionCardArgs {
+  data: MissionViewData;
+  getType: BuildMissionPopupArgs['getType'];
+  getTypeData: BuildMissionPopupArgs['getTypeData'];
+}
+
+export function buildMissionCardProps(args: BuildMissionCardArgs): MissionCardProps {
+  const { data, getType, getTypeData } = args;
+  // Legacy `views/mission.html` rendered *every* goal (no briefing
+  // 3-goal clip) through `mission_goal_small.html`, and the title via
+  // `print(data.title)` (unescaped).
+  const goals = (data.goals ?? []).map((g) => buildGoal(g, data, getType, getTypeData));
+  return {
+    titleHtml: data.title ?? '',
+    goals,
   };
 }

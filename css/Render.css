@@ -1022,6 +1022,12 @@
   display:inline-block;
   padding-left: 40px;
   padding-right: 32px;
+  /* Spacing between the inline-block pills must be explicit: the legacy
+     `mission_goal_small.html` loop emitted newlines between elements and
+     leaned on the inline-block whitespace gap, but the Preact card
+     renders adjacent siblings with no whitespace.  (Mobile sets its own
+     margin under the max-width:768px rule.) */
+  margin: 4px;
 }
 
 .MissionGoal.small .MissionGoalProgress {

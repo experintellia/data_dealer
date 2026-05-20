@@ -109,6 +109,16 @@
   transform: scale(0.97);
 }
 
+/* While a dialog is open `dialogManager` adds `.DialogLock` to the
+   `.MainMenu` (the Stage backdrop can't reach past the engine's
+   Stage transform to cover this header).  Darken it so it reads as
+   part of the backdrop; clicks are captured by dialogManager and
+   dismiss the dialog (so a tab can't be switched from under it). */
+.MainMenu.DialogLock {
+  filter: brightness(0.5);
+  transition: filter 0.15s linear;
+}
+
 /* ── Mobile / responsive layout ─────────────────────────────────────── */
 
 /* ≤ 980 px: hide the brand logo so the tabs reclaim its space. */
