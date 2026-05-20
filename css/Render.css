@@ -3131,6 +3131,27 @@ button {
     left: 8px;
   }
 
+  /* Shrink the bubble container to its content (was hardcoded 160 px,
+   * which left empty white space below the avatar on a narrow phone). */
+  .PopupBody.TutorialBody .NotificationBubble {
+    height: auto;
+  }
+  /* Float the tap hint OUT of the white card so the card sizes to
+   * Marco + the speech bubble alone — same pattern as desktop where
+   * the hint renders below the body's bottom edge. */
+  .PopupBody.TutorialBody .TutorialTapHint {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -32px;
+    margin-top: 0;
+  }
+  /* Drop the desktop min-height now that the bubble + hint don't
+   * inflate the card. */
+  .PopupBody.TutorialBody {
+    min-height: 0;
+  }
+
   .NotificationSays, .NotificationText {
     left: 93px;
     left: 79px;
