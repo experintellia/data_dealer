@@ -5,8 +5,8 @@ import { PopupShell } from './PopupShell.js';
 export interface APStatusPopupProps {
   apValue: number;
   apMax: number;
-  /** Milliseconds until the next AP tick. Omit when AP is already full. */
-  apRemaining?: number;
+  /** Milliseconds until the next AP tick. Omit (or pass undefined) when AP is already full. */
+  apRemaining?: number | undefined;
   onClose: () => void;
 }
 
@@ -29,8 +29,7 @@ export function APStatusPopup({ apValue, apMax, apRemaining, onClose }: APStatus
       <div class="PopupText">{i18n.gettext('sb_AP description')}</div>
       {apValue < apMax && apRemaining !== undefined && (
         <div class="PopupText APRemain">
-          {i18n.gettext('More Energy in')}{' '}
-          <span class="highlight">{toTime(apRemaining)}</span>
+          {i18n.gettext('More Energy in')} <span class="highlight">{toTime(apRemaining)}</span>
         </div>
       )}
     </PopupShell>

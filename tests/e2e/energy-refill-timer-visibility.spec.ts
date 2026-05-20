@@ -33,10 +33,9 @@ test('energy refill timer: visible on statusbar without hover when AP is 0', asy
   expect(ap_max).toBeGreaterThan(0);
 
   // At full AP the refill tooltip must be hidden (no hover has occurred).
-  await expect(page.locator('[data-testid="dd-ap-value"]')).toHaveText(
-    `${ap_max}/${ap_max}`,
-    { timeout: 2_000 }
-  );
+  await expect(page.locator('[data-testid="dd-ap-value"]')).toHaveText(`${ap_max}/${ap_max}`, {
+    timeout: 2_000,
+  });
   await expect(page.locator('[data-testid="dd-ap-remain"]')).not.toBeVisible();
 
   // Drive AP to 0 via a silent updateGameValues (mirrors what the server
