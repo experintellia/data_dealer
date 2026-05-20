@@ -3394,23 +3394,14 @@ button {
   }
 }
 
-/* --- Tutorial / LevelUp dialog: fit narrow phone viewports -----------------
- * `.PopupBody` is hard-pinned at 588 px and `.NotificationText` at 440 px,
- * so on an iPhone SE-sized viewport (375 px) the bubble overflows by
- * ~106 px on each side.  Shrink the popup body to fit the viewport and
- * anchor the absolutely-positioned children to the right edge so the
- * blue speech bubble and the "Marco says:" label reflow with it.
- * Same selectors cover the LevelUp variant — both use
- * `.PopupBody.TutorialBody` + the same NotificationBubble subtree.
+/* --- Popup dialogs on narrow phone viewports ----------------------------
+ * Base `.PopupBody { width: 588 }` + `.Popup { width: 600 }` overflow the
+ * iPhone-SE 375-px viewport by ~106 px.  Generic shrink-to-viewport rule
+ * covers every popup (Tutorial / LevelUp / Mission / Contact / Client /
+ * Pusher / Token / Karma / About).  Per-variant rules below add layout
+ * specifics (inner scroll for Mission, MarcoSpeech margin, etc.).
  * --------------------------------------------------------------------- */
 @media (max-width: 768px) {
-  /* Generic `.Popup` / `.PopupBody` width fit: `.PopupBody { width:
-   * 588px }` (Render.css:1412) and `.Popup { width: 600px }`
-   * (Render.css:649) would force every perp / status / karma / About
-   * popup wider than the viewport.  Apply the same shrink-the-wrapper
-   * + size-the-body pattern we use for Tutorial / Mission to ALL
-   * popups; per-variant overrides below still pin tighter rules
-   * (e.g. flex layout for the speech bubble) on top. */
   .Popup {
     width: auto;
     margin: 0;
@@ -3422,48 +3413,12 @@ button {
     box-sizing: border-box;
   }
 
-  /* `.Popup { width: 600px }` would force the wrapper wider than the
-   * viewport, and its 6 px outer margin offsets the body inside it, so
-   * a `max-width`-only fix leaves an asymmetric strip on the right.
-   * Drop the outer margin, let the wrapper auto-size to the body, and
-   * fix the body's width explicitly so the flex container centres
-   * everything symmetrically. */
-  .Popup.Tutorial,
-  .Popup.LevelUp {
-    width: auto;
-    margin: 0;
-  }
-  /* TutorialBody width fit on narrow viewports.  Flex layout
-   * inherited from the base rule does the rest. */
-  .PopupBody.TutorialBody {
-    width: calc(100vw - 12px);
-    max-width: 588px;
-    min-width: 0;
-    box-sizing: border-box;
-  }
-
-  /* Mission briefing / Mission complete popup: same 588 / 600 / 440 px
-   * fixed-pixel design as Tutorial, with extra fixed-width children
-   * (`.MissionDecorator`, `.NotificationBubble`, `.NotificationText`)
-   * that all overflowed on phone viewports.  Shrink the wrapper +
-   * body together, then reflow each absolute-width child to fit. */
-  .Popup.Mission {
-    width: auto;
-    margin: 0;
-  }
+  /* Mission popup: inner scroll so the header (close X + decorator) and
+   * speech bubble stay visible while a long goals/rewards list scrolls
+   * in the middle.  The 24-px top margin clears the rotated
+   * `.MissionDecorator`'s negative top + 1° overhang so it doesn't bleed
+   * into the statusbar. */
   .PopupBody.MissionBody {
-    width: calc(100vw - 12px);
-    max-width: 588px;
-    min-width: 0;
-    box-sizing: border-box;
-    /* Cap the body at the viewport so a tall dialog can clip its
-     * inner scroll instead of pushing past the bottom edge.  The
-     * 24 px top offset clears the rotated `.MissionDecorator` so its
-     * negative top + 1° overhang doesn't bleed into the statusbar.
-     * `overflow: visible` so the absolutely-positioned NotificationHeader
-     * children (close button at top:-6/right:-6, decorator at -14)
-     * stay visible — the inner scroll is clipped by `.MissionContent`
-     * (see below). */
     max-height: calc(100vh - 24px);
     margin-top: 24px;
     min-height: 0;
@@ -3471,12 +3426,6 @@ button {
     flex-direction: column;
     overflow: visible;
   }
-  /* `.MissionContent` is the visible white card.  Make it the scroll
-   * container so the close button (top:-6 right:-6) and decorator
-   * (which extends 14 px above the body) aren't clipped by the body's
-   * overflow.  Inside, lay out as a flex column with PopupTitle and
-   * NotificationBubble fixed at the ends and the MissionWrap (goals
-   * + rewards) scrolling in the middle. */
   .PopupBody.MissionBody .MissionContent {
     flex: 1 1 auto;
     min-height: 0;
@@ -3491,32 +3440,16 @@ button {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
+    padding-bottom: 0;
   }
-  .PopupBody.MissionBody .MissionContent > .NotificationBubble {
-    flex: 0 0 auto;
-  }
-  /* `.MissionDecorator` is pinned at width:600 (= original popup width)
-   * so it would still overflow even with the wrapper shrunk.  Span the
-   * popup width instead. */
+  /* `.MissionDecorator` is pinned at width:600 in the base rule (=
+   * original popup width).  Span the shrunk popup instead. */
   .PopupBody.MissionBody .MissionDecorator {
     width: 100%;
     box-sizing: border-box;
   }
-  /* MarcoSpeech (the shared speech-bubble component, replacing the
-   * legacy `.NotificationBubble` wrapper) handles its own flex
-   * layout via the `.MarcoSpeech` rules above; no per-popup
-   * positioning hacks needed on mobile. */
-
-  /* Rewards section: title on its own line, rewards as a wrapping
-   * flex row so multiple rewards spill onto the next line instead of
-   * pushing past the popup's right edge.  Slightly more generous
-   * padding + gap on mobile so the chips have breathing room. */
-  /* Mission rewards on mobile: keep every desktop chip rule intact
-   * (the per-variant `.PopupSummaryItem.<type>` styles already give
-   * each pill its proper color, border, margin and icon overhang).
-   * Only change the rewards row to wrap so a tall popup doesn't
-   * push chips past the right edge of the body, and put the
-   * "Rewards" title on its own line. */
+  /* Mission rewards row: stacked title + chips (one wrap per row);
+   * desktop chip styling is preserved via `.PopupSummaryItem.<type>`. */
   .PopupBody.MissionBody .MissionRewards {
     height: auto;
     display: block;
@@ -3525,13 +3458,22 @@ button {
     display: block;
     margin: 0 0 4px 0;
   }
-
-  /* OK button is a sibling of MarcoSpeech inside MissionContent —
-   * flow naturally in the flex column (was `position: absolute;
-   * bottom: 12` which overlayed the speech bubble now that
-   * MarcoSpeech doesn't reserve `padding-bottom: 80` for it).
-   * Reset every legacy `.NotificationButtons` and `.PopupButtons`
-   * base style that assumed the absolute-positioned legacy layout. */
+  /* Mission goal cards: dynamic min-height so longer goal copy wraps
+   * naturally.  Trim text padding for tighter rhythm. */
+  .PopupBody.MissionBody .MissionGoal {
+    height: auto;
+    min-height: 58px;
+  }
+  .PopupBody.MissionBody .MissionGoal .MissionGoalText {
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+  /* MarcoSpeech + OK button inside MissionContent — small horizontal
+   * margin so the speech bubble doesn't sit flush against the card's
+   * edges, OK button centred below it. */
+  .PopupBody.MissionBody .MarcoSpeech {
+    margin-inline: 12px;
+  }
   .PopupBody.MissionBody .NotificationButtons {
     position: static;
     bottom: auto;
@@ -3541,29 +3483,6 @@ button {
     text-align: center;
     flex: 0 0 auto;
   }
-  .PopupBody.MissionBody .MissionWrap {
-    padding-bottom: 0;
-  }
-  /* 12 px of horizontal margin inside MissionContent so the speech
-   * bubble doesn't sit flush against the card's edges. */
-  .PopupBody.MissionBody .MarcoSpeech {
-    margin-inline: 12px;
-  }
-
-  /* Mission goal cards: keep the original block layout (so text +
-   * progress flow naturally and progress sits where it always did),
-   * but lift the hard `height: 58px` so longer goal copy can wrap to
-   * 2-3 lines on a narrow phone.  Reduce the text padding a touch on
-   * mobile so a single-line goal isn't loose vertically. */
-  .PopupBody.MissionBody .MissionGoal {
-    height: auto;
-    min-height: 58px;
-  }
-  .PopupBody.MissionBody .MissionGoal .MissionGoalText {
-    padding-top: 2px;
-    padding-bottom: 2px;
-  }
-
 }
 
 /* --- Mission + Topscore tab content: centre via margin auto + max-width --
