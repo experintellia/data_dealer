@@ -1726,6 +1726,10 @@ function _autoCompleteBuyPowerupGoals(
   goals: MissionGoal[],
   nodes: GameNode[] | undefined
 ): MissionGoal[] {
+  var hasCandidate = goals.some(function (g) {
+    return g.workflow === 'buy_powerup' && !g.complete;
+  });
+  if (!hasCandidate) return goals;
   var owned: Record<string, true> = {};
   (nodes || []).forEach(function (n) {
     var pus = ((n.instance_data as NodeInstanceData) || {}).powerups || [];
