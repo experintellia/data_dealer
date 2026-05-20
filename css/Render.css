@@ -3544,6 +3544,11 @@ button {
   .PopupBody.MissionBody .MissionWrap {
     padding-bottom: 0;
   }
+  /* 12 px of horizontal margin inside MissionContent so the speech
+   * bubble doesn't sit flush against the card's edges. */
+  .PopupBody.MissionBody .MarcoSpeech {
+    margin-inline: 12px;
+  }
 
   /* Mission goal cards: keep the original block layout (so text +
    * progress flow naturally and progress sits where it always did),
