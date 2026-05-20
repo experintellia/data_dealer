@@ -112,6 +112,96 @@ test.describe('iPhone SE (375×667) — dialogs fit the viewport', () => {
     );
   });
 
+  test('Perp popup buttons fire onClick after a real touch tap', async ({ browser }) => {
+    // H-1 regression: `RenderViewMap.initScroller()` registered a
+    // native `touchstart` listener on its DOM element that
+    // unconditionally called `e.preventDefault()`.  Because the
+    // popup container is a descendant of `.ViewMap`, every touch
+    // inside an open popup bubbled up to that listener — and
+    // `preventDefault()` on a non-canceled touchstart suppresses
+    // the synthesized compatibility click chain (W3C touch-events
+    // spec), so every popup-button onClick across the app stayed
+    // inert on a real iPhone.  The fix early-returns from that
+    // listener when the touch originated inside a `.lockOn`
+    // overlay.  This test fires a real touch on the Contact popup's
+    // Charge button and asserts the engine call ran (cash drops by
+    // the charge cost).  Would fail without the fix.
+    const context = await browser.newContext({
+      viewport: IPHONE_SE,
+      hasTouch: true,
+      isMobile: true,
+    });
+    const page = await context.newPage();
+    try {
+      await bootAt(page, IPHONE_SE);
+      await drainBootPopups(page);
+      // Buy contact035 (Jessica) so we have a perp to open.
+      await page.evaluate(async () => {
+        const eng = await new Promise<any>((res, rej) =>
+          (window as any).require(['LocalEngine'], res, rej)
+        );
+        await eng.buyPerp('Imperium', 'contact035');
+      });
+      await page.reload();
+      await page.waitForFunction(() => !!(window as any).__dd?._app?.game);
+      await drainBootPopups(page);
+      // Boost cash so the Charge button isn't disabled.
+      await page.evaluate(async () => {
+        const boot = await new Promise<any>((res, rej) =>
+          (window as any).require(['boot'], res, rej)
+        );
+        const state = boot.getState();
+        boot.setState({
+          ...state,
+          game_values: { ...state.game_values, cash_value: 5000 },
+        });
+        const groot = (window as any).__dd?._app?.game;
+        groot.cash_value = 5000;
+      });
+      // Open the popup directly (canvas tap path doesn't have a
+      // tappable element from Playwright's perspective).
+      await page.evaluate(() => {
+        const game = (window as any).__dd?._app?.game;
+        const gnode = game.getById('contact035');
+        const data = gnode.data as any;
+        const groot = (window as any).__dd?._app?.game;
+        const enriched = (data.tokens ?? []).map((t: { gestalt?: string }) => ({
+          ...t,
+          data: t.gestalt ? groot.getTypeData(t.gestalt) : undefined,
+        }));
+        data.ProfileSet = { tokens_set: enriched };
+        gnode.openPopup();
+      });
+      await expect(
+        page.locator('.PopupContainer.lockOn .PopupBody').first()
+      ).toBeVisible({ timeout: 5_000 });
+
+      const cashBefore = await page.evaluate(
+        () => (window as any).__dd?._app?.game?.cash_value
+      );
+
+      // Real touch tap on the Charge button.
+      const chargeBtn = page
+        .locator('.PopupContainer.lockOn .Button[data-button-id="ChargeButton"]')
+        .first();
+      await expect(chargeBtn).toBeVisible({ timeout: 3_000 });
+      await chargeBtn.tap();
+
+      // Engine.chargePerp deducts charge_cost (60 for contact035);
+      // wait for the deduction to land.  Would never drop without
+      // the fix because the synthesized click never reaches the
+      // button.
+      await expect
+        .poll(
+          () => page.evaluate(() => (window as any).__dd?._app?.game?.cash_value),
+          { timeout: 5_000 }
+        )
+        .toBeLessThan(cashBefore);
+    } finally {
+      await context.close();
+    }
+  });
+
   test('Status popup stays open after a real touch tap (no synthesised-click self-close)', async ({
     browser,
   }) => {

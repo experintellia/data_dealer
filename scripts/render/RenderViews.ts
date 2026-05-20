@@ -627,6 +627,25 @@ export class RenderViewMap extends RenderNode {
         ) {
           return;
         }
+        // Don't intercept touches that originated inside an open
+        // dialog — the popup container is a descendant of `.ViewMap`,
+        // so any tap on a perp-popup button (Charge, Collect,
+        // MakeADeal, SubpopClose, token row, …) bubbles up to this
+        // native listener.  `e.preventDefault()` below kills the
+        // synthesized compatibility click chain (W3C touch-events
+        // spec), and the result is that no popup button on a real
+        // touchscreen ever fires its onClick.  Return early so the
+        // browser delivers the synthesized click to the popup
+        // descendant normally.  Board / camera pans aren't affected
+        // because their touches don't originate inside a `.lockOn`
+        // overlay.
+        const t0target = touchEvt.touches[0]?.target;
+        if (
+          t0target instanceof Element &&
+          t0target.closest('.PopupContainer.lockOn')
+        ) {
+          return;
+        }
         const touch = touchEvt.touches[0];
         const parent = this.parentNode;
         if (!touch || !parent) return;
