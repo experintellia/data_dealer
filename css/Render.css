@@ -1235,10 +1235,10 @@
   display: none;
 }
 .TopscoreList.hasAvatars .TopscoreRow {
-  padding-left: 60px;
+  padding-left: 53px;
 }
 .TopscoreList.hasAvatars .TopscoreRow.user {
-  padding-left: 70px;
+  padding-left: 63px;
 }
 .TopscoreList.hasAvatars .TopscoreAvatar {
   display: block;
