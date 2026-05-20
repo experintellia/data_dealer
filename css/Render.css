@@ -319,14 +319,12 @@
 
 
 .PopupContainer {
-  z-index:100;
-  background:rgba(0,0,0,0);
-  width:inherit;
-  height:inherit;
-  position:absolute;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0);
+  position: absolute;
   visibility: hidden;
-  top:0px;
-  left:0px;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   -webkit-transition: background 0.25s linear, visibility 0.25s linear, box-shadow 0.25s;
@@ -334,13 +332,19 @@
   transition: background 0.25s;
 }
 .PopupContainer.lockOn {
-  display:block;
+  display: block;
   background: transparent;
   visibility: visible;
   box-shadow: 0px 0px 256px #000 inset;
   -webkit-transition: none;
   -moz-transition: none;
   transition: none;
+  /* Sit above the in-Stage `.Statusbar` (z=10000) so its status
+   * indicators don't paint over the popup header.  Stays below
+   * `.PopupContainer.Top` (z=100000) and below `.MainMenu`
+   * (lifted to 30000 in MainMenu.css so master's DialogLock
+   * dim-and-click-through still works). */
+  z-index: 20000;
 }
 .PopupContainer.Top {
   z-index:100000;
@@ -1010,6 +1014,7 @@
   background: #FFF;
   padding-left: 70px;
   height:58px;
+  display: flex;
 }
 
 .MissionGoal.complete {
@@ -1069,8 +1074,8 @@
   width: 48px;
   height: 64px;
   position: absolute;
-  top: -20px;
-  right: -8px;
+  top: -10px;
+  right: -4px;
 }
 
 .MissionGoal.small .MissionGoalStatus {
@@ -1085,6 +1090,10 @@
   background-position: -650px -776px;
 }
 
+.MissionGoalContent {
+  display: flex;
+  flex-direction: column;
+}
 
 .MissionGoalText {
   padding: 3px 45px 3px 3px;
@@ -2311,6 +2320,18 @@
   position:relative;
 }
 
+/* Tutorial / LevelUp top-level wrapper.  Holds the white `.PopupBody`
+ * card and the `.TutorialTapHint` text as siblings so the hint flows
+ * BELOW the card (matches desktop's visual silhouette) without
+ * absolute positioning.  Cursor on the wrapper so the entire region
+ * still reads as tap-to-advance. */
+.TutorialWrap {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
 .TutorialTapHint {
   text-align: center;
   font-family: Bowlby;
@@ -2367,20 +2388,18 @@
   animation: AniNewRot 0.3s linear infinite alternate;
 }
 
+/* `.NotificationSays` + `.NotificationText` only appear inside
+ * `<MarcoSpeech>` (see scripts/components/MarcoSpeech.tsx); the flex
+ * layout in `.MarcoSpeech` / `.MarcoSpeechContent` handles
+ * positioning.  Base rules carry only the visual styling
+ * (typography, gradient, padding). */
 .NotificationSays {
-  position: absolute;
-  top: 0px;
-  left: 120px;
   font-family: Bowlby;
   font-size: 15px;
   line-height: 30px;
   color: #E5892F;
-  width:200px;
 }
 .NotificationText {
-  position: absolute;
-  top: 24px;
-  left: 112px;
   background: #009fd9;
   background: -moz-linear-gradient(-45deg, #009fd9 0%, #00739e 100%);
   background: -webkit-gradient(linear, left top, right bottom, color-stop(0%,#009fd9), color-stop(100%,#00739e));
@@ -2394,8 +2413,9 @@
   line-height: 22px;
   font-size: 19px;
   color: #FFF;
-  height: 119px;
-  width: 440px;
+  /* Min 3 lines (3 × 22 + 4 + 8 padding) so the bubble's tail
+   * reaches down to the avatar's mouth even on short messages. */
+  min-height: 78px;
 }
 .NotificationText .highlight {
   color:#FF0;
@@ -2413,24 +2433,14 @@
   font-size:24px;
 }
 
-.NotificationBubble {
-  height: 160px;
-  position: relative;
-  left: 14px;
-  bottom: 14px;
-  width:100%;
-}
-.Tutorial .NotificationBubble {
-  left:6px;
-  top:0px;
-}
+/* `.NotificationAvatar` only appears inside `<MarcoSpeech>` —
+ * `.MarcoSpeech` (flex row) and the `.MarcoSpeech .NotificationAvatar`
+ * override handle positioning.  Base rule carries only the sprite. */
 .NotificationAvatar {
   background: url(../img/MainSprites.png) no-repeat;
-  background-position:-840px -763px;
-  width:120px;
-  height:160px;
-  position:relative;
-  top:10px;
+  background-position: -840px -763px;
+  width: 120px;
+  height: 160px;
 }
 
 .warn {
@@ -2494,15 +2504,66 @@
   color: #333;
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
 }
+
+/* Tutorial / LevelUp dialog white card. */
 .PopupBody.TutorialBody {
   background: #FFF;
-  box-shadow: 0px 3px 12px rgba(0,0,0,0.3);
   -webkit-animation: AniScaleOpacity 0.2s reverse;
   -moz-animation: AniScaleOpacity 0.2s reverse;
   animation: AniScaleOpacity 0.2s reverse;
-  height: 174px;
-  padding:0px;
+  padding: 0 12px 12px 12px;
   cursor: pointer;
+}
+
+/* Shared Marco speech-bubble component used by Tutorial / LevelUp /
+ * Mission popups (`scripts/components/MarcoSpeech.tsx`):
+ *
+ *   .MarcoSpeech              (flex row)
+ *   ├─ .NotificationAvatar    (Marco, align-self: end → bottom-aligned)
+ *   ├─ .MarcoSpeechContent    (flex column: says + speech bubble)
+ *   │   ├─ .NotificationSays  ("Marco says:" label)
+ *   │   └─ .NotificationText  (blue speech bubble)
+ *   └─ {optional footer}      (Mission's "OK, sounds good!" button)
+ *
+ * Marco's tail-sprite anchors at his mouth and the bubble's tail
+ * anchors at its bottom-left: with Marco bottom-aligned and the
+ * bubble below the says-label in the flex column, the two visually
+ * connect for any message length.  Replaces the previous
+ * absolute-positioning maze (`.NotificationText { position: absolute;
+ * top: 24; left: 112; width: 440; height: 119 }` etc.) — the rules
+ * below override those base styles for everything inside .MarcoSpeech. */
+.MarcoSpeech {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+}
+.MarcoSpeech .NotificationAvatar {
+  align-self: flex-end;
+  flex: 0 0 auto;
+  /* Marco's sprite has ~24 px of transparent padding to the right of
+   * his tail at desktop scale (120 wide); pull the bubble left so
+   * the tail tucks under the bubble's left edge with no visible seam. */
+  margin-right: -24px;
+}
+.MarcoSpeechContent {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.MarcoSpeech .NotificationSays {
+  flex: 0 0 auto;
+}
+.MarcoSpeech .NotificationText {
+  /* Allow shrinking + cap at the column width.  Without
+   * `min-width: 0` the flex child refuses to shrink below its
+   * content's intrinsic width and overflows the popup body when
+   * the message has long unbreakable spans. */
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 .PopupBody a {
@@ -3153,6 +3214,32 @@ button {
     margin-right: 4px;
     font-size: 14px;
   }
+
+  .MissionRewards {
+    margin-bottom: 0px;
+  }
+
+  /* Shrink Marco's avatar to 60 % on narrow phones via dimensional
+   * scaling (NOT `transform: scale`, which only shrinks visually
+   * and leaves the layout claiming the original 120×160).
+   * MainSprites.png is 960×1024; `background-size` = 0.6 × those
+   * and `background-position` is the desktop offset (`-840 -763`)
+   * multiplied by 0.6 so the same sprite frame lands inside the
+   * smaller box.  Applies to Tutorial AND Mission (both use the
+   * shared `.NotificationAvatar` rule); Mission keeps its own
+   * positioning via the absolute children layout. */
+  .NotificationAvatar {
+    width: 72px;
+    height: 96px;
+    background-size: 576px 614.4px;
+    background-position: -504px -457.8px;
+  }
+  /* Mobile avatar is 0.6x desktop scale, so the sprite's right-side
+   * transparency shrinks proportionally — minimal overlap is enough
+   * for the tail to tuck under the bubble's left edge. */
+  .MarcoSpeech .NotificationAvatar {
+    margin-right: -2px;
+  }
 }
 
 /* ── Tap targets (≥ 44 px), legibility (≥ 16 px body), :active feedback. */
@@ -3368,6 +3455,97 @@ button {
   }
   .DatabaseQueuePipeBack {
     z-index: -1;
+  }
+}
+
+/* --- Popup dialogs on narrow phone viewports ----------------------------
+ * Base `.PopupBody { width: 588 }` + `.Popup { width: 600 }` overflow the
+ * iPhone-SE 375-px viewport by ~106 px.  Generic shrink-to-viewport rule
+ * covers every popup (Tutorial / LevelUp / Mission / Contact / Client /
+ * Pusher / Token / Karma / About).  Per-variant rules below add layout
+ * specifics (inner scroll for Mission, MarcoSpeech margin, etc.).
+ * --------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  .Popup {
+    width: auto;
+    margin: 0;
+  }
+  .PopupBody {
+    width: calc(100vw - 12px);
+    max-width: 588px;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  /* Mission popup: inner scroll so the header (close X + decorator) and
+   * speech bubble stay visible while a long goals/rewards list scrolls
+   * in the middle.  The 24-px top margin clears the rotated
+   * `.MissionDecorator`'s negative top + 1° overhang so it doesn't bleed
+   * into the statusbar. */
+  .PopupBody.MissionBody {
+    max-height: calc(100vh - 24px);
+    margin-top: 24px;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+  .PopupBody.MissionBody .MissionContent {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .PopupBody.MissionBody .MissionContent > .PopupTitle {
+    flex: 0 0 auto;
+  }
+  .PopupBody.MissionBody .MissionContent > .MissionWrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 0;
+  }
+  /* `.MissionDecorator` is pinned at width:600 in the base rule (=
+   * original popup width).  Span the shrunk popup instead. */
+  .PopupBody.MissionBody .MissionDecorator {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  /* Mission rewards row: stacked title + chips (one wrap per row);
+   * desktop chip styling is preserved via `.PopupSummaryItem.<type>`. */
+  .PopupBody.MissionBody .MissionRewards {
+    height: auto;
+    display: block;
+  }
+  .PopupBody.MissionBody .MissionRewards .MissionRewardsTitle {
+    display: block;
+    margin: 0 0 4px 0;
+  }
+  /* Mission goal cards: dynamic min-height so longer goal copy wraps
+   * naturally.  Trim text padding for tighter rhythm. */
+  .PopupBody.MissionBody .MissionGoal {
+    height: auto;
+    min-height: 58px;
+  }
+  .PopupBody.MissionBody .MissionGoal .MissionGoalText {
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+  /* MarcoSpeech + OK button inside MissionContent — small horizontal
+   * margin so the speech bubble doesn't sit flush against the card's
+   * edges, OK button centred below it. */
+  .PopupBody.MissionBody .MarcoSpeech {
+    margin-inline: 12px;
+  }
+  .PopupBody.MissionBody .NotificationButtons {
+    position: static;
+    bottom: auto;
+    margin-block: 10px;
+    margin-inline: auto;
+    height: auto;
+    text-align: center;
+    flex: 0 0 auto;
   }
 }
 

@@ -5,6 +5,7 @@
 import type { JSX } from 'preact';
 import i18n from '../../i18n.js';
 import { type SpriteHelperConfig, renderSpriteHtml } from '../../render/renderSpriteHelper.js';
+import { MarcoSpeech } from '../MarcoSpeech.js';
 
 export interface NewItemsPerp {
   data?: {
@@ -69,16 +70,11 @@ export function NewItemsNotification({
       </div>
       <div class="NotificationContent">
         {perp ? <NotificationItem perp={perp} /> : null}
-        <div class="NotificationBubble">
-          <div class="NotificationAvatar" />
-          <div class="NotificationSays">{speaker}</div>
-          {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
-          <div class="NotificationText" dangerouslySetInnerHTML={{ __html: textHtml ?? '' }} />
-          <div class="PopupButtons NotificationButtons">
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-            <div class="Button" data-button-id="MainButton" onClick={close}>
-              {i18n.gettext('OK')}
-            </div>
+        <MarcoSpeech says={speaker} bodyHtml={textHtml ?? ''} />
+        <div class="PopupButtons NotificationButtons">
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+          <div class="Button" data-button-id="MainButton" onClick={close}>
+            {i18n.gettext('OK')}
           </div>
         </div>
       </div>

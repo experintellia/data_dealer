@@ -116,11 +116,32 @@ export class RenderViewTab extends RenderNode {
     jdomelem.append(jdomelem1);
     jdomelem.append(jdomelem3);
 
-    // FIXME: Better collect which events we're listening to
-    jdomelem3.on('mousedown mouseup touchstart touchend dblclick dbltap tap', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    });
+    // Block drag / scroll pass-through to the underlying ViewMap when
+    // the user interacts with the backdrop (= the popup container
+    // itself).  We must NOT block descendants — touch events that
+    // started on a child Button bubble up here, and calling
+    // `preventDefault()` on the touchend would suppress the
+    // synthesised compatibility click, leaving every button inside
+    // the popup inert on a touchscreen.  The container's own click
+    // (backdrop-close) is registered separately by the dialog
+    // manager, so we only need to defuse drag/zoom gestures.
+    //
+    // Check `currentTarget` (= the element the listener is bound to)
+    // vs `target` (= the event's original target).  Using `this` would
+    // also work in classic jQuery, but the shim might re-bind.
+    jdomelem3.on(
+      'mousedown mouseup touchstart touchend dblclick dbltap tap',
+      (e: {
+        target?: unknown;
+        currentTarget?: unknown;
+        preventDefault(): void;
+        stopPropagation(): void;
+      }) => {
+        if (e.target !== e.currentTarget) return;
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    );
 
     super({
       ...config,
@@ -317,10 +338,22 @@ export class RenderViewMap extends RenderNode {
     jdomelem.append(jdomelem3);
     jdomelem.append(jdomelemZoom);
 
-    jdomelem3.on('mousedown mouseup touchstart touchend dblclick dbltap tap', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    });
+    // See ViewMap (above) for the rationale — must NOT preventDefault
+    // events bubbled from descendant buttons or the synthesised click
+    // gets suppressed and every popup button is inert on touchscreens.
+    jdomelem3.on(
+      'mousedown mouseup touchstart touchend dblclick dbltap tap',
+      (e: {
+        target?: unknown;
+        currentTarget?: unknown;
+        preventDefault(): void;
+        stopPropagation(): void;
+      }) => {
+        if (e.target !== e.currentTarget) return;
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    );
 
     super({
       ...config,
@@ -594,6 +627,22 @@ export class RenderViewMap extends RenderNode {
         ) {
           return;
         }
+        // Don't intercept touches that originated inside an open
+        // dialog — the popup container is a descendant of `.ViewMap`,
+        // so any tap on a perp-popup button (Charge, Collect,
+        // MakeADeal, SubpopClose, token row, …) bubbles up to this
+        // native listener.  `e.preventDefault()` below kills the
+        // synthesized compatibility click chain (W3C touch-events
+        // spec), and the result is that no popup button on a real
+        // touchscreen ever fires its onClick.  Return early so the
+        // browser delivers the synthesized click to the popup
+        // descendant normally.  Board / camera pans aren't affected
+        // because their touches don't originate inside a `.lockOn`
+        // overlay.
+        const t0target = touchEvt.touches[0]?.target;
+        if (t0target instanceof Element && t0target.closest('.PopupContainer.lockOn')) {
+          return;
+        }
         const touch = touchEvt.touches[0];
         const parent = this.parentNode;
         if (!touch || !parent) return;
@@ -739,7 +788,20 @@ export class RenderViewMap extends RenderNode {
     root?._cancelPendingCenter?.();
     this.scroller.options.animating = duration > 0;
     this.scroller.options.animationDuration = duration;
-    this.scroller.scrollTo(pos.x - vpCenter.x, pos.y - vpCenter.y, true);
+    // `pos` is in the ViewMap's unscaled native coordinates (e.g.
+    // the Database perp at `viewmapPos: {x: 1024, y: 840}`), but
+    // `vpCenter` is in viewport screen pixels and the Zynga
+    // scroller's `scrollTo(left, top)` interprets `left`/`top` in
+    // post-zoom scaled-content space — the same space its internal
+    // `__maxScrollLeft = contentWidth * zoom - clientWidth` clamp
+    // operates in.  Without scaling `pos` by the active zoom the
+    // computed scroll-left misses by `pos * (1 - zoom)` (e.g. at
+    // Imperium zoom 0.75 the Database lands ~68 px off the left of
+    // a 375-px viewport).  Scale `pos` first, then subtract the
+    // viewport-pixel centre — the scroller's internal clamp handles
+    // the bounds.
+    const zoom = this.zoomScale ?? 1;
+    this.scroller.scrollTo(pos.x * zoom - vpCenter.x, pos.y * zoom - vpCenter.y, true);
     this.scroller.options.animating = false;
     this.scroller.options.animationDuration = 300;
   }

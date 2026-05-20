@@ -7,7 +7,10 @@
 
 import type { JSX } from 'preact';
 import i18n from '../../i18n.js';
+import { MarcoSpeech } from '../MarcoSpeech.js';
 import { MissionGoalRow, type MissionGoalVM, type MissionRewardVM } from '../MissionGoal.js';
+
+export type { MissionGoalVM, MissionRewardVM };
 
 export interface MissionPopupProps {
   /** `complete` renders the `.Complete` body modifier + the
@@ -72,16 +75,11 @@ export function MissionPopup({
             ))}
           </div>
         </div>
-        <div class="NotificationBubble">
-          <div class="NotificationAvatar" />
-          <div class="NotificationSays">{says}</div>
-          {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
-          <div class="NotificationText" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
-          <div class="PopupButtons NotificationButtons">
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-            <div class="Button" data-button-id="MainButton" onClick={close}>
-              {buttonLabel}
-            </div>
+        <MarcoSpeech says={says} bodyHtml={bodyHtml} />
+        <div class="PopupButtons NotificationButtons">
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+          <div class="Button" data-button-id="MainButton" onClick={close}>
+            {buttonLabel}
           </div>
         </div>
       </div>
