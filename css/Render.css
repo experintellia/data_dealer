@@ -3318,9 +3318,20 @@ button {
  * `.PopupBody.TutorialBody` + the same NotificationBubble subtree.
  * --------------------------------------------------------------------- */
 @media (max-width: 768px) {
-  .PopupBody.TutorialBody {
+  /* `.Popup { width: 600px }` would force the wrapper wider than the
+   * viewport, and its 6 px outer margin offsets the body inside it, so
+   * a `max-width`-only fix leaves an asymmetric strip on the right.
+   * Drop the outer margin, let the wrapper auto-size to the body, and
+   * fix the body's width explicitly so the flex container centres
+   * everything symmetrically. */
+  .Popup.Tutorial,
+  .Popup.LevelUp {
     width: auto;
-    max-width: calc(100vw - 16px);
+    margin: 0;
+  }
+  .PopupBody.TutorialBody {
+    width: calc(100vw - 12px);
+    max-width: 588px;
     min-width: 0;
     box-sizing: border-box;
   }
@@ -3328,6 +3339,13 @@ button {
   .PopupBody.TutorialBody .NotificationSays {
     width: auto;
     right: 12px;
+  }
+  /* `.Tutorial .NotificationBubble` is positioned at `left: 6px` with
+   * `width: 100%`, so it visually overflows the body's right edge by
+   * 6 px — on a phone viewport that misaligns the bubble vs. the popup
+   * wrapper.  Pull it back flush so margins look symmetric. */
+  .PopupBody.TutorialBody .NotificationBubble {
+    left: 0;
   }
 }
 
