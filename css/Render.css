@@ -1251,9 +1251,11 @@
   display: block;
   object-fit: cover;
 }
-/* Placeholder: the in-game Profiles token icon, centred in the slot. The
-   <img> sits over it; on a 404 the <img> removes itself so this shows. */
-.TopscoreList.hasAvatars .TopscoreAvatar::before {
+/* Placeholder: the in-game Profiles token icon, scaled up to fill the
+   slot. Rendered only after the row's <img> has hit onerror and added
+   `.failed` — so successful avatars don't briefly flash the placeholder
+   while they're loading. */
+.TopscoreList.hasAvatars .TopscoreAvatar.failed::before {
   content: '';
   position: absolute;
   top: 5px;
@@ -1261,6 +1263,8 @@
   width: 16px;
   height: 16px;
   background: url(../img/MainSprites.png) no-repeat -436px -616px;
+  transform: scale(1.5);
+  transform-origin: center;
 }
 
 .TopscoreDisplayname {
