@@ -1211,7 +1211,6 @@
   border-radius: 6px;
   background: #FFF;
   height: 32px;
-  width: 542px;
   box-sizing: border-box;
   padding: 0 6px 0 4px;
   display: flex;
@@ -3366,10 +3365,6 @@ button {
     max-width: 92vw;
     box-sizing: border-box;
     box-shadow: 3px 3px 0px #aaa, 3px 5px 8px #000;
-  }
-  .TopscoreRow {
-    width: auto;
-    max-width: 100%;
   }
   .TopscoreRankBarWrap {
     max-width: 100%;
