@@ -700,11 +700,9 @@ interface RankingRow {
   display_name: string;
   value: number;
   self: boolean;
-  /** Avatar URL (webxdc virtual `__webxdc__/avatar/<addr>.jpg`); only
-   *  set when the boot-time avatar probe (see webxdc-avatars.ts) found
-   *  that the messenger serves real images. Absent on unsupported
-   *  clients so the template can skip the slot entirely and avoid
-   *  layout jumps from late 404s. */
+  /** Set only when the boot probe found that the messenger serves
+   *  avatars; absent rows skip the <img> slot, so the layout doesn't
+   *  shift on a late 404. See scripts/webxdc-avatars.ts. */
   avatar?: string;
 }
 

@@ -110,18 +110,16 @@ export function boot(options?: BootOptions): Promise<LocalState> {
     }, 0);
   }
 
-  // Promise.resolve handles three shapes uniformly:
-  //   - real webxdc returns a Promise → awaited
-  //   - dev shim (webxdc-shim.ts) returns undefined → already resolved
-  //   - typeof webxdc === 'undefined' (node) → already resolved
   // Fire-and-forget probe of the experimental webxdc avatar API
   // (chatmail/core#6429). Gating on the resolved support flag means
   // the leaderboard either always renders the avatar slot or never
   // does — no late layout shift when the first <img> 404s.
-  probeAvatarSupport(selfAddr).catch(function () {
-    /* probe is best-effort; failure leaves avatars disabled */
-  });
+  probeAvatarSupport(selfAddr);
 
+  // Promise.resolve handles three shapes uniformly:
+  //   - real webxdc returns a Promise → awaited
+  //   - dev shim (webxdc-shim.ts) returns undefined → already resolved
+  //   - typeof webxdc === 'undefined' (node) → already resolved
   _bootPromise = Promise.resolve(listenerPromise).then(function () {
     _replayProgress.done = true;
     const state = _state();

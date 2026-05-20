@@ -17,7 +17,7 @@
         %>
         <div class="TopscoreRow<%= (is_user) ? " user" : "" %><%= avatar_url ? " withAvatar" : "" %>" data-testid="dd-leaderboard-row-<%= testid %>">
           <div class="TopscoreNum"><%= k+1 %></div>
-          <% if (avatar_url) { %><div class="TopscoreAvatar"><img src="<%= avatar_url %>" alt=""></div><% } %>
+          <% if (avatar_url) { %><div class="TopscoreAvatar"><img src="<%= avatar_url %>" alt="" loading="lazy"></div><% } %>
           <div class="TopscoreDisplayname"><%= score.display_name %></div>
           <div class="TopscoreValue"><%= icon_map[D.type] %><%= _.toKSNum(score.value) %></div>
         </div>
