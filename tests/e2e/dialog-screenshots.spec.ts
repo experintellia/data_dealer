@@ -37,6 +37,14 @@ async function boot(page: Page, vp: { width: number; height: number }): Promise<
     await expect(page.locator('[data-testid="game-container"]')).toBeVisible({ timeout: 50_000 });
   }
   await page.waitForFunction(() => !!(window as any).__dd?._app?.game);
+  // Hide the @webxdc/vite-plugins simulator's "webxdc dev tools" panel
+  // (Add Peer / Reset).  It's appended to body via JS with an inline
+  // style (z-index: 9999, position: fixed, bottom: 1em, left: 1em) and
+  // covers the bottom-left of the viewport — including the corner of
+  // the dialog under test on phone viewports.
+  await page.addStyleTag({
+    content: 'body > div[style*="z-index: 9999"][style*="position: fixed"] { display: none !important; }',
+  });
   // Pre-mark mission briefings as seen so the auto-queued boot tutorial
   // doesn't refill the queue while we're trying to open a specific
   // dialog under test.
