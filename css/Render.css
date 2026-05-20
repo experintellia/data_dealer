@@ -2491,6 +2491,9 @@
   position: static;
   top: auto;
   left: auto;
+  /* Overlap the speech bubble by 2 px so Marco's tail sits flush
+   * under the bubble's left edge without a visible seam. */
+  margin-right: -2px;
 }
 .PopupBody.TutorialBody .TutorialContent {
   display: flex;
