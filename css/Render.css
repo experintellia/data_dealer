@@ -1205,13 +1205,13 @@
 .TopscoreRow {
   position: relative;
   font-family: Bowlby;
-  font-size: 15px;
+  font-size: 18px;
   margin: 0px 0px 4px 0px;
   color: #333;
-  line-height: 24px;
+  line-height: 34px;
   border-radius: 6px;
   background: #FFF;
-  height: 24px;
+  height: 32px;
   width: 542px;
   display: inline-block;
   padding-left: 32px;
@@ -1219,9 +1219,6 @@
 
 .TopscoreRow.user {
   background: #FF0;
-  font-size: 18px;
-  line-height: 34px;
-  height: 32px;
 }
 
 /* Avatar slot — collapsed by default; the .TopscoreList container flips
@@ -1235,27 +1232,18 @@
   display: none;
 }
 .TopscoreList.hasAvatars .TopscoreRow {
-  padding-left: 53px;
-}
-.TopscoreList.hasAvatars .TopscoreRow.user {
   padding-left: 63px;
 }
 .TopscoreList.hasAvatars .TopscoreAvatar {
   display: block;
   position: absolute;
-  top: 2px;
-  left: 28px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  overflow: hidden;
-  background: #ddd;
-}
-.TopscoreList.hasAvatars .TopscoreRow.user .TopscoreAvatar {
   top: 4px;
   left: 32px;
   width: 26px;
   height: 26px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #ddd;
 }
 .TopscoreAvatar img {
   width: 100%;
@@ -1268,15 +1256,11 @@
 .TopscoreList.hasAvatars .TopscoreAvatar::before {
   content: '';
   position: absolute;
-  top: 2px;
-  left: 2px;
+  top: 5px;
+  left: 5px;
   width: 16px;
   height: 16px;
   background: url(../img/MainSprites.png) no-repeat -436px -616px;
-}
-.TopscoreList.hasAvatars .TopscoreRow.user .TopscoreAvatar::before {
-  top: 5px;
-  left: 5px;
 }
 
 .TopscoreDisplayname {
