@@ -2471,7 +2471,6 @@
  * friends) — the rules below override those for the Tutorial scope. */
 .PopupBody.TutorialBody {
   background: #FFF;
-  box-shadow: 0px 3px 12px rgba(0,0,0,0.3);
   -webkit-animation: AniScaleOpacity 0.2s reverse;
   -moz-animation: AniScaleOpacity 0.2s reverse;
   animation: AniScaleOpacity 0.2s reverse;
@@ -2498,7 +2497,6 @@
   flex-direction: column;
   flex: 1 1 auto;
   min-width: 0;
-  justify-content: flex-end;
   gap: 4px;
 }
 .PopupBody.TutorialBody .NotificationSays {
