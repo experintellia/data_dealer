@@ -2491,16 +2491,18 @@
   position: static;
   top: auto;
   left: auto;
-  /* Overlap the speech bubble by 2 px so Marco's tail sits flush
-   * under the bubble's left edge without a visible seam. */
-  margin-right: -2px;
+  /* Marco's sprite has transparent padding to the right of his
+   * tail; pull the bubble left so it tucks under the tail with no
+   * visible seam.  Desktop avatar is 120 wide → -10 closes the
+   * sprite's right-side whitespace; mobile (`@media max-width:
+   * 480` shrinks the avatar to 72 wide, so the overlap scales). */
+  margin-right: -10px;
 }
 .PopupBody.TutorialBody .TutorialContent {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-width: 0;
-  gap: 4px;
 }
 .PopupBody.TutorialBody .NotificationSays {
   /* Reset absolute positioning from the base rule.  Keep typography. */
