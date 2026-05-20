@@ -27,17 +27,56 @@ async function bootAt(page: Page, vp: { width: number; height: number }): Promis
 }
 
 /** Drain any auto-queued boot notification so the test can open the cue
- *  it wants without an unrelated popup sitting in front. */
+ *  it wants.  Mirrors dialog-lifecycle.spec.ts's bootGame drain (which
+ *  works reliably in 49 tests): pre-mark briefings as seen so the boot
+ *  tutorial chain doesn't re-queue, close the current popup through
+ *  popup_close *and* clear the lockOn class on stray containers (so
+ *  the next visibility check doesn't bind to an old open popup
+ *  scheduled for removal after the 250–500ms close animation).  Polls
+ *  until the queue + slot + DOM stay empty for 3 consecutive ticks. */
 async function drainBootPopups(page: Page): Promise<void> {
-  for (let i = 0; i < 20; i++) {
-    const open = await page.locator('.PopupContainer.lockOn').count();
-    if (open === 0) return;
-    await page.evaluate(() => {
-      const groot = (window as any).__dd?._app?.game;
-      if (Array.isArray(groot?.NotificationQueue)) groot.NotificationQueue.length = 0;
-      groot?.notificationPopup?.trigger?.('popup_close');
+  await page.evaluate(() => {
+    const groot = (window as any).__dd?._app?.game;
+    if (!groot?.raw_data) return;
+    groot.raw_data.mission_briefings_seen = groot.raw_data.mission_briefings_seen || {};
+    const missions = groot.Missions?.Missions ?? {};
+    for (const g of Object.keys(missions)) {
+      groot.raw_data.mission_briefings_seen[g] = true;
+    }
+  });
+  let stable = 0;
+  for (let i = 0; i < 40; i++) {
+    const settled = await page.evaluate(() => {
+      const g = (window as any).__dd?._app?.game;
+      if (!g) return false;
+      if (Array.isArray(g.NotificationQueue)) g.NotificationQueue.length = 0;
+      const open = g.notificationPopup;
+      if (open) {
+        try {
+          open.trigger('popup_close');
+        } catch {
+          /* ignore */
+        }
+      }
+      document.querySelectorAll<HTMLElement>('.Popup').forEach((el) => {
+        try {
+          el.remove();
+        } catch {
+          /* ignore */
+        }
+      });
+      document
+        .querySelectorAll<HTMLElement>('.PopupContainer.lockOn')
+        .forEach((el) => el.classList.remove('lockOn'));
+      return (
+        (!Array.isArray(g.NotificationQueue) || g.NotificationQueue.length === 0) &&
+        !g.notificationPopup &&
+        document.querySelectorAll('.PopupContainer.lockOn').length === 0
+      );
     });
-    await page.waitForTimeout(200);
+    stable = settled ? stable + 1 : 0;
+    if (stable >= 3) return;
+    await page.waitForTimeout(300);
   }
 }
 
@@ -54,6 +93,10 @@ test.describe('iPhone SE (375×667) — dialogs fit the viewport', () => {
       });
     });
     await expect(page.locator('.PopupBody.TutorialBody').first()).toBeVisible({ timeout: 5_000 });
+    // `.PopupBody.TutorialBody` has a 0.2s `AniScaleOpacity` opening
+    // animation that briefly renders the body at 2x scale — wait it
+    // out so the bounding rect reflects the final layout.
+    await page.waitForTimeout(300);
 
     const box = await page.evaluate(() => {
       const el = document.querySelector<HTMLElement>('.PopupBody.TutorialBody');
@@ -67,5 +110,61 @@ test.describe('iPhone SE (375×667) — dialogs fit the viewport', () => {
     expect(box.right, 'TutorialBody right edge inside viewport').toBeLessThanOrEqual(
       IPHONE_SE.width
     );
+  });
+
+  test('Mission briefing PopupBody fits the viewport + decorator clears the statusbar', async ({
+    page,
+  }) => {
+    await bootAt(page, IPHONE_SE);
+    await drainBootPopups(page);
+    // Pre-mark briefings as seen so the queue settles, then trigger the
+    // mission_active cue for the first mission ourselves.
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.raw_data.mission_briefings_seen = groot.raw_data.mission_briefings_seen || {};
+      const missions = groot.Missions?.Missions ?? {};
+      const gestalt = Object.keys(missions)[0];
+      if (!gestalt) throw new Error('no missions defined');
+      delete groot.raw_data.mission_briefings_seen[gestalt];
+      groot.makeNotifications({ mission_active: gestalt });
+    });
+    await expect(page.locator('.PopupContainer.lockOn.Mission').first()).toBeVisible({
+      timeout: 8_000,
+    });
+    await expect(page.locator('.PopupBody.MissionBody').first()).toBeVisible({ timeout: 5_000 });
+
+    const geom = await page.evaluate(() => {
+      const body = document.querySelector<HTMLElement>('.PopupBody.MissionBody');
+      const deco = document.querySelector<HTMLElement>('.MissionDecorator');
+      const container = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
+      const stage = document.querySelector<HTMLElement>('.Stage');
+      return {
+        body: body && {
+          l: body.getBoundingClientRect().left,
+          r: body.getBoundingClientRect().right,
+          t: body.getBoundingClientRect().top,
+          b: body.getBoundingClientRect().bottom,
+        },
+        deco: deco && { t: deco.getBoundingClientRect().top },
+        containerTop: container ? container.getBoundingClientRect().top : null,
+        stageTop: stage ? stage.getBoundingClientRect().top : null,
+      };
+    });
+    expect(geom.body).not.toBeNull();
+    if (!geom.body) return;
+    expect(geom.body.l, 'MissionBody left inside viewport').toBeGreaterThanOrEqual(0);
+    expect(geom.body.r, 'MissionBody right inside viewport').toBeLessThanOrEqual(IPHONE_SE.width);
+    expect(geom.body.b, 'MissionBody bottom inside viewport').toBeLessThanOrEqual(
+      IPHONE_SE.height
+    );
+    // The decorator banner sits above the body; it must stay below the
+    // statusbar (the Stage's top edge) so the chrome doesn't visually
+    // cover the dialog header.
+    if (geom.deco && geom.stageTop !== null) {
+      expect(
+        geom.deco.t,
+        'MissionDecorator should not overlap the statusbar/menu area above the Stage'
+      ).toBeGreaterThanOrEqual(geom.stageTop);
+    }
   });
 });

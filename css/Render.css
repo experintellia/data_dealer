@@ -3347,6 +3347,73 @@ button {
   .PopupBody.TutorialBody .NotificationBubble {
     left: 0;
   }
+
+  /* Mission briefing / Mission complete popup: same 588 / 600 / 440 px
+   * fixed-pixel design as Tutorial, with extra fixed-width children
+   * (`.MissionDecorator`, `.NotificationBubble`, `.NotificationText`)
+   * that all overflowed on phone viewports.  Shrink the wrapper +
+   * body together, then reflow each absolute-width child to fit. */
+  .Popup.Mission {
+    width: auto;
+    margin: 0;
+  }
+  .PopupBody.MissionBody {
+    width: calc(100vw - 12px);
+    max-width: 588px;
+    min-width: 0;
+    box-sizing: border-box;
+    /* Use the available vertical space on phones — the dialog otherwise
+     * floats in a small box in the middle with ~200 px of unused
+     * viewport above and below.  Subtract enough that the
+     * `.MissionDecorator`'s negative top/margin (-14 px total + 1°
+     * rotation overhang) clears the statusbar instead of bleeding into
+     * it on phone viewports. */
+    min-height: calc(100vh - 120px);
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+  }
+  /* `.MissionContent` is the body's inner frame; let it stretch to
+   * absorb the extra height so the speech bubble docks at the bottom. */
+  .PopupBody.MissionBody .MissionContent {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .PopupBody.MissionBody .MissionWrap {
+    flex: 0 0 auto;
+  }
+  /* `.MissionDecorator` is pinned at width:600 (= original popup width)
+   * so it would still overflow even with the wrapper shrunk.  Span the
+   * popup width instead. */
+  .PopupBody.MissionBody .MissionDecorator {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  /* The speech bubble docks at the bottom and grows to fill the
+   * remaining vertical space; the text inside drops its 440 px width
+   * and anchors against the right edge. */
+  .PopupBody.MissionBody .NotificationBubble {
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 160px;
+    height: auto;
+  }
+  .PopupBody.MissionBody .NotificationText {
+    width: auto;
+    right: 12px;
+    height: auto;
+    bottom: 60px;
+  }
+  .PopupBody.MissionBody .NotificationSays {
+    width: auto;
+    right: 12px;
+  }
+  .PopupBody.MissionBody .NotificationButtons {
+    bottom: 16px;
+  }
 }
 
 /* --- Mission + Topscore tab content: centre via margin auto + max-width --
