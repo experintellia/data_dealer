@@ -2296,6 +2296,18 @@
   position:relative;
 }
 
+/* Tutorial / LevelUp top-level wrapper.  Holds the white `.PopupBody`
+ * card and the `.TutorialTapHint` text as siblings so the hint flows
+ * BELOW the card (matches desktop's visual silhouette) without
+ * absolute positioning.  Cursor on the wrapper so the entire region
+ * still reads as tap-to-advance. */
+.TutorialWrap {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
 .TutorialTapHint {
   text-align: center;
   font-family: Bowlby;
@@ -3136,18 +3148,9 @@ button {
   .PopupBody.TutorialBody .NotificationBubble {
     height: auto;
   }
-  /* Float the tap hint OUT of the white card so the card sizes to
-   * Marco + the speech bubble alone — same pattern as desktop where
-   * the hint renders below the body's bottom edge. */
-  .PopupBody.TutorialBody .TutorialTapHint {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -32px;
-    margin-top: 0;
-  }
-  /* Drop the desktop min-height now that the bubble + hint don't
-   * inflate the card. */
+  /* Drop the desktop min-height — bubble + hint no longer inflate the
+   * card (hint is now a sibling, see TutorialNotification.tsx /
+   * LevelUpNotification.tsx). */
   .PopupBody.TutorialBody {
     min-height: 0;
   }

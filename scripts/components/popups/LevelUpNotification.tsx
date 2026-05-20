@@ -33,16 +33,18 @@ export function LevelUpNotification({
   );
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: tutorial-class popup is tap-to-advance UX; keyboard support is a separate a11y pass
-    <div class="PopupBody TutorialBody" onClick={onClose}>
-      <div class="TutorialContent">
-        <div class="NotificationBubble">
-          <div class="NotificationAvatar" />
-          <div class="NotificationSays">{says}</div>
-          {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
-          <div class="NotificationText" dangerouslySetInnerHTML={{ __html: textHtml }} />
-          <div class="TutorialTapHint">tap anywhere to continue</div>
+    <div class="TutorialWrap" onClick={onClose}>
+      <div class="PopupBody TutorialBody">
+        <div class="TutorialContent">
+          <div class="NotificationBubble">
+            <div class="NotificationAvatar" />
+            <div class="NotificationSays">{says}</div>
+            {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
+            <div class="NotificationText" dangerouslySetInnerHTML={{ __html: textHtml }} />
+          </div>
         </div>
       </div>
+      <div class="TutorialTapHint">tap anywhere to continue</div>
     </div>
   );
 }

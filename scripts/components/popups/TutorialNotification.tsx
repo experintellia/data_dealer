@@ -21,19 +21,24 @@ export function TutorialNotification({
   onClose,
 }: TutorialNotificationProps) {
   const speaker = says ?? i18n.gettext('Mark says:');
-  // Tap anywhere on the body advances the tutorial.
+  // Tap anywhere on the wrapper (white card OR the tap hint sitting
+  // below it) advances the tutorial.  Hint is a sibling of the body
+  // — not a child — so it can flow below the card without needing
+  // absolute positioning (which clipped on a phone viewport).
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: tutorial-class popup is tap-to-advance UX; keyboard support is a separate a11y pass
-    <div class="PopupBody TutorialBody" onClick={onClose}>
-      <div class="TutorialContent">
-        <div class="NotificationBubble">
-          <div class="NotificationAvatar" />
-          <div class="NotificationSays">{speaker}</div>
-          {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
-          <div class="NotificationText" dangerouslySetInnerHTML={{ __html: descriptionHtml }} />
-          <div class="TutorialTapHint">tap anywhere to continue</div>
+    <div class="TutorialWrap" onClick={onClose}>
+      <div class="PopupBody TutorialBody">
+        <div class="TutorialContent">
+          <div class="NotificationBubble">
+            <div class="NotificationAvatar" />
+            <div class="NotificationSays">{speaker}</div>
+            {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
+            <div class="NotificationText" dangerouslySetInnerHTML={{ __html: descriptionHtml }} />
+          </div>
         </div>
       </div>
+      <div class="TutorialTapHint">tap anywhere to continue</div>
     </div>
   );
 }
