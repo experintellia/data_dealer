@@ -3133,26 +3133,36 @@ button {
    * frame lands inside the smaller box.  The bubble + body now
    * size to content naturally because the avatar's flow height
    * is 96 px instead of 160. */
+  /* Anchor Marco to the bottom-left of the bubble so a longer message
+   * (which grows the speech bubble downward via `.NotificationText`'s
+   * min-height: 78 + content) doesn't leave him floating at the top
+   * with empty space below. */
   .NotificationAvatar {
+    position: absolute;
+    bottom: 0;
+    left: 8px;
+    top: auto;
     width: 72px;
     height: 96px;
     background-size: 576px 614.4px;
     background-position: -504px -457.8px;
-    /* Nudge Marco a few px right so he gets a left margin AND so his
-     * right edge meets the speech bubble at left: 79 — no gap. */
-    left: 8px;
   }
 
-  /* Shrink the bubble container to its content (was hardcoded 160 px,
-   * which left empty white space below the avatar on a narrow phone). */
+  /* Bubble container: height follows the speech bubble's content;
+   * `min-height` is the avatar's flow height so a one-line message
+   * still gives Marco somewhere to stand. */
   .PopupBody.TutorialBody .NotificationBubble {
     height: auto;
+    min-height: 102px;
+    left: 0;
+    bottom: 0;
   }
-  /* Drop the desktop min-height — bubble + hint no longer inflate the
-   * card (hint is now a sibling, see TutorialNotification.tsx /
-   * LevelUpNotification.tsx). */
+
+  /* Pad the white card so it's visibly larger than the bubble inside —
+   * 12 px of white margin reads as a card, not a tight crop. */
   .PopupBody.TutorialBody {
     min-height: 0;
+    padding: 12px;
   }
 
   .NotificationSays, .NotificationText {
