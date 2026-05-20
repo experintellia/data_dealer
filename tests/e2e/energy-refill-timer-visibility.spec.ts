@@ -50,10 +50,10 @@ test('energy refill timer: visible on statusbar without hover when AP is 0', asy
   // The countdown must become visible automatically — no hover required.
   await expect(page.locator('[data-testid="dd-ap-remain"]')).toBeVisible({ timeout: 2_000 });
 
-  // The text must include the localised "Energy in" prefix and a MM:SS timer.
+  // The text must include a MM:SS (or HH:MM:SS) timer. Use a locale-agnostic
+  // check — the prefix is translated ("More Energy in" / "Mehr Energie in" / …).
   const remainText = await page.locator('[data-testid="dd-ap-remain"]').innerText();
-  expect(remainText).toMatch(/Energy in/i);
-  expect(remainText).toMatch(/\d{2}:\d{2}/); // MM:SS (or HH:MM:SS)
+  expect(remainText).toMatch(/\d{2}:\d{2}/); // MM:SS or HH:MM:SS
 });
 
 test('energy refill timer: hidden again once AP is restored to full', async ({ page }) => {
@@ -113,11 +113,11 @@ test('energy dialog: shows refill countdown when AP is not full', async ({ page 
   await expect(page.locator('.PopupContainer.lockOn')).toBeVisible({ timeout: 2_000 });
   await expect(page.locator('.PopupBody.Status .MainSpritesPopup.AP')).toBeVisible();
 
-  // The dialog must contain the refill line.
+  // The dialog must contain the refill line with a countdown timer.
+  // Use a locale-agnostic check — the prefix varies by language.
   const refillLine = page.locator('.PopupText.APRemain');
   await expect(refillLine).toBeVisible({ timeout: 2_000 });
   const refillText = await refillLine.innerText();
-  expect(refillText).toMatch(/Energy in/i);
   expect(refillText).toMatch(/\d{2}:\d{2}/);
 
   // Close dialog.
