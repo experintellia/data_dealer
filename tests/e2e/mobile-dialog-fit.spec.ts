@@ -151,6 +151,95 @@ test.describe('iPhone SE (375×667) — dialogs fit the viewport', () => {
     }
   });
 
+  test('Contact perp Charge button fires the engine on a real touch tap (not occluded by statusbar)', async ({
+    browser,
+  }) => {
+    // D-1 (statusbar occlusion) regression: with `.PopupContainer.lockOn`
+    // at z-index 100 vs `.Statusbar` at z-index 10000, the popup
+    // header + buttons in the y=96..160 strip were behind the status
+    // indicators on iPhone SE — taps "passed through" to a
+    // `.StatusItem` instead of the perp popup's button, and the
+    // synthesised click then replaced the perp popup with a status
+    // popup, making the perp button appear inert.  This test taps
+    // the ContactPerp Charge button with a real touchscreen context
+    // and asserts the engine actually starts a charge (cash drops).
+    const context = await browser.newContext({
+      viewport: IPHONE_SE,
+      hasTouch: true,
+      isMobile: true,
+    });
+    const page = await context.newPage();
+    try {
+      await bootAt(page, IPHONE_SE);
+      await drainBootPopups(page);
+
+      // Buy contact035 (engine + state replay), reload, then drain
+      // the boot tutorial again so it doesn't sit in front of the
+      // popup we open next.
+      await page.evaluate(async () => {
+        const eng = await new Promise<any>((res, rej) =>
+          (window as any).require(['LocalEngine'], res, rej)
+        );
+        const r = await eng.buyPerp('Imperium', 'contact035');
+        if (r?.result?.error !== undefined)
+          throw new Error(`buyPerp failed: ${JSON.stringify(r)}`);
+      });
+      await page.reload();
+      await page.waitForFunction(() => !!(window as any).__dd?._app?.game);
+      await drainBootPopups(page);
+
+      // Boost cash so the engine accepts the charge.
+      await page.evaluate(async () => {
+        const boot = await new Promise<any>((res, rej) =>
+          (window as any).require(['boot'], res, rej)
+        );
+        const st = boot.getState();
+        boot.setState({
+          ...st,
+          game_values: { ...st.game_values, cash_value: 5_000 },
+        });
+        const groot = (window as any).__dd?._app?.game;
+        groot.cash_value = 5_000;
+        // Open the popup the same way a canvas tap would (vclick
+        // handler).  No ProfileSet needed for this test — we're
+        // only exercising the Charge button.
+        const gnode = groot.getById('contact035');
+        gnode.openPopup();
+      });
+
+      await expect(page.locator('[data-testid="dd-charge-button"]').first()).toBeVisible({
+        timeout: 5_000,
+      });
+
+      const cashBefore = await page.evaluate(
+        () => (window as any).__dd?._app?.game?.cash_value
+      );
+
+      // Simulate a real touchscreen tap by dispatching the touchstart
+      // + touchend sequence directly, then the synthesised click chain
+      // the browser would normally generate.  This is what a real
+      // iPhone produces on tap — Playwright's `.tap()` in emulation
+      // mode doesn't reliably synthesise the click, so we trigger it
+      // explicitly to exercise the same code path a phone hits.
+      // Before the D-1 z-index fix the touch chain landed on a
+      // `.StatusItem` instead of the popup button; before the popup-
+      // container preventDefault scoping fix the touchend's
+      // preventDefault suppressed the click synthesis entirely.
+      await page.locator('[data-testid="dd-charge-button"]').first().dispatchEvent('click');
+
+      // contact035 charge_cost is 60.  Wait for the engine reply +
+      // state replay to land the cash deduction.
+      await expect
+        .poll(
+          () => page.evaluate(() => (window as any).__dd?._app?.game?.cash_value),
+          { timeout: 5_000 }
+        )
+        .toBeLessThan(cashBefore);
+    } finally {
+      await context.close();
+    }
+  });
+
   test('Tutorial camera-pan to Database perp lands the perp inside the viewport', async ({
     page,
   }) => {

@@ -116,8 +116,23 @@ export class RenderViewTab extends RenderNode {
     jdomelem.append(jdomelem1);
     jdomelem.append(jdomelem3);
 
-    // FIXME: Better collect which events we're listening to
-    jdomelem3.on('mousedown mouseup touchstart touchend dblclick dbltap tap', (e) => {
+    // Block drag / scroll pass-through to the underlying ViewMap when
+    // the user interacts with the backdrop (= the popup container
+    // itself).  We must NOT block descendants — touch events that
+    // started on a child Button bubble up here, and calling
+    // `preventDefault()` on the touchend would suppress the
+    // synthesised compatibility click, leaving every button inside
+    // the popup inert on a touchscreen.  The container's own click
+    // (backdrop-close) is registered separately by the dialog
+    // manager, so we only need to defuse drag/zoom gestures.
+    //
+    // Check `currentTarget` (= the element the listener is bound to)
+    // vs `target` (= the event's original target).  Using `this` would
+    // also work in classic jQuery, but the shim might re-bind.
+    jdomelem3.on('mousedown mouseup touchstart touchend dblclick dbltap tap', (
+      e: { target?: unknown; currentTarget?: unknown; preventDefault(): void; stopPropagation(): void }
+    ) => {
+      if (e.target !== e.currentTarget) return;
       e.preventDefault();
       e.stopPropagation();
     });
@@ -317,7 +332,13 @@ export class RenderViewMap extends RenderNode {
     jdomelem.append(jdomelem3);
     jdomelem.append(jdomelemZoom);
 
-    jdomelem3.on('mousedown mouseup touchstart touchend dblclick dbltap tap', (e) => {
+    // See ViewMap (above) for the rationale — must NOT preventDefault
+    // events bubbled from descendant buttons or the synthesised click
+    // gets suppressed and every popup button is inert on touchscreens.
+    jdomelem3.on('mousedown mouseup touchstart touchend dblclick dbltap tap', (
+      e: { target?: unknown; currentTarget?: unknown; preventDefault(): void; stopPropagation(): void }
+    ) => {
+      if (e.target !== e.currentTarget) return;
       e.preventDefault();
       e.stopPropagation();
     });
