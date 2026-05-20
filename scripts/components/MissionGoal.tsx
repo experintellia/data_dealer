@@ -39,16 +39,38 @@ export function MissionGoalRow({
 }): JSX.Element {
   const sp = renderSpriteHtml(goal.spriteConfig as Parameters<typeof renderSpriteHtml>[0]);
   const base = small ? 'MissionGoal small' : 'MissionGoal';
+  // Small (Missions-tab card) variant keeps the legacy
+  // `mission_goal_small.html` shape — no text, progress as a direct
+  // child of the row.
+  if (small) {
+    return (
+      <div class={goal.complete ? `${base} complete` : base}>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
+        <div class="MissionGoalSprite" dangerouslySetInnerHTML={{ __html: sp }} />
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally formatted progress markup */}
+        <div class="MissionGoalProgress" dangerouslySetInnerHTML={{ __html: goal.progressHtml }} />
+        <div class="MissionGoalStatus" />
+      </div>
+    );
+  }
+  // Full (mission dialog) variant: wrap text + progress in
+  // `.MissionGoalContent` so they stack vertically as a single flex
+  // item between the sprite (left) and the status stamp (right).
+  // Skip the progress div for single-unit goals — `missionView.ts`
+  // emits an empty `progressHtml` and the completion stamp conveys
+  // the state.
   return (
     <div class={goal.complete ? `${base} complete` : base}>
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup */}
       <div class="MissionGoalSprite" dangerouslySetInnerHTML={{ __html: sp }} />
-      {!small && (
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string
+      <div class="MissionGoalContent">
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted ruleset / i18n string */}
         <div class="MissionGoalText" dangerouslySetInnerHTML={{ __html: goal.textHtml }} />
-      )}
-      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally formatted progress markup */}
-      <div class="MissionGoalProgress" dangerouslySetInnerHTML={{ __html: goal.progressHtml }} />
+        {goal.progressHtml && (
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: locally formatted progress markup
+          <div class="MissionGoalProgress" dangerouslySetInnerHTML={{ __html: goal.progressHtml }} />
+        )}
+      </div>
       <div class="MissionGoalStatus" />
     </div>
   );
