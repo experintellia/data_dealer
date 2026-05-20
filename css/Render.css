@@ -3362,26 +3362,43 @@ button {
     max-width: 588px;
     min-width: 0;
     box-sizing: border-box;
-    /* Keep the dialog content-sized on mobile (no min-height grow):
-     * a short briefing stays compact, the speech bubble naturally docks
-     * at the bottom via document flow.  The 24 px top offset clears
-     * the rotated `.MissionDecorator` so its negative top + 1°
-     * overhang doesn't bleed into the statusbar.  When the dialog
-     * grows past the available height, an inner scroll container takes
-     * over (see `.MissionContent` overflow below). */
+    /* Cap the body at the viewport so a tall dialog can clip its
+     * inner scroll instead of pushing past the bottom edge.  The
+     * 24 px top offset clears the rotated `.MissionDecorator` so its
+     * negative top + 1° overhang doesn't bleed into the statusbar.
+     * `overflow: visible` so the absolutely-positioned NotificationHeader
+     * children (close button at top:-6/right:-6, decorator at -14)
+     * stay visible — the inner scroll is clipped by `.MissionContent`
+     * (see below). */
     max-height: calc(100vh - 24px);
     margin-top: 24px;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: visible;
   }
-  /* `.MissionContent` is the body's inner frame; on mobile let it
-   * scroll vertically when the goals / rewards / briefing copy don't
-   * fit inside the body's max-height. */
+  /* `.MissionContent` is the visible white card.  Make it the scroll
+   * container so the close button (top:-6 right:-6) and decorator
+   * (which extends 14 px above the body) aren't clipped by the body's
+   * overflow.  Inside, lay out as a flex column with PopupTitle and
+   * NotificationBubble fixed at the ends and the MissionWrap (goals
+   * + rewards) scrolling in the middle. */
   .PopupBody.MissionBody .MissionContent {
     flex: 1 1 auto;
-    overflow-y: auto;
     min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .PopupBody.MissionBody .MissionContent > .PopupTitle {
+    flex: 0 0 auto;
+  }
+  .PopupBody.MissionBody .MissionContent > .MissionWrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .PopupBody.MissionBody .MissionContent > .NotificationBubble {
+    flex: 0 0 auto;
   }
   /* `.MissionDecorator` is pinned at width:600 (= original popup width)
    * so it would still overflow even with the wrapper shrunk.  Span the
@@ -3410,23 +3427,25 @@ button {
 
   /* Rewards section: title on its own line, rewards as a wrapping
    * flex row so multiple rewards spill onto the next line instead of
-   * pushing past the popup's right edge. */
+   * pushing past the popup's right edge.  Slightly more generous
+   * padding + gap on mobile so the chips have breathing room. */
   .PopupBody.MissionBody .MissionRewards {
     height: auto;
-    padding: 8px 12px 12px 12px;
+    padding: 10px 14px 12px 14px;
     margin: 12px 16px 16px 16px;
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
     align-items: center;
   }
   .PopupBody.MissionBody .MissionRewards .MissionRewardsTitle {
     display: block;
     flex: 0 0 100%;
-    margin: 0 0 4px 0;
+    margin: 0 0 6px 0;
   }
   .PopupBody.MissionBody .MissionRewards .MissionReward {
     margin: 0;
+    padding: 6px 10px;
     flex: 0 0 auto;
   }
 }
