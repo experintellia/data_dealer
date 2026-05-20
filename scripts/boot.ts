@@ -27,7 +27,6 @@
 
 import { applyDelta, freshState } from './state.js';
 import type { GameSeed, LocalState } from './state.js';
-import { probeAvatarSupport } from './webxdc-avatars.js';
 
 export interface BootOptions {
   /** Override webxdc.selfAddr (useful for simulator / tests). */
@@ -109,12 +108,6 @@ export function boot(options?: BootOptions): Promise<LocalState> {
       }
     }, 0);
   }
-
-  // Fire-and-forget probe of the experimental webxdc avatar API
-  // (chatmail/core#6429). Gating on the resolved support flag means
-  // the leaderboard either always renders the avatar slot or never
-  // does — no late layout shift when the first <img> 404s.
-  probeAvatarSupport(selfAddr);
 
   // Promise.resolve handles three shapes uniformly:
   //   - real webxdc returns a Promise → awaited

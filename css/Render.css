@@ -1224,16 +1224,24 @@
   height: 32px;
 }
 
-/* Avatar slot — only present on rows the messenger actually serves an
-   image for (gated by isAvatarSupported() at boot, so the layout never
-   shifts on a delayed 404). */
-.TopscoreRow.withAvatar {
+/* Avatar slot — collapsed by default; the .TopscoreList container flips
+   `hasAvatars` from inline onload="…" once any one <img> succeeds, at
+   which point every row reserves the slot so the names stay aligned.
+   Rows whose <img> 404s remove themselves via onerror; the .Buy.Token
+   placeholder (::before) shows through.
+   The slot stays display:none until first success, so messengers that
+   don't serve avatars at all keep the original row layout. */
+.TopscoreAvatar {
+  display: none;
+}
+.TopscoreList.hasAvatars .TopscoreRow {
   padding-left: 60px;
 }
-.TopscoreRow.user.withAvatar {
+.TopscoreList.hasAvatars .TopscoreRow.user {
   padding-left: 70px;
 }
-.TopscoreAvatar {
+.TopscoreList.hasAvatars .TopscoreAvatar {
+  display: block;
   position: absolute;
   top: 2px;
   left: 28px;
@@ -1243,17 +1251,32 @@
   overflow: hidden;
   background: #ddd;
 }
+.TopscoreList.hasAvatars .TopscoreRow.user .TopscoreAvatar {
+  top: 4px;
+  left: 32px;
+  width: 26px;
+  height: 26px;
+}
 .TopscoreAvatar img {
   width: 100%;
   height: 100%;
   display: block;
   object-fit: cover;
 }
-.TopscoreRow.user .TopscoreAvatar {
-  top: 4px;
-  left: 32px;
-  width: 26px;
-  height: 26px;
+/* Placeholder: the in-game Profiles token icon, centred in the slot. The
+   <img> sits over it; on a 404 the <img> removes itself so this shows. */
+.TopscoreList.hasAvatars .TopscoreAvatar::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: url(../img/MainSprites.png) no-repeat -436px -616px;
+}
+.TopscoreList.hasAvatars .TopscoreRow.user .TopscoreAvatar::before {
+  top: 5px;
+  left: 5px;
 }
 
 .TopscoreDisplayname {

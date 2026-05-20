@@ -27,7 +27,7 @@ import type {
   LocalState,
   MissionGoal,
 } from './state.js';
-import { getAvatarUrl, isAvatarSupported } from './webxdc-avatars.js';
+import { getAvatarUrl } from './webxdc-avatars.js';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -700,9 +700,9 @@ interface RankingRow {
   display_name: string;
   value: number;
   self: boolean;
-  /** Set only when the boot probe found that the messenger serves
-   *  avatars; absent rows skip the <img> slot, so the layout doesn't
-   *  shift on a late 404. See scripts/webxdc-avatars.ts. */
+  /** Speculative webxdc avatar URL; the row template always emits the
+   *  <img> and the .TopscoreList container only reserves slot space
+   *  after at least one image has fired onload. */
   avatar?: string;
 }
 
@@ -717,7 +717,6 @@ export function getRanking(
     console.warn('[getRanking] unknown type "' + type + '", falling back to xp');
   }
   var field: RankingField = _isRankingField(type) ? type : 'xp';
-  var avatars = isAvatarSupported();
 
   var rows: RankingRow[] = Object.keys(peers).map(function (addr) {
     var p = peers[addr] || {};
@@ -728,10 +727,8 @@ export function getRanking(
       value: typeof v === 'number' ? v : 0,
       self: addr === selfAddr,
     };
-    if (avatars) {
-      var url = getAvatarUrl(addr);
-      if (url) row.avatar = url;
-    }
+    var url = getAvatarUrl(addr);
+    if (url) row.avatar = url;
     return row;
   });
 
