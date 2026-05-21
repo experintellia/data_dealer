@@ -619,9 +619,7 @@ test.describe('Section H — profileset import & sub-popups', () => {
       const ps = db.queue.set.find((p: any) => p.psid === id);
       if (!ps) throw new Error(`no profileset with psid=${id} in db queue`);
       // Simulate the click path: add .selected then open the popup.
-      db.renderDBQueue?.jdomelem
-        ?.find?.(`[data-psid="${id}"]`)
-        ?.addClass?.('selected');
+      db.renderDBQueue?.jdomelem?.find?.(`[data-psid="${id}"]`)?.addClass?.('selected');
       db.openProfileSetPopup(ps);
     }, psid);
 
