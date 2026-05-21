@@ -151,3 +151,50 @@ export async function bootGame(page: Page): Promise<void> {
   }
   throw new Error('bootGame: notification queue did not stay drained after 40 attempts');
 }
+
+/**
+ * Drive the full buy → reload → charge → collect → cue flow for contact035
+ * and return the resulting `psid`.  Reused by Section H tests that need a
+ * ProfileSet in the Database queue before driving popup interactions.
+ *
+ * The reload is required because buyPerp only SENDS; boot.ts replays the
+ * delta on reload so contact035 exists in the game tree before chargePerp.
+ * chargePerp likewise only SENDS, so `__ddSettle` waits for the listener to
+ * apply it before advanceNow + collectPerp.
+ */
+export async function cueProfileSet(page: Page): Promise<string> {
+  await page.evaluate(async () => {
+    const eng = await new Promise<any>((res, rej) =>
+      (window as any).require(['LocalEngine'], res, rej)
+    );
+    await eng.buyPerp('Imperium', 'contact035');
+    await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
+      (s) => !!(s.nodes ?? []).some((n: any) => n.full_path === 'Imperium.contact035')
+    );
+  });
+  await page.reload();
+  await bootGame(page);
+
+  const psid = await page.evaluate(async () => {
+    const eng = await new Promise<any>((res, rej) =>
+      (window as any).require(['LocalEngine'], res, rej)
+    );
+    await eng.chargePerp('Imperium.contact035');
+    await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
+      (s) => !!(s.nodes_charging ?? []).some((c: any) => c.path === 'Imperium.contact035')
+    );
+    // contact035.charge_time is 30s in the ruleset — advance the injectable
+    // clock past it so collectPerp doesn't return error 0.
+    (window as any).__dd.advanceNow(31_000);
+    const cr = await (eng as any).collectPerp('Imperium.contact035');
+    const inner = cr?.result?.result;
+    if (!inner?.collect_id) {
+      throw new Error(`collectPerp did not return collect_id; got=${JSON.stringify(cr)}`);
+    }
+    const groot = (window as any).__dd?._app?.game;
+    const db = groot.getDatabase();
+    const ps = db.cue(inner.profile_set, inner.origin, inner.collect_id);
+    return ps.psid as string;
+  });
+  return psid;
+}
