@@ -79,12 +79,14 @@ export function AboutPopup({ locale, buttonLabel, onClose }: AboutPopupProps) {
               ])}
             </div>
           </div>
-          <div class="PopupButtons">
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-            <div class="Button" data-button-id="MainButton" onClick={close}>
-              {buttonLabel}
-            </div>
-          </div>
+        </div>
+      </div>
+      {/* Sibling of the scrolling `.PopupContent` so it stays docked at
+          the dialog's bottom while the prose scrolls behind it. */}
+      <div class="PopupButtons">
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+        <div class="Button" data-button-id="MainButton" onClick={close}>
+          {buttonLabel}
         </div>
       </div>
     </div>

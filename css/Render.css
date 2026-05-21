@@ -1796,17 +1796,51 @@
   width: 564px;
   text-align: left;
 }
+/* About popup sizing.  Flex the whole popup chain — the (already
+ * `display:flex`) `.PopupContainer.PopupPreact` → `.Popup.About` →
+ * `.PopupBody.About` → `.PopupContent` — so the dialog is exactly as
+ * tall as its content but never taller than the popup area; the inner
+ * `.PopupContent` scrolls when the prose overflows.  `.Popup.About`
+ * carries the cap (its `.PopupContainer` parent has a definite
+ * height) and the column so the descendants can shrink.  This adapts
+ * to whatever vertical space the viewport offers — large on desktop,
+ * viewport-bound on a phone — with no fixed content height. */
+.Popup.About {
+  display: flex;
+  flex-direction: column;
+  /* `100%` of the popup area minus a small inset so a viewport-bound
+   * dialog keeps a margin off the screen edges; the `24px` also
+   * absorbs `.Popup`'s 12px border (content-box). */
+  max-height: calc(100% - 24px);
+  min-height: 0;
+}
+.PopupBody.About {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 /* Single unified scroll area: takes the space of the old header +
- * content.  Sized to use the vertical space a desktop window offers
- * while never overflowing a short viewport (the popup is flex-centred,
- * not scaled). */
+ * content. */
 .PopupBody.About .PopupContent {
-  height: min(560px, calc(100vh - 160px));
+  flex: 0 1 auto;
+  height: auto;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
 }
 .PopupBody.About .PopupTab {
-  padding-bottom: 56px;
+  padding-bottom: 12px;
+}
+/* The Close button is a flex sibling of the scrolling `.PopupContent`
+ * (not absolutely pinned inside it), so it stays docked at the
+ * dialog's bottom edge without overlapping the scrolling prose. */
+.PopupBody.About .PopupButtons {
+  position: static;
+  flex: 0 0 auto;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 10px 0 4px;
 }
 
 .SubpopContainer {
@@ -3549,23 +3583,6 @@ button {
     height: auto;
     text-align: center;
     flex: 0 0 auto;
-  }
-
-  /* About popup: the desktop layout pins `.PopupContent` to a fixed
-   * 428-px scroll area, which wastes the vertical space available on
-   * phones.  Mirror the Mission approach — flex column with the scroll
-   * area filling the remaining height. */
-  .PopupBody.About {
-    max-height: calc(100vh - 24px);
-    margin-block: 12px;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
-  .PopupBody.About .PopupContent {
-    flex: 1 1 auto;
-    height: auto;
-    min-height: 0;
   }
 }
 

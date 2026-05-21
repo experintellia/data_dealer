@@ -2094,10 +2094,14 @@ export class GameRoot extends GameNode {
 
     this.on('user_data', (e: unknown) => {
       _stopPropFile(e);
-      this.openPreactDialog(AboutPopup, {
-        locale: setup.locale ?? '',
-        buttonLabel: i18n.gettext('Close'),
-      });
+      this.openPreactDialog(
+        AboutPopup,
+        {
+          locale: setup.locale ?? '',
+          buttonLabel: i18n.gettext('Close'),
+        },
+        { extendClass: 'About' }
+      );
     });
 
     this.on('click_status.karma', () => {
