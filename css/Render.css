@@ -1796,9 +1796,12 @@
   width: 564px;
   text-align: left;
 }
-/* Single unified scroll area: takes the space of the old header + content */
+/* Single unified scroll area: takes the space of the old header +
+ * content.  Sized to use the vertical space a desktop window offers
+ * while never overflowing a short viewport (the popup is flex-centred,
+ * not scaled). */
 .PopupBody.About .PopupContent {
-  height: 428px;
+  height: min(560px, calc(100vh - 160px));
   overflow-y: auto;
   overflow-x: hidden;
 }
