@@ -585,7 +585,12 @@ export class RenderPopup extends RenderNode {
       this.popupContainer.lock?.();
       const containerJ = this.popupContainer.renderNode.popupContainerDomelem;
       if (containerJ) {
-        containerJ.on('click touchend', function (this: HTMLElement, _e: UIEventLike) {
+        containerJ.on('click touchend', function (this: HTMLElement, e: UIEventLike) {
+          // Consume the event so the backdrop tap can't fall through to the
+          // game underneath — on touch the synthesized click would otherwise
+          // land on whatever is exposed once the popup closes.
+          e.stopPropagation();
+          e.preventDefault();
           if (!$(this).hasClass('NoClose')) {
             node.trigger('popup_close');
             node.trigger('popup_cancel');
