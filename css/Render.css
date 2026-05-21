@@ -3549,6 +3549,52 @@ button {
   }
 }
 
+/* --- About popup (`.PopupBody.About`) on phone viewports ---------------
+ * The About dialog is a single fixed-height (428 px) scroll area with the
+ * Close button pinned absolute at `bottom:-10px`.  On a phone the prose
+ * is much taller than the box, so mid-scroll text slides *behind* the
+ * button, the popup overflows the viewport, and the long GitHub URL
+ * (one unbreakable token) spills past the right edge.
+ *
+ * Mobile reflow: `.PopupBody.About` becomes a flex column capped just
+ * short of the viewport — `.PopupContent` is the flexible scroll area
+ * and `.PopupButtons` (moved out of `.PopupContent` in AboutPopup.tsx)
+ * is a static footer that stays visible below it.  `overflow-wrap` lets
+ * the URL break.  Desktop layout is untouched.
+ *
+ * The 100-px reserve clears the reflowed mobile statusbar: the popup is
+ * flex-centred inside `.Stage` (viewport minus the ~84-px statusbar),
+ * not the raw viewport, so a `100vh`-only cap would still overflow.
+ * ----------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  .PopupBody.About {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 100px);
+  }
+  .PopupBody.About .PopupContent {
+    height: auto;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+  /* Button now flows in the column instead of overlaying the scroll
+   * area, so the desktop bottom-reserve padding is no longer needed. */
+  .PopupBody.About .PopupTab {
+    padding-bottom: 12px;
+  }
+  .PopupBody.About .PopupButtons {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 8px 0 4px;
+    flex: 0 0 auto;
+  }
+  /* Long unbreakable URLs in the link nodes overflow the narrow column. */
+  .PopupBody.About .PopupParagraph {
+    overflow-wrap: anywhere;
+  }
+}
+
 /* --- Mission + Topscore tab content: centre via margin auto + max-width --
  * Both views render their content into a tab-wide container.  On desktop
  * they have a fixed width (570 px etc.) which overflows on phone widths.

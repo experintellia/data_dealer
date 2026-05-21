@@ -204,6 +204,32 @@ test.describe('Status info popup — Cash', () => {
   });
 });
 
+/** About popup — opened via the `user_data` event (the main-menu ABOUT
+ *  button).  A tall, scrolling info dialog; the mobile baseline pins
+ *  the viewport-capped flex layout (scroll area + pinned Close footer). */
+async function openAbout(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const groot = (window as any).__dd?._app?.game;
+    groot.trigger('user_data');
+  });
+  await expect(page.locator('.PopupBody.About').first()).toBeVisible({ timeout: 5_000 });
+  await waitForPopupSettle(page);
+}
+
+test.describe('About popup', () => {
+  test('mobile (iPhone SE)', async ({ page }) => {
+    await boot(page, IPHONE_SE);
+    await openAbout(page);
+    await expect(page).toHaveScreenshot('about-iphone-se.png', { fullPage: false });
+  });
+
+  test('desktop (1280×800)', async ({ page }) => {
+    await boot(page, DESKTOP);
+    await openAbout(page);
+    await expect(page).toHaveScreenshot('about-desktop.png', { fullPage: false });
+  });
+});
+
 /** Contact perp popup — buys contact035 (Jessica) and opens the
  *  resulting perp popup, the dialog the user flagged in task D for
  *  both the statusbar-overlap and the generic-width issue. */

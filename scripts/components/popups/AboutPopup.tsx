@@ -79,12 +79,16 @@ export function AboutPopup({ locale, buttonLabel, onClose }: AboutPopupProps) {
               ])}
             </div>
           </div>
-          <div class="PopupButtons">
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-            <div class="Button" data-button-id="MainButton" onClick={close}>
-              {buttonLabel}
-            </div>
-          </div>
+        </div>
+      </div>
+      {/* Outside `.PopupContent` so the mobile layout can pin it as a
+          static footer below the scroll area instead of overlaying the
+          scrolling prose.  On desktop it stays absolute-positioned
+          relative to `.PopupBody` exactly as before. */}
+      <div class="PopupButtons">
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+        <div class="Button" data-button-id="MainButton" onClick={close}>
+          {buttonLabel}
         </div>
       </div>
     </div>
