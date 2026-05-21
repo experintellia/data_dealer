@@ -229,7 +229,10 @@ function bundleEsmDev() {
         server.config.logger.error('[esm-bundle-dev] initial build failed: ' + err.message);
       });
       server.watcher.on('change', (file) => {
-        if (file.includes('/scripts/') && (file.endsWith('.js') || file.endsWith('.ts'))) {
+        // `.tsx` does not end with `.ts`, so a bare `.endsWith('.ts')`
+        // silently skips every Preact component — match the full set of
+        // JS/TS source extensions esbuild compiles into the bundle.
+        if (file.includes('/scripts/') && /\.[jt]sx?$/.test(file)) {
           rebuild().catch((err) => {
             server.config.logger.error('[esm-bundle-dev] rebuild failed: ' + err.message);
           });
