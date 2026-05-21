@@ -1040,7 +1040,12 @@
   height:38px;
   display:inline-block;
   padding-left: 40px;
-  padding-right: 32px;
+  /* The completion stamp (`.MissionGoalStatus`, scaled 0.75) reaches
+     ~42px inward from the pill's right border edge.  With 32px the
+     progress number's last digit tucked under the stamp — and on
+     single-unit goals (empty progress) the sprite and stamp collided.
+     46px clears the stamp with an ~8px gap on both. */
+  padding-right: 46px;
   /* Spacing between the inline-block pills must be explicit: the legacy
      `mission_goal_small.html` loop emitted newlines between elements and
      leaned on the inline-block whitespace gap, but the Preact card

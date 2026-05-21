@@ -54,6 +54,46 @@ test('mission-card small goal pills keep explicit horizontal spacing', async ({ 
   expect(margins.right, 'small pill needs right margin').toBeGreaterThan(0);
 });
 
+test('mission-card small goal pill: progress number and sprite clear the completion stamp', async ({
+  page,
+}) => {
+  // iPhone SE — the viewport the mobile dialog/board pass targets.
+  await page.setViewportSize({ width: 375, height: 667 });
+  await bootGame(page);
+  await page.locator('.mm-tab[data-button-id="Missions"]').dispatchEvent('click');
+  await expect(page.locator('.mm-tab.active[data-button-id="Missions"]')).toBeVisible();
+
+  // The completion stamp (`.MissionGoalStatus`, scaled 0.75) overhangs
+  // ~42px into the pill from the right edge.  With too little
+  // `padding-right` the progress number's last digit tucked under the
+  // stamp, and on single-unit goals the sprite collided with it.
+  const boxes = await page.evaluate(() => {
+    const pills = Array.from(
+      document.querySelectorAll<HTMLElement>('.ViewTab.active .MissionGoal.small')
+    ).filter((p) => p.getBoundingClientRect().width > 1);
+    return pills.map((p) => {
+      const sprite = p.querySelector<HTMLElement>('.MissionGoalSprite')?.getBoundingClientRect();
+      const prog = p.querySelector<HTMLElement>('.MissionGoalProgress')?.getBoundingClientRect();
+      const status = p.querySelector<HTMLElement>('.MissionGoalStatus')?.getBoundingClientRect();
+      return {
+        spriteR: sprite?.right ?? 0,
+        progR: prog?.right ?? 0,
+        statusL: status?.left ?? 0,
+      };
+    });
+  });
+
+  expect(boxes.length, 'at least one visible small goal pill should render').toBeGreaterThan(0);
+  for (const b of boxes) {
+    expect(b.progR, 'progress number must end before the completion stamp').toBeLessThanOrEqual(
+      b.statusL
+    );
+    expect(b.spriteR, 'goal sprite must end before the completion stamp').toBeLessThanOrEqual(
+      b.statusL
+    );
+  }
+});
+
 test('an open dialog dims the header and a tab click dismisses it without switching', async ({
   page,
 }) => {
