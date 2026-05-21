@@ -3701,8 +3701,9 @@ button {
     padding-right: 0;
   }
   /* City tab strip: drop the desktop 600-px absolute positioning so it
-   * flows as an auto-placed, full-width header row with its buttons
-   * wrapping to fit. */
+   * flows as an auto-placed, full-width header row.  Flex so the
+   * buttons grow to fill each row — flush with the strip's edges and a
+   * tight, uniform gap — and wrap when they run out of room. */
   .PopupBody.CityPerp .PopupHeader .PopupMenu {
     position: static;
     grid-column: 1 / -1;
@@ -3710,6 +3711,13 @@ button {
     top: auto;
     left: auto;
     margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .PopupBody.CityPerp .PopupHeader .PopupMenuButton {
+    flex: 1 1 auto;
+    margin: 0;
   }
   /* City perp selector: the desktop layout is a 540×266 absolute blue
    * panel (overflowing the phone dialog) holding a 4000-px wrap of
