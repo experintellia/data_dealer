@@ -3637,10 +3637,14 @@ button {
     padding: 10px 12px 76px 12px;
     box-sizing: border-box;
   }
-  /* SuperToken / City buttons live in `.PopupContent`, not the header. */
-  .PopupBody.TokenPerp.SuperToken .PopupHeader,
-  .PopupBody.CityPerp .PopupHeader {
+  /* SuperToken buttons live in `.PopupContent`, not the header. */
+  .PopupBody.TokenPerp.SuperToken .PopupHeader {
     padding-bottom: 12px;
+  }
+  /* City: the tab strip sits flush at the header's bottom edge and
+   * overhangs onto the content segment below, so no bottom padding. */
+  .PopupBody.CityPerp .PopupHeader {
+    padding-bottom: 0;
   }
   .PopupBody.Status .PopupHeader .PopupLogo,
   .PopupBody.TokenPerp .PopupHeader .PopupLogo,
@@ -3701,23 +3705,39 @@ button {
     padding-right: 0;
   }
   /* City tab strip: drop the desktop 600-px absolute positioning so it
-   * flows as an auto-placed, full-width header row.  Flex so the
-   * buttons grow to fill each row — flush with the strip's edges and a
-   * tight, uniform gap — and wrap when they run out of room. */
+   * flows as the last header row.  Keep it a single row that scrolls
+   * horizontally (touch-draggable) so it reads as a tab bar rather than
+   * a wrapped grid of buttons; the tabs keep their natural width and
+   * the last one peeking past the edge hints the scroll.  The negative
+   * `margin-bottom` makes the strip overhang the header's bottom edge
+   * so the tabs sit flush on the content segment below (z-index keeps
+   * them above it); `padding-top` clears the active tab's -4px lift. */
   .PopupBody.CityPerp .PopupHeader .PopupMenu {
-    position: static;
+    position: relative;
+    z-index: 1;
     grid-column: 1 / -1;
     width: auto;
     top: auto;
     left: auto;
-    margin-top: 6px;
+    margin: 8px 0 -12px;
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    align-items: flex-end;
     gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 6px 0 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .PopupBody.CityPerp .PopupHeader .PopupMenu::-webkit-scrollbar {
+    display: none;
   }
   .PopupBody.CityPerp .PopupHeader .PopupMenuButton {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     margin: 0;
+    font-size: 13px;
+    white-space: nowrap;
   }
   /* City perp selector: the desktop layout is a 540×266 absolute blue
    * panel (overflowing the phone dialog) holding a 4000-px wrap of
@@ -3726,6 +3746,7 @@ button {
    * inline-block tiles wrap to as many rows as needed. */
   .PopupBody.CityPerp .PopupContent {
     height: auto;
+    margin-top: 0;
   }
   .PopupBody.CityPerp .PopupContent .PopupTab {
     padding-bottom: 64px;
