@@ -3711,6 +3711,33 @@ button {
     left: auto;
     margin-top: 6px;
   }
+  /* City perp selector: the desktop layout is a 540×266 absolute blue
+   * panel (overflowing the phone dialog) holding a 4000-px wrap of
+   * floated 540-px pages.  Flow it instead — the content area and
+   * selector size to their content and the single perp page's
+   * inline-block tiles wrap to as many rows as needed. */
+  .PopupBody.CityPerp .PopupContent {
+    height: auto;
+  }
+  .PopupBody.CityPerp .PopupContent .PopupTab {
+    padding-bottom: 64px;
+  }
+  .PopupBody.CityPerp .standalone .PopupSelector {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: auto;
+    height: auto;
+    margin-top: 20px;
+  }
+  .PopupBody.CityPerp .PopupPageWrap {
+    width: auto;
+  }
+  .PopupBody.CityPerp .PopupPage.PerpPage {
+    width: auto;
+    height: auto;
+    float: none;
+  }
 }
 
 /* --- Mission + Topscore tab content: centre via margin auto + max-width --
