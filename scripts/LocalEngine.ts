@@ -501,15 +501,13 @@ export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameRe
   var startupRepair = _repairStuckMissionGoals(seededState);
   var startupLevelup = 0;
   if (startupRepair && startupRepair.missions) {
-    var startupGv = _applyRewardsToGv(seededState.game_values || {}, startupRepair.rewards);
-    // Reward XP banked while away may cross a level threshold. Mirror the
-    // recheckMissions handler: refill AP and advance ap_max/xp_level so the
-    // next materialize() pass doesn't clamp the snapshot back to the old
-    // ceiling, and remember the level so the load can surface the popup.
-    if (_checkLevelup(seededState.game_values.xp_level || 1, startupGv.xp_value || 0)) {
-      startupLevelup = _getLevelByXP(startupGv.xp_value || 0);
-      startupGv = _applyLevelUp(startupGv, startupLevelup);
-    }
+    // Reward XP banked while away may cross a level threshold; _applyRepairRewards
+    // refills AP and advances ap_max/xp_level so the next materialize() pass
+    // doesn't clamp the snapshot back to the old ceiling. The level number is
+    // remembered so the load can surface the popup below.
+    var rewardResult = _applyRepairRewards(seededState.game_values || {}, startupRepair.rewards);
+    var startupGv = rewardResult.game_values;
+    startupLevelup = rewardResult.levelup;
     var recheckDelta = _mkDelta(seededState.addr, 'recheckMissions', [], {
       game_values: startupGv,
       missions: startupRepair.missions,
@@ -2069,6 +2067,23 @@ function _applyRewardsToGv(gv: GameValues, rewards: RewardSet | undefined): Game
   });
 }
 
+// Folds mission-repair reward totals into game_values and, when the reward XP
+// crosses a level threshold, applies the level-up (energy refill + raised
+// ap_max). Returns the new level number, or 0 when no level-up occurred.
+// Shared by the loadGame startup repair and the recheckMissions handler so
+// the two stay in lockstep.
+function _applyRepairRewards(
+  gv: GameValues,
+  rewards: RewardSet | undefined
+): { game_values: GameValues; levelup: number } {
+  var newGv = _applyRewardsToGv(gv, rewards);
+  if (_checkLevelup(gv.xp_level || 1, newGv.xp_value || 0)) {
+    var newLevel = _getLevelByXP(newGv.xp_value || 0);
+    return { game_values: _applyLevelUp(newGv, newLevel), levelup: newLevel };
+  }
+  return { game_values: newGv, levelup: 0 };
+}
+
 function _advanceChargePerpMissions(state: LocalState, gestalt: string): MissionAdvanceResult {
   var activeMissions = state.active_missions || [];
   var missionGoals = state.mission_goals || [];
@@ -3028,10 +3043,11 @@ export function recheckMissions(): Promise<{
   if (!repair || !repair.missions) {
     return Promise.resolve({ result: { repaired: false } });
   }
-  var newGv = _applyRewardsToGv(state.game_values || {}, repair.rewards);
-  // Reward XP may push the player into a new level — apply energy refill if so.
-  var rewardLevelup = _checkLevelup(state.game_values.xp_level || 1, newGv.xp_value || 0);
-  if (rewardLevelup) newGv = _applyLevelUp(newGv, _getLevelByXP(newGv.xp_value || 0));
+  // Reward XP may push the player into a new level — _applyRepairRewards
+  // applies the energy refill if so.
+  var rewardResult = _applyRepairRewards(state.game_values || {}, repair.rewards);
+  var newGv = rewardResult.game_values;
+  var rewardLevelup = rewardResult.levelup > 0;
   // `levelup` is intentionally not included in the persisted delta payload:
   // game_values (which already carries the updated ap_max/ap_snapshot/xp_level)
   // is the authoritative source for replay. Callers that need to show a
