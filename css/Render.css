@@ -3521,6 +3521,16 @@ button {
     box-sizing: border-box;
   }
 
+  /* Anchor dialogs to the bottom of the screen on phones — a dialog
+     grows upward from there instead of staying vertically centred.
+     (`.PopupPreactBottom` cues already dock at the bottom with their
+     own larger inset.) */
+  .PopupContainer.lockOn.PopupPreact {
+    align-items: flex-end;
+    padding-bottom: 12px;
+    box-sizing: border-box;
+  }
+
   /* Mission popup: inner scroll so the header (close X + decorator) and
    * speech bubble stay visible while a long goals/rewards list scrolls
    * in the middle.  The 24-px top margin clears the rotated
