@@ -668,9 +668,8 @@ export class Database extends GameNode {
     const vm = buildProfileSetPopupVM(
       ps as unknown as Parameters<typeof buildProfileSetPopupVM>[0]
     );
-    // When the dialog closes (X, backdrop, or after successful import) fire
-    // popup_cancel on the node so the DatabaseQueueItem's `.selected` class is
-    // cleared and the arm contracts back to its resting state.
+    // On close (X, backdrop, or successful import) clear the queue item's
+    // `.selected` state so the arm contracts back to its resting position.
     const handle = this.mountPopup(ProfileSetPopup, { vm }, () => {
       this.trigger('popup_cancel');
     });

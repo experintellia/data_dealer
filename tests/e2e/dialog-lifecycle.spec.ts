@@ -45,7 +45,7 @@
  */
 
 import { type Page, expect, test } from '@playwright/test';
-import { bootGame, installSettle } from './_helpers';
+import { bootGame, cueProfileSet, installSettle } from './_helpers';
 
 // ── Shared helpers ────────────────────────────────────────────────────────
 // `bootGame` lives in ./_helpers (shared with mission-card-spacing-and-
@@ -576,53 +576,9 @@ test.describe('Section H — profileset import & sub-popups', () => {
   test('Profileset import popup opens after charge → collect cycle and closes', async ({
     page,
   }) => {
-    // Drive the full buy → reload → charge → collect flow.  The collect step
-    // returns a profileset blob; we hand it to Database.cue() ourselves
-    // (the legacy ContactPerp.collect() handler does this for the canvas
-    // click path, but driving the engine directly bypasses that wiring).
-    // Then the Database.openProfileSetPopup helper opens the popup_profileset
-    // template with the right ProfileSet templateData.
     await installSettle(page);
     await bootGame(page);
-    await page.evaluate(async () => {
-      const eng = await new Promise<any>((res, rej) =>
-        (window as any).require(['LocalEngine'], res, rej)
-      );
-      await eng.buyPerp('Imperium', 'contact035');
-      // Only SENDS; wait for the listener to apply before reload replays
-      // webxdc history (otherwise contact035 is missing post-reload).
-      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
-        (s) => !!(s.nodes ?? []).some((n: any) => n.full_path === 'Imperium.contact035')
-      );
-    });
-    await page.reload();
-    await bootGame(page);
-
-    const psid = await page.evaluate(async () => {
-      const eng = await new Promise<any>((res, rej) =>
-        (window as any).require(['LocalEngine'], res, rej)
-      );
-      await eng.chargePerp('Imperium.contact035');
-      // chargePerp only SENDS; collectPerp reads current state, so wait for
-      // the listener to apply the charge first.
-      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
-        (s) => !!(s.nodes_charging ?? []).some((c: any) => c.path === 'Imperium.contact035')
-      );
-      // contact035.charge_time is 30s in the ruleset — advance the
-      // injectable clock past it so collectPerp doesn't return error 0.
-      (window as any).__dd.advanceNow(31_000);
-      const cr = await eng.collectPerp('Imperium.contact035');
-      const inner = cr?.result?.result;
-      if (!inner?.collect_id) {
-        throw new Error(`collectPerp did not return collect_id; got=${JSON.stringify(cr)}`);
-      }
-      // Cue the ProfileSet into the Database queue the same way
-      // ContactPerp.collect() would on a real canvas click.
-      const groot = (window as any).__dd?._app?.game;
-      const db = groot.getDatabase();
-      const ps = db.cue(inner.profile_set, inner.origin, inner.collect_id);
-      return ps.psid as string;
-    });
+    const psid = await cueProfileSet(page);
     expect(psid).toBeTruthy();
 
     await page.evaluate((id) => {
@@ -649,46 +605,13 @@ test.describe('Section H — profileset import & sub-popups', () => {
   test('Canceling the integrate dialog removes .selected from the DatabaseQueueItem (arm contracts)', async ({
     page,
   }) => {
-    // Regression for: after canceling the integrate dialog the arm stays
-    // expanded (DatabaseQueueItem keeps .selected) and is not clickable until
-    // another bundle is selected.
-    //
-    // Fix: Database.openProfileSetPopup passes an onAfterClose callback that
-    // triggers 'popup_cancel' on the gnode, which fires the initPopupEvents
-    // handler that removes .selected from the queue item.
+    // Contract: closing the integrate dialog must remove .selected from the
+    // queue item so the arm contracts and the item becomes clickable again.
     await installSettle(page);
     await bootGame(page);
-    await page.evaluate(async () => {
-      const eng = await new Promise<any>((res, rej) =>
-        (window as any).require(['LocalEngine'], res, rej)
-      );
-      await eng.buyPerp('Imperium', 'contact035');
-      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
-        (s) => !!(s.nodes ?? []).some((n: any) => n.full_path === 'Imperium.contact035')
-      );
-    });
-    await page.reload();
-    await bootGame(page);
-
-    const psid = await page.evaluate(async () => {
-      const eng = await new Promise<any>((res, rej) =>
-        (window as any).require(['LocalEngine'], res, rej)
-      );
-      await eng.chargePerp('Imperium.contact035');
-      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
-        (s) => !!(s.nodes_charging ?? []).some((c: any) => c.path === 'Imperium.contact035')
-      );
-      (window as any).__dd.advanceNow(31_000);
-      const cr = await eng.collectPerp('Imperium.contact035');
-      const inner = cr?.result?.result;
-      const groot = (window as any).__dd?._app?.game;
-      const db = groot.getDatabase();
-      const ps = db.cue(inner.profile_set, inner.origin, inner.collect_id);
-      return ps.psid as string;
-    });
+    const psid = await cueProfileSet(page);
     expect(psid).toBeTruthy();
 
-    // Open the popup and verify the queue item gets .selected.
     await page.evaluate((id) => {
       const groot = (window as any).__dd?._app?.game;
       groot.trigger('switch_view', ['Database']);
@@ -706,26 +629,12 @@ test.describe('Section H — profileset import & sub-popups', () => {
       timeout: 3_000,
     });
 
-    // Verify .selected is present before cancel.
-    const selectedBefore = await page.evaluate((id) => {
-      const groot = (window as any).__dd?._app?.game;
-      const db = groot.getDatabase();
-      const el = db.renderDBQueue?.jdomelem?.find?.(`[data-psid="${id}"]`)?.[0];
-      return el ? el.classList.contains('selected') : false;
-    }, psid);
-    expect(selectedBefore).toBe(true);
-
-    // Cancel via the X button.
+    // Cancel via the X button; after close .selected must be gone — arm
+    // contracted and item clickable again.
     await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupBody', 'x');
 
-    // After cancel the .selected class must be gone — arm contracted.
-    const selectedAfter = await page.evaluate((id) => {
-      const groot = (window as any).__dd?._app?.game;
-      const db = groot.getDatabase();
-      const el = db.renderDBQueue?.jdomelem?.find?.(`[data-psid="${id}"]`)?.[0];
-      return el ? el.classList.contains('selected') : false;
-    }, psid);
-    expect(selectedAfter).toBe(false);
+    // Playwright locator auto-retries, covering any async class removal.
+    await expect(page.locator(`.DatabaseQueueItem[data-psid="${psid}"].selected`)).toHaveCount(0);
   });
 
   test('ProjectPerp BuySlots subpop opens via locked-slot click and dismisses with +/− controls', async ({
@@ -1187,41 +1096,9 @@ test.describe('Section J — in-popup action handlers', () => {
   test('Profileset MainButton triggers integrate and increases profiles_value', async ({
     page,
   }) => {
-    // Re-uses the Section H flow: buy → reload → charge → advance clock →
-    // collect → cue.  Then drives the integrate path through the popup's
-    // MainButton click handler (the popup wires it via popup.on(
-    // 'button_click.MainButton') → gnode.mergeCued in
-    // scripts/game/Database.ts:675).
     await installSettle(page);
     await bootGame(page);
-    await page.evaluate(async () => {
-      const eng = await new Promise<any>((res, rej) =>
-        (window as any).require(['LocalEngine'], res, rej)
-      );
-      await eng.buyPerp('Imperium', 'contact035');
-      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
-        (s) => !!(s.nodes ?? []).some((n: any) => n.full_path === 'Imperium.contact035')
-      );
-    });
-    await page.reload();
-    await bootGame(page);
-
-    const psid = await page.evaluate(async () => {
-      const eng = await new Promise<any>((res, rej) =>
-        (window as any).require(['LocalEngine'], res, rej)
-      );
-      await eng.chargePerp('Imperium.contact035');
-      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
-        (s) => !!(s.nodes_charging ?? []).some((c: any) => c.path === 'Imperium.contact035')
-      );
-      (window as any).__dd.advanceNow(31_000);
-      const cr = await eng.collectPerp('Imperium.contact035');
-      const inner = cr?.result?.result;
-      const groot = (window as any).__dd?._app?.game;
-      const db = groot.getDatabase();
-      const ps = db.cue(inner.profile_set, inner.origin, inner.collect_id);
-      return ps.psid as string;
-    });
+    const psid = await cueProfileSet(page);
     expect(psid).toBeTruthy();
 
     const initialProfiles = await page.evaluate(() => {
