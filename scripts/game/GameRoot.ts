@@ -1359,10 +1359,9 @@ export class GameRoot extends GameNode {
       onAfterClose?: () => void;
     } = {}
   ): PreactDialogHandle | undefined {
-    const containerJq = (
+    const container = (
       this.renderNode as { popupContainerDomelem?: { 0?: HTMLElement } } | undefined
-    )?.popupContainerDomelem;
-    const container = containerJq?.[0];
+    )?.popupContainerDomelem?.[0];
     if (!container) return undefined;
     const slot = options.slot ?? 'popup';
     const handle = openDialog<P>({
@@ -2094,10 +2093,14 @@ export class GameRoot extends GameNode {
 
     this.on('user_data', (e: unknown) => {
       _stopPropFile(e);
-      this.openPreactDialog(AboutPopup, {
-        locale: setup.locale ?? '',
-        buttonLabel: i18n.gettext('Close'),
-      });
+      this.openPreactDialog(
+        AboutPopup,
+        {
+          locale: setup.locale ?? '',
+          buttonLabel: i18n.gettext('Close'),
+        },
+        { extendClass: 'About' }
+      );
     });
 
     this.on('click_status.karma', () => {

@@ -391,6 +391,20 @@
   padding-bottom: 32px;
   box-sizing: border-box;
 }
+/* Every dialog mounts into one of these — a full-screen overlay the
+ * dialog manager creates outside `.Stage`, appended to the render
+ * container.  It is not clipped by the Stage's `overflow:hidden` and
+ * sits above the menu (z 30000), so the backdrop covers the whole
+ * screen and the dialog is flex-centred within it (a tall one can
+ * cover the tabs).  `.lockOn` / `.PopupPreact` add the dim vignette +
+ * centring. */
+.PopupContainer.lockOn.PopupFullViewport {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  z-index: 100000;
+}
 
 
 /* `.MainMenuLogo` is shared between the main-menu header and the
@@ -1796,12 +1810,42 @@
   width: 564px;
   text-align: left;
 }
-/* Single unified scroll area: takes the space of the old header + content */
+/* About popup sizing.  Flex the whole popup chain — the (already
+ * `display:flex`) `.PopupContainer.PopupPreact` → `.Popup.About` →
+ * `.PopupBody.About` → `.PopupContent` — so the dialog is exactly as
+ * tall as its content but never taller than the popup area; the inner
+ * `.PopupContent` scrolls when the prose overflows.  `.Popup.About`
+ * carries the cap (its `.PopupContainer` parent has a definite
+ * height) and the column so the descendants can shrink.  This adapts
+ * to whatever vertical space the viewport offers — large on desktop,
+ * viewport-bound on a phone — with no fixed content height. */
+.Popup.About {
+  display: flex;
+  flex-direction: column;
+  /* `100%` of the popup area minus a small inset so a viewport-bound
+   * dialog keeps a margin off the screen edges; the `24px` also
+   * absorbs `.Popup`'s 12px border (content-box). */
+  max-height: calc(100% - 24px);
+  min-height: 0;
+}
+.PopupBody.About {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Single unified scroll area: takes the space of the old header +
+ * content. */
 .PopupBody.About .PopupContent {
-  height: 428px;
+  flex: 0 1 auto;
+  height: auto;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
 }
+/* The Close button is absolutely pinned to the dialog's bottom edge
+ * (base `.PopupButtons`, containing block `.PopupBody`); it does not
+ * scroll with `.PopupContent`.  Reserve space at the end of the scroll
+ * content so the last lines clear the button when fully scrolled. */
 .PopupBody.About .PopupTab {
   padding-bottom: 56px;
 }
@@ -3474,6 +3518,16 @@ button {
     width: calc(100vw - 12px);
     max-width: 588px;
     min-width: 0;
+    box-sizing: border-box;
+  }
+
+  /* Anchor dialogs to the bottom of the screen on phones — a dialog
+     grows upward from there instead of staying vertically centred.
+     (`.PopupPreactBottom` cues already dock at the bottom with their
+     own larger inset.) */
+  .PopupContainer.lockOn.PopupPreact {
+    align-items: flex-end;
+    padding-bottom: 12px;
     box-sizing: border-box;
   }
 
