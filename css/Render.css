@@ -391,11 +391,13 @@
   padding-bottom: 32px;
   box-sizing: border-box;
 }
-/* Full-viewport dialog overlay (`openPreactDialog({ fullViewport })`).
- * Created outside `.Stage` — appended to the render container — so it
- * is not clipped by the Stage's `overflow:hidden` and sits above the
- * menu (z 30000), letting a tall dialog cover the tabs.  `.lockOn` /
- * `.PopupPreact` still bring the dim vignette + flex-centring. */
+/* Every dialog mounts into one of these — a full-screen overlay the
+ * dialog manager creates outside `.Stage`, appended to the render
+ * container.  It is not clipped by the Stage's `overflow:hidden` and
+ * sits above the menu (z 30000), so the backdrop covers the whole
+ * screen and the dialog is flex-centred within it (a tall one can
+ * cover the tabs).  `.lockOn` / `.PopupPreact` add the dim vignette +
+ * centring. */
 .PopupContainer.lockOn.PopupFullViewport {
   position: fixed;
   inset: 0;

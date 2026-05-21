@@ -176,6 +176,21 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
 
   let isOpen = true;
 
+  // Mount into a fresh full-screen overlay appended to the render
+  // container (a sibling of `.Stage`), so the backdrop escapes the
+  // Stage's `overflow:hidden` + transform and covers the whole screen;
+  // the dialog is CSS-centred within it.  `opts.container` is only used
+  // to locate the render container — it is repointed at the overlay so
+  // the rest of this function is container-agnostic.
+  const rc = opts.container.closest<HTMLElement>(setup.renderContainer);
+  let ownContainer: HTMLElement | null = null;
+  if (rc) {
+    ownContainer = document.createElement('div');
+    ownContainer.className = 'PopupContainer PopupFullViewport';
+    rc.appendChild(ownContainer);
+    opts.container = ownContainer;
+  }
+
   // The Stage-internal `.PopupContainer` backdrop only spans the
   // `.Stage`; the `.MainMenu` game-tab header is a sibling above it and
   // the engine puts an inline transform on `.Stage`, so the backdrop
@@ -235,6 +250,7 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
     lockMenu?.classList.remove('DialogLock');
     lockMenu?.removeEventListener('click', dismissFromMenu, true);
     lockMenu?.removeEventListener('touchend', dismissFromMenu, true);
+    ownContainer?.remove();
     active = null;
     opts.onAfterClose?.();
   };

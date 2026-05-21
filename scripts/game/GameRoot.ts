@@ -1356,28 +1356,12 @@ export class GameRoot extends GameNode {
       extendClass?: string;
       placeBottom?: boolean;
       slot?: 'popup' | 'notification';
-      /** Mount into a fresh overlay appended to the render container —
-       *  a sibling of `.Stage`, so it escapes the Stage's
-       *  `overflow:hidden` (+ transform) and can cover the menu when
-       *  the dialog's content needs the room.  Default mounts into the
-       *  active view's in-Stage popup container. */
-      fullViewport?: boolean;
       onAfterClose?: () => void;
     } = {}
   ): PreactDialogHandle | undefined {
-    let ownContainer: HTMLElement | undefined;
-    if (options.fullViewport) {
-      const rc = document.querySelector<HTMLElement>(setup.renderContainer);
-      if (rc) {
-        ownContainer = document.createElement('div');
-        ownContainer.className = 'PopupContainer PopupFullViewport';
-        rc.appendChild(ownContainer);
-      }
-    }
-    const container =
-      ownContainer ??
-      (this.renderNode as { popupContainerDomelem?: { 0?: HTMLElement } } | undefined)
-        ?.popupContainerDomelem?.[0];
+    const container = (
+      this.renderNode as { popupContainerDomelem?: { 0?: HTMLElement } } | undefined
+    )?.popupContainerDomelem?.[0];
     if (!container) return undefined;
     const slot = options.slot ?? 'popup';
     const handle = openDialog<P>({
@@ -1392,7 +1376,6 @@ export class GameRoot extends GameNode {
         } else {
           delete this.renderPopup;
         }
-        ownContainer?.remove();
         options.onAfterClose?.();
       },
     });
@@ -2116,7 +2099,7 @@ export class GameRoot extends GameNode {
           locale: setup.locale ?? '',
           buttonLabel: i18n.gettext('Close'),
         },
-        { extendClass: 'About', fullViewport: true }
+        { extendClass: 'About' }
       );
     });
 
