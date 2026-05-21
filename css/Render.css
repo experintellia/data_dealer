@@ -3547,6 +3547,23 @@ button {
     text-align: center;
     flex: 0 0 auto;
   }
+
+  /* About popup: the desktop layout pins `.PopupContent` to a fixed
+   * 428-px scroll area, which wastes the vertical space available on
+   * phones.  Mirror the Mission approach — flex column with the scroll
+   * area filling the remaining height. */
+  .PopupBody.About {
+    max-height: calc(100vh - 24px);
+    margin-block: 12px;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .PopupBody.About .PopupContent {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+  }
 }
 
 /* --- Status info popup (`.PopupBody.Status`) on phone viewports ---------
