@@ -204,6 +204,33 @@ test.describe('Status info popup — Cash', () => {
   });
 });
 
+/** AP (energy) status popup — opened via `click_status.AP`.  Same
+ *  `.PopupBody.Status` shell as Cash, but the longest description of the
+ *  four status popups: on a phone viewport it wrapped past the
+ *  bottom-anchored button before the mobile two-row reflow. */
+async function openStatusAP(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const groot = (window as any).__dd?._app?.game;
+    groot.trigger('click_status.AP');
+  });
+  await expect(page.locator('.PopupBody.Status').first()).toBeVisible({ timeout: 5_000 });
+  await waitForPopupSettle(page);
+}
+
+test.describe('Status info popup — AP (energy)', () => {
+  test('mobile (iPhone SE)', async ({ page }) => {
+    await boot(page, IPHONE_SE);
+    await openStatusAP(page);
+    await expect(page).toHaveScreenshot('status-ap-iphone-se.png', { fullPage: false });
+  });
+
+  test('desktop (1280×800)', async ({ page }) => {
+    await boot(page, DESKTOP);
+    await openStatusAP(page);
+    await expect(page).toHaveScreenshot('status-ap-desktop.png', { fullPage: false });
+  });
+});
+
 /** Contact perp popup — buys contact035 (Jessica) and opens the
  *  resulting perp popup, the dialog the user flagged in task D for
  *  both the statusbar-overlap and the generic-width issue. */
