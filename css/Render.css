@@ -3706,12 +3706,12 @@ button {
   }
   /* City tab strip: drop the desktop 600-px absolute positioning so it
    * flows as the last header row.  Keep it a single row that scrolls
-   * horizontally (touch-draggable) so it reads as a tab bar rather than
-   * a wrapped grid of buttons.  A right-edge mask fades the last tab
-   * out, hinting there is more to scroll.  The negative `margin-bottom`
-   * makes the strip overhang the header's bottom edge so the tabs sit
-   * flush on the content segment below (z-index keeps them above it);
-   * `padding-top` clears the active tab's -4px lift. */
+   * horizontally (touch-draggable; mouse drag + wheel are wired in
+   * PopupMenu.tsx) so it reads as a tab bar rather than a wrapped grid
+   * of buttons.  The negative `margin-bottom` makes the strip overhang
+   * the header's bottom edge so the tabs sit flush on the content
+   * segment below (z-index keeps them above it); `padding-top` clears
+   * the active tab's -4px lift.  The edge fades below hint the scroll. */
   .PopupBody.CityPerp .PopupHeader .PopupMenu {
     position: relative;
     z-index: 1;
@@ -3727,13 +3727,38 @@ button {
     overflow-x: auto;
     overflow-y: hidden;
     padding: 6px 0 0;
+    cursor: grab;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 38px), transparent);
-    mask-image: linear-gradient(to right, #000 calc(100% - 38px), transparent);
   }
   .PopupBody.CityPerp .PopupHeader .PopupMenu::-webkit-scrollbar {
     display: none;
+  }
+  /* Edge fades, toggled by PopupMenu.tsx via `can-scroll-left/right` so
+   * each side only fades when it actually has more to reveal. */
+  .PopupBody.CityPerp .PopupHeader .PopupMenu.can-scroll-right {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 38px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 38px), transparent);
+  }
+  .PopupBody.CityPerp .PopupHeader .PopupMenu.can-scroll-left {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 38px);
+    mask-image: linear-gradient(to right, transparent, #000 38px);
+  }
+  .PopupBody.CityPerp .PopupHeader .PopupMenu.can-scroll-left.can-scroll-right {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 38px,
+      #000 calc(100% - 38px),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 38px,
+      #000 calc(100% - 38px),
+      transparent
+    );
   }
   .PopupBody.CityPerp .PopupHeader .PopupMenuButton {
     flex: 0 0 auto;
