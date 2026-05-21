@@ -13,7 +13,7 @@ export function XPStatusPopup({ xpLevel, xpValue, xpMax, onClose }: XPStatusPopu
   const subtitleHtml = sprintf(i18n.gettext('sb_XP subtitle Level %s'), span(toKSNum(xpLevel)));
   const descriptionHtml = sprintf(
     i18n.gettext('sb_XP description %s XP until next level'),
-    span(toKSNum(xpMax - xpValue + 1))
+    span(toKSNum(xpMax - xpValue))
   );
   return (
     <PopupShell
