@@ -499,8 +499,17 @@ export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameRe
   // Persist as a recheckMissions delta so the repair lands in durable
   // history; otherwise rewards would be reapplied every materialize pass.
   var startupRepair = _repairStuckMissionGoals(seededState);
+  var startupLevelup = 0;
   if (startupRepair && startupRepair.missions) {
     var startupGv = _applyRewardsToGv(seededState.game_values || {}, startupRepair.rewards);
+    // Reward XP banked while away may cross a level threshold. Mirror the
+    // recheckMissions handler: refill AP and advance ap_max/xp_level so the
+    // next materialize() pass doesn't clamp the snapshot back to the old
+    // ceiling, and remember the level so the load can surface the popup.
+    if (_checkLevelup(seededState.game_values.xp_level || 1, startupGv.xp_value || 0)) {
+      startupLevelup = _getLevelByXP(startupGv.xp_value || 0);
+      startupGv = _applyLevelUp(startupGv, startupLevelup);
+    }
     var recheckDelta = _mkDelta(seededState.addr, 'recheckMissions', [], {
       game_values: startupGv,
       missions: startupRepair.missions,
@@ -539,6 +548,12 @@ export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameRe
     for (var i = 0; i < events.length; i++) {
       var e = events[i];
       if (e) _emit(e.ev, e.pl);
+    }
+    // A stuck-mission repair that banked enough XP to level up surfaces the
+    // level-up popup the way mid-game handlers do — via a new_items event the
+    // GameRoot turns into a notification.
+    if (startupLevelup) {
+      _emit('new_items', { levelup: startupLevelup });
     }
   });
 

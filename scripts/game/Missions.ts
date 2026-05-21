@@ -61,7 +61,10 @@ export class Missions extends GameNode {
         const r = data.result;
         if (!r || !r.repaired) return;
         if (r.missions && r.missions.complete_missions && r.missions.complete_missions.length) {
-          groot.updateGameValues(r.game_values || {}, r.levelup === true, r.missions, true);
+          // Not silent: a freshly-completed mission should play the reward FX
+          // and, when its XP reward crossed a level threshold, the level-up
+          // popup — same machinery every other mission-completing handler uses.
+          groot.updateGameValues(r.game_values || {}, r.levelup === true, r.missions);
         } else {
           // Goal flipped without finishing the mission — refresh rows only,
           // skipping the reward/levelup popup machinery.

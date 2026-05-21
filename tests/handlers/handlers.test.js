@@ -1866,6 +1866,95 @@ describe('loadGame — repairs stuck integrate_profiles goal at startup', () => 
   });
 });
 
+describe('loadGame — level-up from stuck-mission XP reward at startup', () => {
+  const STUCK_MISSION007 = {
+    active_missions: ['mission007'],
+    mission_goals: [
+      {
+        mission: 'mission007',
+        workflow: 'buy_perp',
+        target: 'contact001',
+        amount: null,
+        position: 1,
+        current_amount: 1,
+        complete: true,
+      },
+      {
+        mission: 'mission007',
+        workflow: 'collect_profiles',
+        target: 'contact001',
+        amount: 3000,
+        position: 2,
+        current_amount: 3000,
+        complete: true,
+      },
+      {
+        mission: 'mission007',
+        workflow: 'integrate_profiles',
+        target: 'token017',
+        amount: 3000,
+        position: 3,
+        current_amount: 3000,
+        complete: false,
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    setOverride(FIXED_NOW);
+    setState(
+      Object.assign(mkBuyPerpState(), STUCK_MISSION007, {
+        game_values: {
+          xp_value: 1,
+          xp_level: 1,
+          cash_value: 0,
+          cash_spent: 0,
+          karma_value: 0,
+          profiles_value: 0,
+          profiles_max: 1,
+          ap_snapshot: 2,
+          ap_max: 6,
+          ap_update: FIXED_NOW,
+          ap_inc_value: 1,
+          ap_inc_interval: 120000,
+        },
+      })
+    );
+  });
+  afterEach(() => {
+    clearOverride();
+    setEmitter(null);
+  });
+
+  it('advances xp_level and refills ap_snapshot to the new ap_max', async () => {
+    setEmitter(function () {});
+    await loadGame();
+    expect(getState().game_values.xp_level).toBe(2);
+    expect(getState().game_values.ap_snapshot).toBe(8);
+    expect(getState().game_values.ap_max).toBe(8);
+  });
+
+  it('keeps the refill across a subsequent materialize() pass', async () => {
+    setEmitter(function () {});
+    await loadGame();
+    const mat = materialize(getState(), FIXED_NOW + 1);
+    expect(mat.state.game_values.ap_snapshot).toBe(8);
+    expect(mat.state.game_values.ap_max).toBe(8);
+  });
+
+  it('emits a new_items levelup event so the load surfaces the popup', async () => {
+    const emitted = [];
+    setEmitter(function (ev, pl) {
+      emitted.push({ ev, pl });
+    });
+    await loadGame();
+    await Promise.resolve();
+    const levelupEvent = emitted.find((e) => e.ev === 'new_items' && e.pl && e.pl.levelup);
+    expect(levelupEvent).toBeDefined();
+    expect(levelupEvent.pl.levelup).toBe(2);
+  });
+});
+
 describe('buyPerp — mission activating after nurse already owned seeds goal as complete', () => {
   beforeEach(() => {
     setState(
