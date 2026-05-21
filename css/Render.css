@@ -3603,21 +3603,24 @@ button {
   }
 }
 
-/* --- Status info popup (`.PopupBody.Status`) on phone viewports ---------
- * Desktop layout pins `.PopupLogo` (180×180) absolute top-left and pushes
- * every text node right by `margin-left:168px`, leaving a narrow column
- * for the description.  On a 375-px viewport that column wraps to ~7
- * lines and the last few duck behind the bottom-anchored `.PopupButtons`
- * (see the screenshot in #321).
+/* --- Status / Token info popups on phone viewports --------------------
+ * `.PopupBody.Status` and `.PopupBody.TokenPerp` share the `PopupHeader`
+ * component.  Its desktop layout pins `.PopupLogo` (180×180) absolute
+ * top-left and pushes every text node right by `margin-left:168px`,
+ * leaving a narrow column for the description.  On a 375-px viewport
+ * that column wraps to many lines and the last few duck behind the
+ * absolute `.PopupButtons` (see the screenshot in #321).
  *
  * Mobile reflow: 2D grid — row 1 is the (shrunk) icon next to a stacked
  * title + subtitle, row 2 is the full-width description, row 3 hosts the
  * optional `.APRefillLabel` + `.APRefillBar` from AP status.  Bottom
  * padding reserves space for the absolute-positioned button so it can't
- * overlap the description regardless of how many lines it wraps to.
+ * overlap the description regardless of how many lines it wraps to —
+ * dropped for the SuperToken header, which has no in-header button.
  * ----------------------------------------------------------------------- */
 @media (max-width: 768px) {
-  .PopupBody.Status .PopupHeader {
+  .PopupBody.Status .PopupHeader,
+  .PopupBody.TokenPerp .PopupHeader {
     height: auto;
     min-height: 0;
     display: grid;
@@ -3631,7 +3634,12 @@ button {
     padding: 10px 12px 76px 12px;
     box-sizing: border-box;
   }
-  .PopupBody.Status .PopupHeader .PopupLogo {
+  /* SuperToken's buttons live in `.PopupContent`, not the header. */
+  .PopupBody.TokenPerp.SuperToken .PopupHeader {
+    padding-bottom: 12px;
+  }
+  .PopupBody.Status .PopupHeader .PopupLogo,
+  .PopupBody.TokenPerp .PopupHeader .PopupLogo {
     position: static;
     grid-area: logo;
     width: 80px;
@@ -3642,19 +3650,24 @@ button {
   /* Visually scale the 180×180 sprite frame into the 80×80 cell without
    * recomputing every per-sprite background-position.  The element still
    * claims 180×180 in layout, which `overflow:hidden` on `.PopupLogo`
-   * clips, and no sibling exists inside `.PopupLogo` to be pushed. */
-  .PopupBody.Status .PopupHeader .PopupLogo .MainSpritesPopup {
+   * clips, and no sibling exists inside `.PopupLogo` to be pushed.
+   * (Status logos are `.MainSpritesPopup`; Token logos are the
+   * `renderSpriteHtml` `.RenderSprite`.) */
+  .PopupBody.Status .PopupHeader .PopupLogo .MainSpritesPopup,
+  .PopupBody.TokenPerp .PopupHeader .PopupLogo .RenderSprite {
     transform: scale(0.4444);
     transform-origin: top left;
   }
-  .PopupBody.Status .PopupHeader .PopupTitle {
+  .PopupBody.Status .PopupHeader .PopupTitle,
+  .PopupBody.TokenPerp .PopupHeader .PopupTitle {
     grid-area: title;
     margin-left: 0;
     margin-top: 0;
     padding-right: 0;
     align-self: end;
   }
-  .PopupBody.Status .PopupHeader .PopupSubTitle {
+  .PopupBody.Status .PopupHeader .PopupSubTitle,
+  .PopupBody.TokenPerp .PopupHeader .PopupSubTitle {
     grid-area: subtitle;
     margin-left: 0;
     padding-right: 0;
@@ -3663,7 +3676,8 @@ button {
   /* `:not(.APRefillLabel)` so the AP refill caption — which also carries
    * `.PopupText` — keeps its own auto-placed row below instead of being
    * pulled into the `desc` cell on top of the description. */
-  .PopupBody.Status .PopupHeader .PopupText:not(.APRefillLabel) {
+  .PopupBody.Status .PopupHeader .PopupText:not(.APRefillLabel),
+  .PopupBody.TokenPerp .PopupHeader .PopupText:not(.APRefillLabel) {
     grid-area: desc;
     margin-left: 0;
     padding-right: 0;
