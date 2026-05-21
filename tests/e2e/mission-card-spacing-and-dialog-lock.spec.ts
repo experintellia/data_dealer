@@ -8,14 +8,12 @@
  *     siblings with no whitespace, so the pills collapse flush.  Spacing
  *     must come from an explicit `margin`, not source whitespace.
  *
- *  2. Dialog modality — the Stage-internal `.PopupContainer` backdrop
- *     only spans the `.Stage`; the `.MainMenu` header is a sibling above
- *     it and can't be covered (the engine puts an inline transform on
- *     `.Stage`, trapping any fixed/absolute overlay).  `dialogManager`
- *     instead dims the header (`.MainMenu.DialogLock`) and captures
- *     clicks on it to dismiss the dialog, so a tab can't be switched
- *     from under it and the darkened header behaves like the rest of
- *     the backdrop.
+ *  2. Dialog modality — `dialogManager` mounts each dialog in a
+ *     full-screen overlay that covers the `.MainMenu` header, and dims
+ *     the header (`.MainMenu.DialogLock`) so it reads as part of the
+ *     darkened backdrop.  A click over the header area lands on the
+ *     overlay and dismisses the dialog, so a tab can't be switched
+ *     from under it.
  */
 
 import { expect, test } from '@playwright/test';
@@ -96,9 +94,14 @@ test('an open dialog dims the header and a tab click dismisses it without switch
   expect(dimmed.hasClass, '.MainMenu gets .DialogLock while a dialog is open').toBe(true);
   expect(dimmed.filter, '.MainMenu is visibly darkened').not.toBe('none');
 
-  // Clicking a tab from under the dialog must dismiss it and NOT switch
-  // the view (capture-phase listener stops the jQuery .mm-tab delegate).
-  await otherTab.click();
+  // A click over a tab lands on the full-screen overlay covering the
+  // header (not the tab itself), so it dismisses the dialog and does
+  // NOT switch the view.  Click by coordinate — the tab is obscured by
+  // the overlay, so a targeted `.click()` would fail the actionability
+  // check.
+  const tabBox = await otherTab.boundingBox();
+  if (!tabBox) throw new Error('tab has no bounding box');
+  await page.mouse.click(tabBox.x + tabBox.width / 2, tabBox.y + tabBox.height / 2);
   await expect(page.locator('.PopupBody.MissionBody')).toHaveCount(0);
   expect(
     await page.locator('.mm-tab.active').first().getAttribute('data-button-id'),

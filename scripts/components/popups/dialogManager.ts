@@ -191,16 +191,12 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
     opts.container = ownContainer;
   }
 
-  // The Stage-internal `.PopupContainer` backdrop only spans the
-  // `.Stage`; the `.MainMenu` game-tab header is a sibling above it and
-  // the engine puts an inline transform on `.Stage`, so the backdrop
-  // can't be pinned past it to physically cover the header.  Instead,
-  // while a dialog is open, dim the header (CSS `.MainMenu.DialogLock`)
-  // and capture clicks on it to dismiss the dialog — so a tab can't be
-  // switched from under it and the darkened header behaves like the
-  // rest of the backdrop.
-  const lockMenu =
-    opts.container.closest(setup.renderContainer)?.querySelector<HTMLElement>('.MainMenu') ?? null;
+  // The full-screen overlay is transparent (it carries only the
+  // vignette box-shadow), so the menu shows through it.  Dim the menu
+  // while a dialog is open (CSS `.MainMenu.DialogLock`) so it reads as
+  // part of the darkened backdrop.  Clicks over the menu land on the
+  // overlay (which sits above it) and dismiss via `handleInteraction`.
+  const lockMenu = rc?.querySelector<HTMLElement>('.MainMenu') ?? null;
 
   // Subpop block below duplicates `RenderTopLevelUI.ts:816` (the legacy
   // jQuery delegated handler on RenderPopup's jdomelem doesn't fire on
@@ -248,21 +244,9 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
     opts.container.classList.remove('lockOn', 'PopupPreact', 'PopupPreactBottom');
     if (opts.extendClass) opts.container.classList.remove(opts.extendClass);
     lockMenu?.classList.remove('DialogLock');
-    lockMenu?.removeEventListener('click', dismissFromMenu, true);
-    lockMenu?.removeEventListener('touchend', dismissFromMenu, true);
     ownContainer?.remove();
     active = null;
     opts.onAfterClose?.();
-  };
-
-  // Capture-phase so this fires before the bubble-phase jQuery
-  // `.mm-tab` delegate on `.MainMenu`; stopping propagation means a tab
-  // click dismisses the dialog instead of switching the view.
-  const dismissFromMenu = (e: Event): void => {
-    e.preventDefault();
-    e.stopPropagation();
-    (e as Event & { stopImmediatePropagation?: () => void }).stopImmediatePropagation?.();
-    close();
   };
 
   // Listener registry — the emitter half of the legacy `popup` seam.
@@ -313,8 +297,6 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
   if (opts.placeBottom) opts.container.classList.add('PopupPreactBottom');
   if (opts.extendClass) opts.container.classList.add(opts.extendClass);
   lockMenu?.classList.add('DialogLock');
-  lockMenu?.addEventListener('click', dismissFromMenu, true);
-  lockMenu?.addEventListener('touchend', dismissFromMenu, true);
 
   // `onClose` + the live `popup` handle are framework-injected.  Perp
   // components fire `popup.trigger('button_click.ChargeButton',[g,d])`
