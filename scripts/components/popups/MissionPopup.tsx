@@ -74,8 +74,8 @@ export function MissionPopup({
               </div>
             ))}
           </div>
+          <MarcoSpeech says={says} bodyHtml={bodyHtml} />
         </div>
-        <MarcoSpeech says={says} bodyHtml={bodyHtml} />
         <div class="PopupButtons NotificationButtons">
           {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
           <div class="Button" data-button-id="MainButton" onClick={close}>
