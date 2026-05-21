@@ -191,7 +191,8 @@ export class Database extends GameNode {
    *  (`initPopupEvents` / a `.on(...)` handler) on the returned handle. */
   private mountPopup<P extends Record<string, unknown>>(
     component: ComponentType<P & { onClose: () => void; popup: PreactDialogHandle }>,
-    props: P
+    props: P,
+    onAfterClose?: () => void
   ): PreactDialogHandle | undefined {
     const container = this.renderApi?.popupContainerDomelem?.[0];
     if (!container) return undefined;
@@ -201,6 +202,7 @@ export class Database extends GameNode {
       container,
       onAfterClose: () => {
         if ((this.renderPopup as unknown) === handle) delete this.renderPopup;
+        onAfterClose?.();
       },
     });
     this.renderPopup = handle as unknown as RenderPopupLike;
@@ -666,7 +668,12 @@ export class Database extends GameNode {
     const vm = buildProfileSetPopupVM(
       ps as unknown as Parameters<typeof buildProfileSetPopupVM>[0]
     );
-    const handle = this.mountPopup(ProfileSetPopup, { vm });
+    // When the dialog closes (X, backdrop, or after successful import) fire
+    // popup_cancel on the node so the DatabaseQueueItem's `.selected` class is
+    // cleared and the arm contracts back to its resting state.
+    const handle = this.mountPopup(ProfileSetPopup, { vm }, () => {
+      this.trigger('popup_cancel');
+    });
     // Import (MainButton) → mergeCued.  Legacy bound this inline (not
     // via initPopupEvents); popup_close is handled by the dialog
     // manager (X / backdrop) + onAfterClose, and mergeCued triggers

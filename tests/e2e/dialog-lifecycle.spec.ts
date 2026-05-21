@@ -646,6 +646,88 @@ test.describe('Section H — profileset import & sub-popups', () => {
     await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupBody', 'x');
   });
 
+  test('Canceling the integrate dialog removes .selected from the DatabaseQueueItem (arm contracts)', async ({
+    page,
+  }) => {
+    // Regression for: after canceling the integrate dialog the arm stays
+    // expanded (DatabaseQueueItem keeps .selected) and is not clickable until
+    // another bundle is selected.
+    //
+    // Fix: Database.openProfileSetPopup passes an onAfterClose callback that
+    // triggers 'popup_cancel' on the gnode, which fires the initPopupEvents
+    // handler that removes .selected from the queue item.
+    await installSettle(page);
+    await bootGame(page);
+    await page.evaluate(async () => {
+      const eng = await new Promise<any>((res, rej) =>
+        (window as any).require(['LocalEngine'], res, rej)
+      );
+      await eng.buyPerp('Imperium', 'contact035');
+      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
+        (s) => !!(s.nodes ?? []).some((n: any) => n.full_path === 'Imperium.contact035')
+      );
+    });
+    await page.reload();
+    await bootGame(page);
+
+    const psid = await page.evaluate(async () => {
+      const eng = await new Promise<any>((res, rej) =>
+        (window as any).require(['LocalEngine'], res, rej)
+      );
+      await eng.chargePerp('Imperium.contact035');
+      await ((window as any).__ddSettle as (p: (s: any) => boolean) => Promise<unknown>)(
+        (s) => !!(s.nodes_charging ?? []).some((c: any) => c.path === 'Imperium.contact035')
+      );
+      (window as any).__dd.advanceNow(31_000);
+      const cr = await eng.collectPerp('Imperium.contact035');
+      const inner = cr?.result?.result;
+      const groot = (window as any).__dd?._app?.game;
+      const db = groot.getDatabase();
+      const ps = db.cue(inner.profile_set, inner.origin, inner.collect_id);
+      return ps.psid as string;
+    });
+    expect(psid).toBeTruthy();
+
+    // Open the popup and verify the queue item gets .selected.
+    await page.evaluate((id) => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.trigger('switch_view', ['Database']);
+      const db = groot.getDatabase();
+      const ps = db.queue.set.find((p: any) => p.psid === id);
+      if (!ps) throw new Error(`no profileset with psid=${id} in db queue`);
+      // Simulate the click path: add .selected then open the popup.
+      db.renderDBQueue?.jdomelem
+        ?.find?.(`[data-psid="${id}"]`)
+        ?.addClass?.('selected');
+      db.openProfileSetPopup(ps);
+    }, psid);
+
+    await expect(page.locator('[data-testid="dd-integrate-button"]').first()).toBeVisible({
+      timeout: 3_000,
+    });
+
+    // Verify .selected is present before cancel.
+    const selectedBefore = await page.evaluate((id) => {
+      const groot = (window as any).__dd?._app?.game;
+      const db = groot.getDatabase();
+      const el = db.renderDBQueue?.jdomelem?.find?.(`[data-psid="${id}"]`)?.[0];
+      return el ? el.classList.contains('selected') : false;
+    }, psid);
+    expect(selectedBefore).toBe(true);
+
+    // Cancel via the X button.
+    await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupBody', 'x');
+
+    // After cancel the .selected class must be gone — arm contracted.
+    const selectedAfter = await page.evaluate((id) => {
+      const groot = (window as any).__dd?._app?.game;
+      const db = groot.getDatabase();
+      const el = db.renderDBQueue?.jdomelem?.find?.(`[data-psid="${id}"]`)?.[0];
+      return el ? el.classList.contains('selected') : false;
+    }, psid);
+    expect(selectedAfter).toBe(false);
+  });
+
   test('ProjectPerp BuySlots subpop opens via locked-slot click and dismisses with +/− controls', async ({
     page,
   }) => {
