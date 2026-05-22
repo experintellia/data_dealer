@@ -126,6 +126,17 @@
   transition: filter 0.15s linear;
 }
 
+/* On phones the full-screen dialog overlay covers the whole viewport —
+   this header included — with its flat backdrop dim.  The extra
+   `brightness()` would then darken the header a second time, making it
+   read darker than the rest of the backdrop.  Drop it so the overlay is
+   the single, uniform dimmer. */
+@media (max-width: 768px) {
+  .MainMenu.DialogLock {
+    filter: none;
+  }
+}
+
 /* ── Mobile / responsive layout ─────────────────────────────────────── */
 
 /* ≤ 980 px: hide the brand logo so the tabs reclaim its space. */

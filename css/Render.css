@@ -3532,14 +3532,15 @@ button {
   }
 
   /* The `.PopupContainer.lockOn` backdrop is only a 256px `box-shadow`
-     vignette.  On a tall phone its reach can't span the viewport, so
-     the mid-screen stays undimmed and a bottom-anchored dialog reads as
-     having no backdrop — only the top "header" strip darkens.  Flat-dim
-     the whole overlay so every dialog gets an edge-to-edge backdrop
-     regardless of viewport height (the vignette still adds edge depth
-     on top).  Alert / LevelUp keep their intentional tinted wash. */
+     vignette.  On a phone the vignette can't span the viewport (mid-
+     screen stays undimmed) and its edge falloff darkens the top strip
+     extra, so the backdrop reads as uneven — darkest behind the header.
+     Replace it with a single flat dim that covers the whole overlay
+     uniformly, edge to edge, regardless of viewport height.  Alert /
+     LevelUp keep their intentional tinted vignette wash. */
   .PopupContainer.lockOn.PopupFullViewport:not(.Alert):not(.LevelUp) {
     background: rgba(0, 0, 0, 0.55);
+    box-shadow: none;
   }
 
   /* Mission popup: inner scroll so the header (close X + decorator) and
