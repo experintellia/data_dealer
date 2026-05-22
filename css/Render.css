@@ -3531,6 +3531,17 @@ button {
     box-sizing: border-box;
   }
 
+  /* The `.PopupContainer.lockOn` backdrop is only a 256px `box-shadow`
+     vignette.  On a tall phone its reach can't span the viewport, so
+     the mid-screen stays undimmed and a bottom-anchored dialog reads as
+     having no backdrop — only the top "header" strip darkens.  Flat-dim
+     the whole overlay so every dialog gets an edge-to-edge backdrop
+     regardless of viewport height (the vignette still adds edge depth
+     on top).  Alert / LevelUp keep their intentional tinted wash. */
+  .PopupContainer.lockOn.PopupFullViewport:not(.Alert):not(.LevelUp) {
+    background: rgba(0, 0, 0, 0.55);
+  }
+
   /* Mission popup: inner scroll so the header (close X + decorator) and
    * speech bubble stay visible while a long goals/rewards list scrolls
    * in the middle.  The 24-px top margin clears the rotated
