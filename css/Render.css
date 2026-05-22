@@ -1914,7 +1914,9 @@
 }
 .PowerupsPage {
   padding: 32px 0px 0px 22px;
-  overflow:hidden;
+  height: 280px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .PopupPerp,
