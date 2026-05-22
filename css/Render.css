@@ -1708,7 +1708,7 @@
 .SubpopButtons,
 .PopupButtons {
   position: absolute;
-  bottom: -10px;
+  bottom: -35px;
   width: 100%;
   text-align: center;
   margin-left: -12px;
@@ -3787,7 +3787,7 @@ button {
     height: auto;
   }
   .PopupBody.CityPerp .PopupContent .PopupTab {
-    padding-bottom: 64px;
+    padding-bottom: 22px;
   }
   .PopupBody.CityPerp .standalone .PopupSelector {
     position: relative;
