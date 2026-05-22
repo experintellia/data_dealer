@@ -8,8 +8,12 @@
 // When the strip is too narrow for its tabs (the mobile City popup) it
 // scrolls horizontally; the effect below tracks the scroll position so
 // the CSS edge-fades only show on a side with more to reveal, and adds
-// mouse-drag + vertical-wheel scrolling (touch drag is already native
-// on an `overflow-x:auto` element).  It is inert when the strip fits.
+// pointer-drag (mouse + touch) + vertical-wheel scrolling.  It is
+// inert when the strip fits.  Touch drag is JS-driven rather than left
+// to native `overflow-x` panning because the engine's global touch
+// handlers can swallow the gesture; `touch-action: pan-y` (CSS) frees
+// the horizontal axis for these handlers while leaving vertical pans
+// to the browser.
 
 import { useEffect, useRef } from 'preact/hooks';
 
@@ -47,7 +51,7 @@ export function PopupMenu({
     // Tab labels use a web font — re-measure once it has loaded.
     document.fonts?.ready.then(update).catch(() => {});
 
-    // Mouse drag-to-scroll (touch drag is native).  A drag past the
+    // Pointer drag-to-scroll (mouse + touch).  A drag past the
     // threshold captures the pointer so it continues outside the thin
     // strip, and suppresses the click so it doesn't also switch a tab.
     let down = false;
@@ -55,7 +59,6 @@ export function PopupMenu({
     let startX = 0;
     let startScroll = 0;
     const onPointerDown = (e: PointerEvent): void => {
-      if (e.pointerType !== 'mouse') return;
       down = true;
       dragged = false;
       startX = e.clientX;
