@@ -1300,6 +1300,9 @@ export class GameRoot extends GameNode {
     config.template = config.template || 'notification.html';
     config.templateData = popupTemplateData;
     config.popupContainer = this;
+    // Notifications previously lived in the Stage's permanently-NoClose
+    // container; keep them non-dismissable by a backdrop tap.
+    (config as { noClose?: boolean }).noClose = true;
 
     const Render = getRender() as Pick<RenderApi, 'Popup'>;
     const popup = new Render.Popup(
@@ -1800,6 +1803,7 @@ export class GameRoot extends GameNode {
           gameNode?: GameNode;
           domelem?: unknown;
           addChild?(child: unknown): void;
+          popupContainerDomelem?: unknown;
         })
       | undefined;
     if (!stage) return;
@@ -1813,6 +1817,12 @@ export class GameRoot extends GameNode {
     $(containerSel).append(menu.domelem);
     menu.initUI?.();
     $(containerSel).append(stage.domelem);
+    // Single viewport-level popup overlay, a sibling of the menu and
+    // stage so it paints above the HUD and the tab bar. Every popup is
+    // routed here via RenderNode.addPopup.
+    const $popupLayer = $("<div class='PopupContainer Top'></div>");
+    $(containerSel).append($popupLayer);
+    stage.popupContainerDomelem = $popupLayer;
     this.renderMenu = menu as NonNullable<typeof this.renderMenu>;
     stage.addChild?.(statusbar);
   }

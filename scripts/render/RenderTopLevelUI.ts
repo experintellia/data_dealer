@@ -507,6 +507,8 @@ export type PopupConfig = NodeConfig & {
   popupContainer?: PopupContainerLike;
   extendClass?: string;
   placeBottom?: boolean;
+  // When set, a backdrop tap does not dismiss the popup.
+  noClose?: boolean;
   // Phase 2 (issue #80): when set, `render()` mounts a Preact component
   // into `jdomelem` instead of running the Underscore.js template flow.
   // Existing jQuery delegated handlers on the popup body (.PopupClose,
@@ -532,6 +534,8 @@ export class RenderPopup extends RenderNode {
   declare popupContainer: PopupContainerLike | undefined;
   declare extendClass: string | undefined;
   declare placeBottom: boolean | undefined;
+  declare noClose: boolean | undefined;
+  declare hostContainer: JQueryUIElem | undefined;
   declare lastButton: JQueryUIElem | undefined;
   declare userAbsPos: { x: number; y: number } | undefined;
   declare preactRender: ((container: HTMLElement, popup: RenderPopup) => void) | undefined;
@@ -565,13 +569,6 @@ export class RenderPopup extends RenderNode {
     // biome-ignore lint/correctness/noSelfAssign: legacy no-op, kept to avoid accidental removal of the property
     tdata.button = tdata.button;
 
-    if (this.popupContainer && this.extendClass) {
-      const containerJ = this.popupContainer.renderNode.popupContainerDomelem as unknown as
-        | JQueryUIElem
-        | undefined;
-      containerJ?.addClass(this.extendClass);
-    }
-
     node.render();
 
     const jq = node.jdomelem;
@@ -580,24 +577,6 @@ export class RenderPopup extends RenderNode {
       e.stopPropagation();
       e.preventDefault();
     });
-
-    if (this.popupContainer) {
-      this.popupContainer.lock?.();
-      const containerJ = this.popupContainer.renderNode.popupContainerDomelem;
-      if (containerJ) {
-        containerJ.on('click touchend', function (this: HTMLElement, e: UIEventLike) {
-          // Consume the event so the backdrop tap can't fall through to the
-          // game underneath — on touch the synthesized click would otherwise
-          // land on whatever is exposed once the popup closes.
-          e.stopPropagation();
-          e.preventDefault();
-          if (!$(this).hasClass('NoClose')) {
-            node.trigger('popup_close');
-            node.trigger('popup_cancel');
-          }
-        });
-      }
-    }
 
     node.on('no_cash', () => {
       if (node.lastButton) {
@@ -671,32 +650,6 @@ export class RenderPopup extends RenderNode {
       node.trigger('popup_close');
       node.trigger('popup_cancel');
     });
-
-    // Tutorial dialogs advance on tap anywhere (body or backdrop).
-    if (node.extendClass === 'Tutorial') {
-      let tutorialTouchFired = false;
-      const advanceTutorial = (e: UIEventLike): void => {
-        if (e.type === 'touchend') {
-          tutorialTouchFired = true;
-        } else if (tutorialTouchFired) {
-          tutorialTouchFired = false;
-          return;
-        }
-        e.stopPropagation();
-        e.preventDefault();
-        node.trigger('popup_close');
-      };
-      jq.on('touchend click', '.TutorialBody', advanceTutorial);
-      if (this.popupContainer) {
-        const $tutorialContainer = this.popupContainer.renderNode.popupContainerDomelem;
-        if ($tutorialContainer) {
-          $tutorialContainer.on('touchend click', advanceTutorial);
-          node.on('popup_close', () => {
-            $tutorialContainer.off('touchend click', advanceTutorial);
-          });
-        }
-      }
-    }
 
     jq.on(
       'click touchend',
@@ -987,6 +940,48 @@ export class RenderPopup extends RenderNode {
 
   override onAddInit(): void {
     const jq = this.jdomelem;
+    // addPopup has just mounted us into the shared popup overlay, so
+    // our parent element is that container.
+    const container = jq.parent() as unknown as JQueryUIElem;
+    this.hostContainer = container;
+
+    // The container is reused across popups; clear our namespaced
+    // handlers/classes from any previous occupant before re-wiring.
+    container.off('.ddpopup');
+    container.addClass('lockOn');
+    container.toggleClass('NoClose', !!this.noClose);
+    if (this.extendClass) container.addClass(this.extendClass);
+
+    if (this.extendClass === 'Tutorial') {
+      // Tutorial dialogs advance on tap anywhere (body or backdrop).
+      let tutorialTouchFired = false;
+      const advanceTutorial = (e: UIEventLike): void => {
+        if (e.type === 'touchend') {
+          tutorialTouchFired = true;
+        } else if (tutorialTouchFired) {
+          tutorialTouchFired = false;
+          return;
+        }
+        e.stopPropagation();
+        e.preventDefault();
+        this.trigger('popup_close');
+      };
+      jq.on('touchend click', '.TutorialBody', advanceTutorial);
+      container.on('touchend.ddpopup click.ddpopup', advanceTutorial);
+    } else {
+      container.on('click.ddpopup touchend.ddpopup', (e: UIEventLike) => {
+        // Consume the event so the backdrop tap can't fall through to
+        // the game underneath — on touch the synthesized click would
+        // otherwise land on whatever is exposed once the popup closes.
+        e.stopPropagation();
+        e.preventDefault();
+        if (!container.hasClass('NoClose')) {
+          this.trigger('popup_close');
+          this.trigger('popup_cancel');
+        }
+      });
+    }
+
     const heightVal = jq.height();
     if (typeof heightVal === 'number') this.height = heightVal;
     const pbody = jq.find('.PopupBody');
@@ -994,12 +989,10 @@ export class RenderPopup extends RenderNode {
     if (typeof pbodyHeight === 'number') pbody.css({ height: pbodyHeight });
     this.offsetY = this.height / 2 - 10;
     this.updateRenderProp();
-    const game = getApp().game;
-    if (game?.renderNode) {
-      const size = game.renderNode.getSize();
-      this.x = size.width / 2;
-      this.y = this.placeBottom ? size.height - this.height / 2 - 32 : size.height / 2;
-    }
+    const cw = container.width() ?? 0;
+    const ch = container.height() ?? 0;
+    this.x = cw / 2;
+    this.y = this.placeBottom ? ch - this.height / 2 - 32 : ch / 2;
     this.draw();
   }
 
@@ -1023,14 +1016,13 @@ export class RenderPopup extends RenderNode {
       if (cb) cb();
     }, 250);
 
-    if (this.popupContainer) {
-      const containerJ = this.popupContainer.renderNode.popupContainerDomelem as unknown as
-        | JQueryUIElem
-        | undefined;
-      if (containerJ && this.extendClass) {
-        containerJ.removeClass(this.extendClass);
+    const container = this.hostContainer;
+    if (container) {
+      if (this.extendClass) {
+        container.removeClass(this.extendClass);
       }
-      this.popupContainer.unlock?.();
+      container.removeClass('lockOn');
+      container.off('.ddpopup');
     }
     this.off('states');
     jq.addClass('close');

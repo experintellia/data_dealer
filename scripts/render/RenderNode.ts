@@ -285,11 +285,20 @@ export class RenderNode {
   }
 
   addPopup(popup: RenderNode): RenderNode | undefined {
-    if (!this.popupContainerDomelem) {
+    // Every popup mounts into the single top-level popup container,
+    // owned by the root node (the Stage). Climbing to the root means a
+    // popup opened from any view/node lands in the same viewport-level
+    // overlay instead of a per-view container trapped under the HUD.
+    let root: RenderNode = this;
+    while (root.parentNode) {
+      root = root.parentNode;
+    }
+    const container = root.popupContainerDomelem;
+    if (!container) {
       return undefined;
     }
-    this.popupContainerDomelem.empty();
-    this.popupContainerDomelem.append(popup.jdomelem);
+    container.empty();
+    container.append(popup.jdomelem);
     popup.parentNode = this;
     this.children.add(popup);
     popup.dragHandler = popup.dragHandler ?? this.dragHandler;

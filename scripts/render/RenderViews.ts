@@ -103,7 +103,6 @@ export type ViewTabConfig = NodeConfig & {
 
 export class RenderViewTab extends RenderNode {
   jdomelem1: JQueryViewElem;
-  jdomelem3: JQueryViewElem;
   domelem1: HTMLElement;
   declare RenderTemplate: string | undefined;
   declare lastButton: JQueryViewElem | undefined;
@@ -112,15 +111,7 @@ export class RenderViewTab extends RenderNode {
     const $ = getRenderJQuery('RenderViews');
     const jdomelem = $("<div class='ViewTab'></div>");
     const jdomelem1 = $("<div class='ViewTabContainer'></div>");
-    const jdomelem3 = $("<div class='PopupContainer'></div>");
     jdomelem.append(jdomelem1);
-    jdomelem.append(jdomelem3);
-
-    // FIXME: Better collect which events we're listening to
-    jdomelem3.on('mousedown mouseup touchstart touchend dblclick dbltap tap', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    });
 
     super({
       ...config,
@@ -133,8 +124,6 @@ export class RenderViewTab extends RenderNode {
     });
 
     this.jdomelem1 = jdomelem1;
-    this.jdomelem3 = jdomelem3;
-    this.popupContainerDomelem = jdomelem3;
     this.domelem1 = jdomelem1[0];
 
     const node = this;
@@ -220,14 +209,6 @@ export class RenderViewTab extends RenderNode {
     return child;
   }
 
-  lock(): void {
-    this.jdomelem3.addClass('lockOn');
-  }
-
-  unlock(): void {
-    this.jdomelem3.removeClass('lockOn');
-  }
-
   override onAddInit(): void {
     this.render();
     this.draw();
@@ -270,7 +251,6 @@ export type ViewMapConfig = NodeConfig & {
 export class RenderViewMap extends RenderNode {
   jdomelem1: JQueryViewElem;
   jdomelem2: JQueryViewElem;
-  jdomelem3: JQueryViewElem;
   domelem1: HTMLElement;
   domelem2: HTMLElement;
   jdomelemZoom: JQueryViewElem;
@@ -301,16 +281,9 @@ export class RenderViewMap extends RenderNode {
     const jdomelemZoom = $(
       '<div class="ZoomControls"><div class="ZoomIn"></div><div class="ZoomOut"></div><div class="Fullscreen"></div></div>'
     );
-    const jdomelem3 = $("<div class='PopupContainer'></div>");
     jdomelem1.append(jdomelem2);
     jdomelem.append(jdomelem1);
-    jdomelem.append(jdomelem3);
     jdomelem.append(jdomelemZoom);
-
-    jdomelem3.on('mousedown mouseup touchstart touchend dblclick dbltap tap', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    });
 
     super({
       ...config,
@@ -326,8 +299,6 @@ export class RenderViewMap extends RenderNode {
 
     this.jdomelem1 = jdomelem1;
     this.jdomelem2 = jdomelem2;
-    this.jdomelem3 = jdomelem3;
-    this.popupContainerDomelem = jdomelem3;
     this.jdomelemZoom = jdomelemZoom;
     this.domelem1 = jdomelem1[0];
     this.domelem2 = jdomelem2[0];
@@ -375,14 +346,6 @@ export class RenderViewMap extends RenderNode {
     child.useDragHandler = this.dragHandler;
     child.onAddInit();
     return child;
-  }
-
-  lock(): void {
-    this.jdomelem3.addClass('lockOn');
-  }
-
-  unlock(): void {
-    this.jdomelem3.removeClass('lockOn');
   }
 
   override onAddInit(): void {
@@ -774,7 +737,6 @@ export type StageConfig = NodeConfig & {
 };
 
 export class RenderStage extends RenderNode {
-  jdomelem2: JQueryViewElem;
   declare userAbsPos: { x: number; y: number } | undefined;
 
   constructor(config: StageConfig = {}) {
@@ -783,8 +745,6 @@ export class RenderStage extends RenderNode {
     // `<div class='MainMenu'>` wrapper).  Same pattern as the
     // PR #221 jdomelem-clobber fix in RenderSprite/RenderText.
     const jdomelem = config.jdomelem ?? $("<div class='Stage'></div>");
-    const jdomelem2 = $("<div class='PopupContainer Top NoClose'></div>");
-    jdomelem.append(jdomelem2);
 
     super({
       ...config,
@@ -798,8 +758,6 @@ export class RenderStage extends RenderNode {
       jdomelem: jdomelem,
     });
 
-    this.jdomelem2 = jdomelem2;
-    this.popupContainerDomelem = jdomelem2;
     this.dragHandler = new RenderDragHandler();
     this.useDragHandler = this.dragHandler;
     this.initUI();
@@ -824,11 +782,11 @@ export class RenderStage extends RenderNode {
   }
 
   lock(): void {
-    this.jdomelem2.addClass('lockOn');
+    this.popupContainerDomelem?.addClass('lockOn');
   }
 
   unlock(): void {
-    this.jdomelem2.removeClass('lockOn');
+    this.popupContainerDomelem?.removeClass('lockOn');
   }
 
   override setSize(size: { width?: number; height?: number }): void {
