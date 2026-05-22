@@ -204,6 +204,12 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
   // components.
   const handleInteraction = (e: Event): void => {
     if (e.target === opts.container) {
+      // Consume the event so the backdrop tap can't fall through to the
+      // game underneath — on touch, `close()` removes the overlay
+      // before the synthesized click fires, so without preventDefault
+      // that click would land on whatever is now exposed.
+      e.stopPropagation();
+      e.preventDefault();
       close();
       return;
     }
