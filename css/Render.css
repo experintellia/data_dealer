@@ -730,10 +730,10 @@
   position:relative;
 }
 
-/* Content grids: every tile renders into one flex-wrap `.PopupPage`
- * (no pagination); the scrolling viewport is `.PopupSelector` /
- * `.PopupTokens`, which keep their fixed sizes and scroll vertically
- * when the tiles overflow. */
+/* Content grids: every tile renders into one `.PopupPage` (no
+ * pagination).  Token / slot grids wrap and scroll vertically in their
+ * `.PopupTokens` / `.PowerupsPage` viewport; buy grids stay one row and
+ * scroll horizontally in `.PopupSelector` (see that rule below). */
 .PopupPageWrap {
   width: auto;
 }
@@ -1884,9 +1884,24 @@
   width: 540px;
   height: 266px;
   border-radius: 10px;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   text-align:center;
+}
+
+/* Buy grids (perp + powerup selectors) render one nowrap row inside
+ * `.PopupSelector` and scroll sideways — the legacy single-page look
+ * without pagination.  `safe center` centres a short row but falls
+ * back to flex-start once it overflows so the first tile stays
+ * reachable. */
+.PopupSelector .PopupPageWrap {
+  height: 100%;
+}
+.PopupSelector .PopupPage {
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: safe center;
+  height: 100%;
 }
 
 .standalone .PopupSelector {

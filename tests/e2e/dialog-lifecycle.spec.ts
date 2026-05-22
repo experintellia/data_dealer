@@ -1574,11 +1574,11 @@ test.describe('Section M — Subpop close + simple TokenPerp', () => {
 // ── Section O: OKButton + PowerupBuySlotsButton (audit follow-up) ────────
 //
 // Two follow-ups from a second-pass audit:
-//   1. `data-button-id="OKButton"` shares its close handler with
-//      `.SubpopClose` (RenderTopLevelUI.ts:824 binds both with one rule).
-//      Section M tests the .SubpopClose class path; we pin the OKButton
-//      attribute path here so a Preact port that splits the two
-//      selectors regresses against this test, not at runtime.
+//   1. `data-button-id="OKButton"` is the Close control inside a subpop
+//      (selector_powerups.html etc.).  Section M tests the `.SubpopClose`
+//      X path; we pin the OKButton path here so a regression in a subpop
+//      component's close handler shows up against this test, not at
+//      runtime.
 //   2. `button_click.PowerupBuySlotsButton` (GameNode.ts:746) actually
 //      executes a slot purchase via ProjectPerp.BuySlots → engine.buySlots.
 //      Section H's BuySlots test exercises the +/− controls inside the
@@ -1586,48 +1586,58 @@ test.describe('Section M — Subpop close + simple TokenPerp', () => {
 //      new slot lands in state.
 
 test.describe('Section O — OKButton + PowerupBuySlotsButton', () => {
-  test('OKButton on a subpop has the same close effect as .SubpopClose', async ({ page }) => {
-    // We can't lean on subpop_token / subpop_token_upgrade in a fresh
-    // game (no integrated tokens yet), so we drive the contract directly:
-    // mount a Subpop[data-subpop-id="OKButtonTest"] inside the open
-    // status popup and click its .Button[data-button-id="OKButton"].
-    // The delegated handler at RenderTopLevelUI.ts:822-839 should strip
-    // .open from the subpop without closing the parent.
+  test('OKButton on a real subpop closes it without closing the parent popup', async ({ page }) => {
+    // The buy-selector subpop (selector_powerups.html) is the real Preact
+    // subpop carrying a `.Button[data-button-id="OKButton"]` Close
+    // control.  Open it from a free Ad slot (project001 ships 3), click
+    // OKButton, and verify it strips `.open` from the subpop while the
+    // ProjectPerp popup itself stays mounted.
     await bootGame(page);
-    await openStatusPopup(page, 'Cash');
-
+    await buyAndOpenPerp(page, {
+      name: 'ProjectPerp',
+      gestalt: 'project001',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupMenu',
+      boost: { cash: 5_000, xp_level: 2, xp_value: 20 },
+    });
     await page.evaluate(() => {
-      const tab = document.querySelector<HTMLElement>('.PopupContainer.lockOn .PopupBody');
-      if (!tab) throw new Error('popup body not mounted');
-      // Wrap the status popup body in a fake PopupTab + SubpopContainer
-      // so the delegated handler's `.parents('.PopupTab')` traversal
-      // resolves the same way it would inside a real subpop host.
-      const fakeHost = document.createElement('div');
-      fakeHost.className = 'PopupTab';
-      fakeHost.innerHTML = `
-        <div class="SubpopContainer open">
-          <div class="Subpop open" data-subpop-id="OKButtonTest" data-testid="okbutton-fake-subpop">
-            <div class="Button" data-button-id="OKButton" data-testid="okbutton-trigger">OK</div>
-          </div>
-        </div>
-      `;
-      tab.appendChild(fakeHost);
+      const game = (window as any).__dd?._app?.game;
+      const gnode = game.getById('project001');
+      gnode.fetchPowerups(function () {
+        gnode.compilePowerups();
+        gnode.compileProfileSet?.();
+        if (gnode.renderPopup) gnode.updatePopup();
+      });
     });
 
-    const subpop = page.locator('[data-testid="okbutton-fake-subpop"]');
-    await expect(subpop).toHaveClass(/open/);
+    // Switch to the Ads tab and open the buy-selector from a free slot.
+    await page
+      .locator('.PopupContainer.lockOn .PopupMenuButton[data-tab="AdPowerup"]')
+      .first()
+      .click({ force: true });
+    await page
+      .locator(
+        '.PopupContainer.lockOn .PopupTab[data-tab="AdPowerup"] .Powerup.free[data-subpop-id="ProvidedAdPowerup"]'
+      )
+      .first()
+      .click({ force: true });
+    const subpop = page
+      .locator('.PopupContainer.lockOn .Subpop.Selector[data-subpop-id="ProvidedAdPowerup"].open')
+      .first();
+    await expect(subpop).toBeVisible({ timeout: 2_000 });
 
-    await page.locator('[data-testid="okbutton-trigger"]').click({ force: true });
+    // Click the OKButton (Close): it strips .open from the subpop, the
+    // parent ProjectPerp popup stays mounted.
+    await subpop.locator('.Button[data-button-id="OKButton"]').first().click({ force: true });
 
-    // Handler must remove .open from the subpop; the parent popup remains.
-    await expect(subpop).not.toHaveClass(/open/, { timeout: 2_000 });
-    await expect(page.locator('.PopupContainer.lockOn .PopupBody.Status')).toBeVisible();
+    await expect(
+      page.locator(
+        '.PopupContainer.lockOn .Subpop.Selector[data-subpop-id="ProvidedAdPowerup"].open'
+      )
+    ).toHaveCount(0, { timeout: 2_000 });
+    await expect(page.locator('.PopupContainer.lockOn .PopupMenu')).toBeVisible();
 
-    // Cleanup.
-    await page.evaluate(() => {
-      const groot = (window as any).__dd?._app?.game;
-      groot.renderPopup?.trigger('popup_close');
-    });
+    await expectOpenAndClose(page, '.PopupContainer.lockOn .PopupMenu', 'x');
   });
 
   test('PowerupBuySlotsButton purchases extra upgrade slots and updates engine state', async ({
@@ -1921,5 +1931,81 @@ test.describe('Section P — Pusher/Proxy provided-perp popups', () => {
     await expect(
       page.locator(`${root} .PopupPerp.provided.locked .Requires .RequiresLevel`)
     ).toContainText('Level 9');
+  });
+});
+
+// ── Section Q — touch subpop reopen ──────────────────────────────────────
+//
+// Regression guard for a touch-only bug: tapping a subpop close control
+// fires a real `touchend` followed by the browser's compatibility
+// `click`.  The dialog manager used to run a legacy jQuery delegated
+// close handler on `touchend` that called `preventDefault()` — which
+// suppressed the compat `click`, so the Preact component's `onClose`
+// never ran.  State desynced (the jQuery handler had stripped `.open`
+// off the DOM behind the vdom's back) and a closed subpop could not be
+// reopened.  Driven with real `.tap()` so the compat-click path is
+// actually exercised; a `.click()` would dispatch mouse events only and
+// miss the bug entirely.
+
+test.describe('Section Q — touch subpop reopen', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 375, height: 667 } });
+
+  test('a subpop closed by tap can be reopened for another slot', async ({ page }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ProjectPerp',
+      gestalt: 'project001',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupMenu',
+      boost: { cash: 5_000, xp_level: 2, xp_value: 20 },
+    });
+    await page.evaluate(() => {
+      const game = (window as any).__dd?._app?.game;
+      const gnode = game.getById('project001');
+      gnode.fetchPowerups(function () {
+        gnode.compilePowerups();
+        gnode.compileProfileSet?.();
+        if (gnode.renderPopup) gnode.updatePopup();
+      });
+    });
+
+    await page
+      .locator('.PopupContainer.lockOn .PopupMenuButton[data-tab="AdPowerup"]')
+      .first()
+      .tap();
+
+    // project001 ships 3 free Ad slots; each opens the buy-selector subpop.
+    const freeSlots = page.locator(
+      '.PopupContainer.lockOn .PopupTab[data-tab="AdPowerup"] .Powerup.free[data-subpop-id="ProvidedAdPowerup"]'
+    );
+    await expect(freeSlots).toHaveCount(3);
+
+    const container = page.locator(
+      '.PopupContainer.lockOn .PopupTab[data-tab="AdPowerup"] .SubpopContainer'
+    );
+    const selector = page.locator(
+      '.PopupContainer.lockOn .Subpop.Selector[data-subpop-id="ProvidedAdPowerup"]'
+    );
+
+    // Tap a free slot — the buy-selector subpop opens.
+    await freeSlots.nth(0).tap();
+    await expect(selector).toHaveClass(/open/, { timeout: 2_000 });
+    await expect(container).toHaveClass(/open/);
+
+    // Tap the SubpopClose X to dismiss it.
+    await selector.locator('.SubpopClose').first().tap();
+    await expect(selector).not.toHaveClass(/open/, { timeout: 2_000 });
+    await expect(container).not.toHaveClass(/open/);
+
+    // Tap another free slot — the subpop must reopen (the bug left it
+    // shut: `.SubpopContainer` never regained `.open`).
+    await freeSlots.nth(1).tap();
+    await expect(selector).toHaveClass(/open/, { timeout: 2_000 });
+    await expect(container).toHaveClass(/open/);
+
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.renderPopup?.trigger('popup_close');
+    });
   });
 });
