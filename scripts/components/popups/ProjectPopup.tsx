@@ -23,7 +23,7 @@ import type {
 import i18n from '../../i18n.js';
 import { PopupMenu } from './PopupMenu.js';
 import type { PreactDialogHandle } from './dialogManager.js';
-import { PageArrows, TokenSubpop, TokenTile, fireAction } from './perpShared.js';
+import { TokenSubpop, TokenTile, fireAction } from './perpShared.js';
 
 /** Imperative seam used by `ProjectPerp.updatePopupGracefully` to drive
  *  the buy/sell slot plug-out → plug-in animation without re-mounting
@@ -249,16 +249,12 @@ function BuySelectorSubpop({
   cat,
   isOpen,
   hasPopup,
-  page,
-  setPage,
   onProvidedOpen,
   onClose,
 }: {
   cat: PowerupCategoryVM;
   isOpen: boolean;
   hasPopup: boolean;
-  page: number;
-  setPage: (next: (p: number) => number) => void;
   onProvidedOpen: (gestalt: string) => void;
   onClose: () => void;
 }) {
@@ -266,9 +262,6 @@ function BuySelectorSubpop({
     e.stopPropagation();
     onClose();
   };
-  const size = cat.selectorPageSize;
-  const pageCount = Math.max(1, Math.ceil(cat.providedTiles.length / size));
-  const pageTiles = cat.providedTiles.slice(page * size, page * size + size);
   let cls = 'Subpop Selector';
   if (isOpen) cls += ' open';
   if (hasPopup) cls += ' hasPopup';
@@ -284,8 +277,8 @@ function BuySelectorSubpop({
       <div class="Pagination Selector">
         <div class="PopupSelector">
           <div class="PopupPageWrap">
-            <div class="PopupPage PowerupPage" data-page-id={page}>
-              {pageTiles.map((t) => (
+            <div class="PopupPage PowerupPage">
+              {cat.providedTiles.map((t) => (
                 <ProvidedTile
                   key={t.gestalt}
                   tile={t}
@@ -295,7 +288,6 @@ function BuySelectorSubpop({
             </div>
           </div>
         </div>
-        <PageArrows page={page} pageCount={pageCount} setPage={setPage} />
       </div>
       <div class="SubpopButtons">
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
@@ -410,7 +402,6 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
   const [activeTab, setActiveTab] = useState(initialVm.initialTab);
   // Data-tab profileset token subpop (Contact-shaped).
   const [openToken, setOpenToken] = useState<string | null>(null);
-  const [tokenPage, setTokenPage] = useState(0);
   // Powerup-tab subpop state. `selPkey` = which category's buy Selector
   // is open; `subId` = a card open on top (sell `<pkey><slot>`,
   // `buyslots`, or an InSelector `Provided<gestalt>`).
@@ -420,8 +411,6 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
   // it onto the buy buttons (`data-button-data`) so `PowerupBuyButton`
   // forwards `[gestalt, slot]` to `BuyPowerup(gestalt, slot)`.
   const [buySlot, setBuySlot] = useState(0);
-  const [slotPage, setSlotPage] = useState<Record<string, number>>({});
-  const [selPage, setSelPage] = useState<Record<string, number>>({});
   // Single in-flight slot animation (buy/sell touches one slot).
   const [anim, setAnim] = useState<{ key: string; phase: 'out' | 'in' } | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
@@ -505,11 +494,6 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
   // prefix), so these render as innerHTML, not escaped text.
   const desc = vm.description;
   const dataTabCls = dataActive ? 'PopupText TabText' : 'PopupText TabText hidden';
-  const tokPageCount = Math.max(1, Math.ceil(vm.tokens.length / vm.pageSize));
-  const pageTokens = vm.tokens.slice(
-    tokenPage * vm.pageSize,
-    tokenPage * vm.pageSize + vm.pageSize
-  );
 
   return (
     <div class="PopupBody ProjectPerp">
@@ -560,14 +544,13 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
           <div class="Pagination">
             <div class="PopupTokens">
               <div class="PopupPageWrap">
-                <div class="PopupPage" data-page-id={tokenPage}>
-                  {pageTokens.map((t) => (
+                <div class="PopupPage">
+                  {vm.tokens.map((t) => (
                     <TokenTile key={t.gestalt} token={t} onOpen={setOpenToken} />
                   ))}
                 </div>
               </div>
             </div>
-            <PageArrows page={tokenPage} pageCount={tokPageCount} setPage={setTokenPage} />
           </div>
           <div class="PopupSummary">
             <div class="PopupSummaryItem Profiles">
@@ -634,10 +617,6 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
               const selOpen = selPkey === cat.pkey;
               const containerOpen = selOpen || sub !== null;
               const inSelectorOpen = sub !== null && sub.startsWith('Provided');
-              const size = cat.pageSize;
-              const sp = slotPage[cat.pkey] ?? 0;
-              const pageCount = Math.max(1, Math.ceil(cat.slots.length / size));
-              const pageSlots = cat.slots.slice(sp * size, sp * size + size);
               return (
                 <div
                   key={cat.pkey}
@@ -658,10 +637,6 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
                       cat={cat}
                       isOpen={selOpen}
                       hasPopup={selOpen && inSelectorOpen}
-                      page={selPage[cat.pkey] ?? 0}
-                      setPage={(next) =>
-                        setSelPage((m) => ({ ...m, [cat.pkey]: next(m[cat.pkey] ?? 0) }))
-                      }
                       onProvidedOpen={(g) => setSubId(`Provided${g}`)}
                       onClose={closeTopSubpop}
                     />
@@ -685,8 +660,8 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
                   <div class="Pagination">
                     <div class="PowerupsPage">
                       <div class="PopupPageWrap">
-                        <div class="PopupPage PowerupPage" data-page-id={sp}>
-                          {pageSlots.map((slot) => {
+                        <div class="PopupPage PowerupPage">
+                          {cat.slots.map((slot) => {
                             const open =
                               slot.kind === 'free'
                                 ? () => {
@@ -721,13 +696,6 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
                         </div>
                       </div>
                     </div>
-                    <PageArrows
-                      page={sp}
-                      pageCount={pageCount}
-                      setPage={(next) =>
-                        setSlotPage((m) => ({ ...m, [cat.pkey]: next(m[cat.pkey] ?? 0) }))
-                      }
-                    />
                   </div>
                 </div>
               );

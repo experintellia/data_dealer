@@ -45,7 +45,6 @@ export function ProfileSetPopup({ vm, onClose, popup }: ProfileSetPopupProps) {
           </div>
           <TokenGrid
             tokens={vm.tokens}
-            pageSize={vm.pageSize}
             paginationClass="Pagination"
             tokensClass="PopupTokens"
             onOpen={setOpenToken}

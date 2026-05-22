@@ -9,13 +9,7 @@ import { useState } from 'preact/hooks';
 import type { ProvidedPopupVM } from '../../game/providedView.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
-import {
-  NoItems,
-  PageArrows,
-  PerpProvidedSubpop,
-  PerpProvidedTile,
-  fireAction,
-} from './perpShared.js';
+import { NoItems, PerpProvidedSubpop, PerpProvidedTile, fireAction } from './perpShared.js';
 
 export interface ProvidedPerpPopupProps {
   vm: ProvidedPopupVM;
@@ -26,15 +20,11 @@ export interface ProvidedPerpPopupProps {
 }
 
 export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps) {
-  const [page, setPage] = useState(0);
   const [openKey, setOpenKey] = useState<number | null>(null);
   // Open/close is just the `.open` toggle: the CSS opacity+scale fade
   // dissolves the whole card cleanly on close (no transparent-bg hack).
   const openSubpop = (key: number): void => setOpenKey(key);
   const closeSubpop = (): void => setOpenKey(null);
-
-  const pageCount = Math.max(1, Math.ceil(vm.tiles.length / vm.pageSize));
-  const pageTiles = vm.tiles.slice(page * vm.pageSize, page * vm.pageSize + vm.pageSize);
 
   return (
     <div class="PopupBody ProvidedPerp">
@@ -86,15 +76,14 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
                     textLoading={vm.loadingText}
                   />
                 ) : (
-                  <div class="PopupPage PerpPage" data-page-id={page}>
-                    {pageTiles.map((t) => (
+                  <div class="PopupPage PerpPage">
+                    {vm.tiles.map((t) => (
                       <PerpProvidedTile key={t.key} tile={t} onOpen={openSubpop} />
                     ))}
                   </div>
                 )}
               </div>
             </div>
-            <PageArrows page={page} pageCount={pageCount} setPage={setPage} standalone />
           </div>
           <div class="PopupButtons">
             {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
