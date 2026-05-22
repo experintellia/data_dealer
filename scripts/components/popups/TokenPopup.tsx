@@ -59,7 +59,6 @@ export function TokenPopup({ vm, onClose, popup }: TokenPopupProps) {
             </div>
             <TokenGrid
               tokens={vm.tokens}
-              pageSize={vm.pageSize}
               paginationClass="Pagination half"
               tokensClass="PopupTokens"
               onOpen={setOpenToken}

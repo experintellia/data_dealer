@@ -50,7 +50,6 @@ export function ClientPopup({ vm, onClose, popup }: ClientPopupProps) {
           </div>
           <TokenGrid
             tokens={vm.providedTokens}
-            pageSize={vm.providedPageSize}
             paginationClass="Pagination half small"
             tokensClass="PopupTokens provided"
             onOpen={setOpenToken}
@@ -63,7 +62,6 @@ export function ClientPopup({ vm, onClose, popup }: ClientPopupProps) {
           </div>
           <TokenGrid
             tokens={vm.consumedTokens}
-            pageSize={vm.consumedPageSize}
             paginationClass="Pagination half"
             tokensClass="PopupTokens consumed"
             onOpen={setOpenToken}

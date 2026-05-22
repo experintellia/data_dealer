@@ -6,7 +6,6 @@
 // once here instead of being duplicated per perp component.
 
 import type { JSX } from 'preact';
-import { useState } from 'preact/hooks';
 import type { ProvidedSubpopVM, ProvidedTileVM } from '../../game/providedView.js';
 import type { TokenUpgradeSubpopVM } from '../../game/tokenPopupView.js';
 import type { TokenVM } from '../../game/tokenView.js';
@@ -98,71 +97,32 @@ export function TokenSubpop({
   );
 }
 
-/** The legacy `.Pagination` prev/next arrows — both perp grids (and
- *  Client's two half-grids) share the same `.hidden`-toggle markup. */
-export function PageArrows({
-  page,
-  pageCount,
-  setPage,
-  standalone,
-}: {
-  page: number;
-  pageCount: number;
-  setPage: (next: (p: number) => number) => void;
-  /** Pusher/Proxy selectors use `.PopupPageArrowR.standalone`. */
-  standalone?: boolean;
-}) {
-  if (pageCount <= 1) return null;
-  const sa = standalone ? ' standalone' : '';
-  return (
-    <>
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-      <div
-        class={page < pageCount - 1 ? `PopupPageArrowR${sa}` : `PopupPageArrowR${sa} hidden`}
-        onClick={() => setPage((p) => Math.min(p + 1, pageCount - 1))}
-      />
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-      <div
-        class={page > 0 ? `PopupPageArrowL${sa}` : `PopupPageArrowL${sa} hidden`}
-        onClick={() => setPage((p) => Math.max(p - 1, 0))}
-      />
-    </>
-  );
-}
-
-/** One paged token grid — `token.html` inside `profileset*.html`.
- *  Owns its own page state; the wrapper classes + page size vary per
- *  caller (Contact/ProfileSet `Pagination`/`PopupTokens`, Client's
- *  provided/consumed halves, TokenPopup's SuperToken `Pagination
- *  half`).  The subpop overlay + open-state stay with the caller. */
+/** One token grid — `token.html` inside `profileset*.html`.  Renders
+ *  every tile into a single flex-wrap grid (`.PopupPage`); the wrapper
+ *  `.PopupSelector` / `.PopupTokens` scrolls when the tiles overflow.
+ *  The subpop overlay + open-state stay with the caller. */
 export function TokenGrid({
   tokens,
-  pageSize,
   paginationClass,
   tokensClass,
   onOpen,
 }: {
   tokens: TokenVM[];
-  pageSize: number;
   paginationClass: string;
   tokensClass: string;
   onOpen: (gestalt: string) => void;
 }) {
-  const [page, setPage] = useState(0);
-  const pageCount = Math.max(1, Math.ceil(tokens.length / pageSize));
-  const pageTokens = tokens.slice(page * pageSize, page * pageSize + pageSize);
   return (
     <div class={paginationClass}>
       <div class={tokensClass}>
         <div class="PopupPageWrap">
-          <div class="PopupPage" data-page-id={page}>
-            {pageTokens.map((t) => (
+          <div class="PopupPage">
+            {tokens.map((t) => (
               <TokenTile key={t.gestalt} token={t} onOpen={onOpen} />
             ))}
           </div>
         </div>
       </div>
-      <PageArrows page={page} pageCount={pageCount} setPage={setPage} />
     </div>
   );
 }

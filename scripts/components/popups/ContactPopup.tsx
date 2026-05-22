@@ -47,7 +47,6 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
           </div>
           <TokenGrid
             tokens={vm.tokens}
-            pageSize={vm.pageSize}
             paginationClass="Pagination"
             tokensClass="PopupTokens"
             onOpen={setOpenToken}
