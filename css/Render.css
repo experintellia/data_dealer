@@ -1913,7 +1913,7 @@
 .Powerups {
 }
 .PowerupsPage {
-  padding: 32px 0px 0px 22px;
+  padding: 32px 0px 0px;
   height: 280px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -3701,6 +3701,27 @@ button {
     width: auto;
     left: 6px;
     right: 6px;
+  }
+  /* Subpop overlay cards (token detail / buy-upgrade / buy-slots) are
+   * pinned at a desktop 540–576-px width + fixed height, so they run
+   * off a phone screen and clip their (narrower-wrapped) content.
+   * Inset them to the dialog and let the card grow to its content. */
+  .SubpopContainer {
+    width: auto;
+    left: 6px;
+    right: 6px;
+    /* Lift the overlay near the top of the popup body so the
+     * grow-to-content card below has room before the screen edge. */
+    top: 40px;
+  }
+  .Subpop {
+    width: auto;
+    left: 6px;
+    right: 6px;
+    /* Grow to the (narrower-wrapped) content height; `padding-bottom`
+     * reserves room for the absolutely-pinned `.SubpopButtons`. */
+    height: auto;
+    padding-bottom: 44px;
   }
 }
 
