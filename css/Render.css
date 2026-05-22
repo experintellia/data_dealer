@@ -3725,10 +3725,11 @@ button {
     margin-left: 0;
     padding-right: 0;
   }
-  /* Contact's profile/risk summary is pinned at a desktop `top:192px`,
-   * which lands inside the now-taller reflowed header.  Let it flow
-   * with the content instead so it can't overlap the description. */
-  .PopupBody.ContactPerp .PopupSummary {
+  /* Contact / Project profile-risk summary is pinned at a desktop
+   * `top:192px`, which lands inside the now-taller reflowed header.
+   * Let it flow with the content instead so it can't overlap. */
+  .PopupBody.ContactPerp .PopupSummary,
+  .PopupBody.ProjectPerp .PopupSummary {
     position: static;
     margin-left: 0;
     width: auto;
