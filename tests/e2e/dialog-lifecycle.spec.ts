@@ -1137,45 +1137,21 @@ test.describe('Section J — in-popup action handlers', () => {
   });
 });
 
-// ── Section K: pagination ────────────────────────────────────────────────
+// ── Section K: content grids ─────────────────────────────────────────────
 //
-// Several popups paginate their list of items (5 per page in
-// popup_karma / popup_agent / popup_pusher / popup_proxy, 12 in
-// popup_profileset).  The page-state machinery is a single delegated
-// handler in scripts/render/RenderTopLevelUI.ts:857-890: click
-// .PopupPageArrowR → next page becomes visible, prev arrow shown,
-// next arrow hidden on the last page.  The Preact port has to mirror
-// that exactly — pin it now so the regression surfaces here.
-//
-// Karma popup is the easiest fixture: providedKarma has all 10
-// karmalauters from the ruleset (always > 5 so always paginated).
+// Perp / token grids render every tile into one wrapping `.PopupPage`
+// (no pagination — the viewport scrolls).  Pin that all tiles render
+// and that no page arrows exist.
 
-test.describe('Section K — pagination arrows', () => {
-  test('Karma popup pagination flips pages and toggles arrow visibility', async ({ page }) => {
-    // Karma is now the Preact ProvidedPerpPopup (tier 13): only the
-    // active `.PopupPage.PerpPage` is rendered (data-page-id flips),
-    // not every page with `.hidden` — same contract as Pusher Section P.
+test.describe('Section K — content grids', () => {
+  test('Karma popup renders every provided-karma tile', async ({ page }) => {
     await bootGame(page);
     await openStatusPopup(page, 'karma');
 
     const root = '.PopupContainer.lockOn';
-    const pageEl = `${root} .PopupPage.PerpPage`;
-    const arrowR = `${root} .PopupPageArrowR.standalone`;
-    const arrowL = `${root} .PopupPageArrowL.standalone`;
-    const hidden = /(^|\s)hidden(\s|$)/;
-
-    // 10 ruleset karmalauters @ 5/page ⇒ 2 pages; page 0, L hidden.
-    await expect(page.locator(pageEl)).toHaveAttribute('data-page-id', '0');
-    await expect(page.locator(arrowR)).not.toHaveClass(hidden);
-    await expect(page.locator(arrowL)).toHaveClass(hidden);
-
-    await page.locator(arrowR).first().click({ force: true });
-    await expect(page.locator(pageEl)).toHaveAttribute('data-page-id', '1');
-    await expect(page.locator(arrowL)).not.toHaveClass(hidden);
-
-    await page.locator(arrowL).first().click({ force: true });
-    await expect(page.locator(pageEl)).toHaveAttribute('data-page-id', '0');
-    await expect(page.locator(arrowL)).toHaveClass(hidden);
+    // All ruleset karmalauters render in one grid (>5 = not paged), no arrows.
+    expect(await page.locator(`${root} .PopupPage.PerpPage .PopupPerp`).count()).toBeGreaterThan(5);
+    await expect(page.locator(`${root} .PopupPageArrowR`)).toHaveCount(0);
 
     await page.evaluate(() => {
       const groot = (window as any).__dd?._app?.game;
@@ -1183,43 +1159,7 @@ test.describe('Section K — pagination arrows', () => {
     });
   });
 
-  test('Karma popup pagination hides the right arrow on the last page', async ({ page }) => {
-    // Walk right until arrowR hides — only the last page hides it, so a
-    // missing last-page branch is a real bug. Preact contract: one
-    // `.PopupPage` whose data-page-id advances; arrowR gains `.hidden`
-    // on the final page.
-    await bootGame(page);
-    await openStatusPopup(page, 'karma');
-
-    const root = '.PopupContainer.lockOn';
-    const arrowR = page.locator(`${root} .PopupPageArrowR.standalone`).first();
-    const arrowL = page.locator(`${root} .PopupPageArrowL.standalone`).first();
-    const hidden = /(^|\s)hidden(\s|$)/;
-
-    // Click next while the right arrow is still active (cap to avoid an
-    // infinite loop if the contract regresses).
-    for (let i = 0; i < 10; i++) {
-      const cls = (await arrowR.getAttribute('class')) ?? '';
-      if (/(^|\s)hidden(\s|$)/.test(cls)) break;
-      await arrowR.click({ force: true });
-    }
-
-    await expect(arrowR).toHaveClass(hidden);
-    await expect(arrowL).not.toHaveClass(hidden);
-
-    await page.evaluate(() => {
-      const groot = (window as any).__dd?._app?.game;
-      groot.renderPopup?.trigger('popup_close');
-    });
-  });
-
-  // The Preact Contact popup uses a different pagination model than the
-  // legacy slide (single `.PopupPage[data-page-id={page}]` swapped via
-  // useState, 12/page) — the two Karma tests above only cover the
-  // legacy template model.  Pin the new model directly so it can't
-  // regress unnoticed during the ~3 tiers the shared profileset.html
-  // stays live for popup_project/popup_client.
-  test('Contact popup paginates a >12-token profileset (swap model)', async ({ page }) => {
+  test('Contact popup renders a >12-token profileset without pagination', async ({ page }) => {
     await bootGame(page);
     await buyAndOpenPerp(page, {
       name: 'ContactPerp',
@@ -1229,8 +1169,8 @@ test.describe('Section K — pagination arrows', () => {
     });
     await expect(page.locator('.PopupContainer.lockOn .PopupBody')).toBeVisible({ timeout: 3_000 });
 
-    // Inject a 13-token profileset and re-open so the VM paginates
-    // (ceil(13/12) = 2 pages).
+    // Inject a 13-token profileset and re-open: all 13 tiles render in
+    // the one wrapping grid (no pagination), with no page arrows.
     await page.evaluate(() => {
       const gnode = (window as any).__dd?._app?.game.getById('contact035');
       gnode.data.ProfileSet = {
@@ -1239,63 +1179,18 @@ test.describe('Section K — pagination arrows', () => {
       gnode.openPopup();
     });
 
-    const read = () =>
-      page.evaluate(() => {
-        const root = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
-        const pag = root?.querySelector<HTMLElement>('.Pagination');
-        const activePage = pag?.querySelector<HTMLElement>('.PopupPage');
-        const arrowL = pag?.querySelector<HTMLElement>('.PopupPageArrowL');
-        const arrowR = pag?.querySelector<HTMLElement>('.PopupPageArrowR');
-        return {
-          activePageId: activePage?.getAttribute('data-page-id') ?? null,
-          tokenCount: activePage?.querySelectorAll('.PopupToken').length ?? 0,
-          arrowLHidden: arrowL ? arrowL.classList.contains('hidden') : null,
-          arrowRHidden: arrowR ? arrowR.classList.contains('hidden') : null,
-        };
-      });
-
-    // Page 0: 12 tiles, left arrow hidden, right arrow shown.
-    expect(await read()).toEqual({
-      activePageId: '0',
-      tokenCount: 12,
-      arrowLHidden: true,
-      arrowRHidden: false,
-    });
-
-    await page
-      .locator('.PopupContainer.lockOn .Pagination .PopupPageArrowR')
-      .first()
-      .click({ force: true });
-
-    // Page 1 (last): the remaining 1 tile, right arrow hidden, left shown.
-    expect(await read()).toEqual({
-      activePageId: '1',
-      tokenCount: 1,
-      arrowLHidden: false,
-      arrowRHidden: true,
-    });
-
-    await page
-      .locator('.PopupContainer.lockOn .Pagination .PopupPageArrowL')
-      .first()
-      .click({ force: true });
-
-    expect(await read()).toEqual({
-      activePageId: '0',
-      tokenCount: 12,
-      arrowLHidden: true,
-      arrowRHidden: false,
-    });
+    const root = '.PopupContainer.lockOn';
+    await expect(page.locator(`${root} .PopupPage .PopupToken`)).toHaveCount(13);
+    await expect(page.locator(`${root} .PopupPageArrowR`)).toHaveCount(0);
 
     await page.evaluate(() => {
       (window as any).__dd?._app?.game.renderPopup?.trigger('popup_close');
     });
   });
 
-  // The Client popup is a different shape again: TWO independently
-  // paged grids (provided 7/page + consumed 6/page) split by a
-  // ClientDivider (min(provided,7) dots).  Pin the dual-grid layout +
-  // independent pagination since nothing else exercises it.
+  // The Client popup is a different shape again: TWO grids (provided +
+  // consumed) split by a ClientDivider.  Pin the dual-grid layout and
+  // that each grid renders every tile (no pagination).
   test('Client popup renders dual provided/consumed grids + divider', async ({ page }) => {
     await bootGame(page);
     await buyAndOpenPerp(page, {
@@ -1306,8 +1201,8 @@ test.describe('Section K — pagination arrows', () => {
     });
     await expect(page.locator('.PopupContainer.lockOn .PopupBody')).toBeVisible({ timeout: 3_000 });
 
-    // Inject 8 provided + 7 consumed tokens and re-open: provided
-    // paginates at 7 (2 pages), consumed at 6 (2 pages), divider = 7.
+    // Inject 8 provided + 7 consumed tokens and re-open: each grid
+    // renders all of its tiles in one wrapping grid.
     await page.evaluate(() => {
       const gnode = (window as any).__dd?._app?.game.getById('client016');
       gnode.data.ProfileSet = {
@@ -1319,48 +1214,25 @@ test.describe('Section K — pagination arrows', () => {
       gnode.openPopup();
     });
 
-    const read = () =>
-      page.evaluate(() => {
-        const root = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
-        const prov = root?.querySelector<HTMLElement>('.PopupTokens.provided');
-        const cons = root?.querySelector<HTMLElement>('.PopupTokens.consumed');
-        const provArrowR = prov
-          ?.closest('.Pagination')
-          ?.querySelector<HTMLElement>('.PopupPageArrowR');
-        return {
-          providedClass: prov?.parentElement?.className ?? null,
-          consumedClass: cons?.parentElement?.className ?? null,
-          providedPage0: prov?.querySelectorAll('.PopupPage .PopupToken').length ?? 0,
-          consumedPage0: cons?.querySelectorAll('.PopupPage .PopupToken').length ?? 0,
-          dividerItems: root?.querySelectorAll('.ClientDivider .ClientDividerItem').length ?? 0,
-          provArrowRHidden: provArrowR ? provArrowR.classList.contains('hidden') : null,
-        };
-      });
-
-    expect(await read()).toEqual({
-      providedClass: 'Pagination half small',
-      consumedClass: 'Pagination half',
-      providedPage0: 7,
-      consumedPage0: 6,
-      dividerItems: 7,
-      provArrowRHidden: false,
+    const result = await page.evaluate(() => {
+      const root = document.querySelector<HTMLElement>('.PopupContainer.lockOn');
+      const prov = root?.querySelector<HTMLElement>('.PopupTokens.provided');
+      const cons = root?.querySelector<HTMLElement>('.PopupTokens.consumed');
+      return {
+        providedClass: prov?.parentElement?.className ?? null,
+        consumedClass: cons?.parentElement?.className ?? null,
+        provided: prov?.querySelectorAll('.PopupPage .PopupToken').length ?? 0,
+        consumed: cons?.querySelectorAll('.PopupPage .PopupToken').length ?? 0,
+        dividerItems: root?.querySelectorAll('.ClientDivider .ClientDividerItem').length ?? 0,
+        arrows: root?.querySelectorAll('.PopupPageArrowR').length ?? 0,
+      };
     });
-
-    // Advancing the provided grid must not move the consumed grid.
-    await page
-      .locator('.PopupContainer.lockOn .PopupTokens.provided')
-      .locator('xpath=ancestor::*[contains(@class,"Pagination")]')
-      .locator('.PopupPageArrowR')
-      .first()
-      .click({ force: true });
-    expect(await read()).toEqual({
-      providedClass: 'Pagination half small',
-      consumedClass: 'Pagination half',
-      providedPage0: 1,
-      consumedPage0: 6,
-      dividerItems: 7,
-      provArrowRHidden: true,
-    });
+    expect(result.providedClass).toBe('Pagination half small');
+    expect(result.consumedClass).toBe('Pagination half');
+    expect(result.provided).toBe(8);
+    expect(result.consumed).toBe(7);
+    expect(result.dividerItems).toBeGreaterThan(0);
+    expect(result.arrows).toBe(0);
 
     await page.evaluate(() => {
       (window as any).__dd?._app?.game.renderPopup?.trigger('popup_close');
@@ -1925,7 +1797,7 @@ test.describe('Section P — Pusher/Proxy provided-perp popups', () => {
     await expect(page.locator(`${root} .SelectorNoItems`)).toHaveCount(0);
   });
 
-  test('Pusher provided grid paginates at 5/page (standalone arrows)', async ({ page }) => {
+  test('Pusher provided grid renders every tile (no pagination)', async ({ page }) => {
     await bootGame(page);
     await buyAndOpenPerp(page, {
       name: 'PusherPerp',
@@ -1948,18 +1820,9 @@ test.describe('Section P — Pusher/Proxy provided-perp popups', () => {
     });
 
     const root = '.PopupContainer.lockOn';
-    const arrowR = `${root} .PopupPageArrowR.standalone`;
-    const arrowL = `${root} .PopupPageArrowL.standalone`;
-    await expect(page.locator(`${root} .PopupPerp.provided`)).toHaveCount(5);
-    await expect(page.locator(`${root} .PopupPage.PerpPage`)).toHaveAttribute('data-page-id', '0');
-    await expect(page.locator(arrowR)).not.toHaveClass(/(^|\s)hidden(\s|$)/);
-    await expect(page.locator(arrowL)).toHaveClass(/(^|\s)hidden(\s|$)/);
-
-    await page.locator(arrowR).first().click({ force: true });
-    await expect(page.locator(`${root} .PopupPerp.provided`)).toHaveCount(1);
-    await expect(page.locator(`${root} .PopupPage.PerpPage`)).toHaveAttribute('data-page-id', '1');
-    await expect(page.locator(arrowR)).toHaveClass(/(^|\s)hidden(\s|$)/);
-    await expect(page.locator(arrowL)).not.toHaveClass(/(^|\s)hidden(\s|$)/);
+    // All 6 tiles render in the single wrapping grid; no page arrows.
+    await expect(page.locator(`${root} .PopupPerp.provided`)).toHaveCount(6);
+    await expect(page.locator(`${root} .PopupPageArrowR`)).toHaveCount(0);
   });
 
   test('Pusher locked tile renders Requires/RequiresProviders and is not openable', async ({
