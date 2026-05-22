@@ -33,7 +33,7 @@ export function CityPopup({ vm, onClose, popup }: CityPopupProps) {
   };
 
   return (
-    <div class="PopupBody">
+    <div class="PopupBody CityPerp">
       <PopupHeader
         onClose={onClose}
         spriteHtml={vm.spriteHtml}

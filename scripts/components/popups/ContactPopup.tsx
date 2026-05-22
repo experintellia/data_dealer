@@ -22,7 +22,7 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
   const [openToken, setOpenToken] = useState<string | null>(null);
 
   return (
-    <div class="PopupBody">
+    <div class="PopupBody ContactPerp">
       <PopupHeader
         onClose={onClose}
         spriteHtml={vm.spriteHtml}

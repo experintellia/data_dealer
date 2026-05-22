@@ -1708,7 +1708,7 @@
 .SubpopButtons,
 .PopupButtons {
   position: absolute;
-  bottom: -10px;
+  bottom: -35px;
   width: 100%;
   text-align: center;
   margin-left: -12px;
@@ -3603,24 +3603,31 @@ button {
   }
 }
 
-/* --- Status / Token info popups on phone viewports --------------------
- * `.PopupBody.Status` and `.PopupBody.TokenPerp` share the `PopupHeader`
- * component.  Its desktop layout pins `.PopupLogo` (180×180) absolute
- * top-left and pushes every text node right by `margin-left:168px`,
- * leaving a narrow column for the description.  On a 375-px viewport
- * that column wraps to many lines and the last few duck behind the
- * absolute `.PopupButtons` (see the screenshot in #321).
+/* --- Status / Token / City / Project / Contact / Provided-perp popups
+ * on phone viewports --------------------------------------------------
+ * All but Project use the `PopupHeader` component; Project builds the
+ * same `.PopupHeader` markup inline.  The desktop layout
+ * pins `.PopupLogo` (180×180) absolute top-left and pushes every text
+ * node right by `margin-left:168px`, leaving a narrow column for the
+ * description.  On a 375-px viewport that column wraps to many lines
+ * and the last few duck behind the absolute `.PopupButtons` (see the
+ * screenshot in #321).
  *
  * Mobile reflow: 2D grid — row 1 is the (shrunk) icon next to a stacked
- * title + subtitle, row 2 is the full-width description, row 3 hosts the
- * optional `.APRefillLabel` + `.APRefillBar` from AP status.  Bottom
- * padding reserves space for the absolute-positioned button so it can't
- * overlap the description regardless of how many lines it wraps to —
- * dropped for the SuperToken header, which has no in-header button.
- * ----------------------------------------------------------------------- */
+ * title + subtitle, row 2 is the full-width description, and any extra
+ * header child (`.APRefillLabel`/`.APRefillBar` for AP status, the
+ * `.PopupMenu` tab strip for City / Project) auto-places into a
+ * full-width row below.  Bottom padding reserves space for the
+ * absolute-positioned button so it can't overlap the description —
+ * dropped for headers with no in-header button (SuperToken, City,
+ * Project). */
 @media (max-width: 768px) {
   .PopupBody.Status .PopupHeader,
-  .PopupBody.TokenPerp .PopupHeader {
+  .PopupBody.TokenPerp .PopupHeader,
+  .PopupBody.CityPerp .PopupHeader,
+  .PopupBody.ProjectPerp .PopupHeader,
+  .PopupBody.ContactPerp .PopupHeader,
+  .PopupBody.ProvidedPerp .PopupHeader {
     height: auto;
     min-height: 0;
     display: grid;
@@ -3634,12 +3641,25 @@ button {
     padding: 10px 12px 76px 12px;
     box-sizing: border-box;
   }
-  /* SuperToken's buttons live in `.PopupContent`, not the header. */
-  .PopupBody.TokenPerp.SuperToken .PopupHeader {
+  /* Headers whose action button lives in `.PopupContent`, not the
+   * header — just a small bottom padding, no 76-px button reserve. */
+  .PopupBody.TokenPerp.SuperToken .PopupHeader,
+  .PopupBody.ContactPerp .PopupHeader,
+  .PopupBody.ProvidedPerp .PopupHeader {
     padding-bottom: 12px;
   }
+  /* City / Project: the tab strip sits flush at the header's bottom
+   * edge and overhangs onto the content segment, so no bottom padding. */
+  .PopupBody.CityPerp .PopupHeader,
+  .PopupBody.ProjectPerp .PopupHeader {
+    padding-bottom: 0;
+  }
   .PopupBody.Status .PopupHeader .PopupLogo,
-  .PopupBody.TokenPerp .PopupHeader .PopupLogo {
+  .PopupBody.TokenPerp .PopupHeader .PopupLogo,
+  .PopupBody.CityPerp .PopupHeader .PopupLogo,
+  .PopupBody.ProjectPerp .PopupHeader .PopupLogo,
+  .PopupBody.ContactPerp .PopupHeader .PopupLogo,
+  .PopupBody.ProvidedPerp .PopupHeader .PopupLogo {
     position: static;
     grid-area: logo;
     width: 80px;
@@ -3651,15 +3671,23 @@ button {
    * recomputing every per-sprite background-position.  The element still
    * claims 180×180 in layout, which `overflow:hidden` on `.PopupLogo`
    * clips, and no sibling exists inside `.PopupLogo` to be pushed.
-   * (Status logos are `.MainSpritesPopup`; Token logos are the
-   * `renderSpriteHtml` `.RenderSprite`.) */
+   * (Status logos are `.MainSpritesPopup`; Token / City / Project logos
+   * are the `renderSpriteHtml` `.RenderSprite`.) */
   .PopupBody.Status .PopupHeader .PopupLogo .MainSpritesPopup,
-  .PopupBody.TokenPerp .PopupHeader .PopupLogo .RenderSprite {
+  .PopupBody.TokenPerp .PopupHeader .PopupLogo .RenderSprite,
+  .PopupBody.CityPerp .PopupHeader .PopupLogo .RenderSprite,
+  .PopupBody.ProjectPerp .PopupHeader .PopupLogo .RenderSprite,
+  .PopupBody.ContactPerp .PopupHeader .PopupLogo .RenderSprite,
+  .PopupBody.ProvidedPerp .PopupHeader .PopupLogo .RenderSprite {
     transform: scale(0.4444);
     transform-origin: top left;
   }
   .PopupBody.Status .PopupHeader .PopupTitle,
-  .PopupBody.TokenPerp .PopupHeader .PopupTitle {
+  .PopupBody.TokenPerp .PopupHeader .PopupTitle,
+  .PopupBody.CityPerp .PopupHeader .PopupTitle,
+  .PopupBody.ProjectPerp .PopupHeader .PopupTitle,
+  .PopupBody.ContactPerp .PopupHeader .PopupTitle,
+  .PopupBody.ProvidedPerp .PopupHeader .PopupTitle {
     grid-area: title;
     margin-left: 0;
     margin-top: 0;
@@ -3667,7 +3695,9 @@ button {
     align-self: end;
   }
   .PopupBody.Status .PopupHeader .PopupSubTitle,
-  .PopupBody.TokenPerp .PopupHeader .PopupSubTitle {
+  .PopupBody.TokenPerp .PopupHeader .PopupSubTitle,
+  .PopupBody.CityPerp .PopupHeader .PopupSubTitle,
+  .PopupBody.ProvidedPerp .PopupHeader .PopupSubTitle {
     grid-area: subtitle;
     margin-left: 0;
     padding-right: 0;
@@ -3677,7 +3707,11 @@ button {
    * `.PopupText` — keeps its own auto-placed row below instead of being
    * pulled into the `desc` cell on top of the description. */
   .PopupBody.Status .PopupHeader .PopupText:not(.APRefillLabel),
-  .PopupBody.TokenPerp .PopupHeader .PopupText:not(.APRefillLabel) {
+  .PopupBody.TokenPerp .PopupHeader .PopupText:not(.APRefillLabel),
+  .PopupBody.CityPerp .PopupHeader .PopupText:not(.APRefillLabel),
+  .PopupBody.ProjectPerp .PopupHeader .PopupText:not(.APRefillLabel),
+  .PopupBody.ContactPerp .PopupHeader .PopupText:not(.APRefillLabel),
+  .PopupBody.ProvidedPerp .PopupHeader .PopupText:not(.APRefillLabel) {
     grid-area: desc;
     margin-left: 0;
     padding-right: 0;
@@ -3690,6 +3724,113 @@ button {
     grid-column: 1 / -1;
     margin-left: 0;
     padding-right: 0;
+  }
+  /* Contact / Project profile-risk summary is pinned at a desktop
+   * `top:192px`, which lands inside the now-taller reflowed header.
+   * Let it flow with the content instead so it can't overlap. */
+  .PopupBody.ContactPerp .PopupSummary,
+  .PopupBody.ProjectPerp .PopupSummary {
+    position: static;
+    margin-left: 0;
+    width: auto;
+  }
+  /* City tab strip: drop the desktop 600-px absolute positioning so it
+   * flows as the last header row.  Keep it a single row that scrolls
+   * horizontally (touch-draggable; mouse drag + wheel are wired in
+   * PopupMenu.tsx) so it reads as a tab bar rather than a wrapped grid
+   * of buttons.  The negative `margin-bottom` makes the strip overhang
+   * the header's bottom edge so the tabs sit flush on the content
+   * segment below (z-index keeps them above it); `padding-top` clears
+   * the active tab's -4px lift.  The edge fades below hint the scroll. */
+  .PopupHeader .PopupMenu {
+    position: relative;
+    z-index: 1;
+    grid-column: 1 / -1;
+    width: auto;
+    top: auto;
+    left: auto;
+    margin: 8px 0 -12px;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 6px 0 0;
+    cursor: grab;
+    /* Horizontal axis is driven by PopupMenu.tsx's pointer-drag;
+       leave the vertical axis to the browser. */
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .PopupHeader .PopupMenu::-webkit-scrollbar {
+    display: none;
+  }
+  /* Edge fades, toggled by PopupMenu.tsx via `can-scroll-left/right` so
+   * each side only fades when it actually has more to reveal. */
+  .PopupHeader .PopupMenu.can-scroll-right {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 38px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 38px), transparent);
+  }
+  .PopupHeader .PopupMenu.can-scroll-left {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 38px);
+    mask-image: linear-gradient(to right, transparent, #000 38px);
+  }
+  .PopupHeader .PopupMenu.can-scroll-left.can-scroll-right {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 38px,
+      #000 calc(100% - 38px),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 38px,
+      #000 calc(100% - 38px),
+      transparent
+    );
+  }
+  .PopupHeader .PopupMenuButton {
+    flex: 0 0 auto;
+    margin: 0;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  /* City / Project: pull the content segment flush under the header so
+   * the overhanging tab strip bridges the two segments. */
+  .PopupBody.CityPerp .PopupContent,
+  .PopupBody.ProjectPerp .PopupContent {
+    margin-top: 0;
+  }
+  /* City perp selector: the desktop layout is a 540×266 absolute blue
+   * panel (overflowing the phone dialog) holding a 4000-px wrap of
+   * floated 540-px pages.  Flow it instead — the content area and
+   * selector size to their content and the single perp page's
+   * inline-block tiles wrap to as many rows as needed. */
+  .PopupBody.CityPerp .PopupContent {
+    height: auto;
+  }
+  .PopupBody.CityPerp .PopupContent .PopupTab {
+    padding-bottom: 22px;
+  }
+  .PopupBody.CityPerp .standalone .PopupSelector {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: auto;
+    height: auto;
+    margin-top: 20px;
+  }
+  .PopupBody.CityPerp .PopupPageWrap {
+    width: auto;
+  }
+  .PopupBody.CityPerp .PopupPage.PerpPage {
+    width: auto;
+    height: auto;
+    float: none;
   }
 }
 
