@@ -118,6 +118,29 @@ export function PopupMenu({
     };
   }, []);
 
+  // When the active tab changes (e.g. tapping a tab on mobile that the
+  // strip had clipped) scroll it fully into view, clear of the 38px
+  // edge-fades.  Inert when the strip isn't overflowing.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const btn = el.querySelector<HTMLElement>(
+      `.PopupMenuButton[data-tab="${CSS.escape(activeKey)}"]`
+    );
+    if (!btn) return;
+    const FADE = 38; // matches the CSS edge-fade width
+    const cr = el.getBoundingClientRect();
+    const br = btn.getBoundingClientRect();
+    const leftGap = br.left - cr.left;
+    const rightGap = br.right - cr.right;
+    let target = el.scrollLeft;
+    if (leftGap < FADE) target += leftGap - FADE;
+    else if (rightGap > -FADE) target += rightGap + FADE;
+    const max = el.scrollWidth - el.clientWidth;
+    target = Math.max(0, Math.min(target, max));
+    if (Math.abs(target - el.scrollLeft) > 1) el.scrollTo({ left: target, behavior: 'smooth' });
+  }, [activeKey]);
+
   return (
     <div class="PopupMenu" ref={ref}>
       {tabs.map((t) => (
