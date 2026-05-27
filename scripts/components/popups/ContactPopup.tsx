@@ -45,12 +45,12 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
               />
             ))}
           </div>
-          <TokenGrid
-            tokens={vm.tokens}
-            paginationClass="Pagination"
-            tokensClass="PopupTokens"
-            onOpen={setOpenToken}
-          />
+          {/* The profiles/risk summary renders before the grid so it
+              sits *above* it.  Desktop pins the chips absolute
+              (`.PopupSummary { top:192px }`, held on top of the grid by
+              `z-index:1`); mobile flows them static, where this earlier
+              DOM position is what stacks them above the grid — parity
+              with the desktop layout. */}
           <div class="PopupSummary">
             <div class="PopupSummaryItem Profiles">
               <div class="RenderSprite Tobi" />
@@ -61,6 +61,12 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
               {vm.summaryRisk}
             </div>
           </div>
+          <TokenGrid
+            tokens={vm.tokens}
+            paginationClass="Pagination"
+            tokensClass="PopupTokens"
+            onOpen={setOpenToken}
+          />
           {vm.collectMode ? (
             <div class="PopupButtons">
               <div class="ButtonDecorator AP">

@@ -48,6 +48,20 @@ export function ClientPopup({ vm, onClose, popup }: ClientPopupProps) {
               />
             ))}
           </div>
+          {/* `.PopupSummary` is emitted by profileset_client.html, so it
+              stays inside `.PopupTab` — but renders before the grids so
+              the income chip sits *above* them.  Desktop pins it absolute
+              (`.PopupSummary { top:192px }`, held on top of the grid by
+              `z-index:1`); mobile flows it static, where this earlier DOM
+              position is what stacks it above the grid — parity with the
+              desktop layout. */}
+          <div class="PopupSummary">
+            <div class={`PopupSummaryItem ${vm.summaryClass}`}>
+              <div class="RenderSprite Tobi" />
+              {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced income markup (penalty span) */}
+              <span dangerouslySetInnerHTML={{ __html: vm.summaryHtml }} />
+            </div>
+          </div>
           <TokenGrid
             tokens={vm.providedTokens}
             paginationClass="Pagination half small"
@@ -66,15 +80,6 @@ export function ClientPopup({ vm, onClose, popup }: ClientPopupProps) {
             tokensClass="PopupTokens consumed"
             onOpen={setOpenToken}
           />
-          {/* `.PopupSummary` is emitted by profileset_client.html, so
-              it stays inside `.PopupTab`. */}
-          <div class="PopupSummary">
-            <div class={`PopupSummaryItem ${vm.summaryClass}`}>
-              <div class="RenderSprite Tobi" />
-              {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced income markup (penalty span) */}
-              <span dangerouslySetInnerHTML={{ __html: vm.summaryHtml }} />
-            </div>
-          </div>
         </div>
         {/* `.PopupButtons` is a sibling of `.PopupTab` in
             popup_client.html (the tab closes before the button bar),

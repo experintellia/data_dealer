@@ -1539,12 +1539,19 @@
   border: 3px solid #009FD9;
   border-radius: 8px;
 }
+/* Contact / Client / Project / ProfileSet render `.PopupSummary` *before*
+ * their token grid in the DOM, so the mobile static reflow (see the
+ * `:not(.half)` rule in the phone media query) flows the chip above the
+ * grid.  On desktop the chip is absolutely pinned at `top:192px` and
+ * slightly overlaps the grid's top edge — `z-index:1` keeps it painting
+ * on top of the now-later grid sibling. */
 .PopupSummary {
   position: absolute;
   top: 192px;
   width: 100%;
   text-align: center;
   margin-left: -12px;
+  z-index: 1;
 }
 .PopupSummary.half {
   top:260px;
@@ -3624,13 +3631,19 @@ button {
     margin-left: 0;
     padding-right: 0;
   }
-  /* The Contact / Client / Project / ProfileSet profile-risk summary is
+  /* The Contact / Client / Project / ProfileSet money/profiles summary is
    * pinned at a desktop `top:192px`, which lands inside the now-taller
-   * reflowed header.  Let it flow with the content instead so it can't
-   * overlap.  `:not(.half)` leaves City's in-selector summary alone. */
+   * reflowed header.  Flow it with the content instead — `relative` with
+   * `top:auto` (not `static`) so it keeps its flow position while the
+   * base rule's `z-index:1` still lifts it above the grid.  Each popup
+   * renders `.PopupSummary` before its token grid, and the negative
+   * bottom margin pulls the grid up so the chip overlaps its top edge —
+   * matching the desktop layout, where the absolute chip straddles the
+   * grid border.  `:not(.half)` leaves City's in-selector summary alone. */
   .PopupContent .PopupSummary:not(.half) {
-    position: static;
-    margin-left: 0;
+    position: relative;
+    top: auto;
+    margin: 8px 0 -34px;
     width: auto;
   }
   /* City tab strip: drop the desktop 600-px absolute positioning so it
@@ -3716,6 +3729,24 @@ button {
     width: auto;
     left: 6px;
     right: 6px;
+  }
+  /* The Client provided→consumed divider arrows are pinned to the desktop
+   * 540-px grid (`.ClientDivider { width:540px; left:18px }`), which
+   * pushes the centred arrow row off the right edge of a phone dialog.
+   * Fit it to the dialog so the arrows centre under the provided-token
+   * row — `.PopupPage` is `justify-content:center`, so a same-width
+   * centred divider drops each arrow under its token. */
+  .ClientDivider {
+    width: auto;
+    left: 0;
+  }
+  /* The Client provided grid is a short 68-px scroll viewport; on a phone
+   * its `.small` tokens (80 px tall, 2-line wrapped labels) overflow it,
+   * so the blue area scrolls.  It only ever holds a handful of
+   * characteristic tokens — let it grow to fit its row(s) so they all
+   * show without a scrollbar, matching the desktop layout. */
+  .Pagination.half.small .PopupTokens {
+    height: auto;
   }
   /* Subpop overlay cards (token detail / buy-upgrade / buy-slots) are
    * pinned at a desktop 540–576-px width + fixed height, so they run
