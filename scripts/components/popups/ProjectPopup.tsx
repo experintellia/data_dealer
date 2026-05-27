@@ -541,6 +541,22 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
               />
             ))}
           </div>
+          {/* The profiles/risk summary renders before the grid so it
+              sits *above* it.  Desktop pins the chips absolute
+              (`.PopupSummary { top:192px }`, held on top of the grid by
+              `z-index:1`); mobile flows them static, where this earlier
+              DOM position is what stacks them above the grid — parity
+              with the desktop layout. */}
+          <div class="PopupSummary">
+            <div class="PopupSummaryItem Profiles">
+              <div class="RenderSprite Tobi" />
+              {vm.summaryProfiles}
+            </div>
+            <div class={`PopupSummaryItem Risk ${vm.summaryRiskUp ? 'Up' : 'Down'}`}>
+              <div class="RenderSprite Tobi" />
+              {vm.summaryRisk}
+            </div>
+          </div>
           <div class="Pagination">
             <div class="PopupTokens">
               <div class="PopupPageWrap">
@@ -550,16 +566,6 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
                   ))}
                 </div>
               </div>
-            </div>
-          </div>
-          <div class="PopupSummary">
-            <div class="PopupSummaryItem Profiles">
-              <div class="RenderSprite Tobi" />
-              {vm.summaryProfiles}
-            </div>
-            <div class={`PopupSummaryItem Risk ${vm.summaryRiskUp ? 'Up' : 'Down'}`}>
-              <div class="RenderSprite Tobi" />
-              {vm.summaryRisk}
             </div>
           </div>
           {vm.collectMode ? (
