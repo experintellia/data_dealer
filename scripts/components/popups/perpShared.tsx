@@ -5,12 +5,25 @@
 // through the same legacy `popup.trigger('button_click.X')` seam, so
 // these live once here instead of being duplicated per perp component.
 
-import type { JSX } from 'preact';
+import { type ComponentType, type JSX } from 'preact';
 import type { ProvidedSubpopVM, ProvidedTileVM } from '../../game/providedView.js';
 import type { TokenUpgradeSubpopVM } from '../../game/tokenPopupView.js';
 import type { TokenVM } from '../../game/tokenView.js';
 import i18n from '../../i18n.js';
-import { type PreactDialogHandle, stopAndClose, toFXTarget } from './dialogManager.js';
+import setup from '../../setup.js';
+import { type PreactDialogHandle, openDialog, stopAndClose, toFXTarget } from './dialogManager.js';
+
+function getDialogContainer(): HTMLElement {
+  return document.querySelector<HTMLElement>(setup.renderContainer) ?? document.body;
+}
+
+/** Desktop breakpoint used by the dialog-fit media query. */
+const MOBILE_BP = 768;
+
+export function isMobileWidth(): boolean {
+  return window.innerWidth <= MOBILE_BP;
+}
+
 
 /** Fire the legacy `.Button` seam: park the clicked element +
  *  click point on the handle, then `popup.trigger('button_click.X')`
@@ -273,4 +286,82 @@ export function TokenUpgradeSubpop({
       </div>
     </div>
   );
+}
+
+// ── Mobile subpop-as-dialog wrappers ──────────────────────────────
+
+/** Wrap a token-info subpop in a dialog shell for mobile. */
+export function TokenSubpopDialog({
+  token,
+  onClose,
+}: {
+  token: TokenVM;
+  onClose: () => void;
+}) {
+  return (
+    <div class="PopupBody">
+      <div class="PopupContent">
+        <TokenSubpop token={token} isOpen={true} onClose={onClose} />
+      </div>
+    </div>
+  );
+}
+
+/** Wraps a provided-perp subpop in a dialog shell for mobile.  Uses
+ *  `parentPopup` (the parent perp dialog's handle) for buy actions
+ *  instead of the auto-injected dialog handle. */
+export function PerpProvidedSubpopDialog({
+  subpop,
+  parentPopup,
+  onClose,
+}: {
+  subpop: ProvidedSubpopVM;
+  parentPopup: PreactDialogHandle;
+  onClose: () => void;
+}) {
+  return (
+    <div class="PopupBody">
+      <div class="PopupContent">
+        <PerpProvidedSubpop
+          subpop={subpop}
+          isOpen={true}
+          onClose={onClose}
+          popup={parentPopup}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Wraps a SuperToken upgrade subpop in a dialog shell for mobile. */
+export function TokenUpgradeSubpopDialog({
+  sub,
+  onClose,
+}: {
+  sub: TokenUpgradeSubpopVM;
+  onClose: () => void;
+}) {
+  return (
+    <div class="PopupBody">
+      <div class="PopupContent">
+        <TokenUpgradeSubpop sub={sub} isOpen={true} onClose={onClose} />
+      </div>
+    </div>
+  );
+}
+
+/** Open a subpop as a dedicated dialog stacked on top of the current
+ *  one (mobile only).  The parent dialog stays open underneath; closing
+ *  the subpop restores the parent.  Returns the dialog handle so callers
+ *  can close it programmatically. */
+export function openSubpopDialog<P>(
+  component: ComponentType<P & { onClose: () => void }>,
+  props: P,
+): PreactDialogHandle {
+  return openDialog({
+    component,
+    props,
+    container: getDialogContainer(),
+    keepParent: true,
+  });
 }

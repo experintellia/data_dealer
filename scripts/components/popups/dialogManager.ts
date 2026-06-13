@@ -152,6 +152,10 @@ export interface OpenDialogOptions<P> {
   placeBottom?: boolean;
   /** Fires once the dialog has been removed from the DOM. */
   onAfterClose?: () => void;
+  /** When true the current active dialog is kept open underneath (the
+   *  new dialog stacks on top).  Closing the stacked dialog restores
+   *  the previous one as active. */
+  keepParent?: boolean;
 }
 
 interface ActiveDialog {
@@ -163,9 +167,10 @@ interface ActiveDialog {
 let active: ActiveDialog | null = null;
 
 export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
-  if (active) active.handle.close();
+  if (!opts.keepParent && active) active.handle.close();
 
   let isOpen = true;
+  const savedActive: ActiveDialog | null = opts.keepParent ? active : null;
 
   // Mount into a fresh full-screen overlay appended to the render
   // container (a sibling of `.Stage`), so the backdrop escapes the
@@ -219,9 +224,10 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
     for (const b of opts.container.querySelectorAll('.FXBling')) b.remove();
     opts.container.classList.remove('lockOn', 'PopupPreact', 'PopupPreactBottom');
     if (opts.extendClass) opts.container.classList.remove(opts.extendClass);
-    lockMenu?.classList.remove('DialogLock');
+    // Only unlock the menu when the last dialog closes.
+    if (!savedActive) lockMenu?.classList.remove('DialogLock');
     ownContainer?.remove();
-    active = null;
+    active = savedActive;
     opts.onAfterClose?.();
   };
 

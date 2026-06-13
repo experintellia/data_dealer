@@ -5,11 +5,19 @@
 // per-perp views resolve the subtitle / selector title / tile kind /
 // button-disabled / empty-state copy into one `ProvidedPopupVM`.
 
-import { useState } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import type { ProvidedPopupVM } from '../../game/providedView.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
-import { NoItems, PerpProvidedSubpop, PerpProvidedTile, fireAction } from './perpShared.js';
+import {
+  NoItems,
+  PerpProvidedSubpop,
+  PerpProvidedSubpopDialog,
+  PerpProvidedTile,
+  fireAction,
+  isMobileWidth,
+  openSubpopDialog,
+} from './perpShared.js';
 
 export interface ProvidedPerpPopupProps {
   vm: ProvidedPopupVM;
@@ -23,8 +31,19 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
   const [openKey, setOpenKey] = useState<number | null>(null);
   // Open/close is just the `.open` toggle: the CSS opacity+scale fade
   // dissolves the whole card cleanly on close (no transparent-bg hack).
-  const openSubpop = (key: number): void => setOpenKey(key);
   const closeSubpop = (): void => setOpenKey(null);
+
+  const handleOpenKey = useCallback(
+    (key: number) => {
+      if (isMobileWidth()) {
+        const subpop = vm.subpops.find((s) => s.key === key);
+        if (subpop) openSubpopDialog(PerpProvidedSubpopDialog, { subpop, parentPopup: popup });
+      } else {
+        setOpenKey(key);
+      }
+    },
+    [vm.subpops, popup],
+  );
 
   return (
     <div class="PopupBody ProvidedPerp">
@@ -78,7 +97,7 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
                 ) : (
                   <div class="PopupPage PerpPage">
                     {vm.tiles.map((t) => (
-                      <PerpProvidedTile key={t.key} tile={t} onOpen={openSubpop} />
+                      <PerpProvidedTile key={t.key} tile={t} onOpen={handleOpenKey} />
                     ))}
                   </div>
                 )}

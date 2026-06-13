@@ -5,12 +5,19 @@
 // seam as Contact.  Token tile / subpop / grid / action seam are
 // the shared `perpShared.tsx`.
 
-import { useState } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import type { ClientPopupVM } from '../../game/clientView.js';
 import i18n from '../../i18n.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
-import { TokenGrid, TokenSubpop, fireAction } from './perpShared.js';
+import {
+  TokenGrid,
+  TokenSubpop,
+  TokenSubpopDialog,
+  fireAction,
+  isMobileWidth,
+  openSubpopDialog,
+} from './perpShared.js';
 
 export interface ClientPopupProps {
   vm: ClientPopupVM;
@@ -22,6 +29,20 @@ export interface ClientPopupProps {
 
 export function ClientPopup({ vm, onClose, popup }: ClientPopupProps) {
   const [openToken, setOpenToken] = useState<string | null>(null);
+
+  const handleOpenToken = useCallback(
+    (gestalt: string) => {
+      if (isMobileWidth()) {
+        const token =
+          vm.providedTokens.find((t) => t.gestalt === gestalt) ??
+          vm.consumedTokens.find((t) => t.gestalt === gestalt);
+        if (token) openSubpopDialog(TokenSubpopDialog, { token });
+      } else {
+        setOpenToken(gestalt);
+      }
+    },
+    [vm.providedTokens, vm.consumedTokens],
+  );
 
   return (
     <div class="PopupBody">
@@ -66,7 +87,7 @@ export function ClientPopup({ vm, onClose, popup }: ClientPopupProps) {
             tokens={vm.providedTokens}
             paginationClass="Pagination half small"
             tokensClass="PopupTokens provided"
-            onOpen={setOpenToken}
+            onOpen={handleOpenToken}
           />
           <div class="ClientDivider">
             {Array.from({ length: vm.dividerCount }, (_, i) => (
@@ -78,7 +99,7 @@ export function ClientPopup({ vm, onClose, popup }: ClientPopupProps) {
             tokens={vm.consumedTokens}
             paginationClass="Pagination half"
             tokensClass="PopupTokens consumed"
-            onOpen={setOpenToken}
+            onOpen={handleOpenToken}
           />
         </div>
         {/* `.PopupButtons` is a sibling of `.PopupTab` in

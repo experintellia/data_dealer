@@ -5,11 +5,18 @@
 // summary and one Import MainButton (routed through the same
 // `fireAction` seam, wired to `Database.mergeCued`).
 
-import { useState } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import type { ProfileSetPopupVM } from '../../game/profilesetView.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
-import { TokenGrid, TokenSubpop, fireAction } from './perpShared.js';
+import {
+  TokenGrid,
+  TokenSubpop,
+  TokenSubpopDialog,
+  fireAction,
+  isMobileWidth,
+  openSubpopDialog,
+} from './perpShared.js';
 
 export interface ProfileSetPopupProps {
   vm: ProfileSetPopupVM;
@@ -21,6 +28,18 @@ export interface ProfileSetPopupProps {
 
 export function ProfileSetPopup({ vm, onClose, popup }: ProfileSetPopupProps) {
   const [openToken, setOpenToken] = useState<string | null>(null);
+
+  const handleOpenToken = useCallback(
+    (gestalt: string) => {
+      if (isMobileWidth()) {
+        const token = vm.tokens.find((t) => t.gestalt === gestalt);
+        if (token) openSubpopDialog(TokenSubpopDialog, { token });
+      } else {
+        setOpenToken(gestalt);
+      }
+    },
+    [vm.tokens],
+  );
 
   return (
     <div class="PopupBody">
@@ -59,7 +78,7 @@ export function ProfileSetPopup({ vm, onClose, popup }: ProfileSetPopupProps) {
             tokens={vm.tokens}
             paginationClass="Pagination"
             tokensClass="PopupTokens"
-            onOpen={setOpenToken}
+            onOpen={handleOpenToken}
           />
           <div class="PopupButtons">
             <div class="ButtonDecorator AP">

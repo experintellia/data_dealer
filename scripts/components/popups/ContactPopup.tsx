@@ -3,12 +3,19 @@
 // Issue #80 phase 2 tier 5a.  Token tile / subpop / pagination /
 // action-button seam live in `perpShared.tsx` (shared with Client).
 
-import { useState } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import type { ContactPopupVM } from '../../game/contactView.js';
 import i18n from '../../i18n.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
-import { TokenGrid, TokenSubpop, fireAction } from './perpShared.js';
+import {
+  TokenGrid,
+  TokenSubpop,
+  TokenSubpopDialog,
+  fireAction,
+  isMobileWidth,
+  openSubpopDialog,
+} from './perpShared.js';
 
 export interface ContactPopupProps {
   vm: ContactPopupVM;
@@ -20,6 +27,18 @@ export interface ContactPopupProps {
 
 export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
   const [openToken, setOpenToken] = useState<string | null>(null);
+
+  const handleOpenToken = useCallback(
+    (gestalt: string) => {
+      if (isMobileWidth()) {
+        const token = vm.tokens.find((t) => t.gestalt === gestalt);
+        if (token) openSubpopDialog(TokenSubpopDialog, { token });
+      } else {
+        setOpenToken(gestalt);
+      }
+    },
+    [vm.tokens],
+  );
 
   return (
     <div class="PopupBody ContactPerp">
@@ -65,7 +84,7 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
             tokens={vm.tokens}
             paginationClass="Pagination"
             tokensClass="PopupTokens"
-            onOpen={setOpenToken}
+            onOpen={handleOpenToken}
           />
           {vm.collectMode ? (
             <div class="PopupButtons">

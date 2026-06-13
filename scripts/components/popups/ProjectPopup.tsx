@@ -11,7 +11,7 @@
 // perpShared TokenTile/TokenSubpop/fireAction pieces.
 
 import type { JSX } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import type {
   BuySlotsVM,
   PowerupCategoryVM,
@@ -23,7 +23,14 @@ import type {
 import i18n from '../../i18n.js';
 import { PopupMenu } from './PopupMenu.js';
 import type { PreactDialogHandle } from './dialogManager.js';
-import { TokenSubpop, TokenTile, fireAction } from './perpShared.js';
+import {
+  TokenSubpop,
+  TokenSubpopDialog,
+  TokenTile,
+  fireAction,
+  isMobileWidth,
+  openSubpopDialog,
+} from './perpShared.js';
 
 /** Imperative seam used by `ProjectPerp.updatePopupGracefully` to drive
  *  the buy/sell slot plug-out → plug-in animation without re-mounting
@@ -402,6 +409,17 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
   const [activeTab, setActiveTab] = useState(initialVm.initialTab);
   // Data-tab profileset token subpop (Contact-shaped).
   const [openToken, setOpenToken] = useState<string | null>(null);
+  const handleOpenToken = useCallback(
+    (gestalt: string) => {
+      if (isMobileWidth()) {
+        const token = vm.tokens.find((t) => t.gestalt === gestalt);
+        if (token) openSubpopDialog(TokenSubpopDialog, { token });
+      } else {
+        setOpenToken(gestalt);
+      }
+    },
+    [vm.tokens],
+  );
   // Powerup-tab subpop state. `selPkey` = which category's buy Selector
   // is open; `subId` = a card open on top (sell `<pkey><slot>`,
   // `buyslots`, or an InSelector `Provided<gestalt>`).
@@ -562,7 +580,7 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
               <div class="PopupPageWrap">
                 <div class="PopupPage">
                   {vm.tokens.map((t) => (
-                    <TokenTile key={t.gestalt} token={t} onOpen={setOpenToken} />
+                    <TokenTile key={t.gestalt} token={t} onOpen={handleOpenToken} />
                   ))}
                 </div>
               </div>
