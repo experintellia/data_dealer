@@ -1,0 +1,14 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "webxdc-shim-updates",
+          "value": "[{\"serial\":1,\"max_serial\":1,\"payload\":{\"kind\":\"delta\",\"op\":\"setLocale\",\"addr\":\"dev@local\",\"locale\":\"en\",\"ts\":0}}]"
+        }
+      ]
+    }
+  ]
+}

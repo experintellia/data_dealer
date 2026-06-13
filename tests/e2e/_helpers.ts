@@ -56,18 +56,18 @@ export async function installSettle(page: Page): Promise<void> {
  */
 export async function bootGame(page: Page): Promise<void> {
   await page.goto('/?devtools=1');
-  await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
-    timeout: 50_000,
-  });
 
-  // Dismiss the first-launch locale picker if it appears.  Picking EN persists
-  // the locale and reloads the page, so we re-wait for the game container.
+  // The language chooser is shown before render() on first start, so the game
+  // container may not appear until after the picker is dismissed.  Race both.
   const picker = page.locator('.LangSelectOverlay');
+  const container = page.locator('[data-testid="game-container"]');
+  await expect(picker.or(container)).toBeVisible({ timeout: 50_000 });
+
+  // Dismiss the first-launch locale picker if it appeared.  Picking EN persists
+  // the locale and reloads the page, so we re-wait for the game container.
   if (await picker.isVisible().catch(() => false)) {
     await picker.locator('.lang-pick[data-locale="en"]').click();
-    await expect(page.locator('[data-testid="game-container"]')).toBeVisible({
-      timeout: 50_000,
-    });
+    await expect(container).toBeVisible({ timeout: 50_000 });
   }
 
   // Wait for the GameRoot to be reachable.  app.ts assigns it to
