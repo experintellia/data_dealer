@@ -1910,6 +1910,12 @@
   justify-content: safe center;
   height: 100%;
 }
+/* Buy-grid tiles must not shrink below their specified width so they
+ * stay readable when the horizontal-scroll viewport is narrower than
+ * the tile row.  The viewport scrolls the overflow. */
+.PopupSelector .PopupPage > * {
+  flex-shrink: 0;
+}
 
 .standalone .PopupSelector {
   display: block;
