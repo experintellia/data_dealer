@@ -3669,7 +3669,7 @@ button {
    * border-area so they read as attached to the card edge without
    * extending below the scrollable content. */
   .PopupButtons {
-    bottom: 0;
+    bottom: -6px;
   }
   /* City tab strip: drop the desktop 600-px absolute positioning so it
    * flows as the last header row.  Keep it a single row that scrolls
