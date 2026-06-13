@@ -3558,6 +3558,7 @@ button {
  * `.TokenPerp .PopupHeader { height:310px }`, …) on mobile. */
 @media (max-width: 768px) {
   .PopupContainer .PopupBody .PopupHeader {
+    flex-shrink: 0;
     height: auto;
     min-height: 0;
     display: grid;
@@ -3644,6 +3645,26 @@ button {
     margin: 8px 0 -34px;
     width: auto;
   }
+  /* Viewport-constrained dialog: flexbox so the dialog never exceeds
+   * the screen.  The header shrinks to its content, the content area
+   * scrolls, and absolutely-positioned children reflow naturally. */
+  .PopupContainer .PopupBody {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 24px);
+  }
+  .PopupContainer .PopupContent {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    height: auto;
+  }
+  /* Flow action buttons at the end of the scrollable content instead of
+   * hanging below the body.  Header buttons keep their grid placement
+   * (unaffected — they are not inside .PopupContent). */
+  .PopupContent .PopupButtons {
+    position: static;
+    margin-top: 10px;
+  }
   /* City tab strip: drop the desktop 600-px absolute positioning so it
    * flows as the last header row.  Keep it a single row that scrolls
    * horizontally (touch-draggable; mouse drag + wheel are wired in
@@ -3718,15 +3739,18 @@ button {
   /* Grid viewports (`.PopupSelector` / `.PopupTokens`) keep their fixed
    * height and scroll, but the desktop 540-px width overflows a phone
    * dialog — fit them to the dialog instead.  The `.standalone` perp
-   * selector is absolutely placed, so inset it left/right. */
+   * selector flows in the document (no longer absolutely positioned)
+   * so the blue buy grid sits inside the scrollable content area. */
   .PopupSelector,
   .PopupTokens {
     width: auto;
   }
   .standalone .PopupSelector {
+    position: relative;
+    top: auto;
+    left: auto;
     width: auto;
-    left: 6px;
-    right: 6px;
+    height: auto;
   }
   /* The Client provided→consumed divider arrows are pinned to the desktop
    * 540-px grid (`.ClientDivider { width:540px; left:18px }`), which
