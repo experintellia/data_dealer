@@ -12,6 +12,7 @@ import type { TokenVM } from '../../game/tokenView.js';
 import i18n from '../../i18n.js';
 import setup from '../../setup.js';
 import { type PreactDialogHandle, openDialog, stopAndClose, toFXTarget } from './dialogManager.js';
+import { PopupHeader } from './PopupHeader.js';
 
 function getDialogContainer(): HTMLElement {
   return document.querySelector<HTMLElement>(setup.renderContainer) ?? document.body;
@@ -290,7 +291,9 @@ export function TokenUpgradeSubpop({
 
 // ── Mobile subpop-as-dialog wrappers ──────────────────────────────
 
-/** Wrap a token-info subpop in a dialog shell for mobile. */
+/** Wrap a token-info subpop in a dialog shell for mobile.  Uses the
+ *  same `PopupHeader` layout as the token-perp db view so the logo
+ *  shrinks to 80×80 and content reflows to the viewport on phones. */
 export function TokenSubpopDialog({
   token,
   onClose,
@@ -298,18 +301,32 @@ export function TokenSubpopDialog({
   token: TokenVM;
   onClose: () => void;
 }) {
+  const sub = token.subpop;
+  const close = stopAndClose(onClose);
   return (
-    <div class="PopupBody">
-      <div class="PopupContent">
-        <TokenSubpop token={token} isOpen={true} onClose={onClose} />
-      </div>
+    <div class="PopupBody TokenPerp">
+      <PopupHeader
+        onClose={onClose}
+        spriteHtml={sub.logoHtml}
+        title={sub.title}
+        subtitleHtml={sub.subTitleHtml}
+        description={sub.description}
+      >
+        <div class="PopupButtons">
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+          <div class="Button" data-button-id="OKButton" onClick={close}>
+            {i18n.gettext('Close')}
+          </div>
+        </div>
+      </PopupHeader>
     </div>
   );
 }
 
-/** Wraps a provided-perp subpop in a dialog shell for mobile.  Uses
+/** Wrap a provided-perp subpop in a dialog shell for mobile.  Uses
  *  `parentPopup` (the parent perp dialog's handle) for buy actions
- *  instead of the auto-injected dialog handle. */
+ *  instead of the auto-injected dialog handle.  Renders the same
+ *  header + content layout as the provided-perp db view. */
 export function PerpProvidedSubpopDialog({
   subpop,
   parentPopup,
@@ -319,15 +336,35 @@ export function PerpProvidedSubpopDialog({
   parentPopup: PreactDialogHandle;
   onClose: () => void;
 }) {
+  const vd = subpop.valuesDetailsHtml;
   return (
-    <div class="PopupBody">
+    <div class="PopupBody ProvidedPerp">
+      <PopupHeader
+        onClose={onClose}
+        spriteHtml={subpop.logoHtml}
+        title={subpop.title}
+        description={subpop.description}
+      >
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced bonus markup */}
+        <div class="PowerupLabelData SubpopLabelData" dangerouslySetInnerHTML={{ __html: vd }} />
+      </PopupHeader>
       <div class="PopupContent">
-        <PerpProvidedSubpop
-          subpop={subpop}
-          isOpen={true}
-          onClose={onClose}
-          popup={parentPopup}
-        />
+        <div class="PopupButtons">
+          <div class="ButtonDecorator Cash">
+            <div class="RenderSprite Tobi" />
+            {subpop.priceText}
+          </div>
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+          <div
+            class="Button"
+            data-button-id="PerpBuyButton"
+            data-button-gestalt={subpop.gestalt}
+            data-testid={`dd-perp-buy-${subpop.gestalt}`}
+            onClick={(e) => fireAction(parentPopup, e, 'PerpBuyButton', [subpop.gestalt])}
+          >
+            {subpop.buyButtonText}
+          </div>
+        </div>
       </div>
     </div>
   );
