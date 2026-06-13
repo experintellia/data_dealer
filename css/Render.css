@@ -1910,6 +1910,12 @@
   justify-content: safe center;
   height: 100%;
 }
+/* Tiles keep their explicit width — without this, default
+ * `flex-shrink: 1` collapses a 5-tile row into the 315 px mobile
+ * selector instead of overflowing it, defeating the sideways scroll. */
+.PopupSelector .PopupPage > * {
+  flex-shrink: 0;
+}
 
 .standalone .PopupSelector {
   display: block;

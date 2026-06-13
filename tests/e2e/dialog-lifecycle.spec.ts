@@ -2009,3 +2009,57 @@ test.describe('Section Q — touch subpop reopen', () => {
     });
   });
 });
+
+// ── Section R — buy grids scroll sideways on a narrow viewport ───────────
+//
+// `.PopupSelector` is a horizontal-scroll viewport: `overflow-x: auto`
+// over a `flex-wrap: nowrap` row.  Default `flex-shrink: 1` on flex
+// items would let the row collapse to fit a narrow dialog instead of
+// overflowing, killing the sideways scroll the refactor is supposed to
+// deliver (visible on Proxy / Pusher / Karma / Project buy selectors).
+// `.PopupSelector .PopupPage > * { flex-shrink: 0 }` pins it.  Test on
+// iPhone SE so the 315-px mobile selector forces the overflow.
+
+test.describe('Section R — buy grid sideways scroll', () => {
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  test('Pusher buy grid overflows the narrow dialog and scrolls sideways', async ({ page }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'PusherPerp',
+      gestalt: 'pusher004',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupBody',
+    });
+    await expect(page.locator('.PopupContainer.lockOn .PopupBody')).toBeVisible({ timeout: 3_000 });
+
+    await page.evaluate(() => {
+      const gnode = (window as any).__dd?._app?.game.getById('pusher004');
+      const rows = Array.from({ length: 6 }, (_, i) => ({
+        gestalt: `g${i}`,
+        locked: false,
+        data: { label: `P${i}`, price: i, title: `P${i}`, description: 'd' },
+      }));
+      gnode.data.buyablePerps = rows.map((r) => r.gestalt);
+      gnode.data.providedPerps = rows;
+      gnode.openPopup();
+    });
+
+    const root = '.PopupContainer.lockOn';
+    await expect(page.locator(`${root} .PopupPerp.provided`)).toHaveCount(6);
+
+    // Without `flex-shrink: 0` the 6 tiles collapse to ~52 px each to
+    // fit the ~315 px mobile selector (overflow ≈ 40 px).  With the
+    // fix the row stays at 6 × ~104 px so the overflow clears 200 px.
+    const { overflow, firstTileWidth } = await page.evaluate((rootSel) => {
+      const sel = document.querySelector(`${rootSel} .PopupSelector`) as HTMLElement | null;
+      const tile = document.querySelector(`${rootSel} .PopupPerp.provided`) as HTMLElement | null;
+      return {
+        overflow: sel ? sel.scrollWidth - sel.clientWidth : 0,
+        firstTileWidth: tile ? tile.getBoundingClientRect().width : 0,
+      };
+    }, root);
+    expect(firstTileWidth).toBeGreaterThanOrEqual(95);
+    expect(overflow).toBeGreaterThan(200);
+  });
+});
