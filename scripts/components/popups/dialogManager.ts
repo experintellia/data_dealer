@@ -116,15 +116,6 @@ export function toFXTarget(el: Element): FXClassTarget {
 
 const FX_EVENTS = new Set(['no_cash', 'no_AP', 'error']);
 
-/** Minimal jQuery surface used to replicate the legacy SubpopClose
- *  handler when running inside a Preact-managed dialog. */
-interface JQueryLikeForSubpop {
-  removeClass(cls: string): JQueryLikeForSubpop;
-  parents(selector: string): JQueryLikeForSubpop;
-  find(selector: string): JQueryLikeForSubpop;
-  length: number;
-}
-
 /** Compatibility-shaped handle returned by `openDialog`.  Pre-Preact
  *  callers read it off `groot.renderPopup` / `groot.notificationPopup`
  *  via the same `.trigger(event)` / `.open` / `.close()` surface the
@@ -198,10 +189,12 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
   // overlay (which sits above it) and dismiss via `handleInteraction`.
   const lockMenu = rc?.querySelector<HTMLElement>('.MainMenu') ?? null;
 
-  // Subpop block below duplicates `RenderTopLevelUI.ts:816` (the legacy
-  // jQuery delegated handler on RenderPopup's jdomelem doesn't fire on
-  // Preact popups).  Both go away in tier-8 when subpops become Preact
-  // components.
+  // Backdrop click / tap closes the dialog.  Subpop close controls are
+  // Preact components owning their own `onClose` — no legacy jQuery
+  // delegation here: it mutated Preact-owned DOM behind the vdom's back
+  // and, on touch, its `preventDefault()` on `touchend` suppressed the
+  // `click` that drives `onClose`, desyncing state so a closed subpop
+  // could not be reopened.
   const handleInteraction = (e: Event): void => {
     if (e.target === opts.container) {
       // Consume the event so the backdrop tap can't fall through to the
@@ -211,29 +204,6 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
       e.stopPropagation();
       e.preventDefault();
       close();
-      return;
-    }
-    const t = e.target as HTMLElement | null;
-    if (!t) return;
-    const subpopCloseEl = t.closest(
-      '.SubpopClose, .Button[data-button-id="OKButton"]'
-    ) as HTMLElement | null;
-    if (!subpopCloseEl) return;
-    e.stopPropagation();
-    e.preventDefault();
-    const jq = (globalThis as unknown as { jQuery?: (el: HTMLElement) => JQueryLikeForSubpop })
-      .jQuery;
-    if (!jq) return;
-    const jelem = jq(subpopCloseEl);
-    jelem.removeClass('active');
-    const tab = jelem.parents('.PopupTab');
-    const containerJq = tab.find('.SubpopContainer');
-    containerJq.find('.Selector.open').removeClass('hasPopup');
-    tab.removeClass('hasPopup');
-    const subpop = jelem.parents('.Subpop');
-    subpop.removeClass('open');
-    if (!containerJq.find('.Subpop.open').length) {
-      containerJq.removeClass('open');
     }
   };
 

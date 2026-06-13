@@ -32,8 +32,6 @@ export interface ContactPopupVM {
   chargeCostText: string;
   chargeTimeText: string;
   tokens: TokenVM[];
-  /** Tokens per page (legacy profileset.html: 12). */
-  pageSize: number;
   summaryProfiles: string;
   summaryRisk: string;
   summaryRiskUp: boolean;
@@ -56,7 +54,6 @@ export function buildContactPopupVM(
     chargeCostText: toKSNum(data.charge_cost ?? 0),
     chargeTimeText: toTime(data.charge_time ?? 0),
     tokens,
-    pageSize: 12,
     summaryProfiles: toKSNum(data.collect_amount ?? 0),
     summaryRisk: toKSNum(Math.abs(collectRisk)),
     summaryRiskUp: collectRisk < 1,

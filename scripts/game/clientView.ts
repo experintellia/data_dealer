@@ -35,12 +35,10 @@ export interface ClientPopupVM {
   chargeDisabled: boolean;
   buttonText: string;
   chargeTimeText: string;
-  /** Blue "provided" tokens (`token.html`, 7/page). */
+  /** Blue "provided" tokens (`token.html`). */
   providedTokens: TokenVM[];
-  /** Orange "consumed" tokens (`token_consumed.html`, 6/page). */
+  /** Orange "consumed" tokens (`token_consumed.html`). */
   consumedTokens: TokenVM[];
-  providedPageSize: number;
-  consumedPageSize: number;
   /** `.ClientDividerItem` count: `min(provided.length, 7)`. */
   dividerCount: number;
   /** Summary item modifier — `Penalty` when karma scales the income. */
@@ -71,8 +69,6 @@ export function buildClientPopupVM(
     chargeTimeText: toTime(data.charge_time || 6666),
     providedTokens,
     consumedTokens,
-    providedPageSize: 7,
-    consumedPageSize: 6,
     dividerCount: Math.min(providedTokens.length, 7),
     summaryClass: penalty ? 'Penalty' : 'Cash',
     summaryHtml: penalty

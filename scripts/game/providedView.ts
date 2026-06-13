@@ -355,7 +355,6 @@ export interface ProvidedPopupVM {
   karmaChip?: { up: boolean; text: string };
   tiles: ProvidedTileVM[];
   subpops: ProvidedSubpopVM[];
-  pageSize: number;
   loading: boolean;
   noItemsText: string;
   loadingText: string;

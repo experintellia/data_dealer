@@ -322,3 +322,183 @@ test.describe('Contact perp popup — contact035 (Jessica)', () => {
     await expect(page).toHaveScreenshot('contact035-desktop.png', { fullPage: false });
   });
 });
+
+/** Client perp popup — buys client016 and force-opens it with a crafted
+ *  provided/consumed profileset (3 characteristic tokens + 5 profile
+ *  fields).  The snapshot pins the two-grid layout the mobile refit
+ *  targets: the income summary chip straddling the grid edge, the
+ *  `.ClientDivider` arrow row centred under the provided tokens, and the
+ *  blue provided grid grown to fit its row without a scrollbar. */
+async function openClientPopup(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const eng = await new Promise<any>((res, rej) =>
+      (window as any).require(['LocalEngine'], res, rej)
+    );
+    const r = await eng.buyPerp('Imperium', 'client016');
+    if (r?.result?.error !== undefined) {
+      throw new Error(`buyPerp failed: error=${r.result.error}`);
+    }
+  });
+  await page.reload();
+  await page.waitForFunction(() => !!(window as any).__dd?._app?.game);
+  await page.evaluate(() => {
+    const groot = (window as any).__dd?._app?.game;
+    if (!groot?.raw_data) return;
+    groot.raw_data.mission_briefings_seen = groot.raw_data.mission_briefings_seen || {};
+    for (const g of Object.keys(groot.Missions?.Missions ?? {})) {
+      groot.raw_data.mission_briefings_seen[g] = true;
+    }
+  });
+  let stable = 0;
+  for (let i = 0; i < 40; i++) {
+    const settled = await page.evaluate(() => {
+      const g = (window as any).__dd?._app?.game;
+      if (!g) return false;
+      if (Array.isArray(g.NotificationQueue)) g.NotificationQueue.length = 0;
+      g?.notificationPopup?.trigger?.('popup_close');
+      document.querySelectorAll<HTMLElement>('.Popup').forEach((el) => el.remove());
+      document
+        .querySelectorAll<HTMLElement>('.PopupContainer.lockOn')
+        .forEach((el) => el.classList.remove('lockOn'));
+      return (
+        (!Array.isArray(g.NotificationQueue) || g.NotificationQueue.length === 0) &&
+        !g.notificationPopup &&
+        document.querySelectorAll('.PopupContainer.lockOn').length === 0
+      );
+    });
+    stable = settled ? stable + 1 : 0;
+    if (stable >= 3) break;
+    await page.waitForTimeout(300);
+  }
+  await page.addStyleTag({
+    content:
+      'body > div[style*="z-index: 9999"][style*="position: fixed"] { display: none !important; }',
+  });
+
+  // Force-open the client popup with a crafted profileset.  clientView.ts
+  // reads `data.ProfileSet?.tokens_set` (provided) + `data.ConsumedProfileSet
+  // ?.tokens_set` (consumed); each token row only needs `gestalt` + `data`
+  // (the ruleset type-data, for the sprite + label), same enrichment the
+  // Contact popup uses above.
+  await page.evaluate(() => {
+    const game = (window as any).__dd?._app?.game;
+    const gnode = game.getById('client016');
+    if (!gnode) throw new Error('client016 gnode not registered');
+    const enrich = (gestalts: string[]) =>
+      gestalts.map((g) => ({ gestalt: g, data: game.getTypeData(g) }));
+    // token084/132/099 = "Naive or critical?" / "Responsive to advertising"
+    // / "Bargain hunter"; token001-004/012 = the profile fields.
+    gnode.data.ProfileSet = { tokens_set: enrich(['token084', 'token132', 'token099']) };
+    gnode.data.ConsumedProfileSet = {
+      tokens_set: enrich(['token001', 'token002', 'token003', 'token004', 'token012']),
+    };
+    gnode.openPopup();
+  });
+  await expect(page.locator('.PopupContainer.lockOn .PopupBody').first()).toBeVisible({
+    timeout: 5_000,
+  });
+  await waitForPopupSettle(page);
+}
+
+test.describe('Client perp popup — provided/consumed grids + divider arrows', () => {
+  test('mobile (iPhone SE)', async ({ page }) => {
+    await boot(page, IPHONE_SE);
+    await openClientPopup(page);
+    await expect(page).toHaveScreenshot('client-iphone-se.png', { fullPage: false });
+  });
+
+  test('desktop (1280×800)', async ({ page }) => {
+    await boot(page, DESKTOP);
+    await openClientPopup(page);
+    await expect(page).toHaveScreenshot('client-desktop.png', { fullPage: false });
+  });
+});
+
+/** Pusher perp popup — buys pusher004 and force-opens it with a crafted
+ *  6-client provided grid.  The snapshot pins the buy-grid horizontal
+ *  scroll layout (`.PopupSelector { overflow-x:auto }` + nowrap row):
+ *  6 client tiles in a single row that overflows the selector width on
+ *  both desktop (540 px) and mobile, scrollable sideways. */
+async function openPusherPopup(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const eng = await new Promise<any>((res, rej) =>
+      (window as any).require(['LocalEngine'], res, rej)
+    );
+    const r = await eng.buyPerp('Imperium', 'pusher004');
+    if (r?.result?.error !== undefined) {
+      throw new Error(`buyPerp failed: error=${r.result.error}`);
+    }
+  });
+  await page.reload();
+  await page.waitForFunction(() => !!(window as any).__dd?._app?.game);
+  await page.evaluate(() => {
+    const groot = (window as any).__dd?._app?.game;
+    if (!groot?.raw_data) return;
+    groot.raw_data.mission_briefings_seen = groot.raw_data.mission_briefings_seen || {};
+    for (const g of Object.keys(groot.Missions?.Missions ?? {})) {
+      groot.raw_data.mission_briefings_seen[g] = true;
+    }
+  });
+  let stable = 0;
+  for (let i = 0; i < 40; i++) {
+    const settled = await page.evaluate(() => {
+      const g = (window as any).__dd?._app?.game;
+      if (!g) return false;
+      if (Array.isArray(g.NotificationQueue)) g.NotificationQueue.length = 0;
+      g?.notificationPopup?.trigger?.('popup_close');
+      document.querySelectorAll<HTMLElement>('.Popup').forEach((el) => el.remove());
+      document
+        .querySelectorAll<HTMLElement>('.PopupContainer.lockOn')
+        .forEach((el) => el.classList.remove('lockOn'));
+      return (
+        (!Array.isArray(g.NotificationQueue) || g.NotificationQueue.length === 0) &&
+        !g.notificationPopup &&
+        document.querySelectorAll('.PopupContainer.lockOn').length === 0
+      );
+    });
+    stable = settled ? stable + 1 : 0;
+    if (stable >= 3) break;
+    await page.waitForTimeout(300);
+  }
+  await page.addStyleTag({
+    content:
+      'body > div[style*="z-index: 9999"][style*="position: fixed"] { display: none !important; }',
+  });
+
+  // Force 6 real client gestalts into the Pusher's providedPerps so the
+  // grid overflows the selector width and the horizontal-scroll layout
+  // is what the baseline captures.  pusher004 provides ClientPerps in
+  // production; the engine's `compileProvided` is bypassed here for a
+  // deterministic visual fixture.
+  await page.evaluate(() => {
+    const game = (window as any).__dd?._app?.game;
+    const gnode = game.getById('pusher004');
+    if (!gnode) throw new Error('pusher004 gnode not registered');
+    const gestalts = ['client002', 'client005', 'client006', 'client007', 'client008', 'client010'];
+    gnode.data.buyablePerps = gestalts;
+    gnode.data.providedPerps = gestalts.map((g) => ({
+      gestalt: g,
+      locked: false,
+      data: game.getTypeData(g),
+    }));
+    gnode.openPopup();
+  });
+  await expect(page.locator('.PopupContainer.lockOn .PopupBody').first()).toBeVisible({
+    timeout: 5_000,
+  });
+  await waitForPopupSettle(page);
+}
+
+test.describe('Pusher perp popup — provided-client buy grid', () => {
+  test('mobile (iPhone SE)', async ({ page }) => {
+    await boot(page, IPHONE_SE);
+    await openPusherPopup(page);
+    await expect(page).toHaveScreenshot('pusher-iphone-se.png', { fullPage: false });
+  });
+
+  test('desktop (1280×800)', async ({ page }) => {
+    await boot(page, DESKTOP);
+    await openPusherPopup(page);
+    await expect(page).toHaveScreenshot('pusher-desktop.png', { fullPage: false });
+  });
+});

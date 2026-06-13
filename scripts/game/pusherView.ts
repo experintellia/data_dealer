@@ -33,7 +33,6 @@ export function buildPusherPopupVM(
     selectorTitle: i18n.gettext('pusher_popup selector title'),
     tiles,
     subpops,
-    pageSize: 5,
     // `compileProvided` clears providedPerps and only repopulates once
     // `buyablePerps` arrives from the server — so empty + undefined
     // buyable === the fetch is still in flight.

@@ -33,7 +33,6 @@ export function buildDatabaseUpgradesPopupVM(
     selectorTitle: data.selectortitle ?? i18n.gettext('database_buytokens selector title'),
     tiles,
     subpops,
-    pageSize: 5,
     // compileSuperTokens is synchronous (no server fetch), so the grid
     // is never in a loading state by the time the popup mounts.
     loading: false,

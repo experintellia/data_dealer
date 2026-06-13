@@ -43,19 +43,24 @@ export function ProfileSetPopup({ vm, onClose, popup }: ProfileSetPopupProps) {
               />
             ))}
           </div>
-          <TokenGrid
-            tokens={vm.tokens}
-            pageSize={vm.pageSize}
-            paginationClass="Pagination"
-            tokensClass="PopupTokens"
-            onOpen={setOpenToken}
-          />
+          {/* The profiles summary renders before the grid so it sits
+              *above* it.  Desktop pins the chip absolute
+              (`.PopupSummary { top:192px }`, held on top of the grid by
+              `z-index:1`); mobile flows it static, where this earlier
+              DOM position is what stacks it above the grid — parity with
+              the desktop layout. */}
           <div class="PopupSummary">
             <div class="PopupSummaryItem Profiles">
               <div class="RenderSprite Tobi" />
               {vm.summaryProfiles}
             </div>
           </div>
+          <TokenGrid
+            tokens={vm.tokens}
+            paginationClass="Pagination"
+            tokensClass="PopupTokens"
+            onOpen={setOpenToken}
+          />
           <div class="PopupButtons">
             <div class="ButtonDecorator AP">
               <div class="RenderSprite Tobi" />1

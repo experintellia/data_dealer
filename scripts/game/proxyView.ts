@@ -34,7 +34,6 @@ export function buildProxyPopupVM(
     selectorTitle: i18n.gettext('proxy_popup selector title'),
     tiles,
     subpops,
-    pageSize: 5,
     loading: rows.length === 0 && data.buyablePerps === undefined,
     noItemsText: i18n.gettext('Sorry, currently there are <br />no new business opportunities.'),
     loadingText: i18n.gettext('Looking for new ventures...'),
