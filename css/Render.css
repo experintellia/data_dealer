@@ -3664,12 +3664,11 @@ button {
     overflow-y: auto;
     height: auto;
   }
-  /* Flow action buttons at the end of the scrollable content instead of
-   * hanging below the body.  Header buttons keep their grid placement
-   * (unaffected — they are not inside .PopupContent). */
-  .PopupContent .PopupButtons {
-    position: static;
-    margin-top: 10px;
+  /* Pin action buttons to the dialog bottom, overlaying its bottom
+   * border-area so they read as attached to the card edge without
+   * extending below the scrollable content. */
+  .PopupButtons {
+    bottom: 0;
   }
   /* City tab strip: drop the desktop 600-px absolute positioning so it
    * flows as the last header row.  Keep it a single row that scrolls
