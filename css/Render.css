@@ -3612,12 +3612,18 @@ button {
     margin-top: 0;
     padding-right: 0;
     align-self: end;
+    /* Grid items don't shrink below content width by default; allow the
+     * title cell to shrink so long words wrap instead of overflowing. */
+    min-width: 0;
+    overflow-wrap: break-word;
   }
   .PopupHeader .PopupSubTitle {
     grid-area: subtitle;
     margin-left: 0;
     padding-right: 0;
     align-self: start;
+    min-width: 0;
+    overflow-wrap: break-word;
   }
   /* `:not(.APRefillLabel)` so the AP refill caption — which also carries
    * `.PopupText` — keeps its own auto-placed row below instead of being
