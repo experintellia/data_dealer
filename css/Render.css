@@ -3817,6 +3817,24 @@ button {
   .Selector.hasPopup {
     display: block;
   }
+  /* ProvidedPerp subpop dialog on mobile: the SubpopLabelData
+   * auto-places into the subtitle grid cell (col 2, row 2 of the
+   * PopupHeader grid).  BonusWrap children default to display:block and
+   * stack vertically; flex on the container + BonusWrap makes the stat
+   * chips flow horizontally, matching the desktop inline layout. */
+  .PopupBody.ProvidedPerp .PopupHeader .PowerupLabelData.SubpopLabelData {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-self: start;
+    align-content: flex-start;
+  }
+  .PopupBody.ProvidedPerp .PopupHeader .PowerupLabelData.SubpopLabelData .BonusWrap {
+    margin-bottom: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
 }
 
 /* --- Mission + Topscore tab content: centre via margin auto + max-width --
