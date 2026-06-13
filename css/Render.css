@@ -3781,21 +3781,35 @@ button {
    * off a phone screen and clip their (narrower-wrapped) content.
    * Inset them to the dialog and let the card grow to its content. */
   .SubpopContainer {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    margin: 6px;
     width: auto;
-    left: 6px;
-    right: 6px;
-    /* Lift the overlay near the top of the popup body so the
-     * grow-to-content card below has room before the screen edge. */
-    top: 40px;
+    height: auto;
+    /* Flow in-content on mobile — no space when closed, visible when
+     * open (the JS toggles `.open` on the container + subpop). */
+  }
+  .SubpopContainer:not(.open) {
+    display: none;
   }
   .Subpop {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none !important;
     width: auto;
-    left: 6px;
-    right: 6px;
-    /* Grow to the (narrower-wrapped) content height; `padding-bottom`
-     * reserves room for the absolutely-pinned `.SubpopButtons`. */
     height: auto;
-    padding-bottom: 44px;
+    padding-bottom: 0;
+    opacity: 1;
+  }
+  .Subpop.open {
+    transform: none !important;
+  }
+  /* Keep the buy grid visible while the subpop is open — no hiding. */
+  .Selector.hasPopup {
+    display: block;
   }
 }
 
