@@ -3,7 +3,7 @@
 // `game/tokenPopupView.ts`.  Issue #80 phase 2 tier 11.  Two layouts
 // keyed by `vm.isSuper`: a bare header + Close (normal token), or the
 // SuperToken profileset grid + Compute/Update footer.  Reuses the
-// shared TokenTile/PageArrows/fireAction + the new TokenUpgradeSubpop.
+// shared TokenTile/TokenGrid/fireAction + the TokenUpgradeSubpop.
 
 import { useState } from 'preact/hooks';
 import type { TokenPopupVM } from '../../game/tokenPopupView.js';

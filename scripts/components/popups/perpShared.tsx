@@ -1,9 +1,9 @@
 // Shared perp-popup pieces — the token tile, the detail subpop, the
-// pagination arrows, and the action-button click bridge.  popup_contact
-// (tier 5a) and popup_client (tier 5b) render the same `token.html` /
-// `subpop_token.html` partials and route action buttons through the
-// same legacy `popup.trigger('button_click.X')` seam, so these live
-// once here instead of being duplicated per perp component.
+// one-grid-fits-all token grid, and the action-button click bridge.
+// popup_contact (tier 5a) and popup_client (tier 5b) render the same
+// `token.html` / `subpop_token.html` partials and route action buttons
+// through the same legacy `popup.trigger('button_click.X')` seam, so
+// these live once here instead of being duplicated per perp component.
 
 import type { JSX } from 'preact';
 import type { ProvidedSubpopVM, ProvidedTileVM } from '../../game/providedView.js';

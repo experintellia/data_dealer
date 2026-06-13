@@ -1,9 +1,9 @@
 // Client perp popup — Preact port of `views/popup_client.html` +
-// `profileset_client.html` (issue #80 phase 2 tier 5b).  Two paged
-// token grids ("provided" 7/page + "consumed" 6/page) split by a
-// ClientDivider, a single Cash/Penalty income summary, and the same
-// Charge/Collect button seam as Contact.  Token tile / subpop /
-// arrows / action seam are the shared `perpShared.tsx`.
+// `profileset_client.html` (issue #80 phase 2 tier 5b).  Two token
+// grids (provided + consumed) split by a ClientDivider, a single
+// Cash/Penalty income summary, and the same Charge/Collect button
+// seam as Contact.  Token tile / subpop / grid / action seam are
+// the shared `perpShared.tsx`.
 
 import { useState } from 'preact/hooks';
 import type { ClientPopupVM } from '../../game/clientView.js';

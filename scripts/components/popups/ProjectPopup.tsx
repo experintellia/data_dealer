@@ -8,7 +8,7 @@
 //
 // The Data tab (profileset + Charge/Collect) is structurally identical
 // to popup_contact, so it reuses the shared tokenView VM + the
-// perpShared TokenTile/TokenSubpop/PageArrows/fireAction pieces.
+// perpShared TokenTile/TokenSubpop/fireAction pieces.
 
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
