@@ -3663,6 +3663,7 @@ button {
     flex: 1 1 auto;
     overflow-y: auto;
     height: auto;
+    padding-bottom: 72px;
   }
   /* Pin action buttons to the dialog bottom, overlaying its bottom
    * border-area so they read as attached to the card edge without
