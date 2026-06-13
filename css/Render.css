@@ -3663,13 +3663,13 @@ button {
     flex: 1 1 auto;
     overflow-y: auto;
     height: auto;
-    padding-bottom: 72px;
+    padding-bottom: 36px;
   }
-  /* Pin action buttons to the dialog bottom, overlaying its bottom
-   * border-area so they read as attached to the card edge without
-   * extending below the scrollable content. */
+  /* Straddle the action buttons across the dialog bottom edge so half
+   * sits inside the content area and the other half extends outside,
+   * using the padding/border area as usable space. */
   .PopupButtons {
-    bottom: -6px;
+    bottom: -36px;
   }
   /* City tab strip: drop the desktop 600-px absolute positioning so it
    * flows as the last header row.  Keep it a single row that scrolls
