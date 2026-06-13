@@ -52,7 +52,6 @@ export interface TokenPopupVM {
   // ---- SuperToken-only ----
   tokens: TokenVM[];
   upgradeSubpops: TokenUpgradeSubpopVM[];
-  pageSize: number;
   summaryLabel: string;
   collectMode: boolean;
   chargeDisabled: boolean;
@@ -100,7 +99,6 @@ export function buildTokenPopupVM(
     closeButtonText: i18n.gettext('Close'),
     tokens,
     upgradeSubpops,
-    pageSize: 6,
     summaryLabel: i18n.gettext('Data that can be analyzed'),
     collectMode: !states?.idle && !states?.chargeRunning,
     chargeDisabled: !states?.idle || states?.zeroresult === true,

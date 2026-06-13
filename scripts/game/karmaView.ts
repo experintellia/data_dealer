@@ -41,7 +41,6 @@ export function buildKarmaPopupVM(
     karmaChip: { up: karmaValue >= 0, text: toKSNum(Math.abs(karmaValue)) },
     tiles,
     subpops,
-    pageSize: 5,
     // compileProvidedKarma is synchronous (no server fetch).
     loading: false,
     noItemsText: i18n.gettext('Currently no items available'),

@@ -22,8 +22,6 @@ export interface ProfileSetPopupVM {
   subtitle: string;
   description: string;
   tokens: TokenVM[];
-  /** Tokens per page (legacy popup_profileset.html: 12). */
-  pageSize: number;
   summaryProfiles: string;
   buttonText: string;
 }
@@ -43,7 +41,6 @@ export function buildProfileSetPopupVM(ps: ProfileSetLike): ProfileSetPopupVM {
       'All these new profiles need to be integrated into your main database. If you already have information on some of these people, your database will try to identify and update existing profiles using complicated mathematical methods.'
     ),
     tokens,
-    pageSize: 12,
     summaryProfiles: toKSNum(profiles),
     buttonText: i18n.gettext('Import'),
   };

@@ -199,10 +199,6 @@ export interface PowerupCategoryVM {
   providedTiles: ProvidedPowerupTileVM[];
   providedSubpops: ProvidedPowerupSubpopVM[];
   buySlots: BuySlotsVM;
-  /** Slot-grid page size (legacy: 10). */
-  pageSize: number;
-  /** Buy-selector page size (legacy: 5). */
-  selectorPageSize: number;
 }
 
 export interface ProjectPopupVM {
@@ -214,7 +210,6 @@ export interface ProjectPopupVM {
   cached: boolean;
   /** Data tab (profileset + Charge/Collect — identical to Contact). */
   tokens: TokenVM[];
-  pageSize: number;
   summaryProfiles: string;
   summaryRisk: string;
   summaryRiskUp: boolean;
@@ -374,8 +369,6 @@ function buildCategory(
       slotsLeft: bucket.slots_left,
       buttonText: wordings.slot_button_text ?? i18n.gettext('Buy'),
     },
-    pageSize: 10,
-    selectorPageSize: 5,
   };
 }
 
@@ -397,7 +390,6 @@ export function buildProjectPopupVM(
     description: data.description ?? '',
     cached: data.powerupsCached === true,
     tokens,
-    pageSize: 12,
     summaryProfiles: toKSNum(data.collect_amount ?? 0),
     summaryRisk: toKSNum(Math.abs(collectRisk)),
     summaryRiskUp: collectRisk < 1,
