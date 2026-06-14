@@ -460,29 +460,29 @@ function BuySlotsSubpopDialog({
     e.stopPropagation();
     setNum((n) => (n + 1 > bs.slotsLeft ? n : n + 1));
   };
+  const close = stopAndClose(onClose);
   const bt = bs.title;
   const bsub = bs.subtitle;
   const bd = bs.description;
   return (
-    <div class="PopupBody ProvidedPerp ProvidedPerpSub">
-      <PopupHeader
-        onClose={onClose}
-        spriteHtml='<div class="BuySlotsLogo"></div>'
-        titleHtml={bt}
-        subtitleHtml={bsub}
-      >
-        <div class="PopupText">
-          {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
-          <span style="display:contents" dangerouslySetInnerHTML={{ __html: bd }} />
-          <div class="BuySlotsWrap">
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-            <div class="BuySlotsDec ButtonInc" onClick={dec}>-</div>
-            <div class="BuySlotsNumWrap">
-              <div class="BuySlotsNum">{num}</div>/<div class="BuySlotsNumLeft">{bs.slotsLeft}</div>
-            </div>
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-            <div class="BuySlotsInc ButtonDec" onClick={inc}>+</div>
+    <div class="PopupBody ProvidedPerpSub BuySlotsDialogBody">
+      <div class="PopupHeader">
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+        <div class="PopupClose" onClick={close}>X</div>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
+        <div class="PopupTitle" dangerouslySetInnerHTML={{ __html: bt }} />
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
+        <div class="PopupSubTitle" dangerouslySetInnerHTML={{ __html: bsub }} />
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
+        <div class="PopupText" dangerouslySetInnerHTML={{ __html: bd }} />
+        <div class="BuySlotsWrap">
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+          <div class="BuySlotsDec ButtonInc" onClick={dec}>-</div>
+          <div class="BuySlotsNumWrap">
+            <div class="BuySlotsNum">{num}</div>/<div class="BuySlotsNumLeft">{bs.slotsLeft}</div>
           </div>
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+          <div class="BuySlotsInc ButtonDec" onClick={inc}>+</div>
         </div>
         <div class="PopupButtons">
           <div class="ButtonDecorator Cash">
@@ -504,7 +504,7 @@ function BuySlotsSubpopDialog({
             {bs.buttonText}
           </div>
         </div>
-      </PopupHeader>
+      </div>
     </div>
   );
 }

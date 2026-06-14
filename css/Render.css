@@ -3657,6 +3657,26 @@ button {
     flex-wrap: wrap;
     gap: 4px;
   }
+  /* BuySlotsDialog: no logo, so switch header from the 2-column grid to
+   * block layout so title/subtitle span full width and can be centred.
+   * BuySlotsWrap uses legacy floats on desktop; override to flex here so
+   * the counter centres inside the full-width block header. */
+  .PopupBody.BuySlotsDialogBody .PopupHeader {
+    display: block;
+    text-align: center;
+  }
+  .PopupBody.BuySlotsDialogBody .PopupHeader .PopupText {
+    text-align: left;
+  }
+  .PopupBody.BuySlotsDialogBody .BuySlotsWrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 16px;
+  }
+  .PopupBody.BuySlotsDialogBody .BuySlotsNumWrap {
+    float: none;
+  }
   /* `:not(.APRefillLabel)` so the AP refill caption — which also carries
    * `.PopupText` — keeps its own auto-placed row below instead of being
    * pulled into the `desc` cell on top of the description. */
