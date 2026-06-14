@@ -79,8 +79,8 @@ export function attachDragScroll(el: HTMLElement, axis: 'x' | 'y'): () => void {
 //   • Async data loads (token grid may be empty when dialog first renders)
 //   • All Preact dialogs (belt-and-suspenders alongside the per-dialog path)
 
-const VERTICAL_SCROLL_SEL = '.PopupPage, .PopupContent';
-const HORIZONTAL_SCROLL_SEL = '.PopupSelector, .PopupTokens';
+const VERTICAL_SCROLL_SEL = '.PopupTokens, .PopupPage, .PopupContent';
+const HORIZONTAL_SCROLL_SEL = '.PopupSelector';
 
 function findScrollTarget(from: Element | null): { el: HTMLElement; axis: 'x' | 'y' } | null {
   let el = from as HTMLElement | null;

@@ -3724,10 +3724,13 @@ button {
   .PopupPage {
     touch-action: pan-x;
   }
-  /* Horizontal-scroll grid viewports: `touch-action: pan-y` mirrors the
-   * tab-strip, pointer events fire for horizontal → JS drag scrolls them. */
-  .PopupSelector,
+  /* .PopupTokens is the vertical token-grid scroll container — pan-x frees
+   * the vertical axis for JS drag (same as .PopupPage / .PopupContent). */
   .PopupTokens {
+    touch-action: pan-x;
+  }
+  /* .PopupSelector is horizontal-only (page tabs) — pan-y frees horizontal. */
+  .PopupSelector {
     touch-action: pan-y;
   }
   /* Straddle the action buttons across the dialog bottom edge so half
