@@ -1,18 +1,18 @@
-// Pointer-drag-to-scroll shared by PopupMenu (horizontal tab strip) and
-// dialogManager (vertical .PopupContent + horizontal .PopupSelector /
-// .PopupTokens).  Uses pointer events so the game engine's native touch
-// handlers (which call preventDefault on touchstart) cannot interfere.
+// Pointer-drag-to-scroll shared by PopupMenu (horizontal tab strip) and the
+// global popup scroll handler (vertical/horizontal grids).  Uses pointer
+// events so the game engine's native touchstart preventDefault() cannot
+// interfere — pointerdown fires before touchstart, so our capture-phase
+// document listener beats the game engine to the event.
 //
-// Why document-level listeners instead of element + setPointerCapture:
-// Calling setPointerCapture on a scrollable element (overflow-y:auto) during
-// a vertical gesture causes Chrome/Safari to fire pointercancel immediately
-// because the browser detects a conflict between pointer capture and its own
-// scroll handling, even when touch-action:none is set.  Attaching move/up
-// listeners to document at capture phase sidesteps this entirely — we never
-// touch setPointerCapture, and the events arrive before the game engine's
-// own document listeners can swallow them.
+// Why document-level listeners + no setPointerCapture:
+//   • setPointerCapture on a scrollable element (overflow-y:auto) during a
+//     vertical gesture causes Chrome/Safari to fire pointercancel immediately
+//     (conflict between capture and the browser's own scroll tracking).
+//   • Document capture-phase listeners receive events before any element
+//     handler, so we never need to redirect via capture.
 
-/** Attach drag-to-scroll to `el` on the given axis.  Returns a cleanup fn. */
+/** Attach drag-to-scroll to `el` on the given axis.  Returns a cleanup fn.
+ *  Used by PopupMenu.tsx for the horizontal tab strip. */
 export function attachDragScroll(el: HTMLElement, axis: 'x' | 'y'): () => void {
   let activeId = -1;
   let dragged = false;
@@ -43,13 +43,11 @@ export function attachDragScroll(el: HTMLElement, axis: 'x' | 'y'): () => void {
   };
 
   const onDown = (e: PointerEvent): void => {
-    if (activeId !== -1) return; // ignore second touch while dragging
+    if (activeId !== -1) return;
     activeId = e.pointerId;
     dragged = false;
     start = coord(e);
     startScroll = axis === 'x' ? el.scrollLeft : el.scrollTop;
-    // Capture-phase document listeners intercept moves before anything else
-    // (including the game engine) and prevent double-scroll from the browser.
     document.addEventListener('pointermove', onDocMove, { capture: true, passive: false });
     document.addEventListener('pointerup', onDocUp, true);
     document.addEventListener('pointercancel', onDocUp, true);
@@ -71,5 +69,108 @@ export function attachDragScroll(el: HTMLElement, axis: 'x' | 'y'): () => void {
     document.removeEventListener('pointermove', onDocMove, true);
     document.removeEventListener('pointerup', onDocUp, true);
     document.removeEventListener('pointercancel', onDocUp, true);
+  };
+}
+
+// ── Global popup scroll ──────────────────────────────────────────────────────
+// A single document-level pointerdown handler that hit-tests the nearest
+// scrollable popup element on every tap.  This covers:
+//   • Legacy popups (not opened via openDialog — dialogManager never runs)
+//   • Async data loads (token grid may be empty when dialog first renders)
+//   • All Preact dialogs (belt-and-suspenders alongside the per-dialog path)
+
+const VERTICAL_SCROLL_SEL = '.PopupPage, .PopupContent';
+const HORIZONTAL_SCROLL_SEL = '.PopupSelector, .PopupTokens';
+
+function findScrollTarget(from: Element | null): { el: HTMLElement; axis: 'x' | 'y' } | null {
+  let el = from as HTMLElement | null;
+  while (el) {
+    if (el.matches(VERTICAL_SCROLL_SEL) && el.scrollHeight > el.clientHeight) {
+      return { el, axis: 'y' };
+    }
+    if (el.matches(HORIZONTAL_SCROLL_SEL) && el.scrollWidth > el.clientWidth) {
+      return { el, axis: 'x' };
+    }
+    // Don't walk above the popup container boundary.
+    if (el.classList.contains('PopupContainer')) break;
+    el = el.parentElement;
+  }
+  return null;
+}
+
+let globalInitialised = false;
+
+/** Call once during app init (or lazily on first openDialog).  The returned
+ *  cleanup is only needed if the entire popup system is torn down. */
+export function initGlobalPopupScrollDrag(): () => void {
+  if (globalInitialised) return () => {};
+  globalInitialised = true;
+
+  let activeId = -1;
+  let dragged = false;
+  let scrollEl: HTMLElement | null = null;
+  let scrollAxis: 'x' | 'y' = 'y';
+  let start = 0;
+  let startScroll = 0;
+
+  const coord = (e: PointerEvent) => (scrollAxis === 'x' ? e.clientX : e.clientY);
+
+  const onMove = (e: PointerEvent): void => {
+    if (e.pointerId !== activeId || !scrollEl) return;
+    const delta = coord(e) - start;
+    if (!dragged) {
+      if (Math.abs(delta) < 4) return;
+      dragged = true;
+    }
+    if (scrollAxis === 'x') scrollEl.scrollLeft = startScroll - delta;
+    else scrollEl.scrollTop = startScroll - delta;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const onUp = (e: PointerEvent): void => {
+    if (e.pointerId !== activeId) return;
+    activeId = -1;
+    scrollEl = null;
+    document.removeEventListener('pointermove', onMove, true);
+    document.removeEventListener('pointerup', onUp, true);
+    document.removeEventListener('pointercancel', onUp, true);
+  };
+
+  const onDown = (e: PointerEvent): void => {
+    if (activeId !== -1) return;
+    // Only act inside a popup container.
+    if (!(e.target as Element).closest?.('.PopupContainer')) return;
+    const found = findScrollTarget(e.target as Element);
+    if (!found) return;
+    activeId = e.pointerId;
+    dragged = false;
+    scrollEl = found.el;
+    scrollAxis = found.axis;
+    start = coord(e);
+    startScroll = scrollAxis === 'x' ? scrollEl.scrollLeft : scrollEl.scrollTop;
+    document.addEventListener('pointermove', onMove, { capture: true, passive: false });
+    document.addEventListener('pointerup', onUp, true);
+    document.addEventListener('pointercancel', onUp, true);
+  };
+
+  const onClickCapture = (e: MouseEvent): void => {
+    if (!dragged) return;
+    dragged = false;
+    e.stopPropagation();
+    e.preventDefault();
+  };
+
+  // Capture phase so we beat the game engine's own document listeners.
+  document.addEventListener('pointerdown', onDown, true);
+  document.addEventListener('click', onClickCapture, true);
+
+  return () => {
+    globalInitialised = false;
+    document.removeEventListener('pointerdown', onDown, true);
+    document.removeEventListener('click', onClickCapture, true);
+    document.removeEventListener('pointermove', onMove, true);
+    document.removeEventListener('pointerup', onUp, true);
+    document.removeEventListener('pointercancel', onUp, true);
   };
 }
