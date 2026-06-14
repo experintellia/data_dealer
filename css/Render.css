@@ -3577,6 +3577,11 @@ button {
     padding: 10px 12px 12px;
     box-sizing: border-box;
   }
+  .PopupBody.Status .PopupHeader,
+  .PopupBody.TokenPerp:not(.SuperToken) .PopupHeader,
+  .PopupBody.ProvidedPerpSub .PopupHeader {
+    padding-bottom: 76px;
+  }
   .PopupBody.CityPerp .PopupHeader,
   .PopupBody.ProjectPerp .PopupHeader {
     padding-bottom: 0;
@@ -3705,37 +3710,26 @@ button {
     overflow-y: auto;
     height: auto;
     padding-bottom: 36px;
-    /* The game engine's global touch handlers can swallow gestures; freeing
-     * the vertical axis here lets native scroll work inside .PopupContent
-     * even when the game layer has touch-action:none. */
-    touch-action: pan-y;
+    /* Mirror the tab-strip fix: the game engine's global touch handlers can
+     * swallow gestures.  `touch-action: pan-x` frees the vertical axis for
+     * the JS pointer-drag handler (attachDragScroll in dialogManager.ts)
+     * while leaving horizontal pans to the browser (nothing to scroll here).
+     * Same reasoning as `.PopupMenu { touch-action: pan-y }` but mirrored. */
+    touch-action: pan-x;
     -webkit-overflow-scrolling: touch;
   }
-  /* Buy/sell action buttons: flow in the normal header block (no straddle)
-   * so long text in any language never overflows the dialog width.  Use
-   * flex-wrap so the price pill + action button sit side-by-side when they
-   * fit and stack vertically when they don't. */
-  .PopupContainer .PopupBody .PopupButtons {
-    position: static;
-    bottom: auto;
-    height: auto;
-    width: 100%;
-    margin-left: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 10px 0 4px;
+  /* Horizontal-scroll grid viewports also need the JS drag treatment.
+   * `touch-action: pan-y` mirrors what .PopupMenu uses: browser handles
+   * vertical (no scroll needed), pointer events fire for horizontal → JS
+   * drag handler (attachDragScroll) scrolls the element. */
+  .PopupSelector,
+  .PopupTokens {
+    touch-action: pan-y;
   }
-  /* The →-arrow connector on .ButtonDecorator.Cash (::after) only reads
-   * correctly when the pill and button sit in the same horizontal row;
-   * hide it on mobile so it doesn't dangle when they wrap. */
-  .PopupContainer .PopupBody .PopupButtons .ButtonDecorator.Cash {
-    margin-right: 0;
-  }
-  .PopupContainer .PopupBody .PopupButtons .ButtonDecorator.Cash::after {
-    display: none;
+  /* Straddle the action buttons across the dialog bottom edge so half
+   * sits inside the content area and the other half extends outside. */
+  .PopupButtons {
+    bottom: -36px;
   }
   /* City tab strip: drop the desktop 600-px absolute positioning so it
    * flows as the last header row.  Keep it a single row that scrolls

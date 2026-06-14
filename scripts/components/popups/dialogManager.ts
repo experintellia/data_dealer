@@ -8,6 +8,7 @@
 
 import { type ComponentChildren, type ComponentType, type JSX, h, render } from 'preact';
 import setup from '../../setup.js';
+import { attachDragScroll } from './scrollDrag.js';
 
 // MainSprites.png window (x y, 65x65) for the legacy FX bling icons.
 const FX_BLING_BUG = '-362px -860px'; // legacy FXError → FXNoAP('bug')
@@ -174,6 +175,8 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
   // Forward ref so `close` can check whether the currently-active dialog
   // is a stacked child of this one (set after `handle` is constructed).
   let ownHandle: PreactDialogHandle | null = null;
+  // Cleanup for pointer-drag-scroll handlers attached after render.
+  let scrollCleanup: (() => void) | null = null;
 
   // Mount into a fresh full-screen overlay appended to the render
   // container (a sibling of `.Stage`), so the backdrop escapes the
@@ -233,6 +236,8 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
     if (opts.extendClass) opts.container.classList.remove(opts.extendClass);
     // Only unlock the menu when the last dialog closes.
     if (!savedActive) lockMenu?.classList.remove('DialogLock');
+    scrollCleanup?.();
+    scrollCleanup = null;
     ownContainer?.remove();
     active = savedActive;
     opts.onAfterClose?.();
@@ -307,6 +312,25 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
     body as ComponentChildren
   );
   render(wrapped, opts.container);
+
+  // Attach pointer-drag-to-scroll to every scrollable region in the dialog.
+  // Preact render() is synchronous so the DOM is immediately queryable.
+  // .PopupContent scrolls vertically; .PopupSelector / .PopupTokens scroll
+  // horizontally.  Mirrors the tab-strip approach in PopupMenu.tsx so touch
+  // drag works despite the game engine's global touch handlers intercepting
+  // raw touch events.
+  {
+    const cleanups: Array<() => void> = [];
+    const content = opts.container.querySelector<HTMLElement>('.PopupContent');
+    if (content) cleanups.push(attachDragScroll(content, 'y'));
+    for (const el of opts.container.querySelectorAll<HTMLElement>('.PopupSelector, .PopupTokens')) {
+      cleanups.push(attachDragScroll(el, 'x'));
+    }
+    if (cleanups.length > 0)
+      scrollCleanup = () => {
+        for (const fn of cleanups) fn();
+      };
+  }
 
   ownHandle = handle;
   active = { container: opts.container, extendClass: opts.extendClass, handle };
