@@ -37,7 +37,7 @@ export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
         setOpenToken(gestalt);
       }
     },
-    [vm.tokens],
+    [vm.tokens]
   );
 
   return (

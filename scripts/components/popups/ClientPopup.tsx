@@ -41,7 +41,7 @@ export function ClientPopup({ vm, onClose, popup }: ClientPopupProps) {
         setOpenToken(gestalt);
       }
     },
-    [vm.providedTokens, vm.consumedTokens],
+    [vm.providedTokens, vm.consumedTokens]
   );
 
   return (

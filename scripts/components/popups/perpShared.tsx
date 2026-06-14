@@ -6,14 +6,14 @@
 // these live once here instead of being duplicated per perp component.
 
 import { type ComponentType, type JSX } from 'preact';
+import type { ProvidedPowerupSubpopVM } from '../../game/powerupView.js';
 import type { ProvidedSubpopVM, ProvidedTileVM } from '../../game/providedView.js';
 import type { TokenUpgradeSubpopVM } from '../../game/tokenPopupView.js';
 import type { TokenVM } from '../../game/tokenView.js';
-import type { ProvidedPowerupSubpopVM } from '../../game/powerupView.js';
 import i18n from '../../i18n.js';
 import setup from '../../setup.js';
-import { type PreactDialogHandle, openDialog, stopAndClose, toFXTarget } from './dialogManager.js';
 import { PopupHeader } from './PopupHeader.js';
+import { type PreactDialogHandle, openDialog, stopAndClose, toFXTarget } from './dialogManager.js';
 
 function getDialogContainer(): HTMLElement {
   return document.querySelector<HTMLElement>(setup.renderContainer) ?? document.body;
@@ -25,7 +25,6 @@ const MOBILE_BP = 768;
 export function isMobileWidth(): boolean {
   return window.innerWidth <= MOBILE_BP;
 }
-
 
 /** Fire the legacy `.Button` seam: park the clicked element +
  *  click point on the handle, then `popup.trigger('button_click.X')`
@@ -439,7 +438,7 @@ export function TokenUpgradeSubpopDialog({
  *  can close it programmatically. */
 export function openSubpopDialog<P>(
   component: ComponentType<P & { onClose: () => void }>,
-  props: P,
+  props: P
 ): PreactDialogHandle {
   return openDialog({
     component,

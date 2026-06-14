@@ -21,9 +21,9 @@ import type {
   SellSubpopVM,
 } from '../../game/powerupView.js';
 import i18n from '../../i18n.js';
-import { PopupMenu } from './PopupMenu.js';
 import { PopupHeader } from './PopupHeader.js';
-import { stopAndClose, type PreactDialogHandle } from './dialogManager.js';
+import { PopupMenu } from './PopupMenu.js';
+import { type PreactDialogHandle, stopAndClose } from './dialogManager.js';
 import {
   ProvidedPowerupSubpopDialog,
   TokenSubpop,
@@ -431,7 +431,9 @@ function SellSubpopDialog({
             data-button-gestalt={sub.gestalt}
             data-button-data={sub.slot}
             data-testid={`dd-powerup-sell-${sub.gestalt}`}
-            onClick={(e) => fireAction(parentPopup, e, 'PowerupSellButton', [sub.gestalt, sub.slot])}
+            onClick={(e) =>
+              fireAction(parentPopup, e, 'PowerupSellButton', [sub.gestalt, sub.slot])
+            }
           >
             {i18n.gettext('Sell')}
           </div>
@@ -468,7 +470,9 @@ function BuySlotsSubpopDialog({
     <div class="PopupBody ProvidedPerpSub BuySlotsDialogBody">
       <div class="PopupHeader">
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-        <div class="PopupClose" onClick={close}>X</div>
+        <div class="PopupClose" onClick={close}>
+          X
+        </div>
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
         <div class="PopupTitle" dangerouslySetInnerHTML={{ __html: bt }} />
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
@@ -477,12 +481,16 @@ function BuySlotsSubpopDialog({
         <div class="PopupText" dangerouslySetInnerHTML={{ __html: bd }} />
         <div class="BuySlotsWrap">
           {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-          <div class="BuySlotsDec ButtonInc" onClick={dec}>-</div>
+          <div class="BuySlotsDec ButtonInc" onClick={dec}>
+            -
+          </div>
           <div class="BuySlotsNumWrap">
             <div class="BuySlotsNum">{num}</div>/<div class="BuySlotsNumLeft">{bs.slotsLeft}</div>
           </div>
           {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-          <div class="BuySlotsInc ButtonDec" onClick={inc}>+</div>
+          <div class="BuySlotsInc ButtonDec" onClick={inc}>
+            +
+          </div>
         </div>
         <div class="PopupButtons">
           <div class="ButtonDecorator Cash">
@@ -527,7 +535,9 @@ function BuySelectorSubpopDialog({
       {/* PopupBody has position:relative so PopupClose positions at its
           top-right corner — no PopupHeader wrapper needed. */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-      <div class="PopupClose" onClick={close}>X</div>
+      <div class="PopupClose" onClick={close}>
+        X
+      </div>
       <div class="PopupContent">
         <div class="PopupTab Powerups">
           <div class="Pagination Selector standalone">
@@ -545,7 +555,9 @@ function BuySelectorSubpopDialog({
                         t.locked
                           ? null
                           : () => {
-                              const found = cat.providedSubpops.find((s) => s.gestalt === t.gestalt);
+                              const found = cat.providedSubpops.find(
+                                (s) => s.gestalt === t.gestalt
+                              );
                               if (found)
                                 openSubpopDialog(ProvidedPowerupSubpopDialog, {
                                   sub: found,
@@ -595,7 +607,7 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
         setOpenToken(gestalt);
       }
     },
-    [vm.tokens],
+    [vm.tokens]
   );
   // Powerup-tab subpop state. `selPkey` = which category's buy Selector
   // is open; `subId` = a card open on top (sell `<pkey><slot>`,
@@ -875,7 +887,7 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
                                     if (isMobileWidth()) {
                                       subpopDialog.current = openSubpopDialog(
                                         BuySelectorSubpopDialog,
-                                        { cat, slot: slot.slot, parentPopup: popup },
+                                        { cat, slot: slot.slot, parentPopup: popup }
                                       );
                                     } else {
                                       setSubId(null);
@@ -888,7 +900,7 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
                                       if (isMobileWidth()) {
                                         subpopDialog.current = openSubpopDialog(
                                           BuySlotsSubpopDialog,
-                                          { bs: cat.buySlots, parentPopup: popup },
+                                          { bs: cat.buySlots, parentPopup: popup }
                                         );
                                       } else {
                                         setSelPkey(null);
@@ -898,12 +910,12 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
                                   : () => {
                                       if (isMobileWidth()) {
                                         const found = cat.sellSubpops.find(
-                                          (s) => s.subpopId === slot.subpopId,
+                                          (s) => s.subpopId === slot.subpopId
                                         );
                                         if (found)
                                           subpopDialog.current = openSubpopDialog(
                                             SellSubpopDialog,
-                                            { sub: found, parentPopup: popup },
+                                            { sub: found, parentPopup: popup }
                                           );
                                       } else {
                                         setSelPkey(null);

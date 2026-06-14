@@ -44,7 +44,7 @@ export function CityPopup({ vm, onClose, popup }: CityPopupProps) {
         setOpenKey(key);
       }
     },
-    [vm.tabs, activeTab, popup],
+    [vm.tabs, activeTab, popup]
   );
 
   const switchTab = (pkey: string): void => {

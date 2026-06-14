@@ -38,7 +38,7 @@ export function ProfileSetPopup({ vm, onClose, popup }: ProfileSetPopupProps) {
         setOpenToken(gestalt);
       }
     },
-    [vm.tokens],
+    [vm.tokens]
   );
 
   return (

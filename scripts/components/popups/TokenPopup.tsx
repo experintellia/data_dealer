@@ -37,7 +37,7 @@ export function TokenPopup({ vm, onClose, popup }: TokenPopupProps) {
         setOpenToken(gestalt);
       }
     },
-    [vm.upgradeSubpops],
+    [vm.upgradeSubpops]
   );
 
   return (

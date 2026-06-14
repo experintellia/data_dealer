@@ -42,7 +42,7 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
         setOpenKey(key);
       }
     },
-    [vm.subpops, popup],
+    [vm.subpops, popup]
   );
 
   return (

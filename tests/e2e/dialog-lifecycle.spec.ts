@@ -1936,16 +1936,11 @@ test.describe('Section P — Pusher/Proxy provided-perp popups', () => {
 
 // ── Section Q — touch subpop reopen ──────────────────────────────────────
 //
-// Regression guard for a touch-only bug: tapping a subpop close control
-// fires a real `touchend` followed by the browser's compatibility
-// `click`.  The dialog manager used to run a legacy jQuery delegated
-// close handler on `touchend` that called `preventDefault()` — which
-// suppressed the compat `click`, so the Preact component's `onClose`
-// never ran.  State desynced (the jQuery handler had stripped `.open`
-// off the DOM behind the vdom's back) and a closed subpop could not be
-// reopened.  Driven with real `.tap()` so the compat-click path is
-// actually exercised; a `.click()` would dispatch mouse events only and
-// miss the bug entirely.
+// Regression guard: on mobile, tapping a free powerup slot opens a stacked
+// dialog (BuySelectorSubpopDialog).  Verifies that closing that dialog by
+// tapping its X and then tapping another slot reopens the dialog — i.e. the
+// stacked-dialog close path correctly restores state so the next tap works.
+// Driven with real `.tap()` so touch-synthesized events are exercised.
 
 test.describe('Section Q — touch subpop reopen', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 375, height: 667 } });
@@ -1974,34 +1969,30 @@ test.describe('Section Q — touch subpop reopen', () => {
       .first()
       .tap();
 
-    // project001 ships 3 free Ad slots; each opens the buy-selector subpop.
+    // project001 ships 3 free Ad slots; each opens the stacked buy-selector dialog.
     const freeSlots = page.locator(
       '.PopupContainer.lockOn .PopupTab[data-tab="AdPowerup"] .Powerup.free[data-subpop-id="ProvidedAdPowerup"]'
     );
     await expect(freeSlots).toHaveCount(3);
 
-    const container = page.locator(
-      '.PopupContainer.lockOn .PopupTab[data-tab="AdPowerup"] .SubpopContainer'
-    );
-    const selector = page.locator(
-      '.PopupContainer.lockOn .Subpop.Selector[data-subpop-id="ProvidedAdPowerup"]'
-    );
+    // The stacked BuySelectorSubpopDialog places its close button as a direct
+    // child of .PopupBody.ProjectPerp (not inside a .PopupHeader like the
+    // parent popup does) — this CSS child combinator is the distinguishing
+    // handle between the two dialogs.
+    const stackedClose = page.locator('.PopupBody.ProjectPerp > .PopupClose');
 
-    // Tap a free slot — the buy-selector subpop opens.
+    // Tap a free slot — the stacked buy-selector dialog opens.
     await freeSlots.nth(0).tap();
-    await expect(selector).toHaveClass(/open/, { timeout: 2_000 });
-    await expect(container).toHaveClass(/open/);
+    await expect(stackedClose).toBeVisible({ timeout: 2_000 });
 
-    // Tap the SubpopClose X to dismiss it.
-    await selector.locator('.SubpopClose').first().tap();
-    await expect(selector).not.toHaveClass(/open/, { timeout: 2_000 });
-    await expect(container).not.toHaveClass(/open/);
+    // Tap the X to dismiss the stacked dialog.
+    await stackedClose.tap();
+    await expect(stackedClose).not.toBeVisible({ timeout: 2_000 });
 
-    // Tap another free slot — the subpop must reopen (the bug left it
-    // shut: `.SubpopContainer` never regained `.open`).
+    // Tap another free slot — the dialog must reopen (the old bug left the
+    // touch-close path broken so subsequent taps were silently ignored).
     await freeSlots.nth(1).tap();
-    await expect(selector).toHaveClass(/open/, { timeout: 2_000 });
-    await expect(container).toHaveClass(/open/);
+    await expect(stackedClose).toBeVisible({ timeout: 2_000 });
 
     await page.evaluate(() => {
       const groot = (window as any).__dd?._app?.game;
