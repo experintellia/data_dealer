@@ -3718,10 +3718,14 @@ button {
     touch-action: pan-x;
     -webkit-overflow-scrolling: touch;
   }
-  /* Horizontal-scroll grid viewports also need the JS drag treatment.
-   * `touch-action: pan-y` mirrors what .PopupMenu uses: browser handles
-   * vertical (no scroll needed), pointer events fire for horizontal → JS
-   * drag handler (attachDragScroll) scrolls the element. */
+  /* .PopupPage is the vertical scroll container for token / tile grids
+   * (overflow-y:auto, fixed height).  Same axis-freeing trick as
+   * .PopupContent so JS pointer-drag can scroll it. */
+  .PopupPage {
+    touch-action: pan-x;
+  }
+  /* Horizontal-scroll grid viewports: `touch-action: pan-y` mirrors the
+   * tab-strip, pointer events fire for horizontal → JS drag scrolls them. */
   .PopupSelector,
   .PopupTokens {
     touch-action: pan-y;

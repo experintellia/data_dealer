@@ -315,14 +315,18 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
 
   // Attach pointer-drag-to-scroll to every scrollable region in the dialog.
   // Preact render() is synchronous so the DOM is immediately queryable.
-  // .PopupContent scrolls vertically; .PopupSelector / .PopupTokens scroll
-  // horizontally.  Mirrors the tab-strip approach in PopupMenu.tsx so touch
-  // drag works despite the game engine's global touch handlers intercepting
-  // raw touch events.
+  // Vertical scrollers: .PopupContent (dialog body) + .PopupPage (token /
+  // tile grids — has its own fixed-height overflow-y:auto viewport).
+  // Horizontal scrollers: .PopupSelector / .PopupTokens (paged grids).
+  // Mirrors the tab-strip approach in PopupMenu.tsx so touch drag works
+  // despite the game engine's global touch handlers intercepting raw touch.
   {
     const cleanups: Array<() => void> = [];
     const content = opts.container.querySelector<HTMLElement>('.PopupContent');
     if (content) cleanups.push(attachDragScroll(content, 'y'));
+    for (const el of opts.container.querySelectorAll<HTMLElement>('.PopupPage')) {
+      cleanups.push(attachDragScroll(el, 'y'));
+    }
     for (const el of opts.container.querySelectorAll<HTMLElement>('.PopupSelector, .PopupTokens')) {
       cleanups.push(attachDragScroll(el, 'x'));
     }
