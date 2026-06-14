@@ -323,10 +323,10 @@ export function TokenSubpopDialog({
   );
 }
 
-/** Wrap a provided-perp subpop in a dialog shell for mobile.  Uses
- *  `parentPopup` (the parent perp dialog's handle) for buy actions
- *  instead of the auto-injected dialog handle.  Renders the same
- *  header + content layout as the provided-perp db view. */
+/** Wrap a provided-perp subpop in a dialog shell for mobile.  Single-box
+ *  layout: logo + title + stats + description all in `PopupHeader`, with
+ *  the buy button straddling the header bottom (same pattern as
+ *  `TokenSubpopDialog`).  Uses `parentPopup` for buy actions. */
 export function PerpProvidedSubpopDialog({
   subpop,
   parentPopup,
@@ -338,7 +338,7 @@ export function PerpProvidedSubpopDialog({
 }) {
   const vd = subpop.valuesDetailsHtml;
   return (
-    <div class="PopupBody ProvidedPerp">
+    <div class="PopupBody ProvidedPerp ProvidedPerpSub">
       <PopupHeader
         onClose={onClose}
         spriteHtml={subpop.logoHtml}
@@ -347,8 +347,6 @@ export function PerpProvidedSubpopDialog({
       >
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced bonus markup */}
         <div class="PowerupLabelData SubpopLabelData" dangerouslySetInnerHTML={{ __html: vd }} />
-      </PopupHeader>
-      <div class="PopupContent">
         <div class="PopupButtons">
           <div class="ButtonDecorator Cash">
             <div class="RenderSprite Tobi" />
@@ -365,7 +363,7 @@ export function PerpProvidedSubpopDialog({
             {subpop.buyButtonText}
           </div>
         </div>
-      </div>
+      </PopupHeader>
     </div>
   );
 }

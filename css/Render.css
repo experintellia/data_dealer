@@ -3582,7 +3582,8 @@ button {
     box-sizing: border-box;
   }
   .PopupBody.Status .PopupHeader,
-  .PopupBody.TokenPerp:not(.SuperToken) .PopupHeader {
+  .PopupBody.TokenPerp:not(.SuperToken) .PopupHeader,
+  .PopupBody.ProvidedPerpSub .PopupHeader {
     padding-bottom: 76px;
   }
   .PopupBody.CityPerp .PopupHeader,
@@ -3624,6 +3625,37 @@ button {
     align-self: start;
     min-width: 0;
     overflow-wrap: break-word;
+  }
+  /* Desktop rule at line 1466 gives all of SubpopTitle/SubpopSubTitle/
+   * SubpopText/SubpopLabelData a `margin-left:168px` (to sit right of
+   * the 180px logo).  In the mobile dialog PopupHeader grid each element
+   * is already positioned by `grid-area`, so reset the margin here. */
+  .PopupHeader .SubpopTitle,
+  .PopupHeader .SubpopSubTitle,
+  .PopupHeader .SubpopText,
+  .PopupHeader .SubpopLabelData {
+    margin-left: 0;
+    padding-right: 0;
+  }
+  /* Tile-context rule at line 2059 gives PerpLabelData/PowerupLabelData
+   * `position:absolute; top:126px; left:0; width:100px`.  Inside the
+   * dialog PopupHeader grid none of that applies; reset to flow layout.
+   * The SubpopLabelData override (position:static) becomes redundant. */
+  .PopupHeader .PerpLabelData,
+  .PopupHeader .PowerupLabelData {
+    position: static;
+    top: auto;
+    left: auto;
+    width: auto;
+    height: auto;
+    padding-top: 0;
+  }
+  /* ProvidedPerpSub SubpopLabelData: make BonusValues a flex container
+   * so the inline Bonus chips wrap horizontally instead of stacking. */
+  .PopupBody.ProvidedPerpSub .PopupHeader .PowerupLabelData.SubpopLabelData .BonusValues {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
   }
   /* `:not(.APRefillLabel)` so the AP refill caption — which also carries
    * `.PopupText` — keeps its own auto-placed row below instead of being
@@ -3816,24 +3848,6 @@ button {
   /* Keep the buy grid visible while the subpop is open — no hiding. */
   .Selector.hasPopup {
     display: block;
-  }
-  /* ProvidedPerp subpop dialog on mobile: the SubpopLabelData
-   * auto-places into the subtitle grid cell (col 2, row 2 of the
-   * PopupHeader grid).  BonusWrap children default to display:block and
-   * stack vertically; flex on the container + BonusWrap makes the stat
-   * chips flow horizontally, matching the desktop inline layout. */
-  .PopupBody.ProvidedPerp .PopupHeader .PowerupLabelData.SubpopLabelData {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    align-self: start;
-    align-content: flex-start;
-  }
-  .PopupBody.ProvidedPerp .PopupHeader .PowerupLabelData.SubpopLabelData .BonusWrap {
-    margin-bottom: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
   }
 }
 
