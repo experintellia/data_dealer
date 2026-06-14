@@ -524,15 +524,16 @@ function BuySelectorSubpopDialog({
   const close = stopAndClose(onClose);
   return (
     <div class="PopupBody ProjectPerp">
-      <div class="PopupHeader">
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-        <div class="PopupClose" onClick={close}>X</div>
-        <div class="PopupLogo" />
-        <div class="PopupTitle">{cat.selectorTitle}</div>
-      </div>
+      {/* PopupBody has position:relative so PopupClose positions at its
+          top-right corner — no PopupHeader wrapper needed. */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+      <div class="PopupClose" onClick={close}>X</div>
       <div class="PopupContent">
         <div class="PopupTab Powerups">
           <div class="Pagination Selector standalone">
+            <div class="SubpopHeader">
+              <div class="SubpopHeaderTitle">{cat.selectorTitle}</div>
+            </div>
             <div class="PopupSelector">
               <div class="PopupPageWrap">
                 <div class="PopupPage PowerupPage">
