@@ -171,6 +171,9 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
 
   let isOpen = true;
   const savedActive: ActiveDialog | null = opts.keepParent ? active : null;
+  // Forward ref so `close` can check whether the currently-active dialog
+  // is a stacked child of this one (set after `handle` is constructed).
+  let ownHandle: PreactDialogHandle | null = null;
 
   // Mount into a fresh full-screen overlay appended to the render
   // container (a sibling of `.Stage`), so the backdrop escapes the
@@ -214,6 +217,10 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
 
   const close = (): void => {
     if (!isOpen) return;
+    // If a child dialog was stacked on top of this one (keepParent), close
+    // it first so its container is torn down and `active` is restored to
+    // this dialog before our own cleanup runs.
+    if (active && active.handle !== ownHandle) active.handle.close();
     isOpen = false;
     opts.container.removeEventListener('click', handleInteraction);
     opts.container.removeEventListener('touchend', handleInteraction);
@@ -296,6 +303,7 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
   );
   render(wrapped, opts.container);
 
+  ownHandle = handle;
   active = { container: opts.container, extendClass: opts.extendClass, handle };
 
   return handle;
