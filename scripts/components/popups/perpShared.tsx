@@ -9,6 +9,7 @@ import { type ComponentType, type JSX } from 'preact';
 import type { ProvidedSubpopVM, ProvidedTileVM } from '../../game/providedView.js';
 import type { TokenUpgradeSubpopVM } from '../../game/tokenPopupView.js';
 import type { TokenVM } from '../../game/tokenView.js';
+import type { ProvidedPowerupSubpopVM } from '../../game/powerupView.js';
 import i18n from '../../i18n.js';
 import setup from '../../setup.js';
 import { type PreactDialogHandle, openDialog, stopAndClose, toFXTarget } from './dialogManager.js';
@@ -361,6 +362,53 @@ export function PerpProvidedSubpopDialog({
             onClick={(e) => fireAction(parentPopup, e, 'PerpBuyButton', [subpop.gestalt])}
           >
             {subpop.buyButtonText}
+          </div>
+        </div>
+      </PopupHeader>
+    </div>
+  );
+}
+
+/** Wrap a provided-powerup (upgrade) buy subpop in a dialog shell for
+ *  mobile.  Same single-box layout as `PerpProvidedSubpopDialog`, but
+ *  fires `PowerupBuyButton` with `[gestalt, slot]`. */
+export function ProvidedPowerupSubpopDialog({
+  sub,
+  slot,
+  parentPopup,
+  onClose,
+}: {
+  sub: ProvidedPowerupSubpopVM;
+  slot: number;
+  parentPopup: PreactDialogHandle;
+  onClose: () => void;
+}) {
+  const vd = sub.valuesDetailsHtml;
+  return (
+    <div class="PopupBody ProvidedPerp ProvidedPerpSub">
+      <PopupHeader
+        onClose={onClose}
+        spriteHtml={sub.logoHtml}
+        title={sub.title}
+        description={sub.description}
+      >
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced bonus markup */}
+        <div class="PowerupLabelData SubpopLabelData" dangerouslySetInnerHTML={{ __html: vd }} />
+        <div class="PopupButtons">
+          <div class="ButtonDecorator Cash">
+            <div class="RenderSprite Tobi" />
+            {sub.priceText}
+          </div>
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+          <div
+            class="Button"
+            data-button-id="PowerupBuyButton"
+            data-button-gestalt={sub.gestalt}
+            data-button-data={slot}
+            data-testid={`dd-powerup-buy-${sub.gestalt}`}
+            onClick={(e) => fireAction(parentPopup, e, 'PowerupBuyButton', [sub.gestalt, slot])}
+          >
+            {sub.buyButtonText}
           </div>
         </div>
       </PopupHeader>

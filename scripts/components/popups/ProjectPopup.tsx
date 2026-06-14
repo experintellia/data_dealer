@@ -24,6 +24,7 @@ import i18n from '../../i18n.js';
 import { PopupMenu } from './PopupMenu.js';
 import type { PreactDialogHandle } from './dialogManager.js';
 import {
+  ProvidedPowerupSubpopDialog,
   TokenSubpop,
   TokenSubpopDialog,
   TokenTile,
@@ -661,7 +662,19 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
                       cat={cat}
                       isOpen={selOpen}
                       hasPopup={selOpen && inSelectorOpen}
-                      onProvidedOpen={(g) => setSubId(`Provided${g}`)}
+                      onProvidedOpen={(g) => {
+                        if (isMobileWidth()) {
+                          const found = cat.providedSubpops.find((s) => s.gestalt === g);
+                          if (found)
+                            openSubpopDialog(ProvidedPowerupSubpopDialog, {
+                              sub: found,
+                              slot: buySlot,
+                              parentPopup: popup,
+                            });
+                        } else {
+                          setSubId(`Provided${g}`);
+                        }
+                      }}
                       onClose={closeTopSubpop}
                     />
                     {cat.providedSubpops.map((s) => (
