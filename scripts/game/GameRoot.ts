@@ -2398,12 +2398,16 @@ export class GameRoot extends GameNode {
       (this.renderNode as { hide?(): void } | undefined)?.hide?.();
     });
 
-    this.render();
     // On first game start with no explicit locale choice, ask the
-    // player.
+    // player before rendering — otherwise the tutorial dialog (which
+    // opens during render via mission after_render → checkTutorial)
+    // would overlap the language chooser with a higher z-index.
     if (data.is_new_game && !data.locale_persisted) {
       _showLangPicker(false);
+      return this;
     }
+
+    this.render();
 
     // fitToWindow handles centring; the legacy `is_new_game`
     // `scrollTo` would be immediately overwritten so we no longer

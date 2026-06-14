@@ -1,0 +1,14 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "__xdcUpdatesKey__",
+          "value": "[{\"serial\":1,\"payload\":{\"kind\":\"delta\",\"op\":\"setLocale\",\"addr\":\"device0@local.host\",\"locale\":\"en\",\"ts\":0},\"_sender\":\"device0@local.host\"}]"
+        }
+      ]
+    }
+  ]
+}

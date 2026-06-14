@@ -40,6 +40,11 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'off',
+    // Pre-seed the webxdc-shim localStorage with a setLocale:'en' delta so
+    // locale_persisted is true from the very first navigation.  Without this,
+    // the language chooser appears before render() on every fresh context and
+    // tests that wait directly for [data-testid="game-container"] time out.
+    storageState: 'tests/e2e/playwright-storage-state.json',
   },
 
   projects: [
