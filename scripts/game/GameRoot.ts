@@ -2398,12 +2398,17 @@ export class GameRoot extends GameNode {
       (this.renderNode as { hide?(): void } | undefined)?.hide?.();
     });
 
-    // On first game start with no explicit locale choice, ask the
-    // player before rendering — otherwise the tutorial dialog (which
-    // opens during render via mission after_render → checkTutorial)
-    // would overlap the language chooser with a higher z-index.
+    // On first game start with no explicit locale choice, auto-detect
+    // from the browser locale.  German variants (de, de-DE, de-AT,
+    // de-CH, …) default to DE; everything else defaults to EN.
+    // setLocale persists the choice so this branch is skipped on
+    // every subsequent load.
     if (data.is_new_game && !data.locale_persisted) {
-      _showLangPicker(false);
+      const chosen = /^de\b/i.test(navigator.language ?? '') ? 'de' : 'en';
+      const remote = appModule.getApplication().remote as {
+        setLocale?(locale: string): { done(cb: () => void): unknown };
+      };
+      remote.setLocale?.(chosen).done(() => location.reload());
       return this;
     }
 
