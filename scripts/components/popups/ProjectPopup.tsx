@@ -434,6 +434,10 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
   const [anim, setAnim] = useState<{ key: string; phase: 'out' | 'in' } | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Handle for any stacked ProvidedPowerupSubpopDialog open on mobile —
+  // closed explicitly on close_powerup since that event doesn't call
+  // popup.close() and so won't trigger the dialogManager child-close path.
+  const subpopDialog = useRef<PreactDialogHandle | null>(null);
 
   const clearTimers = (): void => {
     for (const t of timers.current) clearTimeout(t);
@@ -465,6 +469,8 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
       },
     };
     const onClosePowerup = (_e: unknown, cb?: unknown): void => {
+      subpopDialog.current?.close();
+      subpopDialog.current = null;
       closeSubpops();
       if (typeof cb === 'function') {
         // 400ms matches the legacy `setTimeout(cb, 400)` — lets the
@@ -666,11 +672,10 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
                         if (isMobileWidth()) {
                           const found = cat.providedSubpops.find((s) => s.gestalt === g);
                           if (found)
-                            openSubpopDialog(ProvidedPowerupSubpopDialog, {
-                              sub: found,
-                              slot: buySlot,
-                              parentPopup: popup,
-                            });
+                            subpopDialog.current = openSubpopDialog(
+                              ProvidedPowerupSubpopDialog,
+                              { sub: found, slot: buySlot, parentPopup: popup },
+                            );
                         } else {
                           setSubId(`Provided${g}`);
                         }
