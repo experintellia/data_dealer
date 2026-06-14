@@ -265,7 +265,12 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
         return;
       }
       if (FX_EVENTS.has(event)) {
-        applyFxFeedback(event, opts.container, handle.lastButton, handle.lastButtonPoint);
+        // If a child dialog is stacked on top (e.g. buy subpop over parent
+        // perp popup), the FX bling must appear in the child's container —
+        // the parent container is rendered behind the child and invisible.
+        const fxContainer =
+          active && active.handle !== ownHandle ? active.container : opts.container;
+        applyFxFeedback(event, fxContainer, handle.lastButton, handle.lastButtonPoint);
       }
       const set = listeners.get(event);
       if (set) for (const fn of set) fn(evStub, ...(args ?? []));
