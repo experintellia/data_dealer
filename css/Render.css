@@ -3677,6 +3677,10 @@ button {
   .PopupBody.BuySlotsDialogBody .BuySlotsNumWrap {
     float: none;
   }
+  .PopupBody.BuySlotsDialogBody .BuySlotsWrap .ButtonInc,
+  .PopupBody.BuySlotsDialogBody .BuySlotsWrap .ButtonDec {
+    margin-top: 0;
+  }
   /* `:not(.APRefillLabel)` so the AP refill caption — which also carries
    * `.PopupText` — keeps its own auto-placed row below instead of being
    * pulled into the `desc` cell on top of the description. */
