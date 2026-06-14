@@ -3,13 +3,20 @@
 // `game/tokenPopupView.ts`.  Issue #80 phase 2 tier 11.  Two layouts
 // keyed by `vm.isSuper`: a bare header + Close (normal token), or the
 // SuperToken profileset grid + Compute/Update footer.  Reuses the
-// shared TokenTile/PageArrows/fireAction + the new TokenUpgradeSubpop.
+// shared TokenTile/TokenGrid/fireAction + the TokenUpgradeSubpop.
 
-import { useState } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import type { TokenPopupVM } from '../../game/tokenPopupView.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
-import { TokenGrid, TokenUpgradeSubpop, fireAction } from './perpShared.js';
+import {
+  TokenGrid,
+  TokenUpgradeSubpop,
+  TokenUpgradeSubpopDialog,
+  fireAction,
+  isMobileWidth,
+  openSubpopDialog,
+} from './perpShared.js';
 
 export interface TokenPopupProps {
   vm: TokenPopupVM;
@@ -21,6 +28,17 @@ export interface TokenPopupProps {
 
 export function TokenPopup({ vm, onClose, popup }: TokenPopupProps) {
   const [openToken, setOpenToken] = useState<string | null>(null);
+  const handleOpenToken = useCallback(
+    (gestalt: string) => {
+      if (isMobileWidth()) {
+        const sub = vm.upgradeSubpops.find((s) => s.subpopId === `token${gestalt}`);
+        if (sub) openSubpopDialog(TokenUpgradeSubpopDialog, { sub });
+      } else {
+        setOpenToken(gestalt);
+      }
+    },
+    [vm.upgradeSubpops]
+  );
 
   return (
     <div class={vm.isSuper ? 'PopupBody TokenPerp SuperToken' : 'PopupBody TokenPerp'}>
@@ -61,7 +79,7 @@ export function TokenPopup({ vm, onClose, popup }: TokenPopupProps) {
               tokens={vm.tokens}
               paginationClass="Pagination half"
               tokensClass="PopupTokens"
-              onOpen={setOpenToken}
+              onOpen={handleOpenToken}
             />
             <div class="PopupSummary half">
               <div class="PopupSummaryItem Profiles">

@@ -1910,6 +1910,12 @@
   justify-content: safe center;
   height: 100%;
 }
+/* Buy-grid tiles must not shrink below their specified width so they
+ * stay readable when the horizontal-scroll viewport is narrower than
+ * the tile row.  The viewport scrolls the overflow. */
+.PopupSelector .PopupPage > * {
+  flex-shrink: 0;
+}
 
 .standalone .PopupSelector {
   display: block;
@@ -3558,6 +3564,7 @@ button {
  * `.TokenPerp .PopupHeader { height:310px }`, …) on mobile. */
 @media (max-width: 768px) {
   .PopupContainer .PopupBody .PopupHeader {
+    flex-shrink: 0;
     height: auto;
     min-height: 0;
     display: grid;
@@ -3575,7 +3582,8 @@ button {
     box-sizing: border-box;
   }
   .PopupBody.Status .PopupHeader,
-  .PopupBody.TokenPerp:not(.SuperToken) .PopupHeader {
+  .PopupBody.TokenPerp:not(.SuperToken) .PopupHeader,
+  .PopupBody.ProvidedPerpSub .PopupHeader {
     padding-bottom: 76px;
   }
   .PopupBody.CityPerp .PopupHeader,
@@ -3605,12 +3613,73 @@ button {
     margin-top: 0;
     padding-right: 0;
     align-self: end;
+    /* Grid items don't shrink below content width by default; allow the
+     * title cell to shrink so long words wrap instead of overflowing. */
+    min-width: 0;
+    overflow-wrap: break-word;
   }
   .PopupHeader .PopupSubTitle {
     grid-area: subtitle;
     margin-left: 0;
     padding-right: 0;
     align-self: start;
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+  /* Desktop rule at line 1466 gives all of SubpopTitle/SubpopSubTitle/
+   * SubpopText/SubpopLabelData a `margin-left:168px` (to sit right of
+   * the 180px logo).  In the mobile dialog PopupHeader grid each element
+   * is already positioned by `grid-area`, so reset the margin here. */
+  .PopupHeader .SubpopTitle,
+  .PopupHeader .SubpopSubTitle,
+  .PopupHeader .SubpopText,
+  .PopupHeader .SubpopLabelData {
+    margin-left: 0;
+    padding-right: 0;
+  }
+  /* Tile-context rule at line 2059 gives PerpLabelData/PowerupLabelData
+   * `position:absolute; top:126px; left:0; width:100px`.  Inside the
+   * dialog PopupHeader grid none of that applies; reset to flow layout.
+   * The SubpopLabelData override (position:static) becomes redundant. */
+  .PopupHeader .PerpLabelData,
+  .PopupHeader .PowerupLabelData {
+    position: static;
+    top: auto;
+    left: auto;
+    width: auto;
+    height: auto;
+    padding-top: 0;
+  }
+  /* ProvidedPerpSub SubpopLabelData: make BonusValues a flex container
+   * so the inline Bonus chips wrap horizontally instead of stacking. */
+  .PopupBody.ProvidedPerpSub .PopupHeader .PowerupLabelData.SubpopLabelData .BonusValues {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  /* BuySlotsDialog: no logo, so switch header from the 2-column grid to
+   * block layout so title/subtitle span full width and can be centred.
+   * BuySlotsWrap uses legacy floats on desktop; override to flex here so
+   * the counter centres inside the full-width block header. */
+  .PopupBody.BuySlotsDialogBody .PopupHeader {
+    display: block;
+    text-align: center;
+  }
+  .PopupBody.BuySlotsDialogBody .PopupHeader .PopupText {
+    text-align: left;
+  }
+  .PopupBody.BuySlotsDialogBody .BuySlotsWrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 16px;
+  }
+  .PopupBody.BuySlotsDialogBody .BuySlotsNumWrap {
+    float: none;
+  }
+  .PopupBody.BuySlotsDialogBody .BuySlotsWrap .ButtonInc,
+  .PopupBody.BuySlotsDialogBody .BuySlotsWrap .ButtonDec {
+    margin-top: 0;
   }
   /* `:not(.APRefillLabel)` so the AP refill caption — which also carries
    * `.PopupText` — keeps its own auto-placed row below instead of being
@@ -3643,6 +3712,26 @@ button {
     top: auto;
     margin: 8px 0 -34px;
     width: auto;
+  }
+  /* Viewport-constrained dialog: flexbox so the dialog never exceeds
+   * the screen.  The header shrinks to its content, the content area
+   * scrolls, and absolutely-positioned children reflow naturally. */
+  .PopupContainer .PopupBody {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 24px);
+  }
+  .PopupContainer .PopupContent {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    height: auto;
+    padding-bottom: 36px;
+  }
+  /* Straddle the action buttons across the dialog bottom edge so half
+   * sits inside the content area and the other half extends outside,
+   * using the padding/border area as usable space. */
+  .PopupButtons {
+    bottom: -36px;
   }
   /* City tab strip: drop the desktop 600-px absolute positioning so it
    * flows as the last header row.  Keep it a single row that scrolls
@@ -3718,15 +3807,18 @@ button {
   /* Grid viewports (`.PopupSelector` / `.PopupTokens`) keep their fixed
    * height and scroll, but the desktop 540-px width overflows a phone
    * dialog — fit them to the dialog instead.  The `.standalone` perp
-   * selector is absolutely placed, so inset it left/right. */
+   * selector flows in the document (no longer absolutely positioned)
+   * so the blue buy grid sits inside the scrollable content area. */
   .PopupSelector,
   .PopupTokens {
     width: auto;
   }
   .standalone .PopupSelector {
+    position: relative;
+    top: auto;
+    left: auto;
     width: auto;
-    left: 6px;
-    right: 6px;
+    height: auto;
   }
   /* The Client provided→consumed divider arrows are pinned to the desktop
    * 540-px grid (`.ClientDivider { width:540px; left:18px }`), which
@@ -3751,21 +3843,35 @@ button {
    * off a phone screen and clip their (narrower-wrapped) content.
    * Inset them to the dialog and let the card grow to its content. */
   .SubpopContainer {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    margin: 6px;
     width: auto;
-    left: 6px;
-    right: 6px;
-    /* Lift the overlay near the top of the popup body so the
-     * grow-to-content card below has room before the screen edge. */
-    top: 40px;
+    height: auto;
+    /* Flow in-content on mobile — no space when closed, visible when
+     * open (the JS toggles `.open` on the container + subpop). */
+  }
+  .SubpopContainer:not(.open) {
+    display: none;
   }
   .Subpop {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none !important;
     width: auto;
-    left: 6px;
-    right: 6px;
-    /* Grow to the (narrower-wrapped) content height; `padding-bottom`
-     * reserves room for the absolutely-pinned `.SubpopButtons`. */
     height: auto;
-    padding-bottom: 44px;
+    padding-bottom: 0;
+    opacity: 1;
+  }
+  .Subpop.open {
+    transform: none !important;
+  }
+  /* Keep the buy grid visible while the subpop is open — no hiding. */
+  .Selector.hasPopup {
+    display: block;
   }
 }
 

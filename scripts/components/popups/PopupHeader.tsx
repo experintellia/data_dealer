@@ -25,7 +25,9 @@ export interface PopupHeaderProps {
   mainspritesClass?: string | undefined;
   /** Pre-rendered sprite markup for the logo (legacy `<%= sprite %>`). */
   spriteHtml?: string;
-  title: string;
+  title?: string;
+  /** Raw-HTML title (legacy `<%= %>`); wins over `title`. */
+  titleHtml?: string;
   /** Plain-text subtitle. */
   subtitle?: string;
   /** Raw-HTML subtitle (legacy `<% print %>`); wins over `subtitle`. */
@@ -41,6 +43,7 @@ export function PopupHeader({
   mainspritesClass,
   spriteHtml,
   title,
+  titleHtml,
   subtitle,
   subtitleHtml,
   description,
@@ -61,7 +64,12 @@ export function PopupHeader({
         // biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced sprite markup
         <div class="PopupLogo" dangerouslySetInnerHTML={{ __html: spriteHtml ?? '' }} />
       )}
-      <div class="PopupTitle">{title}</div>
+      {titleHtml !== undefined ? (
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>)
+        <div class="PopupTitle" dangerouslySetInnerHTML={{ __html: titleHtml }} />
+      ) : (
+        <div class="PopupTitle">{title ?? ''}</div>
+      )}
       {subtitleHtml !== undefined ? (
         // biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <% print %>)
         <div class="PopupSubTitle" dangerouslySetInnerHTML={{ __html: subtitleHtml }} />

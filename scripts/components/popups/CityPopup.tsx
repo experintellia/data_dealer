@@ -4,12 +4,20 @@
 // provided-perp grids reusing the shared perpShared tiles/subpops.
 // No pagination (popup_city renders a single PerpPage per tab).
 
-import { useState } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import type { CityPopupVM } from '../../game/cityView.js';
 import { PopupHeader } from './PopupHeader.js';
 import { PopupMenu } from './PopupMenu.js';
 import type { PreactDialogHandle } from './dialogManager.js';
-import { NoItems, PerpProvidedSubpop, PerpProvidedTile, fireAction } from './perpShared.js';
+import {
+  NoItems,
+  PerpProvidedSubpop,
+  PerpProvidedSubpopDialog,
+  PerpProvidedTile,
+  fireAction,
+  isMobileWidth,
+  openSubpopDialog,
+} from './perpShared.js';
 
 export interface CityPopupProps {
   vm: CityPopupVM;
@@ -25,6 +33,19 @@ export function CityPopup({ vm, onClose, popup }: CityPopupProps) {
   // tab-switch closes any open subpop, so a single key scoped to the
   // active tab is enough.
   const [openKey, setOpenKey] = useState<number | null>(null);
+
+  const handleOpenKey = useCallback(
+    (key: number) => {
+      if (isMobileWidth()) {
+        const tab = vm.tabs.find((t) => t.pkey === activeTab);
+        const subpop = tab?.subpops.find((s) => s.key === key);
+        if (subpop) openSubpopDialog(PerpProvidedSubpopDialog, { subpop, parentPopup: popup });
+      } else {
+        setOpenKey(key);
+      }
+    },
+    [vm.tabs, activeTab, popup]
+  );
 
   const switchTab = (pkey: string): void => {
     if (pkey === activeTab) return;
@@ -82,7 +103,7 @@ export function CityPopup({ vm, onClose, popup }: CityPopupProps) {
                     ) : (
                       <div class="PopupPage PerpPage">
                         {t.tiles.map((tile) => (
-                          <PerpProvidedTile key={tile.key} tile={tile} onOpen={setOpenKey} />
+                          <PerpProvidedTile key={tile.key} tile={tile} onOpen={handleOpenKey} />
                         ))}
                       </div>
                     )}

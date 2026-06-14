@@ -1,16 +1,30 @@
 // Shared perp-popup pieces — the token tile, the detail subpop, the
-// pagination arrows, and the action-button click bridge.  popup_contact
-// (tier 5a) and popup_client (tier 5b) render the same `token.html` /
-// `subpop_token.html` partials and route action buttons through the
-// same legacy `popup.trigger('button_click.X')` seam, so these live
-// once here instead of being duplicated per perp component.
+// one-grid-fits-all token grid, and the action-button click bridge.
+// popup_contact (tier 5a) and popup_client (tier 5b) render the same
+// `token.html` / `subpop_token.html` partials and route action buttons
+// through the same legacy `popup.trigger('button_click.X')` seam, so
+// these live once here instead of being duplicated per perp component.
 
-import type { JSX } from 'preact';
+import { type ComponentType, type JSX } from 'preact';
+import type { ProvidedPowerupSubpopVM } from '../../game/powerupView.js';
 import type { ProvidedSubpopVM, ProvidedTileVM } from '../../game/providedView.js';
 import type { TokenUpgradeSubpopVM } from '../../game/tokenPopupView.js';
 import type { TokenVM } from '../../game/tokenView.js';
 import i18n from '../../i18n.js';
-import { type PreactDialogHandle, stopAndClose, toFXTarget } from './dialogManager.js';
+import setup from '../../setup.js';
+import { PopupHeader } from './PopupHeader.js';
+import { type PreactDialogHandle, openDialog, stopAndClose, toFXTarget } from './dialogManager.js';
+
+function getDialogContainer(): HTMLElement {
+  return document.querySelector<HTMLElement>(setup.renderContainer) ?? document.body;
+}
+
+/** Desktop breakpoint used by the dialog-fit media query. */
+const MOBILE_BP = 768;
+
+export function isMobileWidth(): boolean {
+  return window.innerWidth <= MOBILE_BP;
+}
 
 /** Fire the legacy `.Button` seam: park the clicked element +
  *  click point on the handle, then `popup.trigger('button_click.X')`
@@ -273,4 +287,163 @@ export function TokenUpgradeSubpop({
       </div>
     </div>
   );
+}
+
+// ── Mobile subpop-as-dialog wrappers ──────────────────────────────
+
+/** Wrap a token-info subpop in a dialog shell for mobile.  Uses the
+ *  same `PopupHeader` layout as the token-perp db view so the logo
+ *  shrinks to 80×80 and content reflows to the viewport on phones. */
+export function TokenSubpopDialog({
+  token,
+  onClose,
+}: {
+  token: TokenVM;
+  onClose: () => void;
+}) {
+  const sub = token.subpop;
+  const close = stopAndClose(onClose);
+  return (
+    <div class="PopupBody TokenPerp">
+      <PopupHeader
+        onClose={onClose}
+        spriteHtml={sub.logoHtml}
+        title={sub.title}
+        subtitleHtml={sub.subTitleHtml}
+        description={sub.description}
+      >
+        <div class="PopupButtons">
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+          <div class="Button" data-button-id="OKButton" onClick={close}>
+            {i18n.gettext('Close')}
+          </div>
+        </div>
+      </PopupHeader>
+    </div>
+  );
+}
+
+/** Wrap a provided-perp subpop in a dialog shell for mobile.  Single-box
+ *  layout: logo + title + stats + description all in `PopupHeader`, with
+ *  the buy button straddling the header bottom (same pattern as
+ *  `TokenSubpopDialog`).  Uses `parentPopup` for buy actions. */
+export function PerpProvidedSubpopDialog({
+  subpop,
+  parentPopup,
+  onClose,
+}: {
+  subpop: ProvidedSubpopVM;
+  parentPopup: PreactDialogHandle;
+  onClose: () => void;
+}) {
+  const vd = subpop.valuesDetailsHtml;
+  return (
+    <div class="PopupBody ProvidedPerp ProvidedPerpSub">
+      <PopupHeader
+        onClose={onClose}
+        spriteHtml={subpop.logoHtml}
+        title={subpop.title}
+        description={subpop.description}
+      >
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced bonus markup */}
+        <div class="PowerupLabelData SubpopLabelData" dangerouslySetInnerHTML={{ __html: vd }} />
+        <div class="PopupButtons">
+          <div class="ButtonDecorator Cash">
+            <div class="RenderSprite Tobi" />
+            {subpop.priceText}
+          </div>
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+          <div
+            class="Button"
+            data-button-id="PerpBuyButton"
+            data-button-gestalt={subpop.gestalt}
+            data-testid={`dd-perp-buy-${subpop.gestalt}`}
+            onClick={(e) => fireAction(parentPopup, e, 'PerpBuyButton', [subpop.gestalt])}
+          >
+            {subpop.buyButtonText}
+          </div>
+        </div>
+      </PopupHeader>
+    </div>
+  );
+}
+
+/** Wrap a provided-powerup (upgrade) buy subpop in a dialog shell for
+ *  mobile.  Same single-box layout as `PerpProvidedSubpopDialog`, but
+ *  fires `PowerupBuyButton` with `[gestalt, slot]`. */
+export function ProvidedPowerupSubpopDialog({
+  sub,
+  slot,
+  parentPopup,
+  onClose,
+}: {
+  sub: ProvidedPowerupSubpopVM;
+  slot: number;
+  parentPopup: PreactDialogHandle;
+  onClose: () => void;
+}) {
+  const vd = sub.valuesDetailsHtml;
+  return (
+    <div class="PopupBody ProvidedPerp ProvidedPerpSub">
+      <PopupHeader
+        onClose={onClose}
+        spriteHtml={sub.logoHtml}
+        title={sub.title}
+        description={sub.description}
+      >
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced bonus markup */}
+        <div class="PowerupLabelData SubpopLabelData" dangerouslySetInnerHTML={{ __html: vd }} />
+        <div class="PopupButtons">
+          <div class="ButtonDecorator Cash">
+            <div class="RenderSprite Tobi" />
+            {sub.priceText}
+          </div>
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+          <div
+            class="Button"
+            data-button-id="PowerupBuyButton"
+            data-button-gestalt={sub.gestalt}
+            data-button-data={slot}
+            data-testid={`dd-powerup-buy-${sub.gestalt}`}
+            onClick={(e) => fireAction(parentPopup, e, 'PowerupBuyButton', [sub.gestalt, slot])}
+          >
+            {sub.buyButtonText}
+          </div>
+        </div>
+      </PopupHeader>
+    </div>
+  );
+}
+
+/** Wraps a SuperToken upgrade subpop in a dialog shell for mobile. */
+export function TokenUpgradeSubpopDialog({
+  sub,
+  onClose,
+}: {
+  sub: TokenUpgradeSubpopVM;
+  onClose: () => void;
+}) {
+  return (
+    <div class="PopupBody">
+      <div class="PopupContent">
+        <TokenUpgradeSubpop sub={sub} isOpen={true} onClose={onClose} />
+      </div>
+    </div>
+  );
+}
+
+/** Open a subpop as a dedicated dialog stacked on top of the current
+ *  one (mobile only).  The parent dialog stays open underneath; closing
+ *  the subpop restores the parent.  Returns the dialog handle so callers
+ *  can close it programmatically. */
+export function openSubpopDialog<P>(
+  component: ComponentType<P & { onClose: () => void }>,
+  props: P
+): PreactDialogHandle {
+  return openDialog({
+    component,
+    props,
+    container: getDialogContainer(),
+    keepParent: true,
+  });
 }

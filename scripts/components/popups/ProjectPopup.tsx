@@ -8,10 +8,10 @@
 //
 // The Data tab (profileset + Charge/Collect) is structurally identical
 // to popup_contact, so it reuses the shared tokenView VM + the
-// perpShared TokenTile/TokenSubpop/PageArrows/fireAction pieces.
+// perpShared TokenTile/TokenSubpop/fireAction pieces.
 
 import type { JSX } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import type {
   BuySlotsVM,
   PowerupCategoryVM,
@@ -21,9 +21,18 @@ import type {
   SellSubpopVM,
 } from '../../game/powerupView.js';
 import i18n from '../../i18n.js';
+import { PopupHeader } from './PopupHeader.js';
 import { PopupMenu } from './PopupMenu.js';
-import type { PreactDialogHandle } from './dialogManager.js';
-import { TokenSubpop, TokenTile, fireAction } from './perpShared.js';
+import { type PreactDialogHandle, stopAndClose } from './dialogManager.js';
+import {
+  ProvidedPowerupSubpopDialog,
+  TokenSubpop,
+  TokenSubpopDialog,
+  TokenTile,
+  fireAction,
+  isMobileWidth,
+  openSubpopDialog,
+} from './perpShared.js';
 
 /** Imperative seam used by `ProjectPerp.updatePopupGracefully` to drive
  *  the buy/sell slot plug-out → plug-in animation without re-mounting
@@ -388,6 +397,193 @@ function BuySlotsSubpop({
   );
 }
 
+// ── Mobile subpop-as-dialog wrappers ─────────────────────────────────────────
+
+/** Mobile dialog for the per-slot sell card. */
+function SellSubpopDialog({
+  sub,
+  parentPopup,
+  onClose,
+}: {
+  sub: SellSubpopVM;
+  parentPopup: PreactDialogHandle;
+  onClose: () => void;
+}) {
+  const vd = sub.valuesDetailsHtml;
+  const st = sub.title;
+  const sx = sub.description;
+  return (
+    <div class="PopupBody ProvidedPerp ProvidedPerpSub">
+      <PopupHeader onClose={onClose} spriteHtml={sub.logoHtml} titleHtml={st}>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: locally produced bonus markup */}
+        <div class="PowerupLabelData SubpopLabelData" dangerouslySetInnerHTML={{ __html: vd }} />
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
+        <div class="PopupText" dangerouslySetInnerHTML={{ __html: sx }} />
+        <div class="PopupButtons">
+          <div class="ButtonDecorator Cash">
+            <div class="RenderSprite Tobi" />
+            {sub.sellPriceText}
+          </div>
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+          <div
+            class="Button sell"
+            data-button-id="PowerupSellButton"
+            data-button-gestalt={sub.gestalt}
+            data-button-data={sub.slot}
+            data-testid={`dd-powerup-sell-${sub.gestalt}`}
+            onClick={(e) =>
+              fireAction(parentPopup, e, 'PowerupSellButton', [sub.gestalt, sub.slot])
+            }
+          >
+            {i18n.gettext('Sell')}
+          </div>
+        </div>
+      </PopupHeader>
+    </div>
+  );
+}
+
+/** Mobile dialog for the buy-slots counter card. */
+function BuySlotsSubpopDialog({
+  bs,
+  parentPopup,
+  onClose,
+}: {
+  bs: BuySlotsVM;
+  parentPopup: PreactDialogHandle;
+  onClose: () => void;
+}) {
+  const [num, setNum] = useState(1);
+  const dec = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
+    e.stopPropagation();
+    setNum((n) => (n - 1 < 1 ? 1 : n - 1));
+  };
+  const inc = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
+    e.stopPropagation();
+    setNum((n) => (n + 1 > bs.slotsLeft ? n : n + 1));
+  };
+  const close = stopAndClose(onClose);
+  const bt = bs.title;
+  const bsub = bs.subtitle;
+  const bd = bs.description;
+  return (
+    <div class="PopupBody ProvidedPerpSub BuySlotsDialogBody">
+      <div class="PopupHeader">
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+        <div class="PopupClose" onClick={close}>
+          X
+        </div>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
+        <div class="PopupTitle" dangerouslySetInnerHTML={{ __html: bt }} />
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
+        <div class="PopupSubTitle" dangerouslySetInnerHTML={{ __html: bsub }} />
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: raw ruleset HTML (legacy <%= %>) */}
+        <div class="PopupText" dangerouslySetInnerHTML={{ __html: bd }} />
+        <div class="BuySlotsWrap">
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+          <div class="BuySlotsDec ButtonInc" onClick={dec}>
+            -
+          </div>
+          <div class="BuySlotsNumWrap">
+            <div class="BuySlotsNum">{num}</div>/<div class="BuySlotsNumLeft">{bs.slotsLeft}</div>
+          </div>
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+          <div class="BuySlotsInc ButtonDec" onClick={inc}>
+            +
+          </div>
+        </div>
+        <div class="PopupButtons">
+          <div class="ButtonDecorator Cash">
+            <div class="RenderSprite Tobi" />
+            <span class="SlotCost" data-slot-cost={bs.slotCost}>
+              {numToK(bs.slotCost * num)}
+            </span>
+          </div>
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+          <div
+            class="Button"
+            data-button-id="PowerupBuySlotsButton"
+            data-button-gestalt={`buyslots:${bs.pkey}`}
+            data-button-data={num}
+            onClick={(e) =>
+              fireAction(parentPopup, e, 'PowerupBuySlotsButton', [`buyslots:${bs.pkey}`, num])
+            }
+          >
+            {bs.buttonText}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Mobile dialog for the upgrade-chooser tile grid. */
+function BuySelectorSubpopDialog({
+  cat,
+  slot,
+  parentPopup,
+  onClose,
+}: {
+  cat: PowerupCategoryVM;
+  slot: number;
+  parentPopup: PreactDialogHandle;
+  onClose: () => void;
+}) {
+  const close = stopAndClose(onClose);
+  return (
+    <div class="PopupBody ProjectPerp">
+      {/* PopupBody has position:relative so PopupClose positions at its
+          top-right corner — no PopupHeader wrapper needed. */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+      <div class="PopupClose" onClick={close}>
+        X
+      </div>
+      <div class="PopupContent">
+        <div class="PopupTab Powerups">
+          <div class="Pagination Selector standalone">
+            <div class="SubpopHeader">
+              <div class="SubpopHeaderTitle">{cat.selectorTitle}</div>
+            </div>
+            <div class="PopupSelector">
+              <div class="PopupPageWrap">
+                <div class="PopupPage PowerupPage">
+                  {cat.providedTiles.map((t) => (
+                    <ProvidedTile
+                      key={t.gestalt}
+                      tile={t}
+                      onOpen={
+                        t.locked
+                          ? null
+                          : () => {
+                              const found = cat.providedSubpops.find(
+                                (s) => s.gestalt === t.gestalt
+                              );
+                              if (found)
+                                openSubpopDialog(ProvidedPowerupSubpopDialog, {
+                                  sub: found,
+                                  slot,
+                                  parentPopup,
+                                });
+                            }
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="SubpopButtons">
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+            <div class="Button" data-button-id="OKButton" onClick={close}>
+              {i18n.gettext('Close')}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Local KS formatter for the live slot-cost*num (mirrors dd-helpers
 // toKSNum's k/M rounding without importing the game helper into a
 // component — the cost values here are already integers).
@@ -402,6 +598,17 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
   const [activeTab, setActiveTab] = useState(initialVm.initialTab);
   // Data-tab profileset token subpop (Contact-shaped).
   const [openToken, setOpenToken] = useState<string | null>(null);
+  const handleOpenToken = useCallback(
+    (gestalt: string) => {
+      if (isMobileWidth()) {
+        const token = vm.tokens.find((t) => t.gestalt === gestalt);
+        if (token) openSubpopDialog(TokenSubpopDialog, { token });
+      } else {
+        setOpenToken(gestalt);
+      }
+    },
+    [vm.tokens]
+  );
   // Powerup-tab subpop state. `selPkey` = which category's buy Selector
   // is open; `subId` = a card open on top (sell `<pkey><slot>`,
   // `buyslots`, or an InSelector `Provided<gestalt>`).
@@ -415,6 +622,10 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
   const [anim, setAnim] = useState<{ key: string; phase: 'out' | 'in' } | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Handle for any stacked ProvidedPowerupSubpopDialog open on mobile —
+  // closed explicitly on close_powerup since that event doesn't call
+  // popup.close() and so won't trigger the dialogManager child-close path.
+  const subpopDialog = useRef<PreactDialogHandle | null>(null);
 
   const clearTimers = (): void => {
     for (const t of timers.current) clearTimeout(t);
@@ -446,6 +657,8 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
       },
     };
     const onClosePowerup = (_e: unknown, cb?: unknown): void => {
+      subpopDialog.current?.close();
+      subpopDialog.current = null;
       closeSubpops();
       if (typeof cb === 'function') {
         // 400ms matches the legacy `setTimeout(cb, 400)` — lets the
@@ -562,7 +775,7 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
               <div class="PopupPageWrap">
                 <div class="PopupPage">
                   {vm.tokens.map((t) => (
-                    <TokenTile key={t.gestalt} token={t} onOpen={setOpenToken} />
+                    <TokenTile key={t.gestalt} token={t} onOpen={handleOpenToken} />
                   ))}
                 </div>
               </div>
@@ -671,18 +884,43 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
                             const open =
                               slot.kind === 'free'
                                 ? () => {
-                                    setSubId(null);
-                                    setBuySlot(slot.slot);
-                                    setSelPkey(cat.pkey);
+                                    if (isMobileWidth()) {
+                                      subpopDialog.current = openSubpopDialog(
+                                        BuySelectorSubpopDialog,
+                                        { cat, slot: slot.slot, parentPopup: popup }
+                                      );
+                                    } else {
+                                      setSubId(null);
+                                      setBuySlot(slot.slot);
+                                      setSelPkey(cat.pkey);
+                                    }
                                   }
                                 : slot.kind === 'locked'
                                   ? () => {
-                                      setSelPkey(null);
-                                      setSubId('buyslots');
+                                      if (isMobileWidth()) {
+                                        subpopDialog.current = openSubpopDialog(
+                                          BuySlotsSubpopDialog,
+                                          { bs: cat.buySlots, parentPopup: popup }
+                                        );
+                                      } else {
+                                        setSelPkey(null);
+                                        setSubId('buyslots');
+                                      }
                                     }
                                   : () => {
-                                      setSelPkey(null);
-                                      setSubId(slot.subpopId);
+                                      if (isMobileWidth()) {
+                                        const found = cat.sellSubpops.find(
+                                          (s) => s.subpopId === slot.subpopId
+                                        );
+                                        if (found)
+                                          subpopDialog.current = openSubpopDialog(
+                                            SellSubpopDialog,
+                                            { sub: found, parentPopup: popup }
+                                          );
+                                      } else {
+                                        setSelPkey(null);
+                                        setSubId(slot.subpopId);
+                                      }
                                     };
                             const isUpdating =
                               anim !== null && anim.key === `${cat.pkey}:${slot.slot}`;
