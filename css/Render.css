@@ -3567,24 +3567,15 @@ button {
     flex-shrink: 0;
     height: auto;
     min-height: 0;
-    display: grid;
-    grid-template-columns: 80px 1fr;
-    grid-template-areas:
-      'logo title'
-      'logo subtitle'
-      'desc desc';
-    column-gap: 10px;
-    row-gap: 2px;
-    /* Default: small bottom pad.  Status / normal-Token reserve 76px
-     * for their in-header `.PopupButtons`; City / Project drop it to 0
-     * so the tab strip can bridge onto the content segment below. */
+    /* flow-root establishes a BFC that contains the floated logo so the
+     * header grows to wrap around it without a clearfix hack; it does NOT
+     * clip overflow so the absolutely-positioned .PopupClose at top:-6px
+     * is still visible outside the padding edge. */
+    display: flow-root;
+    /* Default: small bottom pad.  City / Project drop it to 0 so the tab
+     * strip can bridge onto the content segment below. */
     padding: 10px 12px 12px;
     box-sizing: border-box;
-  }
-  .PopupBody.Status .PopupHeader,
-  .PopupBody.TokenPerp:not(.SuperToken) .PopupHeader,
-  .PopupBody.ProvidedPerpSub .PopupHeader {
-    padding-bottom: 76px;
   }
   .PopupBody.CityPerp .PopupHeader,
   .PopupBody.ProjectPerp .PopupHeader {
@@ -3592,10 +3583,11 @@ button {
   }
   .PopupHeader .PopupLogo {
     position: static;
-    grid-area: logo;
+    float: left;
     width: 80px;
     height: 80px;
-    align-self: center;
+    margin-right: 10px;
+    margin-bottom: 4px;
     overflow: hidden;
   }
   /* Scale whichever sprite element the logo holds — `.MainSpritesPopup`
@@ -3608,28 +3600,18 @@ button {
     transform-origin: top left;
   }
   .PopupHeader .PopupTitle {
-    grid-area: title;
-    margin-left: 0;
-    margin-top: 0;
+    margin: 0;
     padding-right: 0;
-    align-self: end;
-    /* Grid items don't shrink below content width by default; allow the
-     * title cell to shrink so long words wrap instead of overflowing. */
-    min-width: 0;
     overflow-wrap: break-word;
   }
   .PopupHeader .PopupSubTitle {
-    grid-area: subtitle;
-    margin-left: 0;
+    margin: 0;
     padding-right: 0;
-    align-self: start;
-    min-width: 0;
     overflow-wrap: break-word;
   }
-  /* Desktop rule at line 1466 gives all of SubpopTitle/SubpopSubTitle/
-   * SubpopText/SubpopLabelData a `margin-left:168px` (to sit right of
-   * the 180px logo).  In the mobile dialog PopupHeader grid each element
-   * is already positioned by `grid-area`, so reset the margin here. */
+  /* Desktop rule gives SubpopTitle/SubpopSubTitle/SubpopText/SubpopLabelData
+   * `margin-left:168px` (to sit right of the 180px logo).  In the float
+   * layout they flow naturally around the logo, so reset the margin. */
   .PopupHeader .SubpopTitle,
   .PopupHeader .SubpopSubTitle,
   .PopupHeader .SubpopText,
@@ -3657,10 +3639,9 @@ button {
     flex-wrap: wrap;
     gap: 4px;
   }
-  /* BuySlotsDialog: no logo, so switch header from the 2-column grid to
-   * block layout so title/subtitle span full width and can be centred.
-   * BuySlotsWrap uses legacy floats on desktop; override to flex here so
-   * the counter centres inside the full-width block header. */
+  /* BuySlotsDialog: no logo so no float; override display so title/subtitle
+   * span full width and can be centred.  BuySlotsWrap uses legacy floats on
+   * desktop; override to flex here so the counter centres. */
   .PopupBody.BuySlotsDialogBody .PopupHeader {
     display: block;
     text-align: center;
@@ -3681,20 +3662,18 @@ button {
   .PopupBody.BuySlotsDialogBody .BuySlotsWrap .ButtonDec {
     margin-top: 0;
   }
-  /* `:not(.APRefillLabel)` so the AP refill caption — which also carries
-   * `.PopupText` — keeps its own auto-placed row below instead of being
-   * pulled into the `desc` cell on top of the description. */
+  /* `:not(.APRefillLabel)` so the AP refill caption keeps its own block
+   * below the description rather than merging with it. */
   .PopupHeader .PopupText:not(.APRefillLabel) {
-    grid-area: desc;
     margin-left: 0;
     padding-right: 0;
+    overflow-wrap: break-word;
   }
-  /* AP-only refill row: not in `grid-template-areas`, so auto-placed
-   * after the named cells.  Force full width so the bar stretches edge
-   * to edge instead of falling into column 1 alone. */
+  /* AP refill row: clear the logo float so the bar stretches full width
+   * rather than squeezing into whatever space remains beside the logo. */
   .PopupHeader .APRefillLabel,
   .PopupHeader .APRefillBar {
-    grid-column: 1 / -1;
+    clear: both;
     margin-left: 0;
     padding-right: 0;
   }
@@ -3726,12 +3705,37 @@ button {
     overflow-y: auto;
     height: auto;
     padding-bottom: 36px;
+    /* The game engine's global touch handlers can swallow gestures; freeing
+     * the vertical axis here lets native scroll work inside .PopupContent
+     * even when the game layer has touch-action:none. */
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
   }
-  /* Straddle the action buttons across the dialog bottom edge so half
-   * sits inside the content area and the other half extends outside,
-   * using the padding/border area as usable space. */
-  .PopupButtons {
-    bottom: -36px;
+  /* Buy/sell action buttons: flow in the normal header block (no straddle)
+   * so long text in any language never overflows the dialog width.  Use
+   * flex-wrap so the price pill + action button sit side-by-side when they
+   * fit and stack vertically when they don't. */
+  .PopupContainer .PopupBody .PopupButtons {
+    position: static;
+    bottom: auto;
+    height: auto;
+    width: 100%;
+    margin-left: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 0 4px;
+  }
+  /* The →-arrow connector on .ButtonDecorator.Cash (::after) only reads
+   * correctly when the pill and button sit in the same horizontal row;
+   * hide it on mobile so it doesn't dangle when they wrap. */
+  .PopupContainer .PopupBody .PopupButtons .ButtonDecorator.Cash {
+    margin-right: 0;
+  }
+  .PopupContainer .PopupBody .PopupButtons .ButtonDecorator.Cash::after {
+    display: none;
   }
   /* City tab strip: drop the desktop 600-px absolute positioning so it
    * flows as the last header row.  Keep it a single row that scrolls
@@ -3744,7 +3748,7 @@ button {
   .PopupHeader .PopupMenu {
     position: relative;
     z-index: 1;
-    grid-column: 1 / -1;
+    clear: both;
     width: auto;
     top: auto;
     left: auto;
