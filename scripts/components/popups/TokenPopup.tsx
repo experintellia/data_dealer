@@ -75,18 +75,18 @@ export function TokenPopup({ vm, onClose, popup }: TokenPopupProps) {
                 />
               ))}
             </div>
-            <TokenGrid
-              tokens={vm.tokens}
-              paginationClass="Pagination half"
-              tokensClass="PopupTokens"
-              onOpen={handleOpenToken}
-            />
             <div class="PopupSummary half">
               <div class="PopupSummaryItem Profiles">
                 <div class="RenderSprite Tobi" />
                 {vm.summaryLabel}
               </div>
             </div>
+            <TokenGrid
+              tokens={vm.tokens}
+              paginationClass="Pagination half"
+              tokensClass="PopupTokens"
+              onOpen={handleOpenToken}
+            />
             {vm.collectMode ? (
               <div class="PopupButtons">
                 <div class="ButtonDecorator AP">
