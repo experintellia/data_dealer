@@ -1901,7 +1901,7 @@
 }
 
 .standalone .PopupSelector {
-  display: block;
+  display: flex;
   background: #BFE7F5;
   position: absolute;
   border: 6px solid #BFE7F5;
