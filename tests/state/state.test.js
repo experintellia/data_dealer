@@ -275,8 +275,14 @@ describe('applyDelta — setLocale reducer', () => {
 
   it('ignores invalid locale codes', () => {
     const s = freshState(addr);
-    const result = applyDelta(s, makeLocaleDelta(addr, 'fr'));
+    const result = applyDelta(s, makeLocaleDelta(addr, 'it'));
     expect(result.locale).toBeUndefined();
+  });
+
+  it('stores "fr" locale on state', () => {
+    const s = freshState(addr);
+    const result = applyDelta(s, makeLocaleDelta(addr, 'fr'));
+    expect(result.locale).toBe('fr');
   });
 
   it('overwrites a previously set locale', () => {

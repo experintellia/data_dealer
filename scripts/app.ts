@@ -202,7 +202,7 @@ const Application = function (): ApplicationApi {
     if (!getSessionLocale) throw new Error('app.start: getSessionLocale not wired');
     return getSessionLocale().then(function (...args: unknown[]) {
       const data = args[0] as { result?: unknown } | undefined;
-      const locale = data && data.result === 'de' ? 'de_AT' : 'en_US';
+      const locale = data && data.result === 'de' ? 'de_AT' : data && data.result === 'fr' ? 'fr_FR' : 'en_US';
       i18n.setLocale(locale);
       // type_settings runs gettext at module load — must wait for the
       // locale JSON before requiring Game.

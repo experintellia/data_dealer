@@ -526,11 +526,11 @@ reducers.setDisplayName = function setDisplayNameReducer(state, delta) {
   return Object.assign({}, state, { display_name: dname });
 };
 
-// 'setLocale' stores the player's preferred locale shorthand ('de' or 'en').
+// 'setLocale' stores the player's preferred locale shorthand ('de', 'en', or 'fr').
 // Preserved across resets so the language choice survives a game wipe.
 reducers.setLocale = function setLocaleReducer(state, delta) {
   var locale = delta.locale;
-  if (locale !== 'de' && locale !== 'en') return state;
+  if (locale !== 'de' && locale !== 'en' && locale !== 'fr') return state;
   return Object.assign({}, state, { locale: locale });
 };
 

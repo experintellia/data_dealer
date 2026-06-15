@@ -435,6 +435,7 @@ function _showLangPicker(canDismiss: boolean): void {
       '<div style="display:flex;gap:16px;justify-content:center;">' +
       '<div class="Button lang-pick" data-locale="en">🇺🇸🇬🇧🇦🇺 EN</div>' +
       '<div class="Button lang-pick" data-locale="de">🇩🇪🇦🇹🇨🇭 DE</div>' +
+      '<div class="Button lang-pick" data-locale="fr">🇫🇷🇫🇷🇫🇷 FR</div>' +
       '</div>' +
       '</div>' +
       '</div>'
@@ -1987,7 +1988,7 @@ export class GameRoot extends GameNode {
     const $ = globalThis.$;
     if (!app.remote.getSessionLocale || !$) return;
     const chain = app.remote.getSessionLocale().then((data) => {
-      const locale = data.result === 'de' ? 'de_AT' : 'en_US';
+      const locale = data.result === 'de' ? 'de_AT' : data.result === 'fr' ? 'fr_FR' : 'en_US';
       i18n.setLocale(locale);
       const html = app.renderView?.('game.html') ?? '';
       $('#dd-control').html(html);
@@ -2441,11 +2442,13 @@ export class GameRoot extends GameNode {
 
     // On first game start with no explicit locale choice, auto-detect
     // from the browser locale.  German variants (de, de-DE, de-AT,
-    // de-CH, …) default to DE; everything else defaults to EN.
+    // de-CH, …) default to DE; French variants (fr, fr-FR, fr-CA, …)
+    // default to FR; everything else defaults to EN.
     // setLocale persists the choice so this branch is skipped on
     // every subsequent load.
     if (data.is_new_game && !data.locale_persisted) {
-      const chosen = /^de\b/i.test(navigator.language ?? '') ? 'de' : 'en';
+      const navLang = navigator.language ?? '';
+      const chosen = /^de\b/i.test(navLang) ? 'de' : /^fr\b/i.test(navLang) ? 'fr' : 'en';
       const remote = appModule.getApplication().remote as {
         setLocale?(locale: string): { done(cb: () => void): unknown };
       };

@@ -12,7 +12,7 @@
     <div class="mm-xp-bar"></div>
   </div>
   <div class="mm-actions">
-    <div id="LocaleToggle" class="mm-user-btn"><%= game.setup.localeShort === 'de' ? '🇩🇪🇦🇹🇨🇭 DE' : '🇺🇸🇬🇧🇦🇺 EN' %></div>
+    <div id="LocaleToggle" class="mm-user-btn"><%= game.setup.localeShort === 'de' ? '🇩🇪🇦🇹🇨🇭 DE' : game.setup.localeShort === 'fr' ? '🇫🇷🇫🇷🇫🇷 FR' : '🇺🇸🇬🇧🇦🇺 EN' %></div>
     <div id="UserData" class="mm-user-btn"><%= _._('About') %></div>
   </div>
   <div class="mm-tabs">
