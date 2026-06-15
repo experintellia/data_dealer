@@ -87,21 +87,17 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
               </div>
             ) : null}
             <div class="PopupSelector">
-              <div class="PopupPageWrap">
-                {vm.tiles.length === 0 ? (
-                  <NoItems
-                    loading={vm.loading}
-                    textNoItems={vm.noItemsText}
-                    textLoading={vm.loadingText}
-                  />
-                ) : (
-                  <div class="PopupPage PerpPage">
-                    {vm.tiles.map((t) => (
-                      <PerpProvidedTile key={t.key} tile={t} onOpen={handleOpenKey} />
-                    ))}
-                  </div>
-                )}
-              </div>
+              {vm.tiles.length === 0 ? (
+                <NoItems
+                  loading={vm.loading}
+                  textNoItems={vm.noItemsText}
+                  textLoading={vm.loadingText}
+                />
+              ) : (
+                vm.tiles.map((t) => (
+                  <PerpProvidedTile key={t.key} tile={t} onOpen={handleOpenKey} />
+                ))
+              )}
             </div>
           </div>
           <div class="PopupButtons">

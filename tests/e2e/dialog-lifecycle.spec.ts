@@ -1139,9 +1139,9 @@ test.describe('Section J — in-popup action handlers', () => {
 
 // ── Section K: content grids ─────────────────────────────────────────────
 //
-// Perp / token grids render every tile into one wrapping `.PopupPage`
-// (no pagination — the viewport scrolls).  Pin that all tiles render
-// and that no page arrows exist.
+// Perp / token grids render every tile directly into their scroll viewport
+// (.PopupSelector / .PopupTokens — no .PopupPage wrapper).  Pin that all
+// tiles render and that no page arrows exist.
 
 test.describe('Section K — content grids', () => {
   test('Karma popup renders every provided-karma tile', async ({ page }) => {
@@ -1150,7 +1150,7 @@ test.describe('Section K — content grids', () => {
 
     const root = '.PopupContainer.lockOn';
     // All ruleset karmalauters render in one grid (>5 = not paged), no arrows.
-    expect(await page.locator(`${root} .PopupPage.PerpPage .PopupPerp`).count()).toBeGreaterThan(5);
+    expect(await page.locator(`${root} .PopupSelector .PopupPerp`).count()).toBeGreaterThan(5);
     await expect(page.locator(`${root} .PopupPageArrowR`)).toHaveCount(0);
 
     await page.evaluate(() => {
@@ -1180,7 +1180,7 @@ test.describe('Section K — content grids', () => {
     });
 
     const root = '.PopupContainer.lockOn';
-    await expect(page.locator(`${root} .PopupPage .PopupToken`)).toHaveCount(13);
+    await expect(page.locator(`${root} .PopupTokens .PopupToken`)).toHaveCount(13);
     await expect(page.locator(`${root} .PopupPageArrowR`)).toHaveCount(0);
 
     await page.evaluate(() => {
@@ -1221,8 +1221,8 @@ test.describe('Section K — content grids', () => {
       return {
         providedClass: prov?.parentElement?.className ?? null,
         consumedClass: cons?.parentElement?.className ?? null,
-        provided: prov?.querySelectorAll('.PopupPage .PopupToken').length ?? 0,
-        consumed: cons?.querySelectorAll('.PopupPage .PopupToken').length ?? 0,
+        provided: prov?.querySelectorAll('.PopupToken').length ?? 0,
+        consumed: cons?.querySelectorAll('.PopupToken').length ?? 0,
         dividerItems: root?.querySelectorAll('.ClientDivider .ClientDividerItem').length ?? 0,
         arrows: root?.querySelectorAll('.PopupPageArrowR').length ?? 0,
       };

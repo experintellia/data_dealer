@@ -8,6 +8,12 @@
 
 import { type ComponentChildren, type ComponentType, type JSX, h, render } from 'preact';
 import setup from '../../setup.js';
+import { initGlobalPopupScrollDrag } from './scrollDrag.js';
+
+// One-time init: document-level capture handler that hit-tests the nearest
+// scrollable popup element on every pointerdown, covering both legacy popups
+// (which never go through openDialog) and async-rendered Preact content.
+initGlobalPopupScrollDrag();
 
 // MainSprites.png window (x y, 65x65) for the legacy FX bling icons.
 const FX_BLING_BUG = '-362px -860px'; // legacy FXError → FXNoAP('bug')
@@ -174,7 +180,6 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
   // Forward ref so `close` can check whether the currently-active dialog
   // is a stacked child of this one (set after `handle` is constructed).
   let ownHandle: PreactDialogHandle | null = null;
-
   // Mount into a fresh full-screen overlay appended to the render
   // container (a sibling of `.Stage`), so the backdrop escapes the
   // Stage's `overflow:hidden` + transform and covers the whole screen;
@@ -222,6 +227,12 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
     // this dialog before our own cleanup runs.
     if (active && active.handle !== ownHandle) active.handle.close();
     isOpen = false;
+    // Fire popup_close listeners before tearing down the DOM.
+    // GameNode.initPopupEvents registers badge cleanup (DecoratorNew
+    // removal, mission dismissal, highlightTabs reset) here.  The
+    // p.close() those listeners call is a no-op — isOpen is already false.
+    const closeSet = listeners.get('popup_close');
+    if (closeSet) for (const fn of closeSet) fn(evStub);
     opts.container.removeEventListener('click', handleInteraction);
     opts.container.removeEventListener('touchend', handleInteraction);
     render(null, opts.container);

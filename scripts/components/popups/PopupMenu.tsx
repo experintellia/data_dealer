@@ -16,6 +16,7 @@
 // to the browser.
 
 import { useEffect, useRef } from 'preact/hooks';
+import { attachDragScroll } from './scrollDrag.js';
 
 export interface PopupMenuTab {
   /** `data-tab` value + the key passed to `onSelect`. */
@@ -51,46 +52,8 @@ export function PopupMenu({
     // Tab labels use a web font — re-measure once it has loaded.
     document.fonts?.ready.then(update).catch(() => {});
 
-    // Pointer drag-to-scroll (mouse + touch).  A drag past the
-    // threshold captures the pointer so it continues outside the thin
-    // strip, and suppresses the click so it doesn't also switch a tab.
-    let down = false;
-    let dragged = false;
-    let startX = 0;
-    let startScroll = 0;
-    const onPointerDown = (e: PointerEvent): void => {
-      down = true;
-      dragged = false;
-      startX = e.clientX;
-      startScroll = el.scrollLeft;
-    };
-    const onPointerMove = (e: PointerEvent): void => {
-      if (!down) return;
-      const dx = e.clientX - startX;
-      if (!dragged) {
-        if (Math.abs(dx) < 4) return;
-        dragged = true;
-        el.setPointerCapture(e.pointerId);
-      }
-      el.scrollLeft = startScroll - dx;
-      e.preventDefault();
-    };
-    const onPointerUp = (e: PointerEvent): void => {
-      if (dragged) {
-        try {
-          el.releasePointerCapture(e.pointerId);
-        } catch {
-          /* pointer already released */
-        }
-      }
-      down = false;
-    };
-    const onClickCapture = (e: MouseEvent): void => {
-      if (!dragged) return;
-      dragged = false;
-      e.stopPropagation();
-      e.preventDefault();
-    };
+    // Pointer drag-to-scroll via shared utility (mouse + touch).
+    const cleanupDrag = attachDragScroll(el, 'x');
     // Vertical wheel → horizontal scroll (only while the strip overflows).
     const onWheel = (e: WheelEvent): void => {
       if (el.scrollWidth <= el.clientWidth) return;
@@ -99,21 +62,12 @@ export function PopupMenu({
       el.scrollLeft += delta;
       e.preventDefault();
     };
-    el.addEventListener('pointerdown', onPointerDown);
-    el.addEventListener('pointermove', onPointerMove);
-    el.addEventListener('pointerup', onPointerUp);
-    el.addEventListener('pointercancel', onPointerUp);
-    el.addEventListener('click', onClickCapture, true);
     el.addEventListener('wheel', onWheel, { passive: false });
 
     return () => {
       el.removeEventListener('scroll', update);
       ro.disconnect();
-      el.removeEventListener('pointerdown', onPointerDown);
-      el.removeEventListener('pointermove', onPointerMove);
-      el.removeEventListener('pointerup', onPointerUp);
-      el.removeEventListener('pointercancel', onPointerUp);
-      el.removeEventListener('click', onClickCapture, true);
+      cleanupDrag();
       el.removeEventListener('wheel', onWheel);
     };
   }, []);
