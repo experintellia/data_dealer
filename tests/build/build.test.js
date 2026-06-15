@@ -25,17 +25,10 @@ beforeAll(() => {
 }, 180_000);
 
 describe('dist/ structure', () => {
-  // RequireJS is gone.  scripts/require.config.js and scripts/bootstrap.js
-  // + every other AMD module are folded into dist/scripts/esm-bundle.js;
-  // views/*.html are inlined as `?raw` imports.
-  const required = [
-    'index.html',
-    'scripts/esm-bundle.js',
-    'vendor/jquery.js',
-    'vendor/easeljs.js',
-    'vendor/sprintf.js',
-    'css/dd.css',
-  ];
+  // RequireJS and AMD modules are gone (#58).  Vendor libs (jQuery,
+  // sprintf, createjs, zynga) are now bundled into esm-bundle.js via
+  // Rollup's `output.banner`; no separate vendor/ files in dist/.
+  const required = ['index.html', 'scripts/esm-bundle.js', 'css/dd.css'];
 
   for (const f of required) {
     it(`dist/${f} exists`, () => {
@@ -43,8 +36,8 @@ describe('dist/ structure', () => {
     });
   }
 
-  // Negative assertions: the legacy AMD plumbing must not regress back
-  // into the build output.
+  // Negative assertions: legacy AMD plumbing must not regress, and vendor
+  // libs must not appear as separate dist/ files (they're in esm-bundle.js).
   const removed = [
     'scripts/require.config.js',
     'scripts/bootstrap.js',
@@ -59,6 +52,14 @@ describe('dist/ structure', () => {
     'vendor/native-console.js',
     // Underscore is now replaced by scripts/dd-helpers.ts.
     'vendor/underscore.js',
+    // Vendor libs bundled into esm-bundle.js via Rollup banner (#192).
+    'vendor/jquery.js',
+    'vendor/easeljs.js',
+    'vendor/tweenjs.js',
+    'vendor/soundjs.js',
+    'vendor/sprintf.js',
+    'vendor/zynga-animate.js',
+    'vendor/zynga-scroller.js',
   ];
 
   for (const f of removed) {
@@ -69,11 +70,14 @@ describe('dist/ structure', () => {
 });
 
 describe('dist/index.html', () => {
-  it('references esm-bundle.js with the vendor <script> chain', async () => {
+  it('references esm-bundle.js without separate vendor <script> tags', async () => {
     const { readFileSync } = await import('node:fs');
     const html = readFileSync(join(root, 'dist', 'index.html'), 'utf8');
     expect(html).toContain('scripts/esm-bundle.js');
-    expect(html).toContain('vendor/jquery.js');
+    // Vendor libs are bundled into esm-bundle.js; no separate script tags.
+    expect(html).not.toContain('vendor/jquery.js');
+    expect(html).not.toContain('vendor/easeljs.js');
+    expect(html).not.toContain('vendor/sprintf.js');
     expect(html).not.toContain('vendor/underscore.js');
     expect(html).not.toContain('vendor/requirejs.js');
     expect(html).not.toContain('require.config');
@@ -91,10 +95,24 @@ describe('dist/scripts/esm-bundle.js', () => {
     expect(bundle).toContain('integrateCollected');
   });
 
-  it('does NOT contain a `define.amd` AMD-bridge footer', async () => {
+  it('does NOT contain RequireJS AMD plumbing (require.config call)', async () => {
     const { readFileSync } = await import('node:fs');
     const bundle = readFileSync(join(root, 'dist', 'scripts', 'esm-bundle.js'), 'utf8');
-    expect(bundle).not.toContain('define.amd');
+    // The legacy require.config({paths: {…}}) AMD bootstrap must not regress.
+    // Note: define.amd is legitimately present from jQuery's UMD wrapper and
+    // is no longer a reliable signal for RequireJS — check for require.config instead.
+    expect(bundle).not.toContain('require.config');
+  });
+
+  it('contains bundled vendor globals (jQuery, sprintf, createjs, Scroller)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const bundle = readFileSync(join(root, 'dist', 'scripts', 'esm-bundle.js'), 'utf8');
+    // String literals that survive esbuild minification and confirm each
+    // vendor lib is included.  Property-key strings can't be mangled.
+    expect(bundle).toContain('"jQuery"'); // jQuery.noConflict key
+    expect(bundle).toContain('sprintf'); // sprintf identifier
+    expect(bundle).toContain('createjs'); // createjs namespace
+    expect(bundle).toContain('Scroller'); // zynga-scroller constructor
   });
 
   // Regression guard for #192: catch a future config edit that disables
@@ -202,13 +220,24 @@ describe.each([
     expect(listing).toMatch(/\bimg\//);
     expect(listing).toMatch(/\bi18n\//);
     expect(listing).toMatch(/\bcss\//);
-    expect(listing).toMatch(/\bvendor\//);
     expect(listing).toMatch(/\bscripts\//);
     expect(listing).toMatch(/\bfont\//);
     expect(listing).toMatch(/\bdata\//);
-    // views/*.html are now `?raw`-imported into esm-bundle.js — the
-    // standalone directory is no longer shipped.
+    // views/*.html are `?raw`-imported into esm-bundle.js — no standalone dir.
     expect(listing).not.toMatch(/\bviews\//);
+    // Vendor libs are bundled into esm-bundle.js (#192); no vendor/ dir.
+    expect(listing).not.toMatch(/\bvendor\//);
+  });
+
+  it('does NOT ship vendor libs as separate files (bundled into esm-bundle.js)', () => {
+    const listing = listXdc();
+    expect(listing).not.toContain('vendor/jquery.js');
+    expect(listing).not.toContain('vendor/easeljs.js');
+    expect(listing).not.toContain('vendor/tweenjs.js');
+    expect(listing).not.toContain('vendor/soundjs.js');
+    expect(listing).not.toContain('vendor/sprintf.js');
+    expect(listing).not.toContain('vendor/zynga-animate.js');
+    expect(listing).not.toContain('vendor/zynga-scroller.js');
   });
 
   it('contains license and credits files', () => {
