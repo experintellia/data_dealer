@@ -268,11 +268,20 @@ function _readNumber(rec: object | undefined, key: string): number | undefined {
 // Ruleset selection — locale-memoised, node-index helpers
 // ---------------------------------------------------------------------------
 
+let _rulesetLocaleCache: Locale | null = null;
+let _rulesetCache: Ruleset | null = null;
+
 function _getRuleset(): Ruleset {
   var state = getState();
   var locale: Locale = state && state.locale === 'en' ? 'en' : 'de';
+  if (_rulesetLocaleCache === locale && _rulesetCache) {
+    return _rulesetCache;
+  }
   var strings = locale === 'en' ? rulesetStringsEn : rulesetStringsDe;
-  return injectTranslations(rulesetBase, strings) as unknown as Ruleset;
+  var ruleset = injectTranslations(rulesetBase, strings) as unknown as Ruleset;
+  _rulesetLocaleCache = locale;
+  _rulesetCache = ruleset;
+  return ruleset;
 }
 
 let _nodeMapRef: GameNode[] | null = null;
