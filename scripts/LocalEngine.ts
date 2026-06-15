@@ -15,6 +15,7 @@ import i18nDe from '../i18n/de_AT.json' with { type: 'json' };
 import i18nEn from '../i18n/en_US.json' with { type: 'json' };
 import rulesetStringsDe from '../i18n/ruleset.de.json' with { type: 'json' };
 import rulesetStringsEn from '../i18n/ruleset.en.json' with { type: 'json' };
+import rulesetStringsFr from '../i18n/ruleset.fr.json' with { type: 'json' };
 import { getState, setState } from './boot.js';
 import { now as clockNow } from './clock.js';
 import type { UpgradeValuesShape } from './game/ProfileSet.js';
@@ -36,7 +37,7 @@ import { getAvatarUrl } from './webxdc-avatars.js';
 // ---------------------------------------------------------------------------
 
 /** Locale shorthand persisted in state.locale and selected by handlers. */
-type Locale = 'de' | 'en';
+type Locale = 'de' | 'en' | 'fr';
 
 /** Loose ruleset shape — full schema is the JSON, not enforced here. */
 interface PerpDef {
@@ -273,11 +274,11 @@ let _rulesetCache: Ruleset | null = null;
 
 function _getRuleset(): Ruleset {
   var state = getState();
-  var locale: Locale = state && state.locale === 'en' ? 'en' : 'de';
+  var locale: Locale = state && state.locale === 'en' ? 'en' : state && state.locale === 'fr' ? 'fr' : 'de';
   if (_rulesetLocaleCache === locale && _rulesetCache) {
     return _rulesetCache;
   }
-  var strings = locale === 'en' ? rulesetStringsEn : rulesetStringsDe;
+  var strings = locale === 'en' ? rulesetStringsEn : locale === 'fr' ? rulesetStringsFr : rulesetStringsDe;
   var ruleset = injectTranslations(rulesetBase, strings) as unknown as Ruleset;
   _rulesetLocaleCache = locale;
   _rulesetCache = ruleset;
@@ -453,20 +454,20 @@ export function ping(): Promise<{ result: 'pong' }> {
  */
 export function getSessionLocale(): Promise<{ result: Locale }> {
   var state = getState();
-  var locale: Locale = state && state.locale === 'en' ? 'en' : 'de';
+  var locale: Locale = state && (state.locale === 'en' || state.locale === 'fr') ? state.locale : 'de';
   return Promise.resolve({ result: locale });
 }
 
 /**
  * setLocale(localeCode) → Promise<{result: string}>
  *
- * Persists the player's preferred locale shorthand ('de' or 'en') as a delta
+ * Persists the player's preferred locale shorthand ('de', 'en', or 'fr') as a delta
  * so the choice survives a page reload.  The caller is responsible for
  * calling location.reload() after this resolves.
  * Invalid locale codes are silently ignored (result still echoes the code).
  */
 export function setLocale(localeCode: string): Promise<{ result: string }> {
-  if (localeCode !== 'de' && localeCode !== 'en') {
+  if (localeCode !== 'de' && localeCode !== 'en' && localeCode !== 'fr') {
     return Promise.resolve({ result: localeCode });
   }
 
