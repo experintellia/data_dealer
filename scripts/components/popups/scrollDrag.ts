@@ -40,6 +40,10 @@ export function attachDragScroll(el: HTMLElement, axis: 'x' | 'y'): () => void {
     document.removeEventListener('pointermove', onDocMove, true);
     document.removeEventListener('pointerup', onDocUp, true);
     document.removeEventListener('pointercancel', onDocUp, true);
+    if (dragged)
+      setTimeout(() => {
+        dragged = false;
+      }, 0);
   };
 
   const onDown = (e: PointerEvent): void => {
@@ -135,6 +139,15 @@ export function initGlobalPopupScrollDrag(): () => void {
     document.removeEventListener('pointermove', onMove, true);
     document.removeEventListener('pointerup', onUp, true);
     document.removeEventListener('pointercancel', onUp, true);
+    // On mobile, preventDefault() on pointermove suppresses the browser's
+    // synthetic click after pointer-up, so onClickCapture never fires and
+    // `dragged` stays true — the next genuine tap gets incorrectly eaten.
+    // Defer the reset one turn: if a click does fire (desktop), it is
+    // still caught and suppressed first; if not (mobile), dragged clears.
+    if (dragged)
+      setTimeout(() => {
+        dragged = false;
+      }, 0);
   };
 
   const onDown = (e: PointerEvent): void => {
