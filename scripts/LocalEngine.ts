@@ -11,14 +11,14 @@
 // Remaining handlers are stubs that return a rejected Promise.
 
 import rulesetBase from '../data/ruleset_base.json' with { type: 'json' };
-import rulesetStringsDe from '../i18n/ruleset.de.json' with { type: 'json' };
-import rulesetStringsEn from '../i18n/ruleset.en.json' with { type: 'json' };
-import { injectTranslations } from './inject-translations.js';
 import i18nDe from '../i18n/de_AT.json' with { type: 'json' };
 import i18nEn from '../i18n/en_US.json' with { type: 'json' };
+import rulesetStringsDe from '../i18n/ruleset.de.json' with { type: 'json' };
+import rulesetStringsEn from '../i18n/ruleset.en.json' with { type: 'json' };
 import { getState, setState } from './boot.js';
 import { now as clockNow } from './clock.js';
 import type { UpgradeValuesShape } from './game/ProfileSet.js';
+import { injectTranslations } from './inject-translations.js';
 import { materialize } from './materializer.js';
 import { applyDelta, buildSaveFile, parseSaveFile } from './state.js';
 import type {

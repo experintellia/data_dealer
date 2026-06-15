@@ -36,7 +36,7 @@ function buildBase(enVal, deVal, path) {
   // ── string leaf ─────────────────────────────────────────────────────────
   if (enType === 'string') {
     if (enVal === deVal) {
-      return enVal;  // identical across locales, keep inline
+      return enVal; // identical across locales, keep inline
     }
     enMap[path] = enVal;
     deMap[path] = deVal;
@@ -65,17 +65,29 @@ function buildBase(enVal, deVal, path) {
   var deKeys = Object.keys(deVal);
   if (enKeys.length !== deKeys.length) {
     throw new Error(
-      'Key count mismatch at "' + path + '": ' + enKeys.length + ' vs ' + deKeys.length +
-      '\n  EN keys: ' + JSON.stringify(enKeys) +
-      '\n  DE keys: ' + JSON.stringify(deKeys)
+      'Key count mismatch at "' +
+        path +
+        '": ' +
+        enKeys.length +
+        ' vs ' +
+        deKeys.length +
+        '\n  EN keys: ' +
+        JSON.stringify(enKeys) +
+        '\n  DE keys: ' +
+        JSON.stringify(deKeys)
     );
   }
   for (var k = 0; k < enKeys.length; k++) {
     if (enKeys[k] !== deKeys[k]) {
       throw new Error(
-        'Key mismatch at "' + path + '":\n' +
-        '  EN keys: ' + JSON.stringify(enKeys) + '\n' +
-        '  DE keys: ' + JSON.stringify(deKeys)
+        'Key mismatch at "' +
+          path +
+          '":\n' +
+          '  EN keys: ' +
+          JSON.stringify(enKeys) +
+          '\n' +
+          '  DE keys: ' +
+          JSON.stringify(deKeys)
       );
     }
   }

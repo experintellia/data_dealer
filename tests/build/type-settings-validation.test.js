@@ -2,7 +2,6 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { injectTranslations } from '../../scripts/inject-translations.js';
 /**
  * Build-time validation of type_settings.js and the ruleset.
  *
@@ -18,6 +17,7 @@ import { injectTranslations } from '../../scripts/inject-translations.js';
  * RequireJS + jQuery dependencies in the Node test environment.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
+import { injectTranslations } from '../../scripts/inject-translations.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
