@@ -3697,12 +3697,6 @@ button {
     overflow-y: auto;
     height: auto;
     padding-bottom: 36px;
-    /* Mirror the tab-strip fix: the game engine's global touch handlers can
-     * swallow gestures.  `touch-action: pan-x` frees the vertical axis for
-     * the JS pointer-drag handler (attachDragScroll in dialogManager.ts)
-     * while leaving horizontal pans to the browser (nothing to scroll here).
-     * Same reasoning as `.PopupMenu { touch-action: pan-y }` but mirrored. */
-    touch-action: pan-x;
     -webkit-overflow-scrolling: touch;
   }
   /* .PopupTokens / .PowerupsPage are the vertical scroll containers for
