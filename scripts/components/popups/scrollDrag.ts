@@ -107,7 +107,7 @@ let globalInitialised = false;
 /** Call once during app init (or lazily on first openDialog).  The returned
  *  cleanup is only needed if the entire popup system is torn down. */
 export function initGlobalPopupScrollDrag(): () => void {
-  if (globalInitialised) return () => {};
+  if (globalInitialised || typeof document === 'undefined') return () => {};
   globalInitialised = true;
 
   let activeId = -1;
