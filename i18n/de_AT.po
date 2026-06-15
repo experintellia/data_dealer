@@ -1167,6 +1167,46 @@ msgstr "Kapazität für %s Projekte"
 msgid "per deal"
 msgstr "Füttern"
 
+#: scripts/components/popups/AboutPopup.tsx
+msgid "save section headline"
+msgstr "Spielstand"
+
+#: scripts/components/popups/AboutPopup.tsx
+msgid "save section text"
+msgstr ""
+"Sichere deinen Fortschritt in einem Chat oder lade einen zuvor exportierten "
+"Spielstand. Beim Importieren wird dein aktueller Fortschritt ersetzt."
+
+#: scripts/components/popups/AboutPopup.tsx
+msgid "Export Save"
+msgstr "Spielstand exportieren"
+
+#: scripts/components/popups/AboutPopup.tsx
+msgid "Import Save"
+msgstr "Spielstand importieren"
+
+#: scripts/LocalEngine.ts
+msgid "save export chat text"
+msgstr "Mein Data-Dealer-Spielstand"
+
+#: scripts/LocalEngine.ts
+msgid "save imported chat info"
+msgstr "%s hat einen importierten Spielstand geladen."
+
+#: scripts/components/popups/AboutPopup.tsx
+msgid "save import error malformed"
+msgstr "Diese Datei ist kein gültiger Data-Dealer-Spielstand."
+
+#: scripts/components/popups/AboutPopup.tsx
+msgid "save import error version"
+msgstr ""
+"Dieser Spielstand wurde mit einer neueren Version des Spiels erstellt und "
+"kann nicht importiert werden."
+
+#: scripts/components/popups/AboutPopup.tsx
+msgid "save import error unavailable"
+msgstr "Das Importieren von Spielständen wird hier nicht unterstützt."
+
 #~ msgid "user is %s%% better than other Data Dealers"
 #~ msgstr "Du hast besser gezockt als %s%% aller anderen Data Dealer!"
 

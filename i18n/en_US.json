@@ -980,5 +980,41 @@
   "achievement_karma_devil": [
     null,
     "%s has achieved full devil status"
+  ],
+  "save section headline": [
+    null,
+    "Save game"
+  ],
+  "save section text": [
+    null,
+    "Back up your progress to a chat or restore a previously exported save. Importing replaces your current progress."
+  ],
+  "Export Save": [
+    null,
+    "Export Save"
+  ],
+  "Import Save": [
+    null,
+    "Import Save"
+  ],
+  "save export chat text": [
+    null,
+    "My Data Dealer save game"
+  ],
+  "save imported chat info": [
+    null,
+    "%s loaded an imported save."
+  ],
+  "save import error malformed": [
+    null,
+    "That file is not a valid Data Dealer save."
+  ],
+  "save import error version": [
+    null,
+    "This save was created by a newer version of the game and cannot be imported."
+  ],
+  "save import error unavailable": [
+    null,
+    "Importing save files is not supported here."
   ]
 }

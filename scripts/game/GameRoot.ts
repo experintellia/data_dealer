@@ -21,7 +21,7 @@ import type { ComponentType } from 'preact';
 import { type RenderApi, getRender } from '../Render.js';
 import appModule from '../app.js';
 import { APStatusPopup } from '../components/popups/APStatusPopup.js';
-import { AboutPopup } from '../components/popups/AboutPopup.js';
+import { AboutPopup, type ImportOutcome } from '../components/popups/AboutPopup.js';
 import { CashStatusPopup } from '../components/popups/CashStatusPopup.js';
 import { ProfilesStatusPopup } from '../components/popups/ProfilesStatusPopup.js';
 import { ProvidedPerpPopup } from '../components/popups/ProvidedPerpPopup.js';
@@ -402,6 +402,19 @@ function _stopPropFile(e: unknown): void {
 function _preventDefaultFile(e: unknown): void {
   const fn = (e as { preventDefault?: () => void } | null | undefined)?.preventDefault;
   if (typeof fn === 'function') fn.call(e);
+}
+
+/** Maps LocalEngine.importSave's `{result: ImportSaveResult}` onto the
+ *  AboutPopup's framework-agnostic ImportOutcome.  Unknown shapes degrade to a
+ *  generic 'malformed' error rather than throwing. */
+function _normalizeImport(data: unknown): ImportOutcome {
+  const result = (data as { result?: unknown } | undefined)?.result as
+    | { ok?: boolean; cancelled?: boolean; error?: 'malformed' | 'version' | 'unavailable' }
+    | undefined;
+  if (result?.ok) return { status: 'ok' };
+  if (result?.cancelled) return { status: 'cancelled' };
+  if (result?.error) return { status: 'error', errorKind: result.error };
+  return { status: 'error', errorKind: 'malformed' };
 }
 
 /** First-boot / settings language picker overlay.  jQuery-driven DOM
@@ -2056,6 +2069,13 @@ export class GameRoot extends GameNode {
     // phase – or are we?
     const remoteApi = appModule.getApplication().remote as {
       setPerpCoordinates?(rows: Array<[string, { x: number; y: number }]>): unknown;
+      exportSave?(): unknown;
+      importSave?(): {
+        then(
+          onResolved?: (...a: unknown[]) => unknown,
+          onRejected?: (...a: unknown[]) => unknown
+        ): unknown;
+      };
     };
     this.on('saveCoordsQueue', (_e: unknown, path: unknown, pos: unknown) => {
       remoteApi.setPerpCoordinates?.([[path as string, pos as { x: number; y: number }]]);
@@ -2093,11 +2113,32 @@ export class GameRoot extends GameNode {
 
     this.on('user_data', (e: unknown) => {
       _stopPropFile(e);
+      const onExport = remoteApi.exportSave
+        ? (): void => {
+            remoteApi.exportSave?.();
+          }
+        : undefined;
+      const onImport = remoteApi.importSave
+        ? (): Promise<ImportOutcome> =>
+            new Promise<ImportOutcome>((resolve) => {
+              const chain = remoteApi.importSave?.();
+              if (!chain) {
+                resolve({ status: 'error', errorKind: 'unavailable' });
+                return;
+              }
+              chain.then(
+                (...args: unknown[]) => resolve(_normalizeImport(args[0])),
+                () => resolve({ status: 'error', errorKind: 'malformed' })
+              );
+            })
+        : undefined;
       this.openPreactDialog(
         AboutPopup,
         {
           locale: setup.locale ?? '',
           buttonLabel: i18n.gettext('Close'),
+          ...(onExport && { onExport }),
+          ...(onImport && { onImport }),
         },
         { extendClass: 'About' }
       );

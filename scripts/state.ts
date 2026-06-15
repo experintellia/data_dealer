@@ -178,6 +178,19 @@ export interface GameSeed {
 
 export var SCHEMA_VERSION = 1;
 
+// ---------------------------------------------------------------------------
+// Save-file (export / import) constants (issue #127)
+// ---------------------------------------------------------------------------
+
+/** Magic marker stamped into exported save files; guards against importing
+ *  unrelated JSON. */
+export var SAVE_FORMAT = 'data_dealer_save';
+
+/** Save-file format version.  Bumped when the on-disk shape changes so old
+ *  exports can be migrated (or rejected) on import. Independent of
+ *  SCHEMA_VERSION, which versions the in-memory LocalState. */
+export var SAVE_VERSION = 1;
+
 var _defaultSeed: GameSeed = (defaultGameData as GameSeed) || { game_values: {} };
 
 // Every handler op that can appear as delta.op.  Read-only handlers
@@ -205,6 +218,7 @@ var OP_NAMES = [
   'dismissMissionBriefing',
   'markTokenSeen',
   'recheckMissions',
+  'importSave',
 ];
 
 // ---------------------------------------------------------------------------
@@ -292,6 +306,114 @@ export function freshState(selfAddr?: string, seed?: GameSeed): LocalState {
  */
 export function seedNewGame(state: LocalState): LocalState {
   return state;
+}
+
+// ---------------------------------------------------------------------------
+// Save export / import (issue #127)
+// ---------------------------------------------------------------------------
+
+/**
+ * The current player's own progress, with identity- and peer-scoped fields
+ * stripped.
+ *
+ * `addr` (the webxdc selfAddr) and `peers` (every *other* player's aggregated
+ * leaderboard stats) are deliberately excluded: the export must contain only
+ * the exporting player's state, never other users'. On import the importer's
+ * own addr and peer table are kept, and only these gameplay fields are
+ * replaced.
+ */
+export type SaveState = Omit<LocalState, 'addr' | 'peers'>;
+
+/** Envelope written to / read from an exported save file. */
+export interface SaveFile {
+  /** Always SAVE_FORMAT; rejected on import otherwise. */
+  format: string;
+  /** SAVE_VERSION at export time. */
+  save_version: number;
+  /** SCHEMA_VERSION at export time (informational; LocalState carries its own). */
+  schema_version: number;
+  /** Epoch-ms the file was produced. */
+  exported_at: number;
+  /** The exporting player's own progress (no addr / peers). */
+  state: SaveState;
+}
+
+/** Outcome of parseSaveFile — a discriminated result so callers can map the
+ *  failure to a localized, user-facing message. */
+export type ParsedSave =
+  | { ok: true; save: SaveFile }
+  | { ok: false; error: 'malformed' | 'version' };
+
+/**
+ * buildSaveState(state) → SaveState
+ *
+ * Picks the exportable fields off LocalState explicitly (rather than deleting
+ * addr/peers from a copy) so adding a future LocalState field never silently
+ * leaks into exports — a new field has to be opted in here.
+ */
+export function buildSaveState(state: LocalState): SaveState {
+  return {
+    schema_version: state.schema_version,
+    display_name: state.display_name,
+    game_version: state.game_version,
+    version: state.version,
+    nodes: state.nodes,
+    nodes_charging: state.nodes_charging,
+    nodes_collect: state.nodes_collect,
+    db_queue: state.db_queue,
+    game_values: state.game_values,
+    mission_goals: state.mission_goals,
+    active_missions: state.active_missions,
+    last_seen_ts: state.last_seen_ts,
+    node_counter: state.node_counter,
+    integrated_ids: state.integrated_ids,
+    mission_briefings_seen: state.mission_briefings_seen,
+    tokens_seen: state.tokens_seen,
+    // locale is optional — only include it when set so exactOptionalPropertyTypes
+    // doesn't see an explicit `undefined`.
+    ...(state.locale !== undefined && { locale: state.locale }),
+  };
+}
+
+/** buildSaveFile(state) → SaveFile envelope ready to JSON.stringify. */
+export function buildSaveFile(state: LocalState, exportedAt?: number): SaveFile {
+  return {
+    format: SAVE_FORMAT,
+    save_version: SAVE_VERSION,
+    schema_version: SCHEMA_VERSION,
+    exported_at: typeof exportedAt === 'number' ? exportedAt : clockNow(),
+    state: buildSaveState(state),
+  };
+}
+
+/**
+ * parseSaveFile(text) → ParsedSave
+ *
+ * Validates a previously-exported save file's JSON text.  Fails closed:
+ *   - 'malformed' — not JSON, wrong format marker, or missing state body
+ *   - 'version'   — newer save_version than this build understands
+ * Older save_versions are accepted (forward-migration happens in importSave's
+ * reducer via freshState defaults filling any absent fields).
+ */
+export function parseSaveFile(text: string): ParsedSave {
+  var data: any;
+  try {
+    data = JSON.parse(text);
+  } catch (_) {
+    return { ok: false, error: 'malformed' };
+  }
+  if (!data || typeof data !== 'object' || data.format !== SAVE_FORMAT) {
+    return { ok: false, error: 'malformed' };
+  }
+  if (typeof data.save_version !== 'number' || data.save_version > SAVE_VERSION) {
+    return { ok: false, error: 'version' };
+  }
+  // A valid save must carry an object state body with game_values — the one
+  // field every real game has and the cheapest structural sanity check.
+  if (!data.state || typeof data.state !== 'object' || typeof data.state.game_values !== 'object') {
+    return { ok: false, error: 'malformed' };
+  }
+  return { ok: true, save: data as SaveFile };
 }
 
 function _seedNodesFromTree(src: GameSeed): GameNode[] {
@@ -690,6 +812,35 @@ reducers.dismissMissionBriefing = function dismissMissionBriefingReducer(state, 
   if (seen[gestalt]) return state;
   seen[gestalt] = true;
   return Object.assign({}, state, { mission_briefings_seen: seen });
+};
+
+// 'importSave' (issue #127) replaces the player's own progress with a
+// previously-exported snapshot.  The snapshot rides in delta.result.state and
+// only ever applies to the importing player (applyDelta's addr guard blocks
+// foreign importSave deltas before this reducer runs).
+//
+// Identity (addr) and other players' aggregated stats (peers) are always taken
+// from the live local state — never from the snapshot — so importing someone
+// else's save can't hijack your address or wipe the leaderboard.  Missing
+// fields fall back to freshState defaults, which is also how an older
+// save_version forward-migrates.
+reducers.importSave = function importSaveReducer(state, delta) {
+  var snap = delta.result && delta.result.state;
+  if (!snap || typeof snap !== 'object') return state;
+
+  var base = freshState(state.addr);
+  var merged: LocalState = Object.assign({}, base, snap, {
+    addr: state.addr,
+    peers: state.peers,
+    schema_version: SCHEMA_VERSION,
+    // Respect the monotonic clock guard: never let an imported timestamp
+    // rewind below the value applyDelta already advanced to.
+    last_seen_ts: Math.max(
+      state.last_seen_ts || 0,
+      typeof snap.last_seen_ts === 'number' ? snap.last_seen_ts : 0
+    ),
+  });
+  return merged;
 };
 
 // Stubs — return state unchanged until Wave 4+ fills them in.
