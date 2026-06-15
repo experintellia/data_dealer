@@ -10,8 +10,10 @@
 // resetGame is intentionally absent — in webxdc, reset = re-share the .xdc.
 // Remaining handlers are stubs that return a rejected Promise.
 
-import rulesetDe from '../data/ruleset_3.de.json' with { type: 'json' };
-import rulesetEn from '../data/ruleset_3.en.json' with { type: 'json' };
+import rulesetBase from '../data/ruleset_base.json' with { type: 'json' };
+import rulesetStringsDe from '../i18n/ruleset.de.json' with { type: 'json' };
+import rulesetStringsEn from '../i18n/ruleset.en.json' with { type: 'json' };
+import { injectTranslations } from './inject-translations.js';
 import i18nDe from '../i18n/de_AT.json' with { type: 'json' };
 import i18nEn from '../i18n/en_US.json' with { type: 'json' };
 import { getState, setState } from './boot.js';
@@ -269,7 +271,8 @@ function _readNumber(rec: object | undefined, key: string): number | undefined {
 function _getRuleset(): Ruleset {
   var state = getState();
   var locale: Locale = state && state.locale === 'en' ? 'en' : 'de';
-  return (locale === 'en' ? rulesetEn : rulesetDe) as unknown as Ruleset;
+  var strings = locale === 'en' ? rulesetStringsEn : rulesetStringsDe;
+  return injectTranslations(rulesetBase, strings) as unknown as Ruleset;
 }
 
 let _nodeMapRef: GameNode[] | null = null;
