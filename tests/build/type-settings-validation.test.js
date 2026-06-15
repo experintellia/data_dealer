@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { injectTranslations } from '../../scripts/inject-translations.js';
 /**
  * Build-time validation of type_settings.js and the ruleset.
  *
@@ -26,8 +27,11 @@ let rulesetDe, rulesetEn, localeDe, localeEn;
 let goalsTextWorkflows, goalsTextMsgids, knownHandlerWorkflows;
 
 beforeAll(() => {
-  rulesetDe = JSON.parse(readFileSync(join(root, 'data', 'ruleset_3.de.json'), 'utf8'));
-  rulesetEn = JSON.parse(readFileSync(join(root, 'data', 'ruleset_3.en.json'), 'utf8'));
+  var base = JSON.parse(readFileSync(join(root, 'data', 'ruleset_base.json'), 'utf8'));
+  var stringsEn = JSON.parse(readFileSync(join(root, 'i18n', 'ruleset.en.json'), 'utf8'));
+  var stringsDe = JSON.parse(readFileSync(join(root, 'i18n', 'ruleset.de.json'), 'utf8'));
+  rulesetDe = injectTranslations(base, stringsDe);
+  rulesetEn = injectTranslations(base, stringsEn);
   localeDe = JSON.parse(readFileSync(join(root, 'i18n', 'de_AT.json'), 'utf8'));
   localeEn = JSON.parse(readFileSync(join(root, 'i18n', 'en_US.json'), 'utf8'));
 

@@ -2,6 +2,10 @@
  * Extract translatable strings from the dual ruleset files into a base file
  * + per-locale flat string maps.
  *
+ * Expects data/ruleset_3.en.json and data/ruleset_3.de.json as input.
+ * To re-extract after upstream changes, first restore the vendored source
+ * files from https://github.com/datadealer/dd_rules (see data/UPSTREAM.txt).
+ *
  * Usage: node tools/extract-ruleset-i18n.mjs
  *
  * Produces:
