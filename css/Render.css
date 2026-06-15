@@ -3206,12 +3206,15 @@ button {
 
 @media (max-width: 768px) {
   /* Primary action buttons: meet 44×44 minimum.  Padding gives the visual
-     hit area room without making the rendered button look oversized. */
+     hit area room without making the rendered button look oversized.
+     Reduced horizontal padding + font-size so the button + price/timer
+     decorator row fits on narrow phones without clipping. */
   .Button,
   .inset-button {
-    min-height: 44px;
-    line-height: 38px;
-    padding: 2px 28px;
+    min-height: 34px;
+    line-height: 34px;
+    padding: 2px 12px;
+    font-size: 0.85em;
   }
   .ButtonInc,
   .ButtonDec {

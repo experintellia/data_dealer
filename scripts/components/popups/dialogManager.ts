@@ -227,6 +227,12 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
     // this dialog before our own cleanup runs.
     if (active && active.handle !== ownHandle) active.handle.close();
     isOpen = false;
+    // Fire popup_close listeners before tearing down the DOM.
+    // GameNode.initPopupEvents registers badge cleanup (DecoratorNew
+    // removal, mission dismissal, highlightTabs reset) here.  The
+    // p.close() those listeners call is a no-op — isOpen is already false.
+    const closeSet = listeners.get('popup_close');
+    if (closeSet) for (const fn of closeSet) fn(evStub);
     opts.container.removeEventListener('click', handleInteraction);
     opts.container.removeEventListener('touchend', handleInteraction);
     render(null, opts.container);
