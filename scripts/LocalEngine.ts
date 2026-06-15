@@ -10,13 +10,15 @@
 // resetGame is intentionally absent — in webxdc, reset = re-share the .xdc.
 // Remaining handlers are stubs that return a rejected Promise.
 
-import rulesetDe from '../data/ruleset_3.de.json' with { type: 'json' };
-import rulesetEn from '../data/ruleset_3.en.json' with { type: 'json' };
+import rulesetBase from '../data/ruleset_base.json' with { type: 'json' };
 import i18nDe from '../i18n/de_AT.json' with { type: 'json' };
 import i18nEn from '../i18n/en_US.json' with { type: 'json' };
+import rulesetStringsDe from '../i18n/ruleset.de.json' with { type: 'json' };
+import rulesetStringsEn from '../i18n/ruleset.en.json' with { type: 'json' };
 import { getState, setState } from './boot.js';
 import { now as clockNow } from './clock.js';
 import type { UpgradeValuesShape } from './game/ProfileSet.js';
+import { injectTranslations } from './inject-translations.js';
 import { materialize } from './materializer.js';
 import { applyDelta, buildSaveFile, parseSaveFile } from './state.js';
 import type {
@@ -266,10 +268,20 @@ function _readNumber(rec: object | undefined, key: string): number | undefined {
 // Ruleset selection — locale-memoised, node-index helpers
 // ---------------------------------------------------------------------------
 
+let _rulesetLocaleCache: Locale | null = null;
+let _rulesetCache: Ruleset | null = null;
+
 function _getRuleset(): Ruleset {
   var state = getState();
   var locale: Locale = state && state.locale === 'en' ? 'en' : 'de';
-  return (locale === 'en' ? rulesetEn : rulesetDe) as unknown as Ruleset;
+  if (_rulesetLocaleCache === locale && _rulesetCache) {
+    return _rulesetCache;
+  }
+  var strings = locale === 'en' ? rulesetStringsEn : rulesetStringsDe;
+  var ruleset = injectTranslations(rulesetBase, strings) as unknown as Ruleset;
+  _rulesetLocaleCache = locale;
+  _rulesetCache = ruleset;
+  return ruleset;
 }
 
 let _nodeMapRef: GameNode[] | null = null;

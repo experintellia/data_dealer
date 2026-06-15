@@ -162,8 +162,9 @@ describe('dist/css/*.css are minified', () => {
 // start of any inner line is the unambiguous signal.
 describe('dist/data + dist/i18n JSON is whitespace-stripped', () => {
   const samples = [
-    join('data', 'ruleset_3.de.json'),
-    join('data', 'ruleset_3.en.json'),
+    join('data', 'ruleset_base.json'),
+    join('i18n', 'ruleset.en.json'),
+    join('i18n', 'ruleset.de.json'),
     join('i18n', 'de_AT.json'),
   ];
   for (const rel of samples) {

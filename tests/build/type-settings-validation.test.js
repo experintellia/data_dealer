@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
  * RequireJS + jQuery dependencies in the Node test environment.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
+import { injectTranslations } from '../../scripts/inject-translations.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -26,8 +27,11 @@ let rulesetDe, rulesetEn, localeDe, localeEn;
 let goalsTextWorkflows, goalsTextMsgids, knownHandlerWorkflows;
 
 beforeAll(() => {
-  rulesetDe = JSON.parse(readFileSync(join(root, 'data', 'ruleset_3.de.json'), 'utf8'));
-  rulesetEn = JSON.parse(readFileSync(join(root, 'data', 'ruleset_3.en.json'), 'utf8'));
+  var base = JSON.parse(readFileSync(join(root, 'data', 'ruleset_base.json'), 'utf8'));
+  var stringsEn = JSON.parse(readFileSync(join(root, 'i18n', 'ruleset.en.json'), 'utf8'));
+  var stringsDe = JSON.parse(readFileSync(join(root, 'i18n', 'ruleset.de.json'), 'utf8'));
+  rulesetDe = injectTranslations(base, stringsDe);
+  rulesetEn = injectTranslations(base, stringsEn);
   localeDe = JSON.parse(readFileSync(join(root, 'i18n', 'de_AT.json'), 'utf8'));
   localeEn = JSON.parse(readFileSync(join(root, 'i18n', 'en_US.json'), 'utf8'));
 

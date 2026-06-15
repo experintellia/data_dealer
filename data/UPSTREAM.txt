@@ -1,12 +1,24 @@
 Source repository: https://github.com/datadealer/dd_rules
 Source commit SHA: 9290ab97a9ab7623d85290541cb44173b7a908d9
 
-Files vendored from this commit (unmodified):
-- default_game.json
-- ruleset_3.de.json
-- ruleset_3.en.json
+Files vendored from this commit:
 
-To diff against future upstream changes:
+  data/default_game.json         — still tracked as-is (initial game state)
+
+  data/ruleset_3.de.json         — transformed by
+  data/ruleset_3.en.json           tools/extract-ruleset-i18n.mjs into:
+                                   data/ruleset_base.json
+                                   i18n/ruleset.en.json
+                                   i18n/ruleset.de.json
+
+The original ruleset_3.* files are no longer tracked; the game merges
+base + locale at runtime.
+
+To re-extract after an upstream update:
+
   git clone https://github.com/datadealer/dd_rules.git
   cd dd_rules
   git diff 9290ab97a9ab7623d85290541cb44173b7a908d9 -- default_game.json ruleset_3.de.json ruleset_3.en.json
+  # Copy the updated ruleset_3.*.json into data/
+  # (default_game.json can also be copied directly)
+  node tools/extract-ruleset-i18n.mjs
