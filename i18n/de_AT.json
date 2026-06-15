@@ -980,5 +980,41 @@
   "achievement_karma_devil": [
     null,
     "%s hat den vollen Teufelsstatus erreicht"
+  ],
+  "save section headline": [
+    null,
+    "Spielstand"
+  ],
+  "save section text": [
+    null,
+    "Sichere deinen Fortschritt in einem Chat oder lade einen zuvor exportierten Spielstand. Beim Importieren wird dein aktueller Fortschritt ersetzt."
+  ],
+  "Export Save": [
+    null,
+    "Spielstand exportieren"
+  ],
+  "Import Save": [
+    null,
+    "Spielstand importieren"
+  ],
+  "save export chat text": [
+    null,
+    "Mein Data-Dealer-Spielstand"
+  ],
+  "save imported chat info": [
+    null,
+    "%s hat einen importierten Spielstand geladen."
+  ],
+  "save import error malformed": [
+    null,
+    "Diese Datei ist kein gültiger Data-Dealer-Spielstand."
+  ],
+  "save import error version": [
+    null,
+    "Dieser Spielstand wurde mit einer neueren Version des Spiels erstellt und kann nicht importiert werden."
+  ],
+  "save import error unavailable": [
+    null,
+    "Das Importieren von Spielständen wird hier nicht unterstützt."
   ]
 }

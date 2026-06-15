@@ -18,7 +18,7 @@ import { getState, setState } from './boot.js';
 import { now as clockNow } from './clock.js';
 import type { UpgradeValuesShape } from './game/ProfileSet.js';
 import { materialize } from './materializer.js';
-import { applyDelta } from './state.js';
+import { applyDelta, buildSaveFile, parseSaveFile } from './state.js';
 import type {
   ChargingEntry,
   Delta,
@@ -468,6 +468,122 @@ export function setLocale(localeCode: string): Promise<{ result: string }> {
   });
 
   return Promise.resolve({ result: localeCode });
+}
+
+// ---------------------------------------------------------------------------
+// Save export / import (issue #127)
+// ---------------------------------------------------------------------------
+
+/** Filename used for exported saves; also the suggested name on re-import. */
+export var SAVE_FILE_NAME = 'data_dealer_save.json';
+
+/** Result of an importSave attempt; the popup maps each error to a message. */
+export type ImportSaveResult =
+  | { ok: true }
+  | { cancelled: true }
+  | { error: 'malformed' | 'version' | 'unavailable' };
+
+/**
+ * exportSave() → Promise<{result: {ok: boolean}}>
+ *
+ * Serializes the *current player's* progress (no peer/leaderboard data — see
+ * buildSaveState) and hands it to webxdc.sendToChat so the player can send the
+ * file into any chat as a backup.  sendToChat may close the app before its
+ * promise settles (per the webxdc contract); callers must not depend on the
+ * resolution to do anything destructive.
+ */
+export function exportSave(): Promise<{ result: { ok: boolean } }> {
+  if (typeof webxdc === 'undefined' || !webxdc || typeof webxdc.sendToChat !== 'function') {
+    return Promise.resolve({ result: { ok: false } });
+  }
+  var save = buildSaveFile(getState());
+  var json = JSON.stringify(save, null, 2);
+  return webxdc
+    .sendToChat({
+      file: { name: SAVE_FILE_NAME, plainText: json },
+      text: _t('save export chat text'),
+    })
+    .then(function () {
+      return { result: { ok: true } };
+    })
+    .catch(function () {
+      return { result: { ok: false } };
+    });
+}
+
+/**
+ * importSave() → Promise<{result: ImportSaveResult}>
+ *
+ * Lets the player pick a previously-exported save via webxdc.importFiles,
+ * validates it, then persists an `importSave` delta that replaces the player's
+ * own progress on the next replay.  A visible chat message is attached to the
+ * same sendUpdate (issue #127's anti-cheat transparency requirement) so other
+ * participants can see that a save was loaded.
+ *
+ * Mirrors setLocale's contract: state isn't mutated synchronously — the caller
+ * reloads after a successful ({ok:true}) result so boot() replays the new
+ * importSave delta and rebuilds state from it.
+ */
+export function importSave(): Promise<{ result: ImportSaveResult }> {
+  if (typeof webxdc === 'undefined' || !webxdc || typeof webxdc.importFiles !== 'function') {
+    return Promise.resolve({ result: { error: 'unavailable' } });
+  }
+  // Capture a non-undefined reference so the async closures below keep the
+  // narrowing the early-return guard established.
+  var wx = webxdc;
+  return wx
+    .importFiles({ extensions: ['.json'], mimeTypes: ['application/json'] })
+    .then(function (files): Promise<{ result: ImportSaveResult }> {
+      var file = files && files[0];
+      if (!file) {
+        return Promise.resolve({ result: { cancelled: true } });
+      }
+      return file.text().then(function (text):
+        | { result: ImportSaveResult }
+        | Promise<{ result: ImportSaveResult }> {
+        var parsed = parseSaveFile(text);
+        if (!parsed.ok) {
+          return { result: { error: parsed.error } };
+        }
+        var state = getState();
+        var snapshot = parsed.save.state;
+        var name = state.display_name || snapshot.display_name || wx.selfName || state.addr;
+
+        // Persist the import as a delta AND surface a one-line chat notice via
+        // the same update's `info` field — this is the issue #127 anti-cheat
+        // transparency signal, broadcast to every peer.  The delta replays
+        // own-only (addr guard); `info`/`summary` are messenger metadata
+        // ignored by applyDelta.
+        //
+        // CRITICAL: webxdc.sendUpdate does NOT deliver/persist synchronously
+        // — the listener fires on a later turn and (in Delta Chat and the
+        // @webxdc/vite-plugins simulator) the returned thenable resolves only
+        // once the durability write commits.  The caller reloads the page on
+        // {ok:true}, so we MUST wait for that write before reporting success;
+        // otherwise the reload races persistence and the imported save — and
+        // its chat message — are silently dropped.  `Promise.resolve(...)`
+        // tolerates both the spec's `void` return and the simulator's
+        // Promise.
+        var sent = wx.sendUpdate(
+          {
+            payload: _mkDelta(state.addr, 'importSave', [], {
+              state: snapshot,
+              // Mirror game_values at the top level so the peer aggregator
+              // refreshes this player's leaderboard row from the imported save.
+              game_values: snapshot.game_values,
+            }),
+            info: _t('save imported chat info', name),
+          },
+          ''
+        ) as unknown as void | Promise<void>;
+        return Promise.resolve(sent).then(function (): { result: ImportSaveResult } {
+          return { result: { ok: true } };
+        });
+      });
+    })
+    .catch(function (): { result: ImportSaveResult } {
+      return { result: { error: 'malformed' } };
+    });
 }
 
 /**
@@ -3096,6 +3212,8 @@ var LocalEngine = Object.assign(
     ping: ping,
     getSessionLocale: getSessionLocale,
     setLocale: setLocale,
+    exportSave: exportSave,
+    importSave: importSave,
     loadGame: loadGame,
     getRanking: getRanking,
     setDisplayName: setDisplayName,

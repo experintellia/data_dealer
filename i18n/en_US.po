@@ -1141,6 +1141,45 @@ msgstr "Room for %s ventures"
 msgid "per deal"
 msgstr "per deal"
 
+#: scripts/components/popups/AboutPopup.tsx
+msgid "save section headline"
+msgstr "Save game"
+
+#: scripts/components/popups/AboutPopup.tsx
+msgid "save section text"
+msgstr ""
+"Back up your progress to a chat or restore a previously exported save. "
+"Importing replaces your current progress."
+
+#: scripts/components/popups/AboutPopup.tsx
+msgid "Export Save"
+msgstr "Export Save"
+
+#: scripts/components/popups/AboutPopup.tsx
+msgid "Import Save"
+msgstr "Import Save"
+
+#: scripts/LocalEngine.ts
+msgid "save export chat text"
+msgstr "My Data Dealer save game"
+
+#: scripts/LocalEngine.ts
+msgid "save imported chat info"
+msgstr "%s loaded an imported save."
+
+#: scripts/components/popups/AboutPopup.tsx
+msgid "save import error malformed"
+msgstr "That file is not a valid Data Dealer save."
+
+#: scripts/components/popups/AboutPopup.tsx
+msgid "save import error version"
+msgstr ""
+"This save was created by a newer version of the game and cannot be imported."
+
+#: scripts/components/popups/AboutPopup.tsx
+msgid "save import error unavailable"
+msgstr "Importing save files is not supported here."
+
 #~ msgid "user is %s%% better than other Data Dealers"
 #~ msgstr "You outperformed %s%% of all Data Dealers"
 

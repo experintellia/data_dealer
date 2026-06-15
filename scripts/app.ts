@@ -74,6 +74,8 @@ interface AppRemote {
   getRanking?(type: string): DoneFailChain<RankingResult>;
   getSessionLocale?(): JQueryLike;
   loadGame?(): JQueryLike;
+  exportSave?(): JQueryLike;
+  importSave?(): JQueryLike;
 }
 
 interface ApplicationApi {
