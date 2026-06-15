@@ -405,7 +405,10 @@ export function parseSaveFile(text: string): ParsedSave {
   if (!data || typeof data !== 'object' || data.format !== SAVE_FORMAT) {
     return { ok: false, error: 'malformed' };
   }
-  if (typeof data.save_version !== 'number' || data.save_version > SAVE_VERSION) {
+  if (typeof data.save_version !== 'number') {
+    return { ok: false, error: 'malformed' };
+  }
+  if (data.save_version > SAVE_VERSION) {
     return { ok: false, error: 'version' };
   }
   // A valid save must carry an object state body with game_values — the one

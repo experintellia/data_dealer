@@ -100,6 +100,51 @@ describe('buildSaveFile / parseSaveFile round-trip', () => {
     });
     expect(parseSaveFile(future)).toEqual({ ok: false, error: 'version' });
   });
+
+  it('accepts an older save_version (forward-migration)', () => {
+    const old = JSON.stringify({
+      format: SAVE_FORMAT,
+      save_version: SAVE_VERSION - 1,
+      state: { game_values: { cash_value: 1 } },
+    });
+    const parsed = parseSaveFile(old);
+    expect(parsed.ok).toBe(true);
+  });
+
+  it('treats a non-numeric save_version as malformed, not version', () => {
+    const bad = JSON.stringify({
+      format: SAVE_FORMAT,
+      save_version: 'one',
+      state: { game_values: {} },
+    });
+    expect(parseSaveFile(bad)).toEqual({ ok: false, error: 'malformed' });
+  });
+
+  it('rejects a null state body', () => {
+    const bad = JSON.stringify({
+      format: SAVE_FORMAT,
+      save_version: SAVE_VERSION,
+      state: null,
+    });
+    expect(parseSaveFile(bad)).toEqual({ ok: false, error: 'malformed' });
+  });
+
+  it('rejects game_values that is not an object', () => {
+    const bad = JSON.stringify({
+      format: SAVE_FORMAT,
+      save_version: SAVE_VERSION,
+      state: { game_values: 42 },
+    });
+    expect(parseSaveFile(bad)).toEqual({ ok: false, error: 'malformed' });
+  });
+
+  it('rejects a JSON array (typeof object but not a save)', () => {
+    expect(parseSaveFile('[1,2,3]')).toEqual({ ok: false, error: 'malformed' });
+  });
+
+  it('rejects the JSON literal null', () => {
+    expect(parseSaveFile('null')).toEqual({ ok: false, error: 'malformed' });
+  });
 });
 
 function importDelta(addr, snapshot, ts) {
@@ -164,5 +209,53 @@ describe('applyDelta — importSave reducer', () => {
     const out = applyDelta(freshState(ADDR), importDelta(ADDR, snapshot, 5000));
     expect(out.peers[ADDR].cash).toBe(9999);
     expect(out.peers[ADDR].xp).toBe(4242);
+  });
+
+  it('leaves progress untouched when the delta carries no state body', () => {
+    const s = freshState(ADDR);
+    const noState = { kind: 'delta', addr: ADDR, op: 'importSave', args: [], result: {}, ts: 1000 };
+    const out = applyDelta(s, noState);
+    expect(out.display_name).toBe('');
+    expect(out.game_values.cash_value).toBe(s.game_values.cash_value);
+    expect(out.node_counter).toBe(s.node_counter);
+  });
+
+  it('leaves progress untouched when state is null', () => {
+    const s = freshState(ADDR);
+    const nullState = {
+      kind: 'delta',
+      addr: ADDR,
+      op: 'importSave',
+      args: [],
+      result: { state: null },
+      ts: 1000,
+    };
+    const out = applyDelta(s, nullState);
+    expect(out.game_values.cash_value).toBe(s.game_values.cash_value);
+  });
+
+  it('fills absent snapshot fields from freshState defaults (partial save)', () => {
+    // A minimal/old save that only carries game_values must still produce a
+    // structurally complete state — seeded nodes, empty collections, etc.
+    const partial = { game_values: { cash_value: 7 } };
+    const out = applyDelta(freshState(ADDR), importDelta(ADDR, partial));
+    expect(out.game_values.cash_value).toBe(7);
+    expect(Array.isArray(out.nodes)).toBe(true);
+    expect(out.nodes.length).toBeGreaterThan(0); // seeded trunk-mission nodes
+    expect(out.nodes_charging).toEqual([]);
+    expect(out.db_queue).toEqual([]);
+    expect(out.integrated_ids).toEqual({});
+  });
+
+  it('does not let a stale imported last_seen_ts rewind the monotonic clock', () => {
+    // Local state is already at a far-future timestamp; importing a save whose
+    // last_seen_ts is in the past must not roll the clock backwards (the guard
+    // that protects progress from clock-skew).
+    const future = Date.now() + 1_000_000_000;
+    let s = freshState(ADDR);
+    s = { ...s, last_seen_ts: future };
+    const snapshot = { ...buildSaveState(progressedState()), last_seen_ts: 1 };
+    const out = applyDelta(s, importDelta(ADDR, snapshot));
+    expect(out.last_seen_ts).toBeGreaterThanOrEqual(future);
   });
 });
