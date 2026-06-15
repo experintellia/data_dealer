@@ -15,7 +15,7 @@ ESM signal to tree-shake unused exports.
 | Sourcemaps | `sourcemap: !isRelease` | `BUILD_RELEASE=1` env var (set by CI on tag builds) strips `.map` from the .xdc. Default builds keep them so PR-attached .xdc artifacts are debuggable. |
 | Asset inlining | `assetsInlineLimit: 4096` (explicit) | Files under 4 KB inline as base64; larger ones stay as separate dist files. |
 | CSS | Loaded via 4 `<link>` tags in `index.html`; per-file minified by esbuild via `vite-plugin-static-copy` `transform` | Files stay separate (cascade order = `<link>` tag order in `index.html`) so neither index.html nor `esm-entry.ts` need rewiring. ~31% smaller per file. Bundling the four into one `style.[hash].css` would save another ~2 kB of file overhead but requires an index.html rewrite — out of scope. |
-| Vendor libs | `vendor/*.js` shipped as separate files, loaded as plain `<script>` tags before the bundle (`index.html`) | Each lib attaches a browser global (`$`, `_`, `numeral`, `sprintf`, `createjs`, `Scroller`); the ESM bundle reads from `globalThis` via `scripts/webxdc-shim.ts` etc. Not rolled into the bundle — see #192 "Out of scope". |
+| Vendor libs | Bundled into `esm-bundle.js` via Rollup `output.banner` (#192) | Banner runs at global scope (before `'use strict'` + IIFE), so `this.createjs = …` and `global.Scroller = …` patterns bind to `window`. Game code reads them via `globalThis.$`, `globalThis.createjs`, etc. Order: jquery → sprintf → easeljs → tweenjs → soundjs → zynga-animate → zynga-scroller. No separate `<script>` tags or `vendor/` directory in the `.xdc`. |
 | Static data | `data/`, `i18n/`, `img/`, fonts copied via `vite-plugin-static-copy`; JSON in `data/` and `i18n/` whitespace-stripped at `closeBundle` by the `minify-static-json` plugin | Source files stay pretty-printed for git diffs; the .xdc ships compacted (`JSON.parse` → `JSON.stringify` w/o indent, ~38% smaller raw). On-disk .xdc savings are smaller (zip already compresses whitespace well) but cold-start `JSON.parse` time scales with character count, not compressed bytes. |
 | `.xdc` packaging | `@webxdc/vite-plugins` `buildXDC` (last plugin) | Zips `dist/` to `data-dealer-{hq,casual}.xdc`. |
 
@@ -24,10 +24,9 @@ byte count on every PR / dispatch run and surfaces it in the sticky
 `xdc-artifact` comment alongside the .xdc downloads. Tag builds set
 `BUILD_RELEASE=1` so the released .xdc has no sourcemap.
 
-Background: filed in #192. Sequenced after #58 (AMD → ESM) and #147
-(strict TS) made real bundling possible; lands before the Phase 8 mobile
-work (#80) and the Preact dialog refactor so both have a clean baseline
-to compare against.
+Implemented in #192. Sequenced after #58 (AMD → ESM) and #147 (strict TS)
+made real bundling possible; landed before Phase 8 mobile (#80) and the
+Preact dialog refactor so both have a clean bundle baseline to measure against.
 
 ## Key frontend modules
 

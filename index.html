@@ -35,16 +35,9 @@
     <!-- dev: served by mockWebxdc() Vite plugin; prod: injected by the messenger -->
     <script src="webxdc.js"></script>
 
-    <!-- Vendor libraries: each sets the browser globals our ESM bundle
-         reads ($, sprintf, createjs, core, Scroller).  Order
-         matters: dependents come after their providers. -->
-    <script src="vendor/jquery.js"></script>
-    <script src="vendor/sprintf.js"></script>
-    <script src="vendor/easeljs.js"></script>
-    <script src="vendor/tweenjs.js"></script>
-    <script src="vendor/soundjs.js"></script>
-    <script src="vendor/zynga-animate.js"></script>
-    <script src="vendor/zynga-scroller.js"></script>
+    <!-- Vendor libs (jQuery, sprintf, createjs, zynga-scroller, …) are
+         bundled into esm-bundle.js as a global-scope banner that runs
+         before the strict-mode IIFE; no separate <script> tags needed. -->
 
     <!-- Defer so #dd-control is in the DOM by the time bootstrap.js
          renders the loader into it. -->
