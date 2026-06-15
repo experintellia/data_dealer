@@ -538,7 +538,9 @@ export function importSave(): Promise<{ result: ImportSaveResult }> {
       if (!file) {
         return Promise.resolve({ result: { cancelled: true } });
       }
-      return file.text().then(function (text): { result: ImportSaveResult } {
+      return file.text().then(function (text):
+        | { result: ImportSaveResult }
+        | Promise<{ result: ImportSaveResult }> {
         var parsed = parseSaveFile(text);
         if (!parsed.ok) {
           return { result: { error: parsed.error } };
@@ -548,9 +550,21 @@ export function importSave(): Promise<{ result: ImportSaveResult }> {
         var name = state.display_name || snapshot.display_name || wx.selfName || state.addr;
 
         // Persist the import as a delta AND surface a one-line chat notice via
-        // the same update's `info` field.  The delta replays own-only (addr
-        // guard); `info`/`summary` are messenger metadata ignored by applyDelta.
-        wx.sendUpdate(
+        // the same update's `info` field — this is the issue #127 anti-cheat
+        // transparency signal, broadcast to every peer.  The delta replays
+        // own-only (addr guard); `info`/`summary` are messenger metadata
+        // ignored by applyDelta.
+        //
+        // CRITICAL: webxdc.sendUpdate does NOT deliver/persist synchronously
+        // — the listener fires on a later turn and (in Delta Chat and the
+        // @webxdc/vite-plugins simulator) the returned thenable resolves only
+        // once the durability write commits.  The caller reloads the page on
+        // {ok:true}, so we MUST wait for that write before reporting success;
+        // otherwise the reload races persistence and the imported save — and
+        // its chat message — are silently dropped.  `Promise.resolve(...)`
+        // tolerates both the spec's `void` return and the simulator's
+        // Promise.
+        var sent = wx.sendUpdate(
           {
             payload: _mkDelta(state.addr, 'importSave', [], {
               state: snapshot,
@@ -561,8 +575,10 @@ export function importSave(): Promise<{ result: ImportSaveResult }> {
             info: _t('save imported chat info', name),
           },
           ''
-        );
-        return { result: { ok: true } };
+        ) as unknown as void | Promise<void>;
+        return Promise.resolve(sent).then(function (): { result: ImportSaveResult } {
+          return { result: { ok: true } };
+        });
       });
     })
     .catch(function (): { result: ImportSaveResult } {

@@ -186,9 +186,27 @@ export var SCHEMA_VERSION = 1;
  *  unrelated JSON. */
 export var SAVE_FORMAT = 'data_dealer_save';
 
-/** Save-file format version.  Bumped when the on-disk shape changes so old
- *  exports can be migrated (or rejected) on import. Independent of
- *  SCHEMA_VERSION, which versions the in-memory LocalState. */
+/**
+ * Save-file format version.  Independent of SCHEMA_VERSION (which versions the
+ * in-memory LocalState); this versions the exported-file envelope + snapshot.
+ *
+ * ⚠️ MAINTENANCE CONTRACT — read before changing the save shape ⚠️
+ * The exported snapshot is produced by buildSaveState() and re-applied by the
+ * `importSave` reducer.  If you change WHAT a save contains or HOW it is read,
+ * keep these in lockstep:
+ *   1. Adding a LocalState field that should be exported → add it to
+ *      buildSaveState() (it is allow-listed there, never auto-included) AND
+ *      bump SAVE_VERSION.
+ *   2. Renaming / changing the meaning of an exported field → bump SAVE_VERSION
+ *      and add a migration so old (lower save_version) files still import.
+ *   3. SCHEMA_VERSION changes that alter persisted gameplay shape → consider
+ *      whether old saves need migrating on import too.
+ * Migrations live alongside parseSaveFile() / the importSave reducer: older
+ * save_versions are accepted (parseSaveFile only rejects NEWER ones), and any
+ * field absent from an old snapshot falls back to freshState() defaults in the
+ * reducer — that default-fill is the zero-effort migration for purely-additive
+ * changes.  Anything structural needs an explicit upgrade step.
+ */
 export var SAVE_VERSION = 1;
 
 var _defaultSeed: GameSeed = (defaultGameData as GameSeed) || { game_values: {} };
@@ -350,6 +368,9 @@ export type ParsedSave =
  * Picks the exportable fields off LocalState explicitly (rather than deleting
  * addr/peers from a copy) so adding a future LocalState field never silently
  * leaks into exports — a new field has to be opted in here.
+ *
+ * ⚠️ Adding/removing/renaming a field here changes the save-file shape: bump
+ * SAVE_VERSION and add a migration if needed.  See the SAVE_VERSION doc above.
  */
 export function buildSaveState(state: LocalState): SaveState {
   return {
@@ -390,10 +411,13 @@ export function buildSaveFile(state: LocalState, exportedAt?: number): SaveFile 
  * parseSaveFile(text) → ParsedSave
  *
  * Validates a previously-exported save file's JSON text.  Fails closed:
- *   - 'malformed' — not JSON, wrong format marker, or missing state body
- *   - 'version'   — newer save_version than this build understands
- * Older save_versions are accepted (forward-migration happens in importSave's
- * reducer via freshState defaults filling any absent fields).
+ *   - 'malformed' — not JSON, wrong format marker, non-numeric save_version,
+ *                   or missing/!object state body
+ *   - 'version'   — numeric but NEWER save_version than this build understands
+ * Older save_versions are intentionally accepted: additive changes migrate for
+ * free because the importSave reducer fills any absent field from freshState
+ * defaults.  When you bump SAVE_VERSION for a NON-additive change, branch here
+ * (or in the reducer) on save.save_version to upgrade the older shape.
  */
 export function parseSaveFile(text: string): ParsedSave {
   var data: any;
@@ -826,7 +850,9 @@ reducers.dismissMissionBriefing = function dismissMissionBriefingReducer(state, 
 // from the live local state — never from the snapshot — so importing someone
 // else's save can't hijack your address or wipe the leaderboard.  Missing
 // fields fall back to freshState defaults, which is also how an older
-// save_version forward-migrates.
+// save_version forward-migrates (see the SAVE_VERSION maintenance contract).
+// A NON-additive save_version bump needs an explicit upgrade step here, before
+// the snapshot is merged onto `base`.
 reducers.importSave = function importSaveReducer(state, delta) {
   var snap = delta.result && delta.result.state;
   if (!snap || typeof snap !== 'object') return state;
