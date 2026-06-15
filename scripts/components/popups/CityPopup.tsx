@@ -93,21 +93,17 @@ export function CityPopup({ vm, onClose, popup }: CityPopupProps) {
                   <div class="SubpopHeaderTitle">{t.selectorTitle}</div>
                 </div>
                 <div class="PopupSelector">
-                  <div class="PopupPageWrap">
-                    {t.tiles.length === 0 ? (
-                      <NoItems
-                        loading={t.loading}
-                        textNoItems={t.noItemsText}
-                        textLoading={t.loadingText}
-                      />
-                    ) : (
-                      <div class="PopupPage PerpPage">
-                        {t.tiles.map((tile) => (
-                          <PerpProvidedTile key={tile.key} tile={tile} onOpen={handleOpenKey} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  {t.tiles.length === 0 ? (
+                    <NoItems
+                      loading={t.loading}
+                      textNoItems={t.noItemsText}
+                      textLoading={t.loadingText}
+                    />
+                  ) : (
+                    t.tiles.map((tile) => (
+                      <PerpProvidedTile key={tile.key} tile={tile} onOpen={handleOpenKey} />
+                    ))
+                  )}
                 </div>
               </div>
               <div class="PopupButtons">

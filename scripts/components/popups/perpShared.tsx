@@ -112,9 +112,8 @@ export function TokenSubpop({
 }
 
 /** One token grid — `token.html` inside `profileset*.html`.  Renders
- *  every tile into a single flex-wrap grid (`.PopupPage`); the wrapper
- *  `.PopupSelector` / `.PopupTokens` scrolls when the tiles overflow.
- *  The subpop overlay + open-state stay with the caller. */
+ *  tiles directly into the caller's `.PopupSelector` / `.PopupTokens`
+ *  scroll viewport.  The subpop overlay + open-state stay with the caller. */
 export function TokenGrid({
   tokens,
   paginationClass,
@@ -129,13 +128,9 @@ export function TokenGrid({
   return (
     <div class={paginationClass}>
       <div class={tokensClass}>
-        <div class="PopupPageWrap">
-          <div class="PopupPage">
-            {tokens.map((t) => (
-              <TokenTile key={t.gestalt} token={t} onOpen={onOpen} />
-            ))}
-          </div>
-        </div>
+        {tokens.map((t) => (
+          <TokenTile key={t.gestalt} token={t} onOpen={onOpen} />
+        ))}
       </div>
     </div>
   );

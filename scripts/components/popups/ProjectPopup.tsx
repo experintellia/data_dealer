@@ -285,17 +285,13 @@ function BuySelectorSubpop({
       </div>
       <div class="Pagination Selector">
         <div class="PopupSelector">
-          <div class="PopupPageWrap">
-            <div class="PopupPage PowerupPage">
-              {cat.providedTiles.map((t) => (
-                <ProvidedTile
-                  key={t.gestalt}
-                  tile={t}
-                  onOpen={t.locked ? null : () => onProvidedOpen(t.gestalt)}
-                />
-              ))}
-            </div>
-          </div>
+          {cat.providedTiles.map((t) => (
+            <ProvidedTile
+              key={t.gestalt}
+              tile={t}
+              onOpen={t.locked ? null : () => onProvidedOpen(t.gestalt)}
+            />
+          ))}
         </div>
       </div>
       <div class="SubpopButtons">
@@ -545,31 +541,25 @@ function BuySelectorSubpopDialog({
               <div class="SubpopHeaderTitle">{cat.selectorTitle}</div>
             </div>
             <div class="PopupSelector">
-              <div class="PopupPageWrap">
-                <div class="PopupPage PowerupPage">
-                  {cat.providedTiles.map((t) => (
-                    <ProvidedTile
-                      key={t.gestalt}
-                      tile={t}
-                      onOpen={
-                        t.locked
-                          ? null
-                          : () => {
-                              const found = cat.providedSubpops.find(
-                                (s) => s.gestalt === t.gestalt
-                              );
-                              if (found)
-                                openSubpopDialog(ProvidedPowerupSubpopDialog, {
-                                  sub: found,
-                                  slot,
-                                  parentPopup,
-                                });
-                            }
-                      }
-                    />
-                  ))}
-                </div>
-              </div>
+              {cat.providedTiles.map((t) => (
+                <ProvidedTile
+                  key={t.gestalt}
+                  tile={t}
+                  onOpen={
+                    t.locked
+                      ? null
+                      : () => {
+                          const found = cat.providedSubpops.find((s) => s.gestalt === t.gestalt);
+                          if (found)
+                            openSubpopDialog(ProvidedPowerupSubpopDialog, {
+                              sub: found,
+                              slot,
+                              parentPopup,
+                            });
+                        }
+                  }
+                />
+              ))}
             </div>
           </div>
           <div class="SubpopButtons">
@@ -772,13 +762,9 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
           </div>
           <div class="Pagination">
             <div class="PopupTokens">
-              <div class="PopupPageWrap">
-                <div class="PopupPage">
-                  {vm.tokens.map((t) => (
-                    <TokenTile key={t.gestalt} token={t} onOpen={handleOpenToken} />
-                  ))}
-                </div>
-              </div>
+              {vm.tokens.map((t) => (
+                <TokenTile key={t.gestalt} token={t} onOpen={handleOpenToken} />
+              ))}
             </div>
           </div>
           {vm.collectMode ? (
@@ -878,67 +864,63 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
                   </div>
                   <div class="Pagination">
                     <div class="PowerupsPage">
-                      <div class="PopupPageWrap">
-                        <div class="PopupPage PowerupPage">
-                          {cat.slots.map((slot) => {
-                            const open =
-                              slot.kind === 'free'
-                                ? () => {
-                                    if (isMobileWidth()) {
-                                      subpopDialog.current = openSubpopDialog(
-                                        BuySelectorSubpopDialog,
-                                        { cat, slot: slot.slot, parentPopup: popup }
-                                      );
-                                    } else {
-                                      setSubId(null);
-                                      setBuySlot(slot.slot);
-                                      setSelPkey(cat.pkey);
-                                    }
+                      {cat.slots.map((slot) => {
+                        const open =
+                          slot.kind === 'free'
+                            ? () => {
+                                if (isMobileWidth()) {
+                                  subpopDialog.current = openSubpopDialog(BuySelectorSubpopDialog, {
+                                    cat,
+                                    slot: slot.slot,
+                                    parentPopup: popup,
+                                  });
+                                } else {
+                                  setSubId(null);
+                                  setBuySlot(slot.slot);
+                                  setSelPkey(cat.pkey);
+                                }
+                              }
+                            : slot.kind === 'locked'
+                              ? () => {
+                                  if (isMobileWidth()) {
+                                    subpopDialog.current = openSubpopDialog(BuySlotsSubpopDialog, {
+                                      bs: cat.buySlots,
+                                      parentPopup: popup,
+                                    });
+                                  } else {
+                                    setSelPkey(null);
+                                    setSubId('buyslots');
                                   }
-                                : slot.kind === 'locked'
-                                  ? () => {
-                                      if (isMobileWidth()) {
-                                        subpopDialog.current = openSubpopDialog(
-                                          BuySlotsSubpopDialog,
-                                          { bs: cat.buySlots, parentPopup: popup }
-                                        );
-                                      } else {
-                                        setSelPkey(null);
-                                        setSubId('buyslots');
-                                      }
-                                    }
-                                  : () => {
-                                      if (isMobileWidth()) {
-                                        const found = cat.sellSubpops.find(
-                                          (s) => s.subpopId === slot.subpopId
-                                        );
-                                        if (found)
-                                          subpopDialog.current = openSubpopDialog(
-                                            SellSubpopDialog,
-                                            { sub: found, parentPopup: popup }
-                                          );
-                                      } else {
-                                        setSelPkey(null);
-                                        setSubId(slot.subpopId);
-                                      }
-                                    };
-                            const isUpdating =
-                              anim !== null && anim.key === `${cat.pkey}:${slot.slot}`;
-                            return (
-                              <PowerupSlotTile
-                                key={`${cat.pkey}:${slot.slot}`}
-                                cls={slotClass(cat.pkey, slot.slot, slot.kind)}
-                                bgHtml={slot.backgroundHtml}
-                                spriteHtml={slot.spriteHtml}
-                                labelHtml={slot.labelHtml}
-                                subpopId={slot.subpopId}
-                                slot={slot.slot}
-                                onOpen={isUpdating ? null : open}
-                              />
-                            );
-                          })}
-                        </div>
-                      </div>
+                                }
+                              : () => {
+                                  if (isMobileWidth()) {
+                                    const found = cat.sellSubpops.find(
+                                      (s) => s.subpopId === slot.subpopId
+                                    );
+                                    if (found)
+                                      subpopDialog.current = openSubpopDialog(SellSubpopDialog, {
+                                        sub: found,
+                                        parentPopup: popup,
+                                      });
+                                  } else {
+                                    setSelPkey(null);
+                                    setSubId(slot.subpopId);
+                                  }
+                                };
+                        const isUpdating = anim !== null && anim.key === `${cat.pkey}:${slot.slot}`;
+                        return (
+                          <PowerupSlotTile
+                            key={`${cat.pkey}:${slot.slot}`}
+                            cls={slotClass(cat.pkey, slot.slot, slot.kind)}
+                            bgHtml={slot.backgroundHtml}
+                            spriteHtml={slot.spriteHtml}
+                            labelHtml={slot.labelHtml}
+                            subpopId={slot.subpopId}
+                            slot={slot.slot}
+                            onOpen={isUpdating ? null : open}
+                          />
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

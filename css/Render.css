@@ -730,19 +730,9 @@
   position:relative;
 }
 
-/* Content grids: every tile renders into one `.PopupPage` (no
- * pagination).  Token / slot grids wrap and scroll vertically in their
+/* Token / slot grids wrap and scroll vertically in their
  * `.PopupTokens` / `.PowerupsPage` viewport; buy grids stay one row and
  * scroll horizontally in `.PopupSelector` (see that rule below). */
-.PopupPageWrap {
-  width: auto;
-}
-.PopupPage {
-  display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  justify-content: center;
-}
 
 .SuperToken .Pagination.half .PopupTokens {
   height: 134px;
@@ -751,7 +741,11 @@
 
 
 .PopupTokens {
-  position:relative;
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: center;
   background: white;
   border-radius: 16px;
   margin: 20px 12px;
@@ -762,7 +756,6 @@
   width: 540px;
   overflow-y: auto;
   overflow-x: hidden;
-  text-align:center;
 }
 .PopupTokens.consumed {
   border: 6px solid #FCECCC;
@@ -1885,7 +1878,16 @@
   transform: scale(1,1);
 }
 
+/* Buy grids (perp + powerup selectors) render one nowrap row inside
+ * `.PopupSelector` and scroll sideways.  `safe center` centres a short
+ * row but falls back to flex-start once it overflows so the first tile
+ * stays reachable.  `flex-shrink:0` on children keeps tiles at their
+ * specified width when the viewport is narrower than the tile row. */
 .PopupSelector {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: safe center;
   background: #BFE7F5;
   box-shadow: 0px 0px 128px #009FD9 inset;
   width: 540px;
@@ -1893,27 +1895,8 @@
   border-radius: 10px;
   overflow-x: auto;
   overflow-y: hidden;
-  text-align:center;
 }
-
-/* Buy grids (perp + powerup selectors) render one nowrap row inside
- * `.PopupSelector` and scroll sideways — the legacy single-page look
- * without pagination.  `safe center` centres a short row but falls
- * back to flex-start once it overflows so the first tile stays
- * reachable. */
-.PopupSelector .PopupPageWrap {
-  height: 100%;
-}
-.PopupSelector .PopupPage {
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: safe center;
-  height: 100%;
-}
-/* Buy-grid tiles must not shrink below their specified width so they
- * stay readable when the horizontal-scroll viewport is narrower than
- * the tile row.  The viewport scrolls the overflow. */
-.PopupSelector .PopupPage > * {
+.PopupSelector > * {
   flex-shrink: 0;
 }
 
@@ -1939,6 +1922,10 @@
   height:180px;
 }
 .PowerupsPage {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: center;
   padding: 32px 0px 0px;
   height: 280px;
   overflow-y: auto;
@@ -3718,15 +3705,10 @@ button {
     touch-action: pan-x;
     -webkit-overflow-scrolling: touch;
   }
-  /* .PopupPage is the vertical scroll container for token / tile grids
-   * (overflow-y:auto, fixed height).  Same axis-freeing trick as
-   * .PopupContent so JS pointer-drag can scroll it. */
-  .PopupPage {
-    touch-action: pan-x;
-  }
-  /* .PopupTokens is the vertical token-grid scroll container — pan-x frees
-   * the vertical axis for JS drag (same as .PopupPage / .PopupContent). */
-  .PopupTokens {
+  /* .PopupTokens / .PowerupsPage are the vertical scroll containers for
+   * token and powerup-slot grids — pan-x frees vertical for JS drag. */
+  .PopupTokens,
+  .PowerupsPage {
     touch-action: pan-x;
   }
   /* .PopupSelector is horizontal-only (page tabs) — pan-y frees horizontal. */
@@ -3829,7 +3811,7 @@ button {
    * 540-px grid (`.ClientDivider { width:540px; left:18px }`), which
    * pushes the centred arrow row off the right edge of a phone dialog.
    * Fit it to the dialog so the arrows centre under the provided-token
-   * row — `.PopupPage` is `justify-content:center`, so a same-width
+   * row — `.PopupTokens` is `justify-content:center`, so a same-width
    * centred divider drops each arrow under its token. */
   .ClientDivider {
     width: auto;
