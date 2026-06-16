@@ -1747,11 +1747,16 @@
    * absorbs `.Popup`'s 12px border (content-box). */
   max-height: calc(100% - 24px);
   min-height: 0;
+  /* Let the absolutely-positioned .PopupClose button overflow above
+   * this flex container without being clipped. */
+  overflow: visible;
 }
 .PopupBody.About {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* Same: .PopupClose sits at top:-6px outside this box, must not clip. */
+  overflow: visible;
 }
 /* Single unified scroll area: takes the space of the old header +
  * content. */
@@ -1761,6 +1766,7 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  outline: none;
 }
 /* The Close button is absolutely pinned to the dialog's bottom edge
  * (base `.PopupButtons`, containing block `.PopupBody`); it does not
