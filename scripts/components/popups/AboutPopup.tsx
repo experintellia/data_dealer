@@ -98,7 +98,7 @@ export function AboutPopup({ locale, buttonLabel, onClose, onExport, onImport }:
       <div class="PopupClose" onClick={close}>
         X
       </div>
-      {/* tabIndex={0} lets keyboard users Tab-focus and arrow-key scroll the content */}
+      {/* biome-ignore lint/a11y/noNoninteractiveTabindex: scroll container — tabIndex lets keyboard users focus and arrow-key scroll the content */}
       <div class="PopupContent" ref={contentRef} tabIndex={0}>
         <div class="PopupTab">
           <div class="SubpopContainer" />
