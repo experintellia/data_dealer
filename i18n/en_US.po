@@ -1180,6 +1180,10 @@ msgstr ""
 msgid "save import error unavailable"
 msgstr "Importing save files is not supported here."
 
+#: scripts/components/popups/LevelUpNotification.tsx scripts/components/popups/TutorialNotification.tsx
+msgid "tap anywhere to continue"
+msgstr "Tap anywhere to continue"
+
 #~ msgid "user is %s%% better than other Data Dealers"
 #~ msgstr "You outperformed %s%% of all Data Dealers"
 

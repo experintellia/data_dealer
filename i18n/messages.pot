@@ -1038,3 +1038,7 @@ msgstr ""
 #: views/values_details.html:35
 msgid "per deal"
 msgstr ""
+
+#: scripts/components/popups/LevelUpNotification.tsx scripts/components/popups/TutorialNotification.tsx
+msgid "tap anywhere to continue"
+msgstr ""

@@ -1207,6 +1207,10 @@ msgstr ""
 msgid "save import error unavailable"
 msgstr "Das Importieren von Spielständen wird hier nicht unterstützt."
 
+#: scripts/components/popups/LevelUpNotification.tsx scripts/components/popups/TutorialNotification.tsx
+msgid "tap anywhere to continue"
+msgstr "Überall antippen um fortzufahren"
+
 #~ msgid "user is %s%% better than other Data Dealers"
 #~ msgstr "Du hast besser gezockt als %s%% aller anderen Data Dealer!"
 

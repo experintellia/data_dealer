@@ -1016,5 +1016,9 @@
   "save import error unavailable": [
     null,
     "Importing save files is not supported here."
+  ],
+  "tap anywhere to continue": [
+    null,
+    "Tap anywhere to continue"
   ]
 }

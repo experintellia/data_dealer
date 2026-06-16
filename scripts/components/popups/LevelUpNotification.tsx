@@ -38,7 +38,7 @@ export function LevelUpNotification({
       <div class="PopupBody TutorialBody">
         <MarcoSpeech says={says} bodyHtml={textHtml} />
       </div>
-      <div class="TutorialTapHint">tap anywhere to continue</div>
+      <div class="TutorialTapHint">{i18n.gettext('tap anywhere to continue')}</div>
     </div>
   );
 }
