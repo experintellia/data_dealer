@@ -1,6 +1,6 @@
 {
   "name": "data-dealer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Data Dealer — webxdc port",
   "type": "module",
   "scripts": {
