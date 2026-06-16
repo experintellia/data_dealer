@@ -1761,6 +1761,7 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  outline: none;
 }
 /* The Close button is absolutely pinned to the dialog's bottom edge
  * (base `.PopupButtons`, containing block `.PopupBody`); it does not

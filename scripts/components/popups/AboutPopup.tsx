@@ -6,9 +6,10 @@
 // the dialog is single-purpose and stateless.
 
 import type { JSX } from 'preact';
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import i18n from '../../i18n.js';
 import { Link } from '../Link.js';
+import { attachDragScroll } from './scrollDrag.js';
 
 /** Why an import attempt failed; maps to a localized message in the popup. */
 export type ImportErrorKind = 'malformed' | 'version' | 'unavailable';
@@ -62,6 +63,13 @@ export function AboutPopup({ locale, buttonLabel, onClose, onExport, onImport }:
 
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    return attachDragScroll(el, 'y');
+  }, []);
 
   const handleImport = (): void => {
     if (!onImport || importing) return;
@@ -90,7 +98,8 @@ export function AboutPopup({ locale, buttonLabel, onClose, onExport, onImport }:
       <div class="PopupClose" onClick={close}>
         X
       </div>
-      <div class="PopupContent">
+      {/* tabIndex={0} lets keyboard users Tab-focus and arrow-key scroll the content */}
+      <div class="PopupContent" ref={contentRef} tabIndex={0}>
         <div class="PopupTab">
           <div class="SubpopContainer" />
           <div class={`RenderSprite MainMenuLogo ${locale}`} />
