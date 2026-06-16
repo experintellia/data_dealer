@@ -9,7 +9,7 @@ This repository is a port of the [Data Dealer](http://datadealer.com) browser ga
 - **Runs completely offline** — no server, no account, no hosting bills. The entire game runs inside a Delta Chat group as a single `.xdc` file.
 - **Each chat group is its own game lobby** — share the app into any group and it becomes an isolated game instance. Multiplayer without infrastructure.
 - **Your messenger name is your player name** — identity is pulled straight from Delta Chat, no sign-up required.
-- **English and German** — switch languages in-game at any time without losing your progress. The English ruleset has also been tidied up a little: some previously-untranslated item names and copy filled in, plus a small localization fix.
+- **English and German** — switch languages in-game at any time without losing your progress. Both rulesets have also been fleshed out: previously-untranslated item names plus dozens of missing item descriptions written in both languages (localized, not literal), along with a small localization fix.
 - **The full game, not a demo** — all original game mechanics are ported: buying/selling data profiles, charging and collecting from perps, karma, powerups, missions, and idle progression (your resources keep ticking even when the app is closed).
 - **Two-variant releases** — every release ships an HQ bundle (~14 MiB, bit-exact lossless cartoon art) and a casual bundle (~5.5 MiB, palette-quantized; visually indistinguishable for typical play). Pick whichever your data plan or messenger likes better.
 - **Automated builds** — every pull request builds and tests both `.xdc` files; tagged releases publish both automatically.
