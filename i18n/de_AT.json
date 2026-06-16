@@ -1016,5 +1016,9 @@
   "save import error unavailable": [
     null,
     "Das Importieren von Spielständen wird hier nicht unterstützt."
+  ],
+  "tap anywhere to continue": [
+    null,
+    "Überall antippen um fortzufahren"
   ]
 }

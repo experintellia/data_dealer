@@ -32,7 +32,7 @@ export function TutorialNotification({
       <div class="PopupBody TutorialBody">
         <MarcoSpeech says={speaker} bodyHtml={descriptionHtml} />
       </div>
-      <div class="TutorialTapHint">tap anywhere to continue</div>
+      <div class="TutorialTapHint">{i18n.gettext('tap anywhere to continue')}</div>
     </div>
   );
 }
