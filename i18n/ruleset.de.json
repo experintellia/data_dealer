@@ -1128,7 +1128,7 @@
   "tokens.token127.type_data.description": "Kontrollen, Verwarnungen, Anzeigen, Ermittlungen, die nie zu etwas führten – Polizeiakten enthalten weit mehr als nur Verurteilungen. Schon notiert, befragt oder bloß verdächtigt zu werden, hinterlässt eine Spur, ob fair oder nicht. Solche Informationen werden streng gehütet, sind zutiefst heikel – und genau deshalb würden bestimmte Behörden, Arbeitgeber und schlicht Neugierige eine Menge dafür hinblättern, sie zu sehen.",
   "tokens.token127.type_data.label": "Polizeiakten",
   "tokens.token127.type_data.title": "Polizeiakten",
-  "tokens.token128.type_data.description": "Dieser Textteil zu diesem schönen Spielelement befindet sich derzeit in der Review-Schlange unseres fleißigen Redaktionsteams. Er wird in Kürze an dieser Stelle erscheinen. Vielen Dank fürs Verständnis.",
+  "tokens.token128.type_data.description": "Elite-Zeitung oder Boulevard? Konservativer Feuilleton, kritisches Alternativ-Blatt oder die Wochenrundschau für erfolgreiche Unternehmer? Bunte Illustrierte über Tiere, Umwelt, Wissen, Promis, Modellbau, Feminismus, Waffen, Porno oder das lokale Kirchenblatt? Vielleicht gar alles zusammen?\r\n\r\nSag mir was du liest und ich sage dir wer du bist. Aus den abonnierten Magazinen und Zeitungen lässt sich nicht nur auf die politische Einstellung schließen, sondern auch auf sehr viele andere Dinge.",
   "tokens.token128.type_data.findings_text": "Von %s Personen erfährst du, welche Magazine und Zeitungen sie abonniert haben",
   "tokens.token128.type_data.knowledge_text": "Von %s Personen weisst du, welche Magazine und Zeitungen sie abonniert haben",
   "tokens.token128.type_data.label": "Magazin- &\r\nZeitungsabos",
