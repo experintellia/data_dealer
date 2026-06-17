@@ -562,8 +562,8 @@ describe('collectPerp — karma_incident', () => {
   });
 
   it('seeded PRNG fires karma_incident and returns expected karmalizer gestalt', async () => {
-    // karma=-80 → factor≈0.944; seed=42 first RNG value≈0.601 → fires
-    // eligible at level=5: 4 karmalizers; seed=42 second RNG value picks karma014
+    // karma=-80 → incidentProb = sqrt(0.8)/1.05 ≈ 0.852; seed=42 first RNG ≈ 0.601
+    // < 0.852 → fires. eligible at level=5: 4 karmalizers; second RNG picks karma014
     setState(
       mkState({
         nodes: [mkNode('TokenPerp', PATH)],
@@ -626,6 +626,24 @@ describe('collectPerp — karma_incident', () => {
     expect(result.karma_incident).toBeUndefined();
     expect(result.game_values.karma_value).toBe(-80);
   });
+
+  it('incident probability is normalised (factor/1.05), not factor+0.05', async () => {
+    // Faithfulness guard for dd_app views.py:483. At karma=-80 the incident
+    // probability is sqrt(0.8)/1.05 ≈ 0.852. Seed 4's first RNG draw ≈ 0.924
+    // lands in the gap (0.852, 0.944]: under the old buggy `factor+0.05 ≈ 0.944`
+    // compare it would have fired, but under the normalised formula it must not.
+    setState(
+      mkState({
+        nodes: [mkNode('TokenPerp', PATH)],
+        nodes_collect: [{ path: PATH, result: { amount: 50 } }],
+        game_values: mkGv({ karma_value: -80, xp_level: 5 }),
+      })
+    );
+    setPrngSeed(4);
+    const { result } = await collectPerp(PATH);
+    expect(result.karma_incident).toBeUndefined();
+    expect(result.game_values.karma_value).toBe(-80);
+  });
 });
 
 // ── collect_risk karma cost (dd_app views.py:505 parity) ────────────────────
@@ -657,9 +675,9 @@ describe('collectPerp — collect_risk karma cost', () => {
   });
 
   it('collect_risk can push karma negative and trigger a Karmalizer incident', async () => {
-    // 5 − 50 = −45 ⇒ factor = sqrt(0.45)+0.05 ≈ 0.72; seed 42 first RNG ≈ 0.60
-    // < 0.72 ⇒ incident fires.  This is the loop that was unreachable before:
-    // collecting drives karma negative, which makes the incident roll live.
+    // 5 − 50 = −45 ⇒ incidentProb = sqrt(0.45)/1.05 ≈ 0.639; seed 42 first RNG
+    // ≈ 0.601 < 0.639 ⇒ incident fires.  This is the loop that was unreachable
+    // before: collecting drives karma negative, which makes the incident live.
     // Uses TokenPerp, not ClientPerp: ClientPerp is excluded from the incident
     // roll (dd_app views.py:657), and TokenPerp consumes no RNG before the roll
     // so the seeded outcome is unchanged.

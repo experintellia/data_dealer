@@ -2622,13 +2622,22 @@ interface KarmaIncident {
 }
 
 // Returns { gestalt, karma_delta } if a karma incident fires, else null.
-// factor = sqrt((-karma)/100) + 0.05  (dd_app views.py:483 WeightedRandomizer)
+// dd_app views.py:483 _handleKarmaIncident: factor = ((-karma)/100) ** 0.5, then
+// a WeightedRandomizer over { incident: factor, none: (1 - factor) + 0.05 } fires
+// the incident when its draw lands on the incident key.  WeightedRandomizer
+// normalises by the total weight (helpers.py), so the incident probability is
+// factor / (factor + (1 - factor) + 0.05) = factor / 1.05 — the 0.05 padding is
+// on the *no-incident* side, lowering the chance.  (The earlier port used
+// `factor + 0.05` compared directly, which inverted the padding and over-fired,
+// guaranteeing an incident at karma = -100.)
 function _handleKarmaIncident(gv: GameValues, ruleset: Ruleset): KarmaIncident | null {
   var karma = (gv && gv.karma_value) || 0;
   if (karma >= 0) return null;
 
-  var factor = (-karma / 100) ** 0.5 + 0.05;
-  if (_rng() >= factor) return null;
+  var PROBABILITY_PADDING = 0.05;
+  var factor = (-karma / 100) ** 0.5;
+  var incidentProb = factor / (1 + PROBABILITY_PADDING);
+  if (_rng() >= incidentProb) return null;
 
   var level = (gv && gv.xp_level) || 1;
   var eligible = (ruleset.karmalizers || []).filter(function (k) {
