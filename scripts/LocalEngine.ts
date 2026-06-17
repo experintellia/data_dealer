@@ -2980,6 +2980,16 @@ export function integrateCollected(
   var increment = integratedIds[collectId] ? 0 : profilesIncrement;
   var newIntegratedIds = Object.assign({}, integratedIds, { [collectId]: true });
 
+  // Production integrate rewards (xp / cash / karma) come from mission rewards,
+  // applied via _applyRewardsToGv on missionResult.rewards below — this mirrors
+  // dd_app views.py:320, where integrate karma is `rewards.get('karma_value')`
+  // from MissionHandler.compute_rewards (currently no ruleset mission grants
+  // karma, only xp_value/cash_value — original-faithful).  The profile_set's
+  // xp_gain/karma_gain are a separate optional override channel with no
+  // producer: collectPerp/buyPerp build the set as { profiles_value, tokens_map }
+  // only, so these are 0 in production and exercised solely by direct-payload
+  // tests.  They are NOT the karma-on-collect mechanism — that lives in
+  // collectPerp's collect_risk decrement.  See issue #355.
   var xpGain = ps.xp_gain || 0;
   var karmaGain = ps.karma_gain || 0;
   var newGv: GameValues = Object.assign({}, state.game_values, {
