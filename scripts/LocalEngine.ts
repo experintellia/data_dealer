@@ -2809,7 +2809,11 @@ export function collectPerp(
     });
   }
 
-  var incident = _handleKarmaIncident(newGv, ruleset);
+  // dd_app views.py:657 guards ONLY the incident roll with
+  // `game_type != 'ClientPerp'` — the karma decrement above still applies to a
+  // ClientPerp, but collecting cash from one never rolls a Karmalizer (the
+  // original forces `karmalizer = None`).  Mirror that exclusion.
+  var incident = gameType === 'ClientPerp' ? null : _handleKarmaIncident(newGv, ruleset);
   if (incident) {
     newGv = Object.assign({}, newGv, {
       karma_value: Math.max(-100, Math.min(100, (newGv.karma_value || 0) + incident.karma_delta)),
