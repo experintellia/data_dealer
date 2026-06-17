@@ -605,6 +605,84 @@ describe('collectPerp — karma_incident', () => {
   });
 });
 
+// ── collect_risk karma cost (dd_app views.py:505 parity) ────────────────────
+
+describe('collectPerp — collect_risk karma cost', () => {
+  const PATH = 'Imperium.City.Pusher0.client_karma';
+
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => {
+    clearOverride();
+    setPrngSeed(0xdeadbeef);
+  });
+
+  it('lowers karma_value by the node collect_risk on a collect', async () => {
+    // client_karma is not a real perp gestalt, so collect_risk is sourced from
+    // instance_data (the recompute branch is covered separately below).
+    setState(
+      mkState({
+        nodes: [mkNode('ClientPerp', PATH, { collect_risk: 30 })],
+        nodes_collect: [{ path: PATH, result: { amount: 50 } }],
+        game_values: mkGv({ karma_value: 50, xp_level: 5 }),
+      })
+    );
+    setPrngSeed(42);
+    const { result } = await collectPerp(PATH);
+    // 50 − 30 = 20, still positive ⇒ no incident roll fires.
+    expect(result.game_values.karma_value).toBe(20);
+    expect(result.karma_incident).toBeUndefined();
+  });
+
+  it('collect_risk can push karma negative and trigger a Karmalizer incident', async () => {
+    // 5 − 50 = −45 ⇒ factor = sqrt(0.45)+0.05 ≈ 0.72; seed 42 first RNG ≈ 0.60
+    // < 0.72 ⇒ incident fires.  This is the loop that was unreachable before:
+    // collecting drives karma negative, which makes the incident roll live.
+    setState(
+      mkState({
+        nodes: [mkNode('ClientPerp', PATH, { collect_risk: 50 })],
+        nodes_collect: [{ path: PATH, result: { amount: 50 } }],
+        game_values: mkGv({ karma_value: 5, xp_level: 5 }),
+      })
+    );
+    setPrngSeed(42);
+    const { result } = await collectPerp(PATH);
+    expect(typeof result.karma_incident).toBe('string');
+    expect(result.game_values.karma_value).toBeLessThan(0);
+  });
+
+  it('clamps the karma decrement at -100', async () => {
+    setState(
+      mkState({
+        nodes: [mkNode('ClientPerp', PATH, { collect_risk: 50 })],
+        nodes_collect: [{ path: PATH, result: { amount: 50 } }],
+        game_values: mkGv({ karma_value: -90, xp_level: 5 }),
+      })
+    );
+    setPrngSeed(42);
+    const { result } = await collectPerp(PATH);
+    // −90 − 50 clamps to −100; any incident delta stays clamped at −100.
+    expect(result.game_values.karma_value).toBe(-100);
+  });
+
+  it('recomputes collect_risk from a real perp type_data (base risk applies)', async () => {
+    // contact001 is a real ContactPerp with base collect_risk = 1 and no
+    // powerups, so the recompute branch applies a −1 karma cost.
+    const CONTACT = 'Imperium.City.Agent0.contact001';
+    setState(
+      mkState({
+        nodes: [mkNode('ContactPerp', CONTACT)],
+        nodes_collect: [{ path: CONTACT, result: { amount: 5 } }],
+        game_values: mkGv({ karma_value: 50, xp_level: 5 }),
+      })
+    );
+    setPrngSeed(42);
+    const { result } = await collectPerp(CONTACT);
+    // 50 − 1 = 49, positive ⇒ no incident.
+    expect(result.game_values.karma_value).toBe(49);
+    expect(result.karma_incident).toBeUndefined();
+  });
+});
+
 // ── integrateCollected with token nodes ──────────────────────────────────────
 
 describe('integrateCollected — token node updates', () => {

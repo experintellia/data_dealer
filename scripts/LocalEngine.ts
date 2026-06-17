@@ -2790,6 +2790,25 @@ export function collectPerp(
     return Promise.resolve({ result: { error: 3 } });
   }
 
+  // Karma cost of the collect, then the incident roll on the *post-decrement*
+  // karma (dd_app views.py:505 collectPerp).  The original lowers karma by the
+  // node's collect_risk (base type_data + active powerup collect_risk_modifiers)
+  // on every collect, clamped at -100, and only then rolls _handleKarmaIncident
+  // against the reduced value.  Recompute the risk from typeData + the node's
+  // powerups rather than reading instance_data.collect_risk: buyPerp seeds nodes
+  // with `instance_data: {}`, so the base risk is only persisted after a powerup
+  // op — recomputing covers the un-upgraded case too.  TokenPerp and any node
+  // whose type carries no collect_risk yield 0 here, i.e. no karma change.
+  var collectRisk = typeData
+    ? _computeModifiers(typeData, (node.instance_data && node.instance_data.powerups) || [])
+        .collect_risk
+    : (node.instance_data && node.instance_data.collect_risk) || 0;
+  if (collectRisk > 0) {
+    newGv = Object.assign({}, newGv, {
+      karma_value: Math.max(-100, (newGv.karma_value || 0) - collectRisk),
+    });
+  }
+
   var incident = _handleKarmaIncident(newGv, ruleset);
   if (incident) {
     newGv = Object.assign({}, newGv, {
@@ -2961,6 +2980,16 @@ export function integrateCollected(
   var increment = integratedIds[collectId] ? 0 : profilesIncrement;
   var newIntegratedIds = Object.assign({}, integratedIds, { [collectId]: true });
 
+  // Production integrate rewards (xp / cash / karma) come from mission rewards,
+  // applied via _applyRewardsToGv on missionResult.rewards below — this mirrors
+  // dd_app views.py:320, where integrate karma is `rewards.get('karma_value')`
+  // from MissionHandler.compute_rewards (currently no ruleset mission grants
+  // karma, only xp_value/cash_value — original-faithful).  The profile_set's
+  // xp_gain/karma_gain are a separate optional override channel with no
+  // producer: collectPerp/buyPerp build the set as { profiles_value, tokens_map }
+  // only, so these are 0 in production and exercised solely by direct-payload
+  // tests.  They are NOT the karma-on-collect mechanism — that lives in
+  // collectPerp's collect_risk decrement.  See issue #355.
   var xpGain = ps.xp_gain || 0;
   var karmaGain = ps.karma_gain || 0;
   var newGv: GameValues = Object.assign({}, state.game_values, {
