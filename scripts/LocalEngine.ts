@@ -2790,6 +2790,25 @@ export function collectPerp(
     return Promise.resolve({ result: { error: 3 } });
   }
 
+  // Karma cost of the collect, then the incident roll on the *post-decrement*
+  // karma (dd_app views.py:505 collectPerp).  The original lowers karma by the
+  // node's collect_risk (base type_data + active powerup collect_risk_modifiers)
+  // on every collect, clamped at -100, and only then rolls _handleKarmaIncident
+  // against the reduced value.  Recompute the risk from typeData + the node's
+  // powerups rather than reading instance_data.collect_risk: buyPerp seeds nodes
+  // with `instance_data: {}`, so the base risk is only persisted after a powerup
+  // op — recomputing covers the un-upgraded case too.  TokenPerp and any node
+  // whose type carries no collect_risk yield 0 here, i.e. no karma change.
+  var collectRisk = typeData
+    ? _computeModifiers(typeData, (node.instance_data && node.instance_data.powerups) || [])
+        .collect_risk
+    : (node.instance_data && node.instance_data.collect_risk) || 0;
+  if (collectRisk > 0) {
+    newGv = Object.assign({}, newGv, {
+      karma_value: Math.max(-100, (newGv.karma_value || 0) - collectRisk),
+    });
+  }
+
   var incident = _handleKarmaIncident(newGv, ruleset);
   if (incident) {
     newGv = Object.assign({}, newGv, {
