@@ -536,8 +536,12 @@ describe('collectPerp — failure paths', () => {
 // ── karma_incident with fixed PRNG seed ─────────────────────────────────────
 
 describe('collectPerp — karma_incident', () => {
-  const PATH = 'Imperium.City.Pusher0.client_karma';
+  const PATH = 'Imperium.City.Pusher0.token_karma';
 
+  // These exercise the incident roll itself, so they use a non-excluded type.
+  // TokenPerp (like ClientPerp) skips _generateId, so it consumes no RNG before
+  // the roll — the seeded-PRNG assertions below are draw-order sensitive — but
+  // unlike ClientPerp it is NOT excluded from incidents (dd_app views.py:657).
   beforeEach(() => setOverride(FIXED_NOW));
   afterEach(() => {
     clearOverride();
@@ -547,7 +551,7 @@ describe('collectPerp — karma_incident', () => {
   it('karma_incident absent when karma_value >= 0', async () => {
     setState(
       mkState({
-        nodes: [mkNode('ClientPerp', PATH)],
+        nodes: [mkNode('TokenPerp', PATH)],
         nodes_collect: [{ path: PATH, result: { amount: 50 } }],
         game_values: mkGv({ karma_value: 50, xp_level: 5 }),
       })
@@ -558,11 +562,11 @@ describe('collectPerp — karma_incident', () => {
   });
 
   it('seeded PRNG fires karma_incident and returns expected karmalizer gestalt', async () => {
-    // karma=-80 → factor≈0.944; seed=42 first RNG value≈0.601 → fires
-    // eligible at level=5: 4 karmalizers; seed=42 second RNG value picks karma014
+    // karma=-80 → incidentProb = sqrt(0.8)/1.05 ≈ 0.852; seed=42 first RNG ≈ 0.601
+    // < 0.852 → fires. eligible at level=5: 4 karmalizers; second RNG picks karma014
     setState(
       mkState({
-        nodes: [mkNode('ClientPerp', PATH)],
+        nodes: [mkNode('TokenPerp', PATH)],
         nodes_collect: [{ path: PATH, result: { amount: 50 } }],
         game_values: mkGv({ karma_value: -80, xp_level: 5 }),
       })
@@ -576,7 +580,7 @@ describe('collectPerp — karma_incident', () => {
   it('karma_incident decreases karma_value within [-100, 100]', async () => {
     setState(
       mkState({
-        nodes: [mkNode('ClientPerp', PATH)],
+        nodes: [mkNode('TokenPerp', PATH)],
         nodes_collect: [{ path: PATH, result: { amount: 50 } }],
         game_values: mkGv({ karma_value: -80, xp_level: 5 }),
       })
@@ -592,7 +596,7 @@ describe('collectPerp — karma_incident', () => {
     // All karmalizers have required_level >= 5, so none eligible at level 1.
     setState(
       mkState({
-        nodes: [mkNode('ClientPerp', PATH)],
+        nodes: [mkNode('TokenPerp', PATH)],
         nodes_collect: [{ path: PATH, result: { amount: 50 } }],
         game_values: mkGv({ karma_value: -80, xp_level: 1 }),
       })
@@ -602,6 +606,43 @@ describe('collectPerp — karma_incident', () => {
     const { result } = await collectPerp(PATH);
     // No eligible karmalizers → incident null → karma_incident absent.
     expect(result.karma_incident).toBeUndefined();
+  });
+
+  it('ClientPerp is excluded from the incident roll (dd_app views.py:657)', async () => {
+    // Same negative-karma + seed that fires for TokenPerp above (karma014), but
+    // a ClientPerp must never roll a Karmalizer — collecting cash has no karma
+    // incident. Karma stays put; no incident is reported.
+    const CLIENT_PATH = 'Imperium.City.Pusher0.client_cash';
+    setState(
+      mkState({
+        nodes: [mkNode('ClientPerp', CLIENT_PATH)],
+        nodes_collect: [{ path: CLIENT_PATH, result: { amount: 50 } }],
+        game_values: mkGv({ karma_value: -80, xp_level: 5 }),
+      })
+    );
+    setPrngSeed(42);
+
+    const { result } = await collectPerp(CLIENT_PATH);
+    expect(result.karma_incident).toBeUndefined();
+    expect(result.game_values.karma_value).toBe(-80);
+  });
+
+  it('incident probability is normalised (factor/1.05), not factor+0.05', async () => {
+    // Faithfulness guard for dd_app views.py:483. At karma=-80 the incident
+    // probability is sqrt(0.8)/1.05 ≈ 0.852. Seed 4's first RNG draw ≈ 0.924
+    // lands in the gap (0.852, 0.944]: under the old buggy `factor+0.05 ≈ 0.944`
+    // compare it would have fired, but under the normalised formula it must not.
+    setState(
+      mkState({
+        nodes: [mkNode('TokenPerp', PATH)],
+        nodes_collect: [{ path: PATH, result: { amount: 50 } }],
+        game_values: mkGv({ karma_value: -80, xp_level: 5 }),
+      })
+    );
+    setPrngSeed(4);
+    const { result } = await collectPerp(PATH);
+    expect(result.karma_incident).toBeUndefined();
+    expect(result.game_values.karma_value).toBe(-80);
   });
 });
 
@@ -634,12 +675,15 @@ describe('collectPerp — collect_risk karma cost', () => {
   });
 
   it('collect_risk can push karma negative and trigger a Karmalizer incident', async () => {
-    // 5 − 50 = −45 ⇒ factor = sqrt(0.45)+0.05 ≈ 0.72; seed 42 first RNG ≈ 0.60
-    // < 0.72 ⇒ incident fires.  This is the loop that was unreachable before:
-    // collecting drives karma negative, which makes the incident roll live.
+    // 5 − 50 = −45 ⇒ incidentProb = sqrt(0.45)/1.05 ≈ 0.639; seed 42 first RNG
+    // ≈ 0.601 < 0.639 ⇒ incident fires.  This is the loop that was unreachable
+    // before: collecting drives karma negative, which makes the incident live.
+    // Uses TokenPerp, not ClientPerp: ClientPerp is excluded from the incident
+    // roll (dd_app views.py:657), and TokenPerp consumes no RNG before the roll
+    // so the seeded outcome is unchanged.
     setState(
       mkState({
-        nodes: [mkNode('ClientPerp', PATH, { collect_risk: 50 })],
+        nodes: [mkNode('TokenPerp', PATH, { collect_risk: 50 })],
         nodes_collect: [{ path: PATH, result: { amount: 50 } }],
         game_values: mkGv({ karma_value: 5, xp_level: 5 }),
       })
