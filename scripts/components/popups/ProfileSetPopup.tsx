@@ -80,20 +80,24 @@ export function ProfileSetPopup({ vm, onClose, popup }: ProfileSetPopupProps) {
             tokensClass="PopupTokens"
             onOpen={handleOpenToken}
           />
-          <div class="PopupButtons">
-            <div class="ButtonDecorator AP">
-              <div class="RenderSprite Tobi" />1
-            </div>
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-            <div
-              class="Button"
-              data-button-id="MainButton"
-              data-testid="dd-integrate-button"
-              onClick={(e) => fireAction(popup, e, 'MainButton')}
-            >
-              {vm.buttonText}
-            </div>
-          </div>
+        </div>
+      </div>
+      {/* The button bar renders as a direct child of `.PopupBody`, outside
+          the scrolling, rounded `.PopupContent`, so it straddles the
+          dialog's bottom edge without WebKit clipping the overhang to
+          `.PopupContent`'s border-radius. */}
+      <div class="PopupButtons">
+        <div class="ButtonDecorator AP">
+          <div class="RenderSprite Tobi" />1
+        </div>
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+        <div
+          class="Button"
+          data-button-id="MainButton"
+          data-testid="dd-integrate-button"
+          onClick={(e) => fireAction(popup, e, 'MainButton')}
+        >
+          {vm.buttonText}
         </div>
       </div>
     </div>

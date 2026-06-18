@@ -1644,6 +1644,17 @@
   bottom:-50px;
   margin-left: 0px;
 }
+/* Perp / status dialog button bars render as a direct child of `.PopupBody`
+ * (a sibling of `.PopupContent`) rather than nested inside it, so the
+ * straddling overhang is not clipped by `.PopupContent`'s `overflow` +
+ * `border-radius` on WebKit.  Anchor the bar to the dialog box: the base
+ * `margin-left: -12px` assumed the bar sat one `.PopupContent` border (6px)
+ * in, so without this the centred buttons would land 6px to the left. */
+.PopupBody > .PopupButtons {
+  left: 0;
+  right: 0;
+  margin-left: 0;
+}
 
 .PopupSprite {
   position:absolute;
