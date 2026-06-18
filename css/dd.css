@@ -1,7 +1,12 @@
-.Stage *,
-.MainMenu *,
-.button,
-button {
+/* The app text is non-selectable by default — tapping a button, label or
+ * sprite must never start a text selection (on WebKit a long-press would
+ * otherwise highlight a button caption).  `user-select` inherits, so
+ * setting it once on the app root covers the Stage, the main menu AND every
+ * dialog, including the `.PopupContainer`s the dialog manager appends
+ * outside the Stage (the old `.Stage *` / `.MainMenu *` rules missed those,
+ * which is why button text was selectable).  Specific prose opts back in
+ * below. */
+#dd-control {
   user-select: none;
   -o-user-select: none;
   -moz-user-select: none;
@@ -9,15 +14,22 @@ button {
   -khtml-user-select: none;
   -webkit-user-select: none;
 }
+/* Re-enable selection on the bits worth copying: the perp / token
+ * flavour-text descriptions, form fields and the debug overlay.  Must be
+ * `text`, not `auto`: under an inherited `none`, `auto` computes back to
+ * `none`, so it would not re-enable selection. */
+.PopupText,
+.SubpopText,
 #debug *,
 input,
+textarea,
 .allowselect {
-  user-select: auto;
-  -o-user-select: auto;
-  -moz-user-select: auto;
+  user-select: text;
+  -o-user-select: text;
+  -moz-user-select: text;
   /* biome-ignore lint/correctness/noUnknownProperty: legacy vendor prefix for KHTML/Konqueror */
-  -khtml-user-select: auto;
-  -webkit-user-select: auto;
+  -khtml-user-select: text;
+  -webkit-user-select: text;
 }
 @font-face {
   font-family: Bowlby;

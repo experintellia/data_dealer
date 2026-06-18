@@ -106,19 +106,24 @@ export function CityPopup({ vm, onClose, popup }: CityPopupProps) {
                   )}
                 </div>
               </div>
-              <div class="PopupButtons">
-                {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-                <div
-                  class="Button"
-                  data-button-id="MainButton"
-                  onClick={(e) => fireAction(popup, e, 'MainButton')}
-                >
-                  {vm.buttonText}
-                </div>
-              </div>
             </div>
           );
         })}
+      </div>
+      {/* One button bar for the whole dialog (the action is identical on
+          every city tab), rendered as a direct child of `.PopupBody`
+          outside the scrolling, rounded `.PopupContent` so it straddles the
+          dialog's bottom edge without WebKit clipping the overhang to
+          `.PopupContent`'s border-radius. */}
+      <div class="PopupButtons">
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+        <div
+          class="Button"
+          data-button-id="MainButton"
+          onClick={(e) => fireAction(popup, e, 'MainButton')}
+        >
+          {vm.buttonText}
+        </div>
       </div>
     </div>
   );

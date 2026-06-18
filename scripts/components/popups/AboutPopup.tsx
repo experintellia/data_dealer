@@ -162,12 +162,17 @@ export function AboutPopup({ locale, buttonLabel, onClose, onExport, onImport }:
               {importError && <div class="PopupParagraph SaveError">{importError}</div>}
             </div>
           )}
-          <div class="PopupButtons">
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-            <div class="Button" data-button-id="MainButton" onClick={close}>
-              {buttonLabel}
-            </div>
-          </div>
+        </div>
+      </div>
+      {/* The Close bar renders as a direct child of `.PopupBody`, outside the
+          scrolling, rounded `.PopupContent`, so it stays pinned to the
+          dialog's bottom edge without WebKit clipping it to `.PopupContent`'s
+          border-radius (`.PopupTab`'s padding-bottom keeps the last lines
+          clear of it when fully scrolled). */}
+      <div class="PopupButtons">
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+        <div class="Button" data-button-id="MainButton" onClick={close}>
+          {buttonLabel}
         </div>
       </div>
     </div>
