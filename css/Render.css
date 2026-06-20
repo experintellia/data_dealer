@@ -3410,8 +3410,21 @@ button {
      overlay sits at `right: 0` of the now-shorter conveyor and masks
      the cut. */
   .DatabaseQueueConveyor {
-    --conv-s: clamp(0.4, calc((100vw - 24px) / 520px), 1);
-    transform: scale(var(--conv-s));
+    /* Static fallback FIRST so engines that can't compute the responsive
+       scale below still shrink the 520-px box enough that the pipe (and
+       its "Ausbauen"/Upgrade button at `right: 0`) stay on screen on any
+       phone ≳310 px wide.  0.55 × 520 = 286 px. */
+    transform: scale(0.55);
+    /* Responsive scale where supported.  `length / length` in calc()
+       yields the unitless scalar that scale() needs, but that type-
+       changing division is only in Chrome 91+, Safari 16.4+ and
+       Firefox 116+ — older Android WebView / Gecko builds reject it.
+       Inlining the calc (instead of hiding it behind a custom property
+       consumed via `var()`) means those engines drop THIS declaration at
+       parse time and cascade back to the static `scale(0.55)` above,
+       rather than the var() route's invalid-at-computed-value-time fall
+       to `transform: none` (no scale → 520-px band → button off-screen). */
+    transform: scale(clamp(0.4, calc((100vw - 24px) / 520px), 1));
     transform-origin: bottom left;
     top: auto !important;
     bottom: 0 !important;
