@@ -272,7 +272,14 @@ function buildAgentTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
 }
 
 /** `pusher.html` — CityPerp Pushers-tab tile (PowerupBackground/Label,
- *  box pivot 47, `Requires either … or<br/>` locked branch). */
+ *  box pivot 47, `Requires … and<br/>` locked branch).
+ *
+ *  A pusher unlocks only once **all** of its `required_providers` are
+ *  owned — `_isProvidable` (LocalEngine) ANDs the list, and the
+ *  ruleset-query tests assert "buyable once all required_providers are
+ *  owned".  The locked-tile copy therefore lists them joined with "and",
+ *  not the old "Requires either … or" (which wrongly implied any single
+ *  one would suffice). */
 function buildPusherTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
   const data = perp.data;
   const bg = spriteOf(data.perp_background);
@@ -281,9 +288,9 @@ function buildPusherTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
   if (locked) {
     const provs = (data.requiredProviders as string[] | undefined) ?? [];
     const inner = provs
-      .map((v, k) => (k + 1 < provs.length ? `${v},<br />` : `${i18n.gettext('or<br/>')}${v}`))
+      .map((v, k) => (k + 1 < provs.length ? `${v},<br />` : `${i18n.gettext('and<br/>')}${v}`))
       .join('');
-    dataHtml = `<div class="Requires">${i18n.gettext('Requires either')}<div class="RequiresProviders">${inner}</div></div>`;
+    dataHtml = `<div class="Requires">${i18n.gettext('Requires')}<div class="RequiresProviders">${inner}</div></div>`;
   } else {
     dataHtml = buildValuesHtml(data);
   }

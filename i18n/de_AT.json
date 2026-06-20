@@ -901,6 +901,10 @@
     null,
     "oder<br />"
   ],
+  "and<br/>": [
+    null,
+    "und<br />"
+  ],
   "Buy Upgrade": [
     null,
     "Ausbauen"
