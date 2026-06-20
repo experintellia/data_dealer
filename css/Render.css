@@ -1167,6 +1167,11 @@
   flex: 1 1 auto;
   color: #009fd9;
   min-width: 0;
+  /* Long display names must truncate with an ellipsis rather than wrap —
+     rows have a fixed 32px height, so wrapping overflows into the row below. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .TopscoreValue {
   flex: 0 0 auto;
