@@ -3574,6 +3574,79 @@ button {
   }
 }
 
+/* --- NewItems / NewContact notification card reflow on phones ---------
+ * The NewItemsNotification (`scripts/components/popups/NewItemsNotification.tsx`)
+ * shows the unlocked perp in a `.NotificationItem .Subpop` whose desktop
+ * rule (line ~2307) pins it 550px wide with the 180px `.SubpopLogo`
+ * absolute top-left and the title/subtitle/description column pushed
+ * right by `margin-left:168px`.  Inside the viewport-shrunk
+ * `.NotificationBody` (`width:calc(100vw-12px)`) that 550px card
+ * overflows the screen, so the contact name and description get clipped
+ * off the right edge (the "NEW CONTACT!" cue with the text running off-
+ * screen).  Reflow to the same float layout `.PopupHeader` uses on
+ * phones: collapse the fixed heights, let the card fill the body, shrink
+ * the logo to 80×80 floated left, and flow the text full-width beside
+ * and below it so it wraps inside the dialog.
+ * --------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  .PopupContainer .NotificationBody {
+    height: auto;
+  }
+  .PopupContainer .NotificationContent {
+    height: auto;
+  }
+  .PopupContainer .NotificationItem {
+    height: auto;
+  }
+  /* The card flows in-place (relative, not absolute) and fills the
+   * body width minus a small inset.  flow-root contains the floated
+   * logo so the card grows to wrap it. */
+  .PopupContainer .NotificationItem .Subpop {
+    position: relative;
+    top: 0;
+    left: 0;
+    width: auto;
+    height: auto;
+    min-height: 0;
+    margin: 12px;
+    padding: 12px;
+    box-sizing: border-box;
+    display: flow-root;
+  }
+  /* Shrink the 180×180 logo into an 80×80 floated cell (same scale the
+   * PopupHeader reflow uses); the inner sprite still claims 180×180 so
+   * overflow:hidden clips it to the cell. */
+  .PopupContainer .NotificationItem .SubpopLogo {
+    position: static;
+    float: left;
+    width: 80px;
+    height: 80px;
+    margin: 0 10px 4px 0;
+    overflow: hidden;
+  }
+  .PopupContainer .NotificationItem .SubpopLogo > * {
+    transform: scale(0.4444);
+    transform-origin: top left;
+  }
+  /* Drop the desktop `margin-left:168px` (which cleared the absolute
+   * logo) so the text flows full-width around the now-floated logo and
+   * wraps inside the card instead of running off-screen. */
+  .PopupContainer .NotificationItem .SubpopTitle,
+  .PopupContainer .NotificationItem .SubpopSubTitle,
+  .PopupContainer .NotificationItem .SubpopText {
+    margin-left: 0;
+    padding-right: 0;
+    overflow-wrap: break-word;
+  }
+  /* Desktop pins the OK button up via `position:relative; bottom:36px`
+   * against the fixed-height content; with the card now auto-height it
+   * should just sit below the speech bubble. */
+  .PopupContainer .NotificationContent .NotificationButtons {
+    position: static;
+    bottom: auto;
+  }
+}
+
 /* --- Popup `.PopupHeader` reflow on phone viewports -------------------
  * Every perp/status popup (Status, Token, City, Project, Contact,
  * Client, ProvidedPerp/Karma, ProfileSet) uses the `PopupHeader`
