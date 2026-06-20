@@ -1,7 +1,7 @@
 /**
- * High score tab visibility and rendering test
+ * Leaderboard tab visibility and rendering test
  *
- * Validates that clicking the HIGHSCORE button in the main menu shows
+ * Validates that clicking the LEADERBOARD button in the main menu shows
  * the topscores view without errors.
  */
 
@@ -9,7 +9,7 @@ import { expect, test } from '@playwright/test';
 
 const GAME_CONTAINER = '[data-testid="game-container"]';
 
-test('highscore tab: HIGHSCORE button appears in main menu', async ({ page }) => {
+test('leaderboard tab: LEADERBOARD button appears in main menu', async ({ page }) => {
   const jsErrors: string[] = [];
   page.on('console', (msg) => {
     if (msg.type() === 'error' && !msg.text().includes('favicon')) {
@@ -36,17 +36,17 @@ test('highscore tab: HIGHSCORE button appears in main menu', async ({ page }) =>
     });
   }
 
-  const highscoreButton = page
+  const leaderboardButton = page
     .locator('.mm-tab')
-    .filter({ hasText: /Highscore/ })
+    .filter({ hasText: /Leaderboard/ })
     .first();
 
-  await expect(highscoreButton).toBeVisible();
+  await expect(leaderboardButton).toBeVisible();
 
-  await highscoreButton.click();
+  await leaderboardButton.click();
 
   const topscoresView = page.locator('.TopscorePerp').first();
   await expect(topscoresView).toBeVisible({ timeout: 10_000 });
 
-  expect(jsErrors, `JS errors when opening Highscore tab: ${jsErrors.join(' | ')}`).toHaveLength(0);
+  expect(jsErrors, `JS errors when opening Leaderboard tab: ${jsErrors.join(' | ')}`).toHaveLength(0);
 });
