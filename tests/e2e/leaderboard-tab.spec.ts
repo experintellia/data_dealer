@@ -48,5 +48,5 @@ test('leaderboard tab: LEADERBOARD button appears in main menu', async ({ page }
   const topscoresView = page.locator('.TopscorePerp').first();
   await expect(topscoresView).toBeVisible({ timeout: 10_000 });
 
-  expect(jsErrors, `JS errors when opening Leaderboard tab: ${jsErrors.join(' | ')}`).toHaveLength(0);
+  expect(jsErrors, `JS errors opening Leaderboard tab: ${jsErrors.join(' | ')}`).toHaveLength(0);
 });
