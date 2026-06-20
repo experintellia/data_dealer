@@ -159,7 +159,7 @@
   ],
   "Topscores": [
     null,
-    "Highscore"
+    "Bestenliste"
   ],
   "Missions": [
     null,
@@ -243,19 +243,19 @@
   ],
   "topscore cash headline": [
     null,
-    "Data Dealer Highscore<br />Cash"
+    "Data Dealer Bestenliste<br />Cash"
   ],
   "topscore profiles headline": [
     null,
-    "Data Dealer Highscore<br />Gesammelte Profile"
+    "Data Dealer Bestenliste<br />Gesammelte Profile"
   ],
   "topscore xp headline": [
     null,
-    "Data Dealer Highscore<br />Erfahrungspunkte (XP)"
+    "Data Dealer Bestenliste<br />Erfahrungspunkte (XP)"
   ],
   "topscore spent headline": [
     null,
-    "Data Dealer Highscore<br />Investierte Kohle"
+    "Data Dealer Bestenliste<br />Investierte Kohle"
   ],
   "topscore Cash": [
     null,
@@ -883,7 +883,7 @@
   ],
   "userdebug reset game text": [
     null,
-    "Hier kannst du bei Bedarf deinen Spielstand zurücksetzen und komplett von vorne beginnen.<br /><span class=\"warn\">Achtung: Dabei geht dein gesamter Spielfortschritt (erreichte Levels, XP, Profile, Items, Geld, dein Platz in der Highscore-Liste) verloren, für immer!</span>"
+    "Hier kannst du bei Bedarf deinen Spielstand zurücksetzen und komplett von vorne beginnen.<br /><span class=\"warn\">Achtung: Dabei geht dein gesamter Spielfortschritt (erreichte Levels, XP, Profile, Items, Geld, dein Platz in der Bestenliste) verloren, für immer!</span>"
   ],
   "Reset Game": [
     null,

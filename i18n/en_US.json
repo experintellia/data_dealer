@@ -159,7 +159,7 @@
   ],
   "Topscores": [
     null,
-    "Highscore"
+    "Leaderboard"
   ],
   "Missions": [
     null,
@@ -243,19 +243,19 @@
   ],
   "topscore cash headline": [
     null,
-    "Data Dealer Highscore<br />CASH"
+    "Data Dealer Leaderboard<br />CASH"
   ],
   "topscore profiles headline": [
     null,
-    "Data Dealer Highscore<br />Profiles"
+    "Data Dealer Leaderboard<br />Profiles"
   ],
   "topscore xp headline": [
     null,
-    "Data Dealer Highscore<br />Experience Points (XP)"
+    "Data Dealer Leaderboard<br />Experience Points (XP)"
   ],
   "topscore spent headline": [
     null,
-    "Data Dealer Highscore<br />Cash Invested"
+    "Data Dealer Leaderboard<br />Cash Invested"
   ],
   "topscore Cash": [
     null,
@@ -883,7 +883,7 @@
   ],
   "userdebug reset game text": [
     null,
-    "Do you want to delete and reset your game and start again from scratch? <span class=\"warn\">Caution: All your game progress (levels, XP, profiles, items, cash, your ranks in the highscore) will be lost, forever!</span>"
+    "Do you want to delete and reset your game and start again from scratch? <span class=\"warn\">Caution: All your game progress (levels, XP, profiles, items, cash, your ranks in the leaderboard) will be lost, forever!</span>"
   ],
   "Reset Game": [
     null,
