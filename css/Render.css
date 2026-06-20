@@ -3861,6 +3861,33 @@ button {
     width: auto;
     height: auto;
   }
+  /* Empty-state copy ("Sorry, no new ventures") is desktop-pinned at
+   * `position:absolute; top:95px; width:540px` so it centres over the
+   * fixed-height desktop grid.  On a phone the grid flows with
+   * `height:auto`, so an absolute child contributes no height and the
+   * 540-px line overflows off-screen: the selector collapses and its
+   * `START VENTURE` title slams into the bottom CLOSE button (the
+   * "squashed" empty page).  Flow the message in-document instead —
+   * centred, full-width, with breathing room — so it reads and reserves
+   * the vertical space that keeps the title clear of the button. */
+  .standalone .SelectorNoItems {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: auto;
+    height: auto;
+    padding: 28px 12px;
+    box-sizing: border-box;
+    line-height: 22px;
+    /* The selector is a nowrap flex row whose children don't shrink
+     * (`.PopupSelector > * { flex-shrink:0 }`), so the one-line message
+     * overflows and the `overflow-x` clips it ("…NO NEW BUSIN").  Let
+     * this single child fill and shrink to the dialog width so the copy
+     * wraps and centres instead of being cut off. */
+    flex: 1 1 100%;
+    min-width: 0;
+    white-space: normal;
+  }
   /* The Client provided→consumed divider arrows are pinned to the desktop
    * 540-px grid (`.ClientDivider { width:540px; left:18px }`), which
    * pushes the centred arrow row off the right edge of a phone dialog.
