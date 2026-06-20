@@ -3914,6 +3914,55 @@ button {
   .Selector.hasPopup {
     display: block;
   }
+
+  /* Tutorial / LevelUp "tap to continue" hint: cap to the viewport so the
+   * centred Bowlby text + its 2 px text-shadow can't bleed past the right
+   * edge on narrow phones (the .TutorialWrap stretches it full-width). */
+  .TutorialTapHint {
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-wrap: break-word;
+  }
+
+  /* New-items / new-powerups unlock card.  Unlike the buy popups (which
+   * open a dedicated .ProvidedPerpSub dialog on mobile), this .Subpop is
+   * always rendered inline, so its desktop 550 px width + 180 px absolute
+   * logo overflowed the right edge on phones.  Reflow it the same way the
+   * .PopupHeader does: shrink to content width and float the logo, scaling
+   * its 180×180 sprite into an 80×80 cell (transform 0.4444 = 80/180). */
+  .NotificationItem {
+    height: auto;
+  }
+  .NotificationItem .Subpop {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: auto;
+    height: auto;
+    transform: none !important;
+    margin: 6px;
+    padding: 10px 12px 12px;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .NotificationItem .SubpopLogo {
+    position: static;
+    float: left;
+    width: 80px;
+    height: 80px;
+    margin-right: 10px;
+    overflow: hidden;
+  }
+  .NotificationItem .SubpopLogo > * {
+    transform: scale(0.4444);
+    transform-origin: top left;
+  }
+  .NotificationItem .SubpopTitle,
+  .NotificationItem .SubpopSubTitle,
+  .NotificationItem .SubpopText {
+    margin-left: 0;
+    overflow-wrap: break-word;
+  }
 }
 
 /* --- Mission + Topscore tab content: centre via margin auto + max-width --
