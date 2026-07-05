@@ -220,8 +220,14 @@ function buildPerpTile(perp: ProvidedPerpRow, key: number, ctx: ProvidedContext)
       | undefined;
     const reqLevel = (data.required_level as number | undefined) ?? 0;
     if (reqTokens?.length && reqLevel <= ctx.xpLevel) {
+      // Mirror Database.ts's lock condition: a required token leaves the
+      // perp locked when it's either missing OR present with a zero count.
+      // Filtering on key-presence alone dropped the zero-count token from
+      // the list, leaving a bare "Requires" with no names beneath it.
       const filtered = reqTokens.filter(
-        (t) => !Object.prototype.hasOwnProperty.call(ctx.dbTokens, t.gestalt)
+        (t) =>
+          !Object.prototype.hasOwnProperty.call(ctx.dbTokens, t.gestalt) ||
+          ctx.dbTokens[t.gestalt] === 0
       );
       const titles = filtered.map((t) => t.type_data?.title ?? '');
       dataHtml = `<div class="Requires">${i18n.gettext('Requires')}<div class="RequiresProviders">${titles.join(',<br />')}</div></div>`;
