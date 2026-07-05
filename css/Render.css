@@ -3410,21 +3410,17 @@ button {
      overlay sits at `right: 0` of the now-shorter conveyor and masks
      the cut. */
   .DatabaseQueueConveyor {
-    /* Static fallback FIRST so engines that can't compute the responsive
-       scale below still shrink the 520-px box enough that the pipe (and
-       its "Ausbauen"/Upgrade button at `right: 0`) stay on screen on any
-       phone ≳310 px wide.  0.55 × 520 = 286 px. */
+    /* The responsive scale that fills the viewport width is computed and
+       written inline by RenderDBQueue.fitMobileConveyor() (see
+       scripts/render/RenderTopLevelUI.ts).  It has to be done in JS: a
+       CSS-only responsive ratio needs `length / length` calc division
+       (`(100vw - 24px) / 520px`), which Firefox and older Android WebView
+       reject — there the belt would collapse to this static fallback and
+       hug the left edge instead of centring.  This static value only
+       shows on the very first paint before render() runs (and as a safety
+       net if JS never does).  0.55 × 520 = 286 px keeps the pipe and its
+       "Ausbauen"/Upgrade button on screen on phones down to ~310 px. */
     transform: scale(0.55);
-    /* Responsive scale where supported.  `length / length` in calc()
-       yields the unitless scalar that scale() needs, but that type-
-       changing division is only in Chrome 91+, Safari 16.4+ and
-       Firefox 116+ — older Android WebView / Gecko builds reject it.
-       Inlining the calc (instead of hiding it behind a custom property
-       consumed via `var()`) means those engines drop THIS declaration at
-       parse time and cascade back to the static `scale(0.55)` above,
-       rather than the var() route's invalid-at-computed-value-time fall
-       to `transform: none` (no scale → 520-px band → button off-screen). */
-    transform: scale(clamp(0.4, calc((100vw - 24px) / 520px), 1));
     transform-origin: bottom left;
     top: auto !important;
     bottom: 0 !important;

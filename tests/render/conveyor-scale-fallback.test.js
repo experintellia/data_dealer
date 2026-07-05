@@ -4,25 +4,25 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-// Source-level guard for the mobile-conveyor scale fix.
+// Source-level guard for the mobile-conveyor scale.
 //
-// The mobile rule scales the fixed 520-px belt box down to fit the
-// viewport with `transform: scale(<ratio>)`.  The responsive ratio uses
-// `length / length` calc division, which older Android WebView / Gecko
-// builds reject (Chrome 91+, Safari 16.4+, Firefox 116+ only).  When that
-// declaration is dropped, the cascade must fall back to a *static* scale —
-// otherwise the band stays 520 px wide and the "Ausbauen"/Upgrade button
-// (anchored at the pipe's `right: 0`) is pushed off screen.
+// The mobile rule shrinks the fixed 520-px belt box with
+// `transform: scale(<ratio>)` so it fills the viewport width.  A *CSS*
+// responsive ratio would need `length / length` calc division
+// (`(100vw - 24px) / 520px`), which Firefox and older Android WebView
+// reject — there the belt collapses to a too-small size and hugs the left
+// edge.  So the responsive ratio is computed in JS
+// (RenderDBQueue.fitMobileConveyor) and written inline; the CSS keeps only
+// a static `transform: scale()` fallback for the first paint.
 //
-// Two things must hold in the source, and neither is observable through
-// Chromium's CSSOM (it de-duplicates same-block `transform` declarations),
-// so we assert them against the stylesheet text directly:
-//   1. a static `transform: scale(<number>)` fallback exists;
-//   2. it appears BEFORE the responsive (calc/clamp) declaration so the
-//      cascade can fall back to it.
+// This test locks in that the CSS does NOT reintroduce the fragile
+// length/length calc (or the even worse `var()`-behind-scale form that
+// silently falls back to `transform: none`), and that a static fallback is
+// present.
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const css = readFileSync(join(root, 'css', 'Render.css'), 'utf8');
+const js = readFileSync(join(root, 'scripts', 'render', 'RenderTopLevelUI.ts'), 'utf8');
 
 // Extract the body of the *mobile* `.DatabaseQueueConveyor` rule that owns
 // the scale.  Match the first `.DatabaseQueueConveyor { ... }` block whose
@@ -36,43 +36,44 @@ function conveyorScaleRuleBody() {
   return null;
 }
 
-describe('mobile conveyor scale fallback', () => {
+describe('mobile conveyor scale', () => {
   it('has a .DatabaseQueueConveyor rule that sets transform: scale()', () => {
     expect(conveyorScaleRuleBody()).not.toBeNull();
   });
 
-  it('declares a static scale fallback before the responsive scale', () => {
+  it('keeps a static scale fallback in CSS (for the first paint)', () => {
     const body = conveyorScaleRuleBody();
     expect(body).not.toBeNull();
 
     const transforms = [...body.matchAll(/transform\s*:\s*([^;]+);/g)].map((x) => x[1].trim());
-
-    // A static fallback: scale(<number>) with no var() and no calc/clamp.
-    const staticIdx = transforms.findIndex(
+    const hasStatic = transforms.some(
       (t) =>
         /^scale\(\s*[\d.]+\s*\)$/.test(t) &&
         !t.includes('var(') &&
         !t.includes('calc(') &&
         !t.includes('clamp(')
     );
-    expect(
-      staticIdx,
-      `transform declarations: ${JSON.stringify(transforms)}`
-    ).toBeGreaterThanOrEqual(0);
-
-    // The responsive declaration (calc/clamp) must come AFTER the fallback.
-    const responsiveIdx = transforms.findIndex((t) => t.includes('calc(') || t.includes('clamp('));
-    expect(responsiveIdx, 'responsive scale declaration missing').toBeGreaterThanOrEqual(0);
-    expect(responsiveIdx).toBeGreaterThan(staticIdx);
+    expect(hasStatic, `transform declarations: ${JSON.stringify(transforms)}`).toBe(true);
   });
 
-  it('does not consume the scale ratio through a custom property (var())', () => {
-    // The original bug: `transform: scale(var(--conv-s))` parses fine but
-    // fails at computed-value time on engines lacking length/length calc,
-    // falling all the way back to `transform: none` instead of the static
-    // fallback.  Inlining the calc avoids that trap.
+  it('does not use fragile length/length calc or var()-behind-scale in CSS', () => {
+    // `scale(var(...))` parses but fails at computed-value time on engines
+    // lacking length/length calc, falling to `transform: none` (no scale →
+    // 520-px band → button off-screen).  `calc(... / <length>)` is the
+    // length/length division those engines can't compute.  Both must stay
+    // out of the conveyor scale — the responsive value comes from JS.
     const body = conveyorScaleRuleBody();
     expect(body).not.toBeNull();
     expect(/transform\s*:\s*scale\(\s*var\(/.test(body)).toBe(false);
+    // No division by a length inside the conveyor's transform.
+    expect(/calc\([^)]*\/\s*[\d.]+px/.test(body)).toBe(false);
+  });
+
+  it('computes the responsive scale in JS mirroring clamp(0.4, (100vw-24)/520, 1)', () => {
+    // Guard that the JS fallback path exists and uses the same formula the
+    // CSS media query documents, so the belt fills the width on every
+    // engine (not just those with length/length calc).
+    expect(js).toMatch(/fitMobileConveyor/);
+    expect(js).toMatch(/\(vw\s*-\s*24\)\s*\/\s*520/);
   });
 });

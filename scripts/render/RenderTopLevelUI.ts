@@ -547,6 +547,38 @@ export class RenderDBQueue extends RenderNode {
     const html = getApp().renderView(this.template, this);
     jq.append(html);
     this.draw();
+    this.fitMobileConveyor();
+  }
+
+  /**
+   * Scale the mobile conveyor so the fixed 520-px belt box fills the
+   * viewport width (matching the desktop belt's width-filling look).
+   *
+   * The mobile CSS (`@media (max-width: 926px)`) does this with
+   * `transform: scale(<ratio>)`, but a *responsive* ratio needs
+   * `length / length` calc division — `(100vw - 24px) / 520px` — which
+   * Firefox and older Android WebView reject.  There the belt collapses to
+   * the static CSS fallback size and, because of `transform-origin: bottom
+   * left`, hugs the left edge instead of centring.  Compute the exact
+   * ratio here so every engine renders the same width-filling belt.
+   * Mirrors the CSS `clamp(0.4, (100vw - 24px) / 520, 1)`; the 926-px gate
+   * matches the media-query breakpoint that owns the mobile layout, and
+   * above it we clear the inline value so the desktop layout (no scale)
+   * applies.
+   */
+  private fitMobileConveyor(): void {
+    const root = this.jdomelem[0];
+    const conv = root?.querySelector('.DatabaseQueueConveyor') as HTMLElement | null;
+    if (!conv) return;
+    const vw = window.innerWidth;
+    if (vw <= 926) {
+      const s = Math.min(1, Math.max(0.4, (vw - 24) / 520));
+      conv.style.transform = `scale(${s})`;
+      conv.style.transformOrigin = 'bottom left';
+    } else {
+      conv.style.transform = '';
+      conv.style.transformOrigin = '';
+    }
   }
 
   override tick(): void {
