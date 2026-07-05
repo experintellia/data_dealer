@@ -502,3 +502,109 @@ test.describe('Pusher perp popup — provided-client buy grid', () => {
     await expect(page).toHaveScreenshot('pusher-desktop.png', { fullPage: false });
   });
 });
+
+/** Proxy perp popup, empty state — buys proxy001 and force-opens it
+ *  with no provided tiles, the "you've bought every project" case the
+ *  user flagged.  The `.SelectorNoItems` copy is desktop-pinned at
+ *  `position:absolute; top:95px; width:540px`; on a phone that escaped
+ *  the now-flowing selector, collapsing it to zero height so the
+ *  "Start ventures" title overlapped the bottom Close button and the
+ *  message was clipped.  The baseline pins the in-flow, wrapped,
+ *  centred empty-state copy after the mobile fit. */
+async function openProxyEmpty(page: Page): Promise<void> {
+  // Grant level + cash via a buyKarma delta (its reducer merges
+  // result.game_values) so proxy001 (required_level 2, price 100) buys.
+  await page.evaluate(() => {
+    const wx = (window as any).webxdc;
+    wx.sendUpdate(
+      {
+        payload: {
+          kind: 'delta',
+          addr: wx.selfAddr,
+          op: 'buyKarma',
+          args: [],
+          result: { game_values: { xp_level: 10, cash_value: 99999999 } },
+          ts: Date.now(),
+        },
+      },
+      ''
+    );
+  });
+  await page.reload();
+  await page.waitForFunction(() => !!(window as any).__dd?._app?.game);
+  await page.evaluate(async () => {
+    const eng = await new Promise<any>((res, rej) =>
+      (window as any).require(['LocalEngine'], res, rej)
+    );
+    const r = await eng.buyPerp('Imperium', 'proxy001');
+    if (r?.result?.error !== undefined) {
+      throw new Error(`buyPerp failed: error=${r.result.error}`);
+    }
+  });
+  await page.reload();
+  await page.waitForFunction(() => !!(window as any).__dd?._app?.game);
+  await page.evaluate(() => {
+    const groot = (window as any).__dd?._app?.game;
+    if (!groot?.raw_data) return;
+    groot.raw_data.mission_briefings_seen = groot.raw_data.mission_briefings_seen || {};
+    for (const g of Object.keys(groot.Missions?.Missions ?? {})) {
+      groot.raw_data.mission_briefings_seen[g] = true;
+    }
+  });
+  let stable = 0;
+  for (let i = 0; i < 40; i++) {
+    const settled = await page.evaluate(() => {
+      const g = (window as any).__dd?._app?.game;
+      if (!g) return false;
+      if (Array.isArray(g.NotificationQueue)) g.NotificationQueue.length = 0;
+      g?.notificationPopup?.trigger?.('popup_close');
+      document.querySelectorAll<HTMLElement>('.Popup').forEach((el) => el.remove());
+      document
+        .querySelectorAll<HTMLElement>('.PopupContainer.lockOn')
+        .forEach((el) => el.classList.remove('lockOn'));
+      return (
+        (!Array.isArray(g.NotificationQueue) || g.NotificationQueue.length === 0) &&
+        !g.notificationPopup &&
+        document.querySelectorAll('.PopupContainer.lockOn').length === 0
+      );
+    });
+    stable = settled ? stable + 1 : 0;
+    if (stable >= 3) break;
+    await page.waitForTimeout(300);
+  }
+  await page.addStyleTag({
+    content:
+      'body > div[style*="z-index: 9999"][style*="position: fixed"] { display: none !important; }',
+  });
+
+  // Force the "all projects bought" empty state: no provided/buyable
+  // tiles (so providedView falls to NoItems, not the loading spinner).
+  await page.evaluate(() => {
+    const game = (window as any).__dd?._app?.game;
+    const gnode = game.getById('proxy001');
+    if (!gnode) throw new Error('proxy001 gnode not registered');
+    gnode.data.providedPerps = [];
+    gnode.data.buyablePerps = [];
+    gnode.data.used_slots = 2;
+    gnode.data.max_slots = 5;
+    gnode.openPopup();
+  });
+  await expect(page.locator('.PopupContainer.lockOn .PopupBody').first()).toBeVisible({
+    timeout: 5_000,
+  });
+  await waitForPopupSettle(page);
+}
+
+test.describe('Proxy perp popup — empty "no new ventures" state', () => {
+  test('mobile (iPhone SE)', async ({ page }) => {
+    await boot(page, IPHONE_SE);
+    await openProxyEmpty(page);
+    await expect(page).toHaveScreenshot('proxy-empty-iphone-se.png', { fullPage: false });
+  });
+
+  test('desktop (1280×800)', async ({ page }) => {
+    await boot(page, DESKTOP);
+    await openProxyEmpty(page);
+    await expect(page).toHaveScreenshot('proxy-empty-desktop.png', { fullPage: false });
+  });
+});
