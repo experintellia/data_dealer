@@ -1073,6 +1073,10 @@ msgstr "Requires either"
 msgid "or<br/>"
 msgstr "or<br/>"
 
+#: scripts/game/providedView.ts:284
+msgid "and<br/>"
+msgstr "and<br/>"
+
 #: views/selector_powerups.html:10
 msgid "Buy Upgrade"
 msgstr "Buy Upgrade"
