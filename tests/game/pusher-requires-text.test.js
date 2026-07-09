@@ -38,11 +38,22 @@ describe('pusher locked tile — requirement copy is AND, not OR', () => {
     expect(html).not.toContain('or<br/>');
   });
 
-  it('still renders cleanly for a single required provider', () => {
+  it('renders a lone provider with no dangling "and"', () => {
     const row = lockedPusher(['Warranty Cards']);
     const { tiles } = buildProvided([row], 'pusher', CTX);
     const html = tiles[0].dataHtml;
     expect(html).toContain('Warranty Cards');
     expect(html).not.toContain('Requires either');
+    // A single provider has nothing to join, so no connector must appear.
+    expect(html).not.toContain('and<br/>');
+  });
+
+  it('joins exactly two providers with "and" and no trailing comma-only tail', () => {
+    const row = lockedPusher(['Franz Sauerzapf', 'Warranty Cards']);
+    const { tiles } = buildProvided([row], 'pusher', CTX);
+    const html = tiles[0].dataHtml;
+    expect(html).toContain('and<br/>');
+    expect(html).toContain('Franz Sauerzapf');
+    expect(html).toContain('Warranty Cards');
   });
 });

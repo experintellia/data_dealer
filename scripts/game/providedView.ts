@@ -288,7 +288,13 @@ function buildPusherTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
   if (locked) {
     const provs = (data.requiredProviders as string[] | undefined) ?? [];
     const inner = provs
-      .map((v, k) => (k + 1 < provs.length ? `${v},<br />` : `${i18n.gettext('and<br/>')}${v}`))
+      .map((v, k) => {
+        if (k + 1 < provs.length) return `${v},<br />`;
+        // Last provider gets the "and" connector — but only when it
+        // actually follows others; a lone provider must not render a
+        // dangling "Requires and X".
+        return provs.length > 1 ? `${i18n.gettext('and<br/>')}${v}` : v;
+      })
       .join('');
     dataHtml = `<div class="Requires">${i18n.gettext('Requires')}<div class="RequiresProviders">${inner}</div></div>`;
   } else {
