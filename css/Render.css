@@ -3415,8 +3415,17 @@ button {
      overlay sits at `right: 0` of the now-shorter conveyor and masks
      the cut. */
   .DatabaseQueueConveyor {
-    --conv-s: clamp(0.4, calc((100vw - 24px) / 520px), 1);
-    transform: scale(var(--conv-s));
+    /* The responsive scale that fills the viewport width is computed and
+       written inline by RenderDBQueue.fitMobileConveyor() (see
+       scripts/render/RenderTopLevelUI.ts).  It has to be done in JS: a
+       CSS-only responsive ratio needs `length / length` calc division
+       (`(100vw - 24px) / 520px`), which Firefox and older Android WebView
+       reject — there the belt would collapse to this static fallback and
+       hug the left edge instead of centring.  This static value only
+       shows on the very first paint before render() runs (and as a safety
+       net if JS never does).  0.55 × 520 = 286 px keeps the pipe and its
+       "Ausbauen"/Upgrade button on screen on phones down to ~310 px. */
+    transform: scale(0.55);
     transform-origin: bottom left;
     top: auto !important;
     bottom: 0 !important;
