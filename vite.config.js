@@ -202,6 +202,9 @@ function mockWebxdc() {
 const DEV_PANEL_CLOSE_BUTTON = `
 // --- appended by vite.config.js pagesWebxdc() (GitHub Pages build only) ---
 document.addEventListener('DOMContentLoaded', () => {
+  // Same condition the stub uses to draw the panel — peer windows get none,
+  // and without this their observer would stay connected forever.
+  if (window.webxdc.selfName !== 'device0') return;
   new MutationObserver((_records, obs) => {
     const panel = Array.from(document.body.children).find(
       (el) => el.firstChild && el.firstChild.textContent === 'webxdc dev tools'
