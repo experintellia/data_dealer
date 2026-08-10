@@ -52,6 +52,11 @@ if (variant !== 'hq' && variant !== 'casual') {
 // .xdc into Delta Chat can debug against the original sources.
 const isRelease = process.env.BUILD_RELEASE === '1';
 
+// `pnpm build:pages` sets BUILD_TARGET=pages: build a plain static site for
+// GitHub Pages instead of a .xdc — same dist/, plus the webxdc stub the
+// messenger would otherwise inject (see pagesWebxdc below).
+const isPages = process.env.BUILD_TARGET === 'pages';
+
 // Plugin: for the casual variant, after vite-plugin-static-copy has run,
 // replace the canonical dist/img/ + dist/icon.png with the pre-quantized
 // counterparts (img-casual/, icon-casual.png).  This keeps the in-bundle
@@ -161,13 +166,17 @@ async function minifyCssTransform(src) {
   return result.code;
 }
 
-// Serve the @webxdc/vite-plugins simulator with an explicit Content-Type so
-// strict-MIME environments (GitHub Codespaces reverse proxy) don't block it.
-function mockWebxdc() {
-  const src = readFileSync(
+function readWebxdcStub() {
+  return readFileSync(
     fileURLToPath(new URL('./node_modules/@webxdc/vite-plugins/src/webxdc.js', import.meta.url)),
     'utf-8'
   );
+}
+
+// Serve the @webxdc/vite-plugins simulator with an explicit Content-Type so
+// strict-MIME environments (GitHub Codespaces reverse proxy) don't block it.
+function mockWebxdc() {
+  const src = readWebxdcStub();
   return {
     name: 'webxdc-mock',
     configureServer(server) {
@@ -179,6 +188,52 @@ function mockWebxdc() {
           next();
         }
       });
+    },
+  };
+}
+
+// On GitHub Pages there is no messenger to inject webxdc.js, so ship the
+// @webxdc/vite-plugins stub (peer simulation + IndexedDB-persisted updates)
+// as dist/webxdc.js.  Its "webxdc dev tools" panel is useful for poking at
+// multiplayer but in the way of someone who just wants to play the game, so
+// append a close button.  The panel is added by an async `load` handler
+// (it awaits the app icon), hence the MutationObserver rather than a
+// straight querySelector.
+const DEV_PANEL_CLOSE_BUTTON = `
+// --- appended by vite.config.js pagesWebxdc() (GitHub Pages build only) ---
+document.addEventListener('DOMContentLoaded', () => {
+  new MutationObserver((_records, obs) => {
+    const panel = Array.from(document.body.children).find(
+      (el) => el.firstChild && el.firstChild.textContent === 'webxdc dev tools'
+    );
+    if (!panel) return;
+    obs.disconnect();
+    // The stub panel sits at z-index 9999; game popups go up to 100001 and
+    // would bury it (and the close button) mid-tutorial.
+    panel.style.zIndex = '1000000';
+    const close = document.createElement('a');
+    close.href = 'javascript:void(0);';
+    close.textContent = '\\u2715';
+    close.title = 'Hide dev tools';
+    close.setAttribute('aria-label', 'Hide dev tools');
+    close.setAttribute(
+      'style',
+      'color:#fff;text-decoration:none;margin-left:1em;font-size:14px;cursor:pointer'
+    );
+    close.onclick = () => panel.remove();
+    panel.firstChild.append(close);
+  }).observe(document.body, { childList: true });
+});
+`;
+
+function pagesWebxdc() {
+  return {
+    name: 'pages-webxdc',
+    apply: 'build',
+    closeBundle() {
+      const root = fileURLToPath(new URL('.', import.meta.url));
+      writeFileSync(`${root}dist/webxdc.js`, readWebxdcStub() + DEV_PANEL_CLOSE_BUTTON);
+      console.log('[pages-webxdc] dist/webxdc.js written (stub + dev-panel close button)');
     },
   };
 }
@@ -389,6 +444,8 @@ export default defineConfig({
     }),
     swapInCasualAssets(),
     minifyStaticJson(),
-    buildXDC({ inDir: 'dist', outDir: '.', outFileName: `data-dealer-${variant}.xdc` }),
+    isPages
+      ? pagesWebxdc()
+      : buildXDC({ inDir: 'dist', outDir: '.', outFileName: `data-dealer-${variant}.xdc` }),
   ],
 });

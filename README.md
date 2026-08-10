@@ -44,6 +44,17 @@ Build the `.xdc` files:
     $ npm run build:hq        # HQ only — bit-exact lossless pixels
     $ npm run build:casual    # casual only — pre-quantized assets
 
+Build the standalone browser version (what GitHub Pages serves):
+
+    $ npm run build:pages   # dist/ — no .xdc, ships a webxdc stub instead
+
+`.github/workflows/pages.yml` deploys that `dist/` to GitHub Pages on every
+push to `master` (repo setting: Settings → Pages → Source = "GitHub Actions").
+Since there is no messenger to inject `webxdc.js`, the build ships the
+[`@webxdc/vite-plugins`](https://github.com/webxdc/vite-plugins) stub — the
+game is fully playable, "Add Peer" opens a second local player in a new tab,
+and the dev-tools panel has a close button so it can be dismissed.
+
 The casual variant ships pre-quantized PNGs from [`img-casual/`](./img-casual/) and `icon-casual.png` (committed to the repo). If you change anything in [`img/`](./img/) or `icon.png`, run `npm run quantize-assets` (requires `pngquant` and `oxipng`) and commit the resulting diff.
 
 ## Licensing & credits
