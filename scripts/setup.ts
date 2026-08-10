@@ -31,7 +31,10 @@ const defaults: Setup = {
   debug: false,
   pathSeparator: '.',
   typeSeparator: ':',
-  imagePathPrefix: '/img/',
+  // Document-relative on purpose: inside a messenger the app is served at
+  // the root, but on GitHub Pages it lives under /<repo>/ — a leading `/`
+  // would 404 there.  Resolved against index.html's directory either way.
+  imagePathPrefix: 'img/',
   renderContainer: '#GameContainer',
   viewMapPerspective: false,
   viewMapStopZone: 0,

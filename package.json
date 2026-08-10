@@ -10,6 +10,7 @@
     "build:hq": "BUILD_VARIANT=hq vite build",
     "build:casual": "BUILD_VARIANT=casual vite build",
     "build:all": "pnpm build:hq && pnpm build:casual",
+    "build:pages": "BUILD_TARGET=pages BUILD_VARIANT=casual BUILD_RELEASE=1 vite build",
     "quantize-assets": "node tools/quantize-assets.mjs",
     "preview": "vite preview",
     "test": "vitest run",

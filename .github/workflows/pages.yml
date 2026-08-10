@@ -1,0 +1,56 @@
+name: Deploy to GitHub Pages
+
+# Standalone playable build (no messenger): dist/ plus the webxdc stub from
+# @webxdc/vite-plugins, so the game runs in a plain browser tab.  Casual
+# variant — palette-quantized sprites, ~60% less to download over the web.
+#
+# Requires Settings → Pages → Source = "GitHub Actions" (one-time).
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build static site
+        run: pnpm build:pages
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-pages
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
