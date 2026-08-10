@@ -46,9 +46,9 @@ Build the `.xdc` files:
 
 Build the standalone browser version (what GitHub Pages serves):
 
-    $ npm run build:pages   # dist/ — no .xdc, ships a webxdc stub instead
+    $ npm run build:pages   # dist-pages/ — no .xdc, ships a webxdc stub instead
 
-`.github/workflows/pages.yml` deploys that `dist/` to GitHub Pages on every
+`.github/workflows/pages.yml` deploys that `dist-pages/` to GitHub Pages on every
 push to `master` (repo setting: Settings → Pages → Source = "GitHub Actions").
 Since there is no messenger to inject `webxdc.js`, the build ships the
 [`@webxdc/vite-plugins`](https://github.com/webxdc/vite-plugins) stub — the

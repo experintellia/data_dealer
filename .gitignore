@@ -5,6 +5,7 @@
 # messenger injects this at runtime — never bundle it
 /webxdc.js
 /dist/
+/dist-pages/
 /*.xdc
 /docs/*
 !/docs/*.md

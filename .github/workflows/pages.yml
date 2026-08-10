@@ -50,7 +50,7 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: dist-pages
 
       - id: deployment
         uses: actions/deploy-pages@v4

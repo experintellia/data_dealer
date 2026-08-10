@@ -53,9 +53,13 @@ if (variant !== 'hq' && variant !== 'casual') {
 const isRelease = process.env.BUILD_RELEASE === '1';
 
 // `pnpm build:pages` sets BUILD_TARGET=pages: build a plain static site for
-// GitHub Pages instead of a .xdc — same dist/, plus the webxdc stub the
+// GitHub Pages instead of a .xdc — the same output plus the webxdc stub the
 // messenger would otherwise inject (see pagesWebxdc below).
 const isPages = process.env.BUILD_TARGET === 'pages';
+
+// The pages build gets its own output directory so it never clobbers the
+// dist/ that `pnpm build:all` (and tests/build/build.test.js) work against.
+const outDir = isPages ? 'dist-pages' : 'dist';
 
 // Plugin: for the casual variant, after vite-plugin-static-copy has run,
 // replace the canonical dist/img/ + dist/icon.png with the pre-quantized
@@ -74,8 +78,8 @@ function swapInCasualAssets() {
     closeBundle() {
       if (variant !== 'casual') return;
       const root = fileURLToPath(new URL('.', import.meta.url));
-      const distImg = `${root}dist/img`;
-      const distIcon = `${root}dist/icon.png`;
+      const distImg = `${root}${outDir}/img`;
+      const distIcon = `${root}${outDir}/icon.png`;
       const srcImg = `${root}img-casual`;
       const srcIcon = `${root}icon-casual.png`;
       if (!existsSync(srcImg) || !existsSync(srcIcon)) {
@@ -89,7 +93,7 @@ function swapInCasualAssets() {
       rmSync(distIcon, { force: true });
       cpSync(srcIcon, distIcon);
       console.log(
-        '[swap-in-casual-assets] dist/img/ and dist/icon.png replaced with casual variants'
+        `[swap-in-casual-assets] ${outDir}/img/ and ${outDir}/icon.png replaced with casual variants`
       );
     },
   };
@@ -105,7 +109,7 @@ function swapInCasualAssets() {
 // Order in plugins[] matters: this must run AFTER viteStaticCopy (so
 // the files exist in dist/) and BEFORE buildXDC zips dist/.
 function minifyStaticJson() {
-  const targets = ['dist/data', 'dist/i18n'];
+  const targets = [`${outDir}/data`, `${outDir}/i18n`];
   const root = fileURLToPath(new URL('.', import.meta.url));
 
   function walkJson(dir) {
@@ -235,8 +239,8 @@ function pagesWebxdc() {
     apply: 'build',
     closeBundle() {
       const root = fileURLToPath(new URL('.', import.meta.url));
-      writeFileSync(`${root}dist/webxdc.js`, readWebxdcStub() + DEV_PANEL_CLOSE_BUTTON);
-      console.log('[pages-webxdc] dist/webxdc.js written (stub + dev-panel close button)');
+      writeFileSync(`${root}${outDir}/webxdc.js`, readWebxdcStub() + DEV_PANEL_CLOSE_BUTTON);
+      console.log(`[pages-webxdc] ${outDir}/webxdc.js written (stub + dev-panel close button)`);
     },
   };
 }
@@ -375,7 +379,7 @@ export default defineConfig({
   },
 
   build: {
-    outDir: 'dist',
+    outDir,
     emptyOutDir: true,
     // Tree-shaking and minification (esbuild) come for free from Rollup
     // + Vite defaults — set them explicitly so the .xdc artifact never
