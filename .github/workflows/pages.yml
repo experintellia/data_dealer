@@ -1,8 +1,9 @@
 name: Deploy to GitHub Pages
 
-# Standalone playable build (no messenger): dist/ plus the webxdc stub from
-# @webxdc/vite-plugins, so the game runs in a plain browser tab.  Casual
-# variant — palette-quantized sprites, ~60% less to download over the web.
+# Standalone playable build (no messenger): dist-pages/ plus the webxdc stub
+# from @webxdc/vite-plugins, so the game runs in a plain browser tab.  HQ
+# variant — lossless sprites; the web has no bundle-size ceiling to respect
+# and Pages serves the atlases compressed and cached.
 #
 # Requires Settings → Pages → Source = "GitHub Actions" (one-time).
 
