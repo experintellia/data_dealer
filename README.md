@@ -7,12 +7,17 @@
 This repository is a port of the [Data Dealer](http://datadealer.com) browser game into a [webxdc](https://webxdc.org) mini-app — a self-contained, offline-capable application that runs inside a Delta Chat group.
 
 - **Runs completely offline** — no server, no account, no hosting bills. The entire game runs inside a Delta Chat group as a single `.xdc` file.
+- **Playable on phones** — the original layout assumed a desktop screen. Every dialog, the status bar and the game board were rebuilt for touch: full-screen bottom-anchored popups, drag-scrolling item grids, and layouts that hold together down to 375 px (iPhone SE). CI takes screenshots at that viewport on every pull request, so mobile is a tested target rather than a hope.
+- **Try it in a browser first** — [experintellia.github.io/data_dealer](https://experintellia.github.io/data_dealer/) runs the same build as a plain web page, no messenger install required. Peer messaging is simulated locally there; the real thing needs Delta Chat.
 - **Each chat group is its own game lobby** — share the app into any group and it becomes an isolated game instance. Multiplayer without infrastructure.
-- **Your messenger name is your player name** — identity is pulled straight from Delta Chat, no sign-up required.
-- **English and German** — switch languages in-game at any time without losing your progress. Both rulesets have also been fleshed out: previously-untranslated item names plus dozens of missing item descriptions written in both languages (localized, not literal), along with a small localization fix.
+- **Your messenger name is your player name** — identity is pulled straight from Delta Chat, no sign-up required. On messengers that implement the experimental webxdc avatar API, peers' profile pictures appear next to their scores in the leaderboard.
+- **Milestones land in the chat** — level-ups, completed missions, profile-count milestones and full saint/devil karma post a one-line notice into the group timeline, so the game plays as a conversation and not just a private tab.
+- **Take your save with you** — export your progress into the chat as a file and import it back on another device or in another group. An export carries your own progress only, never other players' data.
+- **Nothing phones home** — no accounts, no analytics, no ads, no network calls of any kind. The game code contains no `fetch` and no `XMLHttpRequest`; everything is bundled in the `.xdc`.
+- **English and German** — the app picks your messenger's language on first start, and you can switch in-game at any time without losing your progress. Both rulesets have also been fleshed out: previously-untranslated item names plus dozens of missing item descriptions written in both languages (localized, not literal), along with a small localization fix.
 - **The full game, not a demo** — all original game mechanics are ported: buying/selling data profiles, charging and collecting from perps, karma, powerups, missions, and idle progression (your resources keep ticking even when the app is closed).
 - **Two-variant releases** — every release ships an HQ bundle (~14 MiB, bit-exact lossless cartoon art) and a casual bundle (~5.5 MiB, palette-quantized; visually indistinguishable for typical play). Pick whichever your data plan or messenger likes better.
-- **Automated builds** — every pull request builds and tests both `.xdc` files; tagged releases publish both automatically.
+- **Automated builds and a real test suite** — 800+ unit tests plus a Playwright end-to-end suite (including the mobile screenshots) run on every pull request, which also builds both `.xdc` files for download; tagged releases publish both automatically.
 
 The port fuses three of the original repositories:
 
