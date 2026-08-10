@@ -48,6 +48,10 @@ Build the standalone browser version (what GitHub Pages serves):
 
     $ npm run build:pages   # dist-pages/ — no .xdc, ships a webxdc stub instead
 
+It builds the HQ assets (lossless sprites): unlike a `.xdc`, which travels
+through a chat, the web version is served once and cached, so there is no
+bundle-size ceiling to trade quality against.
+
 `.github/workflows/pages.yml` deploys that `dist-pages/` to GitHub Pages on every
 push to `master` (repo setting: Settings → Pages → Source = "GitHub Actions").
 Since there is no messenger to inject `webxdc.js`, the build ships the
