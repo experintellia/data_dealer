@@ -1,6 +1,6 @@
 // Render-side `Node` base class — the foundation that every render
-// primitive (Sprite, Circle, Text, Perp, Decorator, Cable, Popup,
-// Statusbar, ViewMap, …) extends via util.extend.  Owns positioning,
+// primitive (Sprite, Text, Perp, Decorator, Cable, Statusbar, ViewMap,
+// …) extends.  Owns positioning,
 // transforms, opacity, the DOM/jQuery wrapper, the children/decorators
 // collections, and the click/drag wiring.
 // The `_instances` / `_ids` registry lives in scripts/render/renderRegistry.ts.
@@ -102,12 +102,9 @@ export class RenderNode {
   children!: RenderSet<RenderNode>;
   decorators!: RenderSet<RenderNode>;
 
-  // Defaults live on the prototype (see static-init block below) so that
-  // legacy function-constructor subclasses extended via util.extend pick
-  // them up through the prototype chain even when they don't call into
-  // RenderNode's constructor.  `declare` keeps TS aware of the shape
-  // without emitting per-instance initialisers that would shadow the
-  // prototype defaults.
+  // Defaults live on the prototype (see static-init block below).
+  // `declare` keeps TS aware of the shape without emitting per-instance
+  // initialisers that would shadow the prototype defaults.
   declare x: number;
   declare y: number;
   declare z: number;
@@ -135,9 +132,7 @@ export class RenderNode {
   // `T?`) so that legacy assignments such as `child.useDragHandler =
   // this.dragHandler` survive `exactOptionalPropertyTypes` even when
   // the right-hand side is itself undefined.  `declare` keeps the
-  // declarations type-only — legacy `extend()` subclasses don't pass
-  // through RenderNode's constructor, so emitting per-instance
-  // initialisers would just shadow the prototype-chain lookup.
+  // declarations type-only, so no per-instance initialisers are emitted.
   declare parentNode: RenderNode | undefined;
   declare decoratedNode: RenderNode | undefined;
   declare dragHandler: DragHandlerLike | undefined;

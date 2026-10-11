@@ -1,8 +1,7 @@
 // GameNode base class + instance registry, extracted from scripts/Game.js's
 // IIFE in the issue #147 / Phase 7 migration.  Foundation for the
-// per-subclass extractions to come (Topscores, Missions, Imperium, …) —
-// each subclass extends GameNode via the legacy `extend(SubClass, GameNode)`
-// helper from ./util.js.
+// subclasses (Topscores, Missions, Imperium, …), each a plain
+// `class … extends GameNode`.
 //
 // What's here:
 //   - The instance registry (`_instances`, `_ids`) + add/get/remove/clear
