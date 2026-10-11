@@ -136,6 +136,75 @@ export function TokenGrid({
   );
 }
 
+/** The Charge / Collect `.PopupButtons` bar of the Contact / Client /
+ *  Project / SuperToken popups.  `chargeCostText` set → a Cash cost
+ *  decorator before the Charge button (Contact / Project); unset → the
+ *  1-AP decorator (Client / Token).  Placement stays with the caller. */
+export function ChargeCollectButtons({
+  popup,
+  collectMode,
+  chargeDisabled,
+  chargeText,
+  chargeTimeText,
+  chargeCostText,
+  collectText = i18n.gettext('Collect'),
+}: {
+  popup: PreactDialogHandle;
+  collectMode: boolean;
+  chargeDisabled: boolean;
+  chargeText: string;
+  chargeTimeText: string;
+  chargeCostText?: string;
+  collectText?: string;
+}) {
+  const ap = (
+    <div class="ButtonDecorator AP">
+      <div class="RenderSprite Tobi" />1
+    </div>
+  );
+  if (collectMode) {
+    return (
+      <div class="PopupButtons">
+        {ap}
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+        <div
+          class="Button"
+          data-button-id="CollectButton"
+          data-testid="dd-collect-button"
+          onClick={(e) => fireAction(popup, e, 'CollectButton')}
+        >
+          {collectText}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div class="PopupButtons">
+      {chargeCostText === undefined ? (
+        ap
+      ) : (
+        <div class="ButtonDecorator Cash">
+          <div class="RenderSprite Tobi" />
+          {chargeCostText}
+        </div>
+      )}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+      <div
+        class={chargeDisabled ? 'Button disabled' : 'Button'}
+        data-button-id="ChargeButton"
+        data-testid="dd-charge-button"
+        onClick={(e) => fireAction(popup, e, 'ChargeButton')}
+      >
+        {chargeText}
+      </div>
+      <div class="ButtonDecorator Time">
+        <div class="RenderSprite Tobi" />
+        {chargeTimeText}
+      </div>
+    </div>
+  );
+}
+
 /** One provided-perp grid tile (`client.html` / `perp.html`).  Opens
  *  its detail subpop by the legacy row key (`data-subpop-id`). */
 export function PerpProvidedTile({

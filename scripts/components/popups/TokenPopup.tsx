@@ -10,6 +10,7 @@ import type { TokenPopupVM } from '../../game/tokenPopupView.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
 import {
+  ChargeCollectButtons,
   TokenGrid,
   TokenUpgradeSubpop,
   TokenUpgradeSubpopDialog,
@@ -87,41 +88,14 @@ export function TokenPopup({ vm, onClose, popup }: TokenPopupProps) {
               tokensClass="PopupTokens"
               onOpen={handleOpenToken}
             />
-            {vm.collectMode ? (
-              <div class="PopupButtons">
-                <div class="ButtonDecorator AP">
-                  <div class="RenderSprite Tobi" />1
-                </div>
-                {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-                <div
-                  class="Button"
-                  data-button-id="CollectButton"
-                  data-testid="dd-collect-button"
-                  onClick={(e) => fireAction(popup, e, 'CollectButton')}
-                >
-                  {vm.collectButtonText}
-                </div>
-              </div>
-            ) : (
-              <div class="PopupButtons">
-                <div class="ButtonDecorator AP">
-                  <div class="RenderSprite Tobi" />1
-                </div>
-                {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-                <div
-                  class={vm.chargeDisabled ? 'Button disabled' : 'Button'}
-                  data-button-id="ChargeButton"
-                  data-testid="dd-charge-button"
-                  onClick={(e) => fireAction(popup, e, 'ChargeButton')}
-                >
-                  {vm.chargeButtonText}
-                </div>
-                <div class="ButtonDecorator Time">
-                  <div class="RenderSprite Tobi" />
-                  {vm.chargeTimeText}
-                </div>
-              </div>
-            )}
+            <ChargeCollectButtons
+              popup={popup}
+              collectMode={vm.collectMode}
+              chargeDisabled={vm.chargeDisabled}
+              chargeText={vm.chargeButtonText}
+              chargeTimeText={vm.chargeTimeText}
+              collectText={vm.collectButtonText}
+            />
           </div>
         </div>
       ) : null}

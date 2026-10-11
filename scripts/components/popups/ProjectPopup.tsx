@@ -25,6 +25,7 @@ import { PopupHeader } from './PopupHeader.js';
 import { PopupMenu } from './PopupMenu.js';
 import { type PreactDialogHandle, stopAndClose } from './dialogManager.js';
 import {
+  ChargeCollectButtons,
   ProvidedPowerupSubpopDialog,
   TokenSubpop,
   TokenSubpopDialog,
@@ -898,43 +899,16 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
           overhang to `.PopupContent`'s border-radius.  Guarded by the active
           tab so it only shows on the data tab (the powerup tabs have no
           charge/collect action — they buy/sell through their own subpops). */}
-      {dataActive &&
-        (vm.collectMode ? (
-          <div class="PopupButtons">
-            <div class="ButtonDecorator AP">
-              <div class="RenderSprite Tobi" />1
-            </div>
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-            <div
-              class="Button"
-              data-button-id="CollectButton"
-              data-testid="dd-collect-button"
-              onClick={(e) => fireAction(popup, e, 'CollectButton')}
-            >
-              {i18n.gettext('Collect')}
-            </div>
-          </div>
-        ) : (
-          <div class="PopupButtons">
-            <div class="ButtonDecorator Cash">
-              <div class="RenderSprite Tobi" />
-              {vm.chargeCostText}
-            </div>
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-            <div
-              class={vm.chargeDisabled ? 'Button disabled' : 'Button'}
-              data-button-id="ChargeButton"
-              data-testid="dd-charge-button"
-              onClick={(e) => fireAction(popup, e, 'ChargeButton')}
-            >
-              {vm.chargeButtonText}
-            </div>
-            <div class="ButtonDecorator Time">
-              <div class="RenderSprite Tobi" />
-              {vm.chargeTimeText}
-            </div>
-          </div>
-        ))}
+      {dataActive && (
+        <ChargeCollectButtons
+          popup={popup}
+          collectMode={vm.collectMode}
+          chargeDisabled={vm.chargeDisabled}
+          chargeText={vm.chargeButtonText}
+          chargeTimeText={vm.chargeTimeText}
+          chargeCostText={vm.chargeCostText}
+        />
+      )}
     </div>
   );
 }

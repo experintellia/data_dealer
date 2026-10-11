@@ -7,14 +7,13 @@
 
 import { useCallback, useState } from 'preact/hooks';
 import type { ClientPopupVM } from '../../game/clientView.js';
-import i18n from '../../i18n.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
 import {
+  ChargeCollectButtons,
   TokenGrid,
   TokenSubpop,
   TokenSubpopDialog,
-  fireAction,
   isMobileWidth,
   openSubpopDialog,
 } from './perpShared.js';
@@ -108,41 +107,13 @@ export function ClientPopup({ vm, onClose, popup }: ClientPopupProps) {
           bar).  Keeping it outside the scrolling, rounded `.PopupContent`
           lets it straddle the dialog's bottom edge without WebKit clipping
           the overhang to `.PopupContent`'s border-radius. */}
-      {vm.collectMode ? (
-        <div class="PopupButtons">
-          <div class="ButtonDecorator AP">
-            <div class="RenderSprite Tobi" />1
-          </div>
-          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-          <div
-            class="Button"
-            data-button-id="CollectButton"
-            data-testid="dd-collect-button"
-            onClick={(e) => fireAction(popup, e, 'CollectButton')}
-          >
-            {i18n.gettext('Collect')}
-          </div>
-        </div>
-      ) : (
-        <div class="PopupButtons">
-          <div class="ButtonDecorator AP">
-            <div class="RenderSprite Tobi" />1
-          </div>
-          {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-          <div
-            class={vm.chargeDisabled ? 'Button disabled' : 'Button'}
-            data-button-id="ChargeButton"
-            data-testid="dd-charge-button"
-            onClick={(e) => fireAction(popup, e, 'ChargeButton')}
-          >
-            {vm.buttonText}
-          </div>
-          <div class="ButtonDecorator Time">
-            <div class="RenderSprite Tobi" />
-            {vm.chargeTimeText}
-          </div>
-        </div>
-      )}
+      <ChargeCollectButtons
+        popup={popup}
+        collectMode={vm.collectMode}
+        chargeDisabled={vm.chargeDisabled}
+        chargeText={vm.buttonText}
+        chargeTimeText={vm.chargeTimeText}
+      />
     </div>
   );
 }
