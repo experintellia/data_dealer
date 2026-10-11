@@ -91,7 +91,14 @@ export function boot(options?: BootOptions): Promise<LocalState> {
   if (typeof webxdc !== 'undefined' && webxdc) {
     listenerPromise = webxdc.setUpdateListener(function (update) {
       const prevPeers = _currentState && _currentState.peers;
-      _currentState = applyDelta(_state(), update.payload);
+      try {
+        _currentState = applyDelta(_state(), update.payload);
+      } catch (err) {
+        // Payloads are untrusted and replayed on every start: skip one that
+        // throws (applyDelta is pure, state is unchanged) rather than wedging
+        // boot for good.
+        console.error('boot.ts: skipping update', update.serial, err);
+      }
       if (_currentState && _currentState.peers !== prevPeers) {
         _notifyPeersChanged();
       }

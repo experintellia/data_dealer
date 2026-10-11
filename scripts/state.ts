@@ -211,34 +211,6 @@ export var SAVE_VERSION = 1;
 
 var _defaultSeed: GameSeed = (defaultGameData as GameSeed) || { game_values: {} };
 
-// Every handler op that can appear as delta.op.  Read-only handlers
-// (getToken, ping, etc.) never produce deltas but get stubs for completeness.
-var OP_NAMES = [
-  'loadGame',
-  'setPerpCoordinates',
-  'integrateCollected',
-  'collectPerp',
-  'chargePerp',
-  'buySlots',
-  'buyKarma',
-  'buyPerp',
-  'getProvidedPerps',
-  'sellPowerup',
-  'buyPowerup',
-  'getPowerups',
-  'setDisplayName',
-  'getRanking',
-  'getToken',
-  'getSessionLocale',
-  'ping',
-  'checkUsername',
-  'setLocale',
-  'dismissMissionBriefing',
-  'markTokenSeen',
-  'recheckMissions',
-  'importSave',
-];
-
 // ---------------------------------------------------------------------------
 // freshState
 // ---------------------------------------------------------------------------
@@ -412,7 +384,7 @@ export function buildSaveFile(state: LocalState, exportedAt?: number): SaveFile 
  *
  * Validates a previously-exported save file's JSON text.  Fails closed:
  *   - 'malformed' — not JSON, wrong format marker, non-numeric save_version,
- *                   or missing/!object state body
+ *                   or a state body _isSaveState rejects
  *   - 'version'   — numeric but NEWER save_version than this build understands
  * Older save_versions are intentionally accepted: additive changes migrate for
  * free because the importSave reducer fills any absent field from freshState
@@ -435,12 +407,37 @@ export function parseSaveFile(text: string): ParsedSave {
   if (data.save_version > SAVE_VERSION) {
     return { ok: false, error: 'version' };
   }
-  // A valid save must carry an object state body with game_values — the one
-  // field every real game has and the cheapest structural sanity check.
-  if (!data.state || typeof data.state !== 'object' || typeof data.state.game_values !== 'object') {
+  if (!_isSaveState(data.state)) {
     return { ok: false, error: 'malformed' };
   }
   return { ok: true, save: data as SaveFile };
+}
+
+// Collections the reducers / materializer iterate: a non-array one would throw
+// on every replay once imported, so it can never be fixed by re-importing.
+var _SAVE_ARRAYS = [
+  'nodes',
+  'nodes_charging',
+  'nodes_collect',
+  'db_queue',
+  'mission_goals',
+  'active_missions',
+];
+
+// A valid save state is an object carrying an object game_values (the one field
+// every real game has) and, where present, array collections.
+// ponytail: top-level shape only, elements aren't checked; add that if crafted
+// saves turn out to crash on element shape too.
+function _isSaveState(s: any): boolean {
+  return (
+    !!s &&
+    typeof s === 'object' &&
+    !!s.game_values &&
+    typeof s.game_values === 'object' &&
+    _SAVE_ARRAYS.every(function (k) {
+      return s[k] === undefined || Array.isArray(s[k]);
+    })
+  );
 }
 
 function _seedNodesFromTree(src: GameSeed): GameNode[] {
@@ -493,7 +490,9 @@ function _seedNodesFromTree(src: GameSeed): GameNode[] {
 // ---------------------------------------------------------------------------
 // Each reducer is a pure function (state, delta) → newState.
 
-var reducers: Record<string, Reducer> = {};
+// Null prototype: delta.op is untrusted, so 'toString' / '__proto__' etc. must
+// miss here instead of resolving to an Object.prototype member.
+var reducers: Record<string, Reducer> = Object.create(null);
 
 // Pulls mission_goals + active_missions out of a delta result whose
 // progression handler shipped them under .missions.mission_data. Returns
@@ -855,7 +854,7 @@ reducers.dismissMissionBriefing = function dismissMissionBriefingReducer(state, 
 // the snapshot is merged onto `base`.
 reducers.importSave = function importSaveReducer(state, delta) {
   var snap = delta.result && delta.result.state;
-  if (!snap || typeof snap !== 'object') return state;
+  if (!_isSaveState(snap)) return state;
 
   var base = freshState(state.addr);
   var merged: LocalState = Object.assign({}, base, snap, {
@@ -872,15 +871,6 @@ reducers.importSave = function importSaveReducer(state, delta) {
   return merged;
 };
 
-// Stubs — return state unchanged until Wave 4+ fills them in.
-OP_NAMES.forEach(function (op) {
-  if (!reducers[op]) {
-    reducers[op] = function stubReducer(state) {
-      return state;
-    };
-  }
-});
-
 // ---------------------------------------------------------------------------
 // Peer aggregator
 // ---------------------------------------------------------------------------
@@ -896,7 +886,8 @@ OP_NAMES.forEach(function (op) {
 // aggregator timestamp-LWW rather than insertion-order-LWW.
 function _applyPeerDelta(state: LocalState, delta: Delta): LocalState {
   var addr = delta.addr;
-  if (!addr) return state;
+  // '__proto__' would replace newPeers' prototype below instead of adding a row.
+  if (!addr || addr === '__proto__') return state;
 
   var peers = state.peers || {};
   var existing: PeerEntry = peers[addr] || {};
@@ -946,7 +937,7 @@ function _applyPeerDelta(state: LocalState, delta: Delta): LocalState {
  * Guards applied (in order):
  *   1. Malformed delta  → return state unchanged
  *   2. Schema-version mismatch → reset to freshState (graceful forward-compat)
- *   3. Other-peer addr  → skip (Phase 6 leaderboard handles cross-user deltas)
+ *   3. Other-peer or missing addr → skip (Phase 6 leaderboard handles cross-user deltas)
  *   4. Clock-skew guard → last_seen_ts = max(Date.now(), last_seen_ts)
  *   5. Dispatch to reducer[delta.op]; unknown op → return guarded state as-is
  */
@@ -973,8 +964,9 @@ export function applyDelta(state: LocalState, delta: any): LocalState {
 
   // Guard 3: ignore other peers' deltas (multi-device: only own addr mutates).
   // Runs before any state.addr mutation; also fires when state.addr is empty
-  // so a foreign delta can never seed our identity (closes #130).
-  if (delta.addr && delta.addr !== state.addr) {
+  // so a foreign delta can never seed our identity (closes #130).  An addr-less
+  // delta is never ours — every own delta carries state.addr (_mkDelta).
+  if (!delta.addr || delta.addr !== state.addr) {
     return state;
   }
 
