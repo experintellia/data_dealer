@@ -9,6 +9,7 @@ import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import i18n from '../../i18n.js';
 import { Link } from '../Link.js';
+import { stopAndClose } from './dialogManager.js';
 import { attachDragScroll } from './scrollDrag.js';
 
 /** Why an import attempt failed; maps to a localized message in the popup. */
@@ -56,10 +57,7 @@ function withLinks(template: string, links: JSX.Element[]): (string | JSX.Elemen
 }
 
 export function AboutPopup({ locale, buttonLabel, onClose, onExport, onImport }: AboutPopupProps) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
 
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);

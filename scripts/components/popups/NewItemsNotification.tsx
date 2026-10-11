@@ -2,10 +2,10 @@
 // in `GameRoot.makeNotifications` (level-up unlocks, project upgrade
 // unlocks).
 
-import type { JSX } from 'preact';
 import i18n from '../../i18n.js';
 import { type SpriteHelperConfig, renderSpriteHtml } from '../../render/renderSpriteHelper.js';
 import { MarcoSpeech } from '../MarcoSpeech.js';
+import { stopAndClose } from './dialogManager.js';
 
 export interface NewItemsPerp {
   data?: {
@@ -55,10 +55,7 @@ export function NewItemsNotification({
   onClose,
 }: NewItemsNotificationProps) {
   const speaker = says ?? i18n.gettext('Mark says:');
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   return (
     <div class="PopupBody NotificationBody">
       <div class="NotificationHeader">

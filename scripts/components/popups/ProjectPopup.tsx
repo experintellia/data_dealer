@@ -106,10 +106,7 @@ function SellSubpop({
   onClose: () => void;
   popup: PreactDialogHandle;
 }) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   // Short local keeps the dangerouslySetInnerHTML line single-line so
   // the biome-ignore attaches (codebase convention, see perpShared).
   // Short locals keep the dangerouslySetInnerHTML lines single-line so
@@ -169,10 +166,7 @@ function ProvidedSubpop({
   onClose: () => void;
   popup: PreactDialogHandle;
 }) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   // Short locals keep the dangerouslySetInnerHTML lines single-line so
   // the biome-ignore attaches. Legacy subpop_powerup_provided.html
   // emits title / description with `<%= … %>` (raw ruleset HTML).
@@ -268,10 +262,7 @@ function BuySelectorSubpop({
   onProvidedOpen: (gestalt: string) => void;
   onClose: () => void;
 }) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   let cls = 'Subpop Selector';
   if (isOpen) cls += ' open';
   if (hasPopup) cls += ' hasPopup';
@@ -319,10 +310,7 @@ function BuySlotsSubpop({
   popup: PreactDialogHandle;
 }) {
   const [num, setNum] = useState(1);
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   // Legacy BuySlotsInc: num+1 > slots_left ? num : num+1; Dec: max(1).
   const dec = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
     e.stopPropagation();
@@ -671,10 +659,7 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
     popup.trigger('tab_change', [tab]);
   };
 
-  const closeX = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const closeX = stopAndClose(onClose);
 
   // SubpopClose / OKButton: close the topmost (InSelector/sell/buyslots
   // first, then the Selector) — mirrors the legacy delegated handler.
