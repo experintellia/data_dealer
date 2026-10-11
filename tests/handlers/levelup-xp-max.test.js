@@ -18,7 +18,7 @@
  * the next level.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buyPerp, setEmitter, setSendAchievement } from '../../scripts/LocalEngine.js';
+import { buyKarma, buyPerp, setEmitter, setSendAchievement } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { installWebxdc, setSendDelta, uninstallWebxdc } from './_webxdc-harness.js';
 
@@ -93,5 +93,35 @@ describe('levelup — fires when xp lands exactly on xp_max', () => {
     expect(gv.xp_value).toBe(6);
     expect(gv.xp_level).toBe(1);
     expect(callsOfKind(spy, 'levelup')).toHaveLength(0);
+  });
+});
+
+describe('levelup — buyKarma uses the same xp_max rule', () => {
+  beforeEach(() => setOverride(FIXED_NOW));
+  afterEach(() => {
+    clearOverride();
+    setSendAchievement(null);
+  });
+
+  it('promotes xp_level when buyKarma lands xp_value exactly on xp_max', async () => {
+    // karma001 karma_points=5: xp 5 → 10 == L1.xp_max → L2 (ap_max 8).
+    setState(
+      mkState({
+        display_name: 'Eve',
+        locale: 'en',
+        game_values: mkGv({ xp_value: 5, xp_level: 1, cash_value: 5000 }),
+      })
+    );
+    const spy = mkAchievementSpy();
+
+    const { result } = await buyKarma('karma001');
+
+    expect(result.levelup).toBe(true);
+    const gv = getState().game_values;
+    expect(gv.xp_value).toBe(10);
+    expect(gv.xp_level).toBe(2);
+    expect(gv.ap_max).toBe(8);
+    expect(gv.ap_snapshot).toBe(8);
+    expect(callsOfKind(spy, 'levelup')).toHaveLength(1);
   });
 });

@@ -1001,17 +1001,6 @@ export function setPerpCoordinates(updates: unknown): Promise<{ result: 1 }> {
 // buyKarma handler
 // ---------------------------------------------------------------------------
 
-// Returns the matching level entry (or the last level for XP beyond the cap).
-function _findLevelByXP(levels: LevelEntry[], xp: number): LevelEntry {
-  for (var i = 0; i < levels.length; i++) {
-    var lvl = levels[i];
-    if (lvl && xp >= lvl.xp_min && xp <= lvl.xp_max) return lvl;
-  }
-  var last = levels[levels.length - 1];
-  if (!last) throw new Error('_findLevelByXP: empty levels');
-  return last;
-}
-
 /**
  * buyKarma(karmalauterGestalt) → Promise<{result}>
  *
@@ -1050,28 +1039,24 @@ export function buyKarma(
   var newCashSpent = (gv.cash_spent || 0) + td.price;
 
   var oldLevelNum = gv.xp_level || 1;
-  var newLevel = _findLevelByXP(ruleset.levels, newXp);
-  var levelup = newLevel.number > oldLevelNum;
+  var newLevel = _getLevelByXP(newXp);
+  var levelup = newLevel > oldLevelNum;
 
   var newGv: GameValues = Object.assign({}, gv, {
     xp_value: newXp,
     karma_value: newKarma,
     cash_value: newCash,
     cash_spent: newCashSpent,
-    xp_level: newLevel.number,
   });
 
-  if (levelup) newGv = _applyLevelUp(newGv, newLevel.number);
+  if (levelup) newGv = _applyLevelUp(newGv, newLevel);
 
   _persistDelta(_mkDelta(state.addr, 'buyKarma', [karmalauterGestalt], { game_values: newGv }));
 
   // Achievements
   var _bkDisplayName = state.display_name || state.addr;
   if (levelup) {
-    triggerAchievement(
-      'levelup',
-      _t('achievement_levelup', _bkDisplayName, String(newLevel.number))
-    );
+    triggerAchievement('levelup', _t('achievement_levelup', _bkDisplayName, String(newLevel)));
   }
   var _bkOldKarma = gv.karma_value || 0;
   if (_bkOldKarma !== 100 && newKarma === 100) {
