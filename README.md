@@ -56,8 +56,9 @@ It builds the HQ assets (lossless sprites): unlike a `.xdc`, which travels
 through a chat, the web version is served once and cached, so there is no
 bundle-size ceiling to trade quality against.
 
-`.github/workflows/pages.yml` deploys that `dist-pages/` to GitHub Pages on every
-push to `master` (repo setting: Settings → Pages → Source = "GitHub Actions").
+`.github/workflows/pages.yml` deploys that `dist-pages/` to GitHub Pages once the
+Tests workflow passes on a push to `master` (repo setting: Settings → Pages →
+Source = "GitHub Actions").
 Since there is no messenger to inject `webxdc.js`, the build ships the
 [`@webxdc/vite-plugins`](https://github.com/webxdc/vite-plugins) stub — the
 game is fully playable, "Add Peer" opens a second local player in a new tab,
