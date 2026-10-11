@@ -40,10 +40,6 @@ export function buildProvidedContext(groot: ProvidedContextRoot): ProvidedContex
 
 type Frame = { width?: number; height?: number; pivotx?: number; pivoty?: number };
 
-function spriteOf(v: unknown): SpriteHelperConfig | undefined {
-  return v as SpriteHelperConfig | undefined;
-}
-
 function normalFrame(cfg: SpriteHelperConfig | undefined): Frame | undefined {
   return (cfg as { frameMap?: { normal?: Frame } } | undefined)?.frameMap?.normal;
 }
@@ -69,8 +65,9 @@ function perpStyle(fm: Frame | undefined, box: number): string {
 }
 
 /** `values.html` — the `.PowerupLabelData` / `.PerpLabelData` value
- *  rows for an unlocked tile (price is rendered by the caller). */
-function buildValuesHtml(data: Record<string, unknown>): string {
+ *  rows for an unlocked tile (price is rendered by the caller).  Also
+ *  used by powerupView for the provided powerup tiles. */
+export function buildValuesHtml(data: Record<string, unknown>): string {
   const g = i18n.gettext.bind(i18n);
   const num = (v: unknown) => toKSNum((v as number) ?? 0);
   let h = '';
@@ -172,7 +169,7 @@ export interface ProvidedTileVM {
 /** `client.html` — Pusher tiles (PowerupBackground/Label). */
 function buildClientTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
   const data = perp.data;
-  const bg = spriteOf(data.perp_background);
+  const bg = data.perp_background as SpriteHelperConfig | undefined;
   const locked = perp.locked === true;
   let dataHtml = '';
   if (locked) {
@@ -187,7 +184,7 @@ function buildClientTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
     locked,
     extraClass: '',
     perpStyle: perpStyle(normalFrame(bg), 48),
-    renderPerpHtml: `<div class="PowerupBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PowerupSprite">${renderSpriteHtml(spriteOf(data.perp_sprite))}</div>`,
+    renderPerpHtml: `<div class="PowerupBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PowerupSprite">${renderSpriteHtml(data.perp_sprite as SpriteHelperConfig | undefined)}</div>`,
     labelHtml: crlf2html(data.label),
     labelClass: 'PowerupLabel',
     labelDataClass: 'PowerupLabelData',
@@ -209,10 +206,11 @@ function buildPerpTile(perp: ProvidedPerpRow, key: number, ctx: ProvidedContext)
   // slot_background sprite but left offset/size at 0/0/100/100 —
   // it did *not* pivot-centre by the slot frame (whose pivot is 0,0,
   // which would shove the tile +49px and bleed it across neighbours).
-  let bg = spriteOf(data.perp_background);
-  if (bg && isSuper) bg = spriteOf(data.perp_background2);
+  let bg = data.perp_background as SpriteHelperConfig | undefined;
+  if (bg && isSuper) bg = data.perp_background2 as SpriteHelperConfig | undefined;
   const styleFrame = normalFrame(bg);
-  if (!styleFrame && data.slot_background) bg = spriteOf(data.slot_background);
+  if (!styleFrame && data.slot_background)
+    bg = data.slot_background as SpriteHelperConfig | undefined;
   let dataHtml = '';
   if (locked) {
     const reqTokens = data.requiredTokens as
@@ -243,7 +241,7 @@ function buildPerpTile(perp: ProvidedPerpRow, key: number, ctx: ProvidedContext)
     locked,
     extraClass: data.is_city ? ' CityPerpSpecial' : '',
     perpStyle: perpStyle(styleFrame, 49),
-    renderPerpHtml: `<div class="PerpBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PerpSprite">${renderSpriteHtml(spriteOf(data.perp_sprite ?? data.slot_sprite))}</div>`,
+    renderPerpHtml: `<div class="PerpBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PerpSprite">${renderSpriteHtml((data.perp_sprite ?? data.slot_sprite) as SpriteHelperConfig | undefined)}</div>`,
     labelHtml: crlf2html(data.label),
     labelClass: 'PerpLabel',
     labelDataClass: 'PerpLabelData',
@@ -256,7 +254,7 @@ function buildPerpTile(perp: ProvidedPerpRow, key: number, ctx: ProvidedContext)
  *  box pivot 49, plain level-Requires locked branch). */
 function buildAgentTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
   const data = perp.data;
-  const bg = spriteOf(data.perp_background);
+  const bg = data.perp_background as SpriteHelperConfig | undefined;
   const locked = perp.locked === true;
   const reqLevel = (data.required_level as number | undefined) ?? 0;
   const dataHtml = locked
@@ -268,7 +266,7 @@ function buildAgentTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
     locked,
     extraClass: '',
     perpStyle: perpStyle(normalFrame(bg), 49),
-    renderPerpHtml: `<div class="PowerupBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PowerupSprite">${renderSpriteHtml(spriteOf(data.perp_sprite))}</div>`,
+    renderPerpHtml: `<div class="PowerupBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PowerupSprite">${renderSpriteHtml(data.perp_sprite as SpriteHelperConfig | undefined)}</div>`,
     labelHtml: crlf2html(data.label),
     labelClass: 'PowerupLabel',
     labelDataClass: 'PowerupLabelData',
@@ -288,7 +286,7 @@ function buildAgentTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
  *  one would suffice). */
 function buildPusherTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
   const data = perp.data;
-  const bg = spriteOf(data.perp_background);
+  const bg = data.perp_background as SpriteHelperConfig | undefined;
   const locked = perp.locked === true;
   let dataHtml: string;
   if (locked) {
@@ -312,7 +310,7 @@ function buildPusherTile(perp: ProvidedPerpRow, key: number): ProvidedTileVM {
     locked,
     extraClass: '',
     perpStyle: perpStyle(normalFrame(bg), 47),
-    renderPerpHtml: `<div class="PowerupBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PowerupSprite">${renderSpriteHtml(spriteOf(data.perp_sprite))}</div>`,
+    renderPerpHtml: `<div class="PowerupBackground">${renderSpriteHtml(bg, 'normal')}</div><div class="PowerupSprite">${renderSpriteHtml(data.perp_sprite as SpriteHelperConfig | undefined)}</div>`,
     labelHtml: crlf2html(data.label),
     labelClass: 'PowerupLabel',
     labelDataClass: 'PowerupLabelData',
@@ -342,7 +340,7 @@ function buildProvidedSubpop(
   return {
     key,
     gestalt: perp.gestalt,
-    logoHtml: renderSpriteHtml(spriteOf(data.popup_sprite)),
+    logoHtml: renderSpriteHtml(data.popup_sprite as SpriteHelperConfig | undefined),
     title: (data.title as string | undefined) ?? '',
     valuesDetailsHtml: buildValuesDetailsHtml(data, ctx.typeOf(perp.gestalt)),
     description: (data.description as string | undefined) ?? '',

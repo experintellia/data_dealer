@@ -13,6 +13,7 @@ import { crlf2html, sprintf, toKSNum, toTime } from '../dd-helpers.js';
 import i18n from '../i18n.js';
 import { type SpriteHelperConfig, renderSpriteHtml } from '../render/renderSpriteHelper.js';
 import { convertPowerupType } from './powerupTypes.js';
+import { buildValuesHtml } from './providedView.js';
 import { type TokenEntry, type TokenVM, buildToken } from './tokenView.js';
 
 const PKEYS = ['UpgradePowerup', 'AdPowerup', 'TeamMemberPowerup'] as const;
@@ -50,48 +51,6 @@ interface ProjectData {
   powerupsCached?: boolean;
   ProfileSet?: { tokens_set?: TokenEntry[] };
   [k: string]: unknown;
-}
-
-function spriteOf(v: unknown): SpriteHelperConfig | undefined {
-  return v as SpriteHelperConfig | undefined;
-}
-
-/** `values.html` — the unlocked `.PowerupLabelData` value rows for a
- *  provided powerup tile (price is rendered separately by the caller). */
-function buildValuesHtml(data: Record<string, unknown>): string {
-  const g = i18n.gettext.bind(i18n);
-  const num = (v: unknown) => toKSNum((v as number) ?? 0);
-  let h = '';
-  const tokens = data.tokens as unknown[] | undefined;
-  const consumed = data.consumed_tokens as unknown[] | undefined;
-  if (tokens?.length)
-    h += `<div class="Profiles"><div class="Buy Token"></div> ×${tokens.length}</div>`;
-  if (consumed?.length)
-    h += `<div class="Profiles consumed"><div class="Buy Token"></div> ×${consumed.length}</div>`;
-  if (data.collect_amount_modifier)
-    h += `<div class="Profiles">+${sprintf(g('%s Profiles'), data.collect_amount_modifier)}</div>`;
-  if (data.collect_amount)
-    h += `<div class="Profiles">${sprintf(g('%s Profiles'), data.collect_amount)}</div>`;
-  if (data.charge_cost_modifier)
-    h += `<div class="Invest">+$${num(data.charge_cost_modifier)} ${g('Invest')}</div>`;
-  if (data.charge_cost)
-    h += `<div class="Invest">$${num(data.charge_cost)} ${(data.button_text as string) ?? ''}</div>`;
-  if (data.income_base) h += `<div class="Invest">$${num(data.income_base)} ${g('income')}</div>`;
-  const risk = data.collect_risk as number | undefined;
-  if (risk)
-    h += `<div class="Risk ${risk < 0 ? 'Up' : 'Down'}"><div class="Buy Risk"></div>${toKSNum(Math.abs(risk))} ${g('Risk')}</div>`;
-  const riskMod = data.collect_risk_modifier as number | undefined;
-  if (riskMod)
-    h += `<div class="Risk ${riskMod < 0 ? 'Up' : 'Down'}"><div class="Buy Risk"></div>${toKSNum(Math.abs(riskMod))} ${g('Risk')}</div>`;
-  const karma = data.karma_points as number | undefined;
-  if (karma)
-    h += `<div class="Risk Up"><div class="Buy Risk"></div>${toKSNum(Math.abs(karma))} ${g('karma_image')}</div>`;
-  if (data.max_slots)
-    h += `<div class="Slots">${sprintf(g('proxy_buy can host %s projects'), data.max_slots)}</div>`;
-  const pp = data.provided_perps as unknown[] | undefined;
-  if (pp)
-    h += `<div class="ProvidedPerps">${sprintf((data.provided_perps_text as string) ?? '', pp.length)}</div>`;
-  return h;
 }
 
 /** `values_details_powerup.html` — the subpop `.BonusWrap` block for
@@ -243,7 +202,10 @@ function buildSlot(
         kind: 'locked',
         slot,
         subpopId: 'buyslots',
-        backgroundHtml: renderSpriteHtml(spriteOf(data.slot_background), 'locked'),
+        backgroundHtml: renderSpriteHtml(
+          data.slot_background as SpriteHelperConfig | undefined,
+          'locked'
+        ),
         spriteHtml: '',
         labelHtml: wordings.add_slots_label ?? '',
       };
@@ -252,7 +214,10 @@ function buildSlot(
       kind: 'free',
       slot,
       subpopId: `Provided${pkey}`,
-      backgroundHtml: renderSpriteHtml(spriteOf(data.slot_background), 'free'),
+      backgroundHtml: renderSpriteHtml(
+        data.slot_background as SpriteHelperConfig | undefined,
+        'free'
+      ),
       spriteHtml: '',
       labelHtml: wordings.empty_slot_label ?? '',
     };
@@ -262,8 +227,8 @@ function buildSlot(
     kind: 'taken',
     slot,
     subpopId: `${pkey}${slot}`,
-    backgroundHtml: renderSpriteHtml(spriteOf(pd.slot_background)),
-    spriteHtml: renderSpriteHtml(spriteOf(pd.slot_sprite)),
+    backgroundHtml: renderSpriteHtml(pd.slot_background as SpriteHelperConfig | undefined),
+    spriteHtml: renderSpriteHtml(pd.slot_sprite as SpriteHelperConfig | undefined),
     labelHtml: crlf2html(pd.label),
   };
 }
@@ -274,7 +239,7 @@ function buildSellSubpop(entry: PowerupRowLike, slot: number, pkey: PowerupPkey)
     subpopId: `${pkey}${slot}`,
     slot,
     gestalt: entry.gestalt,
-    logoHtml: renderSpriteHtml(spriteOf(pd.popup_sprite)),
+    logoHtml: renderSpriteHtml(pd.popup_sprite as SpriteHelperConfig | undefined),
     title: (pd.title as string | undefined) ?? '',
     valuesDetailsHtml: buildValuesDetailsPowerupHtml(pd),
     description: (pd.description as string | undefined) ?? '',
@@ -296,8 +261,11 @@ function buildProvidedTile(powerup: PowerupRowLike, xpLevel: number): ProvidedPo
     gestalt: powerup.gestalt,
     locked,
     newBadge: xpLevel === reqLevel,
-    backgroundHtml: renderSpriteHtml(spriteOf(pd.slot_background), 'normal'),
-    spriteHtml: renderSpriteHtml(spriteOf(pd.slot_sprite)),
+    backgroundHtml: renderSpriteHtml(
+      pd.slot_background as SpriteHelperConfig | undefined,
+      'normal'
+    ),
+    spriteHtml: renderSpriteHtml(pd.slot_sprite as SpriteHelperConfig | undefined),
     labelHtml: crlf2html(pd.label),
     priceText: toKSNum((powerup.price as number) ?? 0),
     dataHtml,
@@ -312,7 +280,7 @@ function buildProvidedSubpop(
   return {
     subpopId: `Provided${powerup.gestalt}`,
     gestalt: powerup.gestalt,
-    logoHtml: renderSpriteHtml(spriteOf(pd.popup_sprite)),
+    logoHtml: renderSpriteHtml(pd.popup_sprite as SpriteHelperConfig | undefined),
     title: (pd.title as string | undefined) ?? '',
     valuesDetailsHtml: buildValuesDetailsPowerupHtml(pd),
     description: (pd.description as string | undefined) ?? '',

@@ -60,16 +60,12 @@ export interface TokenPopupVM {
   chargeTimeText: string;
 }
 
-function spriteOf(v: unknown): SpriteHelperConfig | undefined {
-  return v as SpriteHelperConfig | undefined;
-}
-
 function buildTokenUpgradeSubpop(token: TokenEntry): TokenUpgradeSubpopVM {
   const data = (token.data ?? {}) as Record<string, unknown>;
   const t = token as TokenEntry & { doneAbsoluteAmount?: number };
   return {
     subpopId: `token${token.gestalt}`,
-    logoHtml: renderSpriteHtml(spriteOf(data.popup_sprite)),
+    logoHtml: renderSpriteHtml(data.popup_sprite as SpriteHelperConfig | undefined),
     title: (data.title as string | undefined) ?? '',
     todoLabel: i18n.gettext('subpopup_token Data not yet analyzed:'),
     todoText: toKSNum(t.diffAbsoluteAmount ?? 0),
