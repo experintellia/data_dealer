@@ -358,7 +358,7 @@ export class GameNode {
     this.jq = _$()(this);
     // GameRoot.loadGame() re-runs init(); $(this) shares the first wrapper's
     // handler store, so unbind before re-binding or every handler fires twice.
-    this.removeEventHandlers();
+    this.off();
     this.initEventHandlers();
   }
 
