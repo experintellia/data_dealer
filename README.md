@@ -7,7 +7,7 @@
 This repository is a port of the [Data Dealer](http://datadealer.com) browser game into a [webxdc](https://webxdc.org) mini-app — a self-contained, offline-capable application that runs inside a Delta Chat group.
 
 - **Runs completely offline** — no server, no account, no hosting bills. The entire game runs inside a Delta Chat group as a single `.xdc` file.
-- **Playable on phones** — the original layout assumed a desktop screen. Every dialog, the status bar and the game board were rebuilt for touch: full-screen bottom-anchored popups, drag-scrolling item grids, and layouts that hold together down to 375 px (iPhone SE). CI takes screenshots at that viewport on every pull request, so mobile is a tested target rather than a hope.
+- **Playable on phones** — the original layout assumed a desktop screen. Every dialog, the status bar and the game board were rebuilt for touch: full-screen bottom-anchored popups, drag-scrolling item grids, and layouts that hold together down to 375 px (iPhone SE). Playwright specs exercise that viewport on every pull request, so mobile is a tested target rather than a hope (the screenshot baselines run locally only; CI's Chromium anti-aliases differently).
 - **Try it in a browser first** — [experintellia.github.io/data_dealer](https://experintellia.github.io/data_dealer/) runs the same build as a plain web page, no messenger install required. Peer messaging is simulated locally there; the real thing needs Delta Chat.
 - **Each chat group is its own game lobby** — share the app into any group and it becomes an isolated game instance. Multiplayer without infrastructure.
 - **Your messenger name is your player name** — identity is pulled straight from Delta Chat, no sign-up required.
