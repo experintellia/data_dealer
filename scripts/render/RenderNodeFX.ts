@@ -534,7 +534,7 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
     // '50%':{'transform':'s1,1.1'},
     // '75%':{'transform':'s1.1'},
     // '100%':{'transform':'s1'}
-    this.FXSimpleCue({ scaleX: 1.1, sacaleY: 1 }, 37);
+    this.FXSimpleCue({ scaleX: 1.1, scaleY: 1 }, 37);
     this.FXSimpleCue({ scaleX: 1, scaleY: 1.1 }, 37);
     this.FXSimpleCue({ scaleX: 1.1, scaleY: 1.1 }, 37);
     this.FXSimpleCue({ scaleX: 1, scaleY: 1 }, 37);
