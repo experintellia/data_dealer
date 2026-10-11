@@ -1,4 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 /**
  * Synchronous fake-webxdc harness for handler unit tests.
  *

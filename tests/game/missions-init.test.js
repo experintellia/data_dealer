@@ -1,5 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
-//
 // Regression guards for Missions.initMissions completion handling.
 //
 // 1. Original #272 fix: when the server reports an empty/undefined

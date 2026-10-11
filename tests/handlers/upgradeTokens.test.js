@@ -1,4 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 /**
  * Regression for the "bought upgrade, data points still greyed out" bug.
  *

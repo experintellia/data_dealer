@@ -1,5 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
-//
 // Topscores.extendEventHandlers subscribes to `subscribePeersChanged` to
 // refresh the leaderboards on every peer ref change. Pre-fix the
 // returned unsubscribe handle was discarded ("Topscores lives for the

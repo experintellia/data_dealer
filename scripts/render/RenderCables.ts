@@ -125,20 +125,6 @@ export class RenderCable extends RenderNode {
     };
   }
 
-  getLength(): number {
-    // This is the old Bezier fallback, not in use currently
-    const p = this.getPoints();
-    const cx = p.p1.x < p.p5.x ? p.p1.x : p.p5.x;
-    const cy = p.p1.y < p.p5.y ? p.p1.y : p.p5.y;
-    const x = p.p1.x - cx + this.offsetX;
-    const y = p.p1.y - cy + this.offsetY;
-    const x2 = p.p5.x - cx + this.offsetX;
-    const y2 = p.p5.y - cy + this.offsetY;
-    const dx = x2 - x;
-    const dy = y2 - y;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-
   override draw(): void {
     if (this.hidden || this.progress <= 0) {
       this.css({ display: 'none' });

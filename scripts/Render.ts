@@ -22,9 +22,7 @@
 //     unchanged.
 
 import { registerTemplateHelpers } from './dd-helpers.js';
-import { RenderButtonInline } from './render/RenderButtonInline.js';
 import { RenderCable, RenderPerpCable } from './render/RenderCables.js';
-import { RenderCircle } from './render/RenderCircle.js';
 import {
   RenderDecorator,
   RenderDecoratorAmount,
@@ -46,7 +44,6 @@ import { RenderText } from './render/RenderText.js';
 import {
   RenderDBQueue,
   RenderMissionPerp,
-  RenderStatusItem,
   RenderStatusbar,
   RenderTopscorePerp,
   renderAmountHtml,
@@ -88,7 +85,6 @@ export interface RenderApi {
   DragHandler: typeof RenderDragHandler;
   Set: typeof RenderSet;
   Node: typeof RenderNode;
-  Circle: typeof RenderCircle;
   Text: typeof RenderText;
   Sprite: typeof RenderSprite;
   Perp: typeof RenderPerp;
@@ -107,7 +103,6 @@ export interface RenderApi {
   ViewTab: typeof RenderViewTab;
   ViewMap: typeof RenderViewMap;
   MainMenu: typeof RenderMainMenu;
-  ButtonInline: typeof RenderButtonInline;
   Stage: typeof RenderStage;
   SlowTicker: typeof RenderSlowTicker;
   Statusbar: typeof RenderStatusbar;
@@ -159,7 +154,6 @@ function Render(): RenderApi {
     DragHandler: RenderDragHandler,
     Set: RenderSet,
     Node: RenderNode,
-    Circle: RenderCircle,
     Text: RenderText,
     Sprite: RenderSprite,
     Perp: RenderPerp,
@@ -178,7 +172,6 @@ function Render(): RenderApi {
     ViewTab: RenderViewTab,
     ViewMap: RenderViewMap,
     MainMenu: RenderMainMenu,
-    ButtonInline: RenderButtonInline,
     Stage: RenderStage,
     SlowTicker: RenderSlowTicker,
     Statusbar: RenderStatusbar,

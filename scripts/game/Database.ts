@@ -53,10 +53,7 @@ type RenderMenuLike = Pick<InstanceType<RenderApi['MainMenu']>, 'addButton'>;
 
 interface RenderNodeLike {
   addChild?(node: unknown, ...args: unknown[]): void;
-  addPopup?(node: unknown): void;
   popupContainerDomelem?: { 0?: HTMLElement };
-  lock?(): void;
-  unlock?(): void;
   getPosition?(): { x: number; y: number };
   hide?(): void;
   parentNode?: { scrollTo?(pos: { x: number; y: number }): void };
@@ -408,16 +405,6 @@ export class Database extends GameNode {
     >;
     this.renderDBQueue.gameNode = this;
     this.renderApi?.addChild?.(this.renderDBQueue, true);
-  }
-
-  lock(): void {
-    // TODO: Lock Profileset Queue etc...
-    this.renderApi?.lock?.();
-  }
-
-  unlock(): void {
-    // TODO: Unlock Profileset Queue etc...
-    this.renderApi?.unlock?.();
   }
 
   cue(profileset: unknown, path: unknown, collect_id: unknown): ProfileSet {

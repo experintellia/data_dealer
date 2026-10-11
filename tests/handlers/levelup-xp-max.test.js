@@ -1,4 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 /**
  * Regression: level-up must fire when xp_value reaches the level's xp_max,
  * not only when it crosses into the next level's xp_min.

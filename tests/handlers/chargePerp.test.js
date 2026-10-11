@@ -1,4 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { chargePerp, loadGame, setEmitter } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';

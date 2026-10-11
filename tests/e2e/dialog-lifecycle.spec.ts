@@ -1561,12 +1561,9 @@ test.describe('Section M — Subpop close + simple TokenPerp', () => {
 //   scripts/LocalEngine.ts:10).  The AboutPopup Preact port dropped the
 //   Debug tab entirely, so this affordance no longer exists.
 //
-// - button_click.RefreshButton listener exists at GameNode.ts:807 but no
-//   template uses data-button-id="RefreshButton".  Dead handler.
-//
-// - button_click.UpgradeButton listener exists at GameNode.ts:787 (calls
-//   gnode.Charge) but no template uses data-button-id="UpgradeButton".
-//   Dead handler.
+// - button_click.RefreshButton / button_click.UpgradeButton listeners
+//   (GameNode.initPopupEvents) had no emitter — no template used either
+//   data-button-id.  Deleted together with GameRoot.refresh().
 //
 // If a phase 2 follow-up reintroduces any of these as a real affordance,
 // add a test alongside the new template / handler.

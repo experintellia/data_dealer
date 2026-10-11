@@ -25,8 +25,7 @@ export class RenderText extends RenderNode {
   }
 
   constructor(config: TextConfig = {}) {
-    // Respect a subclass-supplied jdomelem (e.g. ButtonInline's
-    // `<div class='Button'>` wrapper).  Only fall through to the
+    // Respect a subclass-supplied jdomelem.  Only fall through to the
     // default Text container when no subclass overrode it.
     const jdomelem = config.jdomelem ?? getRenderJQuery('RenderText')("<div class='Text'></div>");
     super({ ...config, jdomelem });
@@ -96,13 +95,5 @@ export class RenderText extends RenderNode {
     // which just echoes back a previously-locked CSS width.
     const el = this.domelem as HTMLElement;
     this.width = el.offsetWidth || el.scrollWidth || 200;
-  }
-
-  /** Note the legacy double-`s` typo: `ssetSize`.  Preserved here
-   *  because Render.js's existing call sites — and any external code
-   *  exercising the publisher — already use this name. */
-  ssetSize(): void {
-    this.updateRenderProp();
-    this.updateSize();
   }
 }

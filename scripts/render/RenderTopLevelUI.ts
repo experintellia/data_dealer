@@ -6,8 +6,6 @@
 //     bar.  Owns the silent-vs-FX update split (silent = `render()`
 //     once, no Tween queue churn) and the AP-tooltip "More Energy
 //     in N" loop.
-//   - `RenderStatusItem` — the stripe-sprite child each Statusbar
-//     icon mounts itself on top of (extends Sprite).
 //   - `RenderDBQueue` — the bottom-of-stage profile-set queue with
 //     its merge animation choreography (`FXMerge`) and bling-queue
 //     callbacks.
@@ -44,7 +42,7 @@ import { buildMissionCardProps } from '../game/missionView.js';
 import i18n from '../i18n.js';
 import setup from '../setup.js';
 import { type NodeConfig, RenderNode } from './RenderNode.js';
-import { RenderSprite, type SpriteConfig, type SpriteFrameMap } from './RenderSprite.js';
+import type { SpriteFrameMap } from './RenderSprite.js';
 import { type JQueryRenderElem, type JQueryRenderEvent, getRenderJQuery } from './_jqueryShim.js';
 import { renderSpriteHtml } from './renderSpriteHelper.js';
 
@@ -406,28 +404,6 @@ export class RenderStatusbar extends RenderNode {
   }
 }
 
-// ── StatusItem ──────────────────────────────────────────────────────────────
-
-const STATUS_ITEM_DEFAULT_FRAMEMAP: SpriteFrameMap = {
-  normal: { x: 36, y: 580, width: 128, height: 25, pivotx: 0, pivoty: 0 },
-};
-
-export type StatusItemConfig = SpriteConfig;
-
-export class RenderStatusItem extends RenderSprite {
-  constructor(config: StatusItemConfig = {}) {
-    const $ = getRenderJQuery('RenderTopLevelUI');
-    const jdomelem = $("<div class='StatusItem'></div>");
-    super({
-      ...config,
-      frameSrc: config.frameSrc ?? 'MainSprites.png',
-      frameMap: config.frameMap ?? STATUS_ITEM_DEFAULT_FRAMEMAP,
-      frame: 'normal',
-      jdomelem: jdomelem,
-    } as SpriteConfig);
-  }
-}
-
 // ── DBQueue ─────────────────────────────────────────────────────────────────
 
 export type DBQueueConfig = NodeConfig;
@@ -584,16 +560,6 @@ export class RenderDBQueue extends RenderNode {
   override tick(): void {
     this.render();
   }
-}
-
-// ── Popup ───────────────────────────────────────────────────────────────────
-
-interface PopupContainerLike {
-  renderNode: RenderNode & {
-    popupContainerDomelem?: JQueryRenderElem;
-  };
-  lock?(): void;
-  unlock?(): void;
 }
 
 // ── MissionPerp ─────────────────────────────────────────────────────────────

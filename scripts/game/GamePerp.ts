@@ -37,7 +37,6 @@ export interface RenderNodeLike {
   cableTo?(target: unknown, opts: { mode: CableType }): void;
   cableAnimatedTo?(target: unknown, opts: { mode: CableType }, cb?: () => void): void;
   addDecorator?(deco: unknown): unknown;
-  addPopup?(popup: unknown): void;
   hide?(): void;
   show?(): void;
   remove?(): void;
@@ -170,7 +169,6 @@ export class GamePerp extends GameNode {
   path?: string;
   noConnect?: boolean;
   popupTemplateData?: Record<string, unknown>;
-  highlightTabs?: string[];
 
   // -------------------------------------------------------------------
   // Typed accessors (consolidated cast seam, per PR #177 review)

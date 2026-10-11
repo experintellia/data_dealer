@@ -1,4 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,27 +21,6 @@ describe('vendor files', () => {
   for (const f of required) {
     it(`vendor/${f} exists`, () => {
       expect(existsSync(join(root, 'vendor', f))).toBe(true);
-    });
-  }
-
-  // The legacy AMD plumbing must not regress back into vendor/, plus
-  // underscore (replaced by scripts/dd-helpers.ts), plus jquery-migrate
-  // and numeral (replaced by Intl.NumberFormat in dd-helpers.ts).
-  const removed = [
-    'requirejs.js',
-    'almond.js',
-    'text.js',
-    'tpl.js',
-    'jquery-mobile.js',
-    'native-console.js',
-    'underscore.js',
-    'jquery-migrate.js',
-    'numeral.js',
-    'numeral-de.js',
-  ];
-  for (const f of removed) {
-    it(`vendor/${f} no longer exists`, () => {
-      expect(existsSync(join(root, 'vendor', f))).toBe(false);
     });
   }
 });

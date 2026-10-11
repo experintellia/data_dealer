@@ -127,7 +127,7 @@ export class RenderNode {
   declare sticky: boolean;
   declare extendClass: string | undefined;
 
-  // Optional links set by addChild / addDecorator / addPopup or by
+  // Optional links set by addChild / addDecorator or by
   // subclasses.  Declared as `T | undefined` (rather than optional
   // `T?`) so that legacy assignments such as `child.useDragHandler =
   // this.dragHandler` survive `exactOptionalPropertyTypes` even when
@@ -294,20 +294,6 @@ export class RenderNode {
     return child;
   }
 
-  addPopup(popup: RenderNode): RenderNode | undefined {
-    if (!this.popupContainerDomelem) {
-      return undefined;
-    }
-    this.popupContainerDomelem.empty();
-    this.popupContainerDomelem.append(popup.jdomelem);
-    popup.parentNode = this;
-    this.children.add(popup);
-    popup.dragHandler = popup.dragHandler ?? this.dragHandler;
-    popup.useDragHandler = this.dragHandler;
-    popup.onAddInit();
-    return popup;
-  }
-
   addDecorator(deco: RenderNode): RenderNode | string {
     if (!this.parentNode) {
       return 'Could not decorate';
@@ -329,10 +315,6 @@ export class RenderNode {
     deco.decoratedNode = this;
     this.parentNode.addChild(deco);
     return deco;
-  }
-
-  removeChild(node: RenderNode): void {
-    this.children.remove(node);
   }
 
   getPosition(): { x: number; y: number } {
@@ -398,22 +380,8 @@ export class RenderNode {
     };
   }
 
-  getScaledPosition(): { x: number; y: number } {
-    return {
-      x: this.x + this.getScaledSize().width / 2,
-      y: this.y + this.getScaledSize().height / 2,
-    };
-  }
-
   moveTo(pos: { x: number; y: number }): void {
     this.setPosition(pos);
-  }
-
-  moveBy(vector: { x: number; y: number }): void {
-    this.moveTo({
-      x: this.getPosition().x + vector.x,
-      y: this.getPosition().y + vector.y,
-    });
   }
 
   clipCablePos(newPos: { x: number; y: number }): { x: number; y: number } {

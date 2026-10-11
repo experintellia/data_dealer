@@ -31,22 +31,20 @@ export class Topscores extends GameNode {
   // Topscore instance.  Type-only override (`declare`); no runtime change.
   declare children: OrderedSet<Topscore>;
   ViewMap?: Topscores;
-  queue?: OrderedSet<unknown>;
   /** Unsubscribe handle returned by `bootMod.subscribePeersChanged()` in
    *  extendEventHandlers; invoked from remove() so the listener doesn't
    *  outlive the GameNode (see audit bug #8). */
   private _peersUnsub?: () => void;
 
   constructor(config?: GameNodeConfig) {
-    // The legacy constructor stamped these *before* calling init() so that
+    // The legacy constructor stamped this *before* calling init() so that
     // subclass extendEventHandlers() (called from init via initEventHandlers)
-    // could read this.queue / this.ViewMap.  Replicating the order here:
-    // super() runs first (which invokes init), but we can't pre-stamp before
-    // the super call.  Move the stamps to happen *after* super(): no
-    // observable difference because nothing in init() reads queue/ViewMap.
+    // could read this.ViewMap.  Replicating the order here: super() runs
+    // first (which invokes init), but we can't pre-stamp before the super
+    // call.  Move the stamp to happen *after* super(): no observable
+    // difference because nothing in init() reads ViewMap.
     super(config);
     this.ViewMap = this;
-    this.queue = new OrderedSet();
   }
 
   initTopscore(type: string | undefined): Topscore | undefined {

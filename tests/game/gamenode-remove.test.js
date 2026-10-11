@@ -1,5 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
-//
 // Regression guard for the GameNode.remove recursive-cleanup fix.
 // Pre-fix `remove()` only orphaned children (`delete child.parentNode`)
 // — leaving stale ids in `_instances` / `_ids` resolvable via

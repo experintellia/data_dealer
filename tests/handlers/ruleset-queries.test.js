@@ -1,4 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getPowerups, getProvidedPerps } from '../../scripts/LocalEngine.js';
 import { setState } from '../../scripts/boot.js';

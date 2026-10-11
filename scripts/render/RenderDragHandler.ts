@@ -104,15 +104,6 @@ export class RenderDragHandler {
     this.listeners.push(node);
   }
 
-  removeListener(node: DraggableNode): void {
-    const index = this.listeners.indexOf(node);
-    if (index !== -1) {
-      const listener = this.listeners[index];
-      if (listener) listener.trigger('dragend');
-      this.listeners.splice(index, 1);
-    }
-  }
-
   dragstart(e: DragEventLike): void {
     this.state = 'started';
     // FIXME: trigger touchhandling broken?!
@@ -249,46 +240,6 @@ export class RenderDragHandler {
       }
     });
     return coll;
-  }
-
-  getCollisions(_node?: DraggableNode): boolean {
-    if (this.collisionNodes.set.length === 0) {
-      return false;
-    }
-    // TODO: Calculate or store Bounding-Box on Perp generation for performance reasons
-    //       and to get better visual collisions (e.g. store in framemaps...)
-    const data: Array<{
-      tl: { x: number; y: number };
-      tr: { x: number; y: number };
-      bl: { x: number; y: number };
-      br: { x: number; y: number };
-    }> = [];
-    this.collisionNodes.each((other) => {
-      const posX = other.getPosition().x - other.offsetX;
-      const posY = other.getPosition().y - other.offsetY;
-      const width = other.getSize().width;
-      const height = other.getSize().height;
-      data.push({
-        tl: { x: posX, y: posY },
-        tr: { x: posX + width, y: posY },
-        bl: { x: posX, y: posY + height },
-        br: { x: posX + width, y: posY + height },
-      });
-    });
-
-    let i = data.length;
-    while (i--) {
-      let l = data.length;
-      while (l-- && l !== i) {
-        const a = data[i];
-        const b = data[l];
-        if (!a || !b) continue;
-        if (!(b.br.x < a.bl.x || b.bl.x > a.br.x || b.bl.y < a.tl.y || b.tl.y > a.bl.y)) {
-          return true;
-        }
-      }
-    }
-    return false;
   }
 
   init(): void {

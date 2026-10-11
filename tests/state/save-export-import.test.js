@@ -1,5 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
-//
 // Tests for the game-save export/import primitives (issue #127).
 //
 // Export must contain ONLY the current player's progress — never other

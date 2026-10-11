@@ -206,13 +206,6 @@ export class Mission extends GameNode {
       gnode.openMissionPopup();
     });
   }
-
-  override extendRender(): void {
-    // Legacy comment in Game.js — no-op when not active/complete.
-    if (!this.states.active && !this.states.complete) {
-      // gnode.renderNode.hide();
-    }
-  }
 }
 
 void appModule;

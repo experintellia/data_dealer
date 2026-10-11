@@ -1,4 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 /**
  * Regression: bootstrap.ts must invoke boot() even when the webxdc global
  * is absent. The legacy guard `typeof webxdc !== 'undefined'` skipped boot()

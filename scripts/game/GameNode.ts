@@ -232,7 +232,6 @@ interface RenderNodeLike {
   hidden?: boolean;
   jdomelem?: unknown;
   gameNode?: GameNode;
-  addPopup?(popup: unknown): void;
   FXError?(): void;
   FXNoCash?(): void;
   FXNoAP?(): void;
@@ -259,7 +258,6 @@ type RenderPopupLike = RenderPopupBase & RenderPopupGameNodeExtras;
 interface GameRootForGameNode {
   data: { status_icons?: unknown; [key: string]: unknown };
   renderNode?: RenderNodeLike;
-  refresh(): void;
   getTypeFromGestalt(gestalt: string): string | undefined;
 }
 
@@ -482,14 +480,6 @@ export class GameNode {
     }
   }
 
-  load(): void {
-    // FIXME: Do we need this?
-  }
-
-  save(): void {
-    // FIXME: Do we need this?
-  }
-
   addChild(child: GameNode): GameNode | false {
     // The GameNode Tree: Append a child to the GameNode.
     if (!child) {
@@ -521,11 +511,6 @@ export class GameNode {
     if (this.extendEventHandlers) {
       this.extendEventHandlers();
     }
-  }
-
-  removeEventHandlers(): void {
-    // Stupidly removes all event handlers.
-    this.off();
   }
 
   makeRenderConfig(): RenderConfig {
@@ -587,22 +572,6 @@ export class GameNode {
     this.renderData.parentNode = this.renderNodeParent;
     this.renderData.config = cfg as RenderConfig;
     return cfg as RenderConfig;
-  }
-
-  updateRenderNode(render?: RenderData): void {
-    // Test method: updates the rendered GameNode to the stored config.
-    // FIXME: this probably is pointless, better to reinit a specific node?
-    if (!this.renderData && !render) {
-      return;
-    }
-    if (render) {
-      this.renderData = render;
-    }
-    const rd = this.renderData;
-    if (rd && Object.prototype.hasOwnProperty.call(rd, 'config') && this.renderNode) {
-      this.renderNode.setAttrs?.(rd.config as RenderConfig);
-    }
-    this.renderNode?.draw?.();
   }
 
   render(): void {
@@ -696,10 +665,6 @@ export class GameNode {
         };
         remote.dismissMissionBriefing?.(gestalt);
       }
-      const subclass = this as GameNode & {
-        highlightTabs?: string[];
-      };
-      if (subclass.highlightTabs) subclass.highlightTabs = [];
       const rn = this.renderNode as RenderNodeLike | undefined;
       if (rn?.DecoratorNew && this.gestalt) {
         getAllByGestalt(this.gestalt).forEach((gn) => {
@@ -762,11 +727,6 @@ export class GameNode {
       }
     });
 
-    p.on('button_click.UpgradeButton', (e: unknown) => {
-      GameNode._stopProp(e);
-      (this as GameNode & { Charge?(): void }).Charge?.();
-    });
-
     const $ = globalThis.$ as JQueryStatic | undefined;
     p.jdomelem?.on('click touchend', 'a.ml', function (this: unknown, e: unknown) {
       GameNode._stopProp(e);
@@ -780,11 +740,6 @@ export class GameNode {
       GameNode._preventDefault(e);
       const link = $?.(this as object).attr?.('href');
       if (typeof link === 'string') window.open(link);
-    });
-
-    p.on('button_click.RefreshButton', (e: unknown) => {
-      GameNode._stopProp(e);
-      groot.refresh();
     });
   }
 

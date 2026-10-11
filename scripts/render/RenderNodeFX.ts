@@ -144,7 +144,6 @@ declare module './RenderNode.js' {
     FXSpinner(config?: FXSpinnerConfig, cb?: () => void): void;
     FXSpark(config?: FXSparkConfig, cb?: () => void): void;
     FXWheee(config?: FXSparkConfig & FXSpinnerConfig): void;
-    FXWheeeOld(config?: FXSparkConfig & FXSpinnerConfig): void;
     FXMeMeMe(cb?: () => void): void;
     FXNotMeMeMe(cb?: () => void): void;
     FXFeedMe(cb?: () => void): void;
@@ -165,11 +164,10 @@ declare module './RenderNode.js' {
     FXError(frame?: string, cb?: () => void): void;
     FXBlingQueue(config?: FXBlingConfig, cb?: () => void): void;
     FXBling(config: FXBlingConfig, cb?: () => void): void;
-    FXElasticTo(pos: { x: number; y: number }, callb?: () => void): TweenChain;
   }
 }
 
-// ── helper used by FXSpark / FXWheeeOld ─────────────────────────────────────
+// ── helper used by FXSpark ──────────────────────────────────────────────────
 
 interface QueueParentLike {
   domelem1?: HTMLElement;
@@ -425,93 +423,6 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
     this.FXSpark(config, () => {
       this.FXSpinner(config);
     });
-  };
-
-  proto.FXWheeeOld = function (this: RenderNode, config?: FXSparkConfig & FXSpinnerConfig): void {
-    const cfg = config ?? {};
-    const text = cfg.text ?? '';
-    const psid = cfg.psid;
-    let oPos = cfg.oPos;
-    const isnew = cfg.isnew ?? false;
-    const spinner = new RenderSprite({
-      frame: 'normal',
-      frameSrc: 'largespinner.png',
-      frameMap: {
-        normal: { x: 0, y: 0, width: 120, height: 120, pivotx: 60, pivoty: 60 },
-      },
-      z: -1,
-      opacity: 0,
-    } as SpriteConfig);
-    const spark = new RenderSprite({
-      x: 0,
-      y: 0,
-      frame: 'normal',
-      frameSrc: 'sprite_spark_big.png',
-      frameMap: {
-        normal: { x: 0, y: 0, width: 36, height: 36, pivotx: 18, pivoty: 18 },
-      },
-      z: 5000,
-      opacity: 1,
-    } as SpriteConfig);
-    tickerAddListener(this);
-    tickerAddListener(spinner);
-    tickerAddListener(spark);
-    this.DecoratorAmount?.hide();
-    spinner.setFrame('normal');
-    spark.setFrame('normal');
-
-    this.parentNode?.addChild(spark);
-    this.parentNode?.addChild(spinner);
-    const nPos = this.getPosition();
-    let oScale = 1;
-    if (psid && !oPos) {
-      const parent = this.parentNode;
-      oScale = 1 / (parent?.zoomScale ?? 1);
-      const computed = computeQueueItemOPos(psid, parent as QueueParentLike | undefined, oScale);
-      if (computed) oPos = computed;
-    }
-    if (!oPos) return;
-    spinner.setPosition(nPos);
-    const A = nPos.x - oPos.x;
-    const O = oPos.y - nPos.y;
-    const lenratio = Math.sqrt((oPos.x - nPos.x) ** 2 + (oPos.y - nPos.y) ** 2) / 108;
-    const dir = A > 0 ? 1 : -1;
-    const deg = Math.atan(O / Math.abs(A)) * (180 / Math.PI);
-
-    spark.setPosition({ x: oPos.x, y: oPos.y });
-    spark.rotate = 180 + (90 - deg) * dir;
-    spark.scaleX = oScale * 2;
-    spark.scaleY = oScale * 2;
-    const speed = 1;
-
-    Tween.get(spark)
-      .to({ scaleX: oScale * 2, scaleY: oScale * 2 }, 0, Ease.linear)
-      .wait(200)
-      .to({ scaleX: 0.5, scaleY: lenratio }, 100, Ease.linear)
-      .to({ scaleX: 1, x: nPos.x, y: nPos.y, opacity: 1 }, 300, Ease.easeOut)
-      .to({ scaleY: 1 }, 100, Ease.linear)
-      .call(() => {
-        spark.hide();
-        if (isnew) this.show();
-        this.FXBounce();
-      });
-
-    const sps = this.width > 80 ? 1.3 : 1;
-    Tween.get(spinner)
-      .wait(500)
-      .to({ scaleX: 0.8, scaleY: 0.8, rotate: 125 * speed, opacity: 0 }, 0, Ease.linear)
-      .to({ scaleX: sps, scaleY: sps, rotate: 0, opacity: 1 }, 250 * speed, Ease.linear)
-      .to({ scaleX: sps, scaleY: sps, rotate: -1000 * speed }, 2000 * speed, Ease.easeIn)
-      .to({ scaleX: 0.8, scaleY: 0.8, rotate: -2000 * speed, opacity: 0 }, 500 * speed, Ease.easeIn)
-      .call(() => {
-        tickerRemoveListener(this);
-        tickerRemoveListener(spinner);
-        this.FXBounce();
-        this.FXBling({ text });
-        this.DecoratorAmount?.show();
-        spinner.remove();
-        spark.remove();
-      });
   };
 
   proto.FXMeMeMe = function (this: RenderNode, cb?: () => void): void {
@@ -1032,19 +943,5 @@ export function applyRenderNodeFX(deps: RenderNodeFXDeps): void {
       bling.remove();
       if (cb) cb();
     });
-  };
-
-  proto.FXElasticTo = function (
-    this: RenderNode,
-    pos: { x: number; y: number },
-    callb?: () => void
-  ): TweenChain {
-    tickerAddListener(this);
-    return Tween.get(this, { override: true })
-      .to({ x: pos.x, y: pos.y }, 500, Ease.elasticOut)
-      .call(() => {
-        if (callb) callb();
-        tickerRemoveListener(this);
-      });
   };
 }

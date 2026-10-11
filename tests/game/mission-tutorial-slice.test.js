@@ -1,5 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
-//
 // Regression guard for the Mission.checkTutorial off-by-one fix in
 // scripts/game/Mission.ts. `deletefrom` records the index of the *last
 // completed* tutorial step (either buyPerp already in IPerps or
