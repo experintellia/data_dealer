@@ -1355,7 +1355,7 @@ export function buyPowerup(
     cash_value: cashValue - price,
     cash_spent: (state.game_values.cash_spent || 0) + price,
     xp_value: newXp,
-    karma_value: (state.game_values.karma_value || 0) + 1,
+    karma_value: Math.min(100, Math.max(-100, (state.game_values.karma_value || 0) + 1)),
   });
   if (levelup) newGameValues = _applyLevelUp(newGameValues, _getLevelByXP(newXp));
 

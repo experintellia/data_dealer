@@ -815,6 +815,18 @@ describe('buyPowerup — happy path', () => {
     expect(result.game_values.karma_value).toBe(before + 1);
   });
 
+  it('clamps karma_value at 100', async () => {
+    // Unclamped 101 made the next integrateCollected clamp back to 100 and
+    // re-fire the karma_saint achievement.
+    setState(
+      mkProjectState({
+        game_values: Object.assign({}, freshState('test@local').game_values, { karma_value: 100 }),
+      })
+    );
+    const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
+    expect(result.game_values.karma_value).toBe(100);
+  });
+
   it('applies charge_cost_modifier to charge_cost', async () => {
     // project001 base charge_cost=190, ad002 modifier=35 → 225
     const { result } = await buyPowerup(PROJECT_NODE.full_path, 0, 'ad002');
