@@ -2587,10 +2587,12 @@ function _scheduleChargeReady(entry: ChargingEntry): void {
 }
 
 // ---------------------------------------------------------------------------
-// PRNG — Mulberry32, seeded for deterministic tests.
-// Call setPrngSeed(n) before any handler invocation that uses RNG.
+// PRNG — Mulberry32, seeded per launch (a constant seed replayed the same
+// karma-incident rolls after every reopen).  Rolls are persisted in the
+// deltas, never re-rolled on replay.  Tests call setPrngSeed(n) for
+// deterministic results.
 // ---------------------------------------------------------------------------
-var _prngSeed = 0xdeadbeef;
+var _prngSeed = crypto.getRandomValues(new Uint32Array(1))[0] as number;
 
 /**
  * Seed the deterministic PRNG used for charge-amount jitter.
