@@ -8,7 +8,7 @@
 //
 // The Data tab (profileset + Charge/Collect) is structurally identical
 // to popup_contact, so it reuses the shared tokenView VM + the
-// perpShared TokenTile/TokenSubpop/fireAction pieces.
+// perpShared TokenTab / ChargeCollectButtons pieces.
 
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
@@ -27,9 +27,7 @@ import { type PreactDialogHandle, stopAndClose } from './dialogManager.js';
 import {
   ChargeCollectButtons,
   ProvidedPowerupSubpopDialog,
-  TokenSubpop,
-  TokenSubpopDialog,
-  TokenTile,
+  TokenTab,
   fireAction,
   isMobileWidth,
   openSubpopDialog,
@@ -575,16 +573,6 @@ function numToK(n: number): string {
 export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectPopupProps) {
   const [vm, setVm] = useState(initialVm);
   const [activeTab, setActiveTab] = useState(initialVm.initialTab);
-  // Data-tab profileset token subpop (Contact-shaped).
-  const [openToken, setOpenToken] = useState<string | null>(null);
-  const handleOpenToken = (gestalt: string): void => {
-    if (isMobileWidth()) {
-      const token = vm.tokens.find((t) => t.gestalt === gestalt);
-      if (token) openSubpopDialog(TokenSubpopDialog, { token });
-    } else {
-      setOpenToken(gestalt);
-    }
-  };
   // Powerup-tab subpop state. `selPkey` = which category's buy Selector
   // is open; `subId` = a card open on top (sell `<pkey><slot>`,
   // `buyslots`, or an InSelector `Provided<gestalt>`).
@@ -713,44 +701,14 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
         />
       </div>
       <div class="PopupContent">
-        <div
-          class={`PopupTab data${dataActive ? '' : ' hidden'}${openToken ? ' hasPopup' : ''}`}
-          data-tab="data"
-        >
-          <div class={openToken ? 'SubpopContainer open' : 'SubpopContainer'}>
-            {vm.tokens.map((t) => (
-              <TokenSubpop
-                key={t.gestalt}
-                token={t}
-                isOpen={openToken === t.gestalt}
-                onClose={() => setOpenToken(null)}
-              />
-            ))}
-          </div>
-          {/* The profiles/risk summary renders before the grid so it
-              sits *above* it.  Desktop pins the chips absolute
-              (`.PopupSummary { top:192px }`, held on top of the grid by
-              `z-index:1`); mobile flows them static, where this earlier
-              DOM position is what stacks them above the grid — parity
-              with the desktop layout. */}
-          <div class="PopupSummary">
-            <div class="PopupSummaryItem Profiles">
-              <div class="RenderSprite Tobi" />
-              {vm.summaryProfiles}
-            </div>
-            <div class={`PopupSummaryItem Risk ${vm.summaryRiskUp ? 'Up' : 'Down'}`}>
-              <div class="RenderSprite Tobi" />
-              {vm.summaryRisk}
-            </div>
-          </div>
-          <div class="Pagination">
-            <div class="PopupTokens">
-              {vm.tokens.map((t) => (
-                <TokenTile key={t.gestalt} token={t} onOpen={handleOpenToken} />
-              ))}
-            </div>
-          </div>
-        </div>
+        <TokenTab
+          tokens={vm.tokens}
+          summaryProfiles={vm.summaryProfiles}
+          summaryRisk={vm.summaryRisk}
+          summaryRiskUp={vm.summaryRiskUp}
+          tabClass={`PopupTab data${dataActive ? '' : ' hidden'}`}
+          dataTab="data"
+        />
 
         {!vm.cached ? (
           <div class="PopupContentLoading">
