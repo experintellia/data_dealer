@@ -7,8 +7,10 @@
 //
 // Version notes (divergences from original bower.json pins):
 //   jquery        bower: 2.0.3      npm: latest (4.x) — API-compatible for boot path
+//   easeljs       bower: 0.6.1      npm: latest (1.x) — only used post-getToken
 //   tweenjs       bower: 0.4.1      npm: latest (1.x) — only used post-getToken
 //   preloadjs     bower: 0.3.1      npm: latest (1.x) — LoadQueue API is stable
+//   soundjs       bower: 0.4.1      npm: latest (1.x) — only used post-getToken
 //   zynga-animate — no npm pkg; vendored verbatim
 //   zynga-scroller — no npm pkg; vendored from upstream + AMD wrapper
 //
@@ -62,11 +64,15 @@ function cp(src: string, dest: string): void {
 
 console.log('Installing npm-sourced vendor packages…');
 run('npm init -y');
-run(['npm install --save-exact', 'jquery', 'tweenjs', 'sprintf-js'].join(' '));
+run(
+  ['npm install --save-exact', 'jquery', 'easeljs', 'tweenjs', 'soundjs', 'sprintf-js'].join(' ')
+);
 
 console.log('\nCopying to vendor/…');
 cp('jquery/dist/jquery.min.js', 'jquery.js');
+cp('easeljs/lib/easeljs.min.js', 'easeljs.js');
 cp('tweenjs/lib/tweenjs.min.js', 'tweenjs.js');
+cp('soundjs/lib/soundjs.min.js', 'soundjs.js');
 cp('sprintf-js/dist/sprintf.min.js', 'sprintf.js');
 
 console.log('\nVendor population complete.');

@@ -37,9 +37,6 @@ describe('vendor files', () => {
     'jquery-migrate.js',
     'numeral.js',
     'numeral-de.js',
-    // tweenjs.js carries its own Ticker; the game never used Easel/Sound.
-    'easeljs.js',
-    'soundjs.js',
   ];
   for (const f of removed) {
     it(`vendor/${f} no longer exists`, () => {
