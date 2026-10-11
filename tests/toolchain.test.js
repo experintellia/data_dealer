@@ -12,9 +12,7 @@ describe('vendor files', () => {
   // The libs index.html `<script>`-loads, in dependency order.
   const required = [
     'jquery.js',
-    'easeljs.js',
     'tweenjs.js',
-    'soundjs.js',
     'sprintf.js',
     'zynga-animate.js',
     'zynga-scroller.js',
@@ -39,6 +37,9 @@ describe('vendor files', () => {
     'jquery-migrate.js',
     'numeral.js',
     'numeral-de.js',
+    // tweenjs.js carries its own Ticker; the game never used Easel/Sound.
+    'easeljs.js',
+    'soundjs.js',
   ];
   for (const f of removed) {
     it(`vendor/${f} no longer exists`, () => {

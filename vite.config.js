@@ -24,9 +24,10 @@ function readVendorLibs() {
   const libs = [
     'vendor/jquery.js',
     'vendor/sprintf.js',
-    'vendor/easeljs.js',
+    // ponytail: tweenjs.js is the standalone CreateJS build (own Ticker,
+    // EventDispatcher, Event) — the game only touches Tween / Ease / Ticker,
+    // so EaselJS and SoundJS are not shipped.
     'vendor/tweenjs.js',
-    'vendor/soundjs.js',
     'vendor/zynga-animate.js',
     'vendor/zynga-scroller.js',
   ];
@@ -396,10 +397,10 @@ export default defineConfig({
     // config rather than implicit in Vite version bumps.
     assetsInlineLimit: 4096,
     // Vite's default 500 kB warning fires noisily on every build.  Vendor
-    // libs (~520 kB unminified) are now prepended as a banner and counted
+    // libs (~150 kB) are now prepended as a banner and counted
     // toward the Rollup chunk size before esbuild re-minifies them.  Raise
     // the threshold to 2000 kB so the warning only fires for truly unexpected
-    // growth; esbuild's final output should be ~1.3–1.4 MB.
+    // growth; esbuild's final output should be ~1.1–1.2 MB.
     chunkSizeWarningLimit: 2000,
     rollupOptions: {
       input: 'scripts/esm-entry.js',
