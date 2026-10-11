@@ -155,29 +155,6 @@ describe('dist/css/*.css are minified', () => {
   }
 });
 
-// Regression guard for the JSON-compaction plugin (minifyStaticJson) in
-// vite.config.js.  Source rulesets and i18n catalogs are pretty-printed
-// with 2-space indent; the plugin re-stringifies without whitespace at
-// closeBundle.  Verify the indentation is gone — newline + space at the
-// start of any inner line is the unambiguous signal.
-describe('dist/data + dist/i18n JSON is whitespace-stripped', () => {
-  const samples = [
-    join('data', 'ruleset_base.json'),
-    join('i18n', 'ruleset.en.json'),
-    join('i18n', 'ruleset.de.json'),
-    join('i18n', 'de_AT.json'),
-  ];
-  for (const rel of samples) {
-    it(`dist/${rel} has no indented lines`, async () => {
-      const { readFileSync } = await import('node:fs');
-      const text = readFileSync(join(root, 'dist', rel), 'utf8');
-      // JSON.stringify(x) with no third arg produces zero internal
-      // whitespace; \n  signals the source pretty-print survived.
-      expect(text).not.toMatch(/\n\s/);
-    });
-  }
-});
-
 // Both variants ship the same files (manifest, icon, scripts, etc.) — the
 // casual variant just has palette-quantized PNGs.  Run the same structural
 // assertions against both, plus a per-variant size sanity warning.
@@ -219,13 +196,14 @@ describe.each([
   it('contains static asset directories', () => {
     const listing = listXdc();
     expect(listing).toMatch(/\bimg\//);
-    expect(listing).toMatch(/\bi18n\//);
     expect(listing).toMatch(/\bcss\//);
     expect(listing).toMatch(/\bscripts\//);
     expect(listing).toMatch(/\bfont\//);
-    expect(listing).toMatch(/\bdata\//);
-    // views/*.html are `?raw`-imported into esm-bundle.js — no standalone dir.
+    // views/*.html (`?raw`) and data/ + i18n/ JSON are imported into
+    // esm-bundle.js — no standalone dirs.
     expect(listing).not.toMatch(/\bviews\//);
+    expect(listing).not.toMatch(/\bdata\//);
+    expect(listing).not.toMatch(/\bi18n\//);
     // Vendor libs are bundled into esm-bundle.js (#192); no vendor/ dir.
     expect(listing).not.toMatch(/\bvendor\//);
   });

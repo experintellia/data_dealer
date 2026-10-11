@@ -1,12 +1,4 @@
-import {
-  cpSync,
-  existsSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildXDC } from '@webxdc/vite-plugins';
@@ -96,61 +88,6 @@ function swapInCasualAssets() {
       console.log(
         `[swap-in-casual-assets] ${outDir}/img/ and ${outDir}/icon.png replaced with casual variants`
       );
-    },
-  };
-}
-
-// Strip whitespace from runtime-loaded JSON (rulesets in data/, locale
-// catalogs in i18n/).  These files are copied verbatim by
-// vite-plugin-static-copy from the source-tree pretty-printed originals;
-// inside the .xdc the indentation is dead bytes — JSON.parse / stringify
-// cuts ~38% (1.24 MB → 770 kB on the current ruleset corpus) with no
-// runtime semantics change.
-//
-// Order in plugins[] matters: this must run AFTER viteStaticCopy (so
-// the files exist in dist/) and BEFORE buildXDC zips dist/.
-function minifyStaticJson() {
-  const targets = [`${outDir}/data`, `${outDir}/i18n`];
-  const root = fileURLToPath(new URL('.', import.meta.url));
-
-  function walkJson(dir) {
-    const out = [];
-    for (const name of readdirSync(dir)) {
-      const full = join(dir, name);
-      if (statSync(full).isDirectory()) out.push(...walkJson(full));
-      else if (name.endsWith('.json')) out.push(full);
-    }
-    return out;
-  }
-
-  return {
-    name: 'minify-static-json',
-    apply: 'build',
-    closeBundle() {
-      let totalSaved = 0;
-      let fileCount = 0;
-      for (const rel of targets) {
-        const dir = join(root, rel);
-        if (!existsSync(dir)) continue;
-        for (const f of walkJson(dir)) {
-          const original = readFileSync(f, 'utf-8');
-          // Re-stringify without whitespace.  Throws on malformed JSON
-          // — we want that: a bad ruleset should fail the build, not
-          // silently ship.
-          const compact = JSON.stringify(JSON.parse(original));
-          if (compact.length < original.length) {
-            writeFileSync(f, compact);
-            totalSaved += original.length - compact.length;
-            fileCount++;
-          }
-        }
-      }
-      if (fileCount > 0) {
-        const kb = (totalSaved / 1024).toFixed(1);
-        console.log(
-          `[minify-static-json] compacted ${fileCount} file${fileCount === 1 ? '' : 's'}, saved ${kb} kB`
-        );
-      }
     },
   };
 }
@@ -444,14 +381,12 @@ export default defineConfig({
         { src: 'font/Skranji-Regular.ttf', dest: '' },
         { src: 'font/SourceSansPro-Black.woff', dest: '' },
         { src: 'font/LICENSE', dest: '' },
-        // views/*.html templates are now `?raw`-imported and bundled
-        // into esm-bundle.js; the directory itself is no longer shipped.
-        { src: 'data', dest: '' },
-        { src: 'i18n', dest: '' },
+        // views/*.html, data/*.json and i18n/*.json are imported into
+        // esm-bundle.js; none of those directories is shipped.  Their
+        // CC BY-SA notice ships as LICENSE-ASSETS.txt + CREDITS.txt above.
       ],
     }),
     swapInCasualAssets(),
-    minifyStaticJson(),
     isPages
       ? pagesWebxdc()
       : buildXDC({ inDir: 'dist', outDir: '.', outFileName: `data-dealer-${variant}.xdc` }),
