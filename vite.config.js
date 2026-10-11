@@ -208,10 +208,6 @@ function bundleEsmDev() {
           configFile: false,
           root: process.cwd(),
           logLevel: 'error',
-          esbuild: {
-            jsx: 'automatic',
-            jsxImportSource: 'preact',
-          },
           build: {
             write: false,
             emptyOutDir: false,
@@ -296,16 +292,10 @@ export default defineConfig({
   root: '.',
   publicDir: false,
 
-  // JSX → Preact via esbuild's automatic runtime (`preact/jsx-runtime`).
-  // Using esbuild config instead of `@preact/preset-vite` because the .xdc
-  // bundle is built by an inline `build()` call (see `bundleEsmDev` above
-  // and the `rollupOptions` in `build` below) with `configFile: false`,
-  // which doesn't pick up plugins from this config.  HMR / debug-name
-  // niceties from the preset aren't needed in the webxdc target anyway.
-  esbuild: {
-    jsx: 'automatic',
-    jsxImportSource: 'preact',
-  },
+  // ponytail: JSX → Preact (`preact/jsx-runtime`) comes from tsconfig.json's
+  // `jsx: react-jsx` + `jsxImportSource: preact`, which Vite 8's Oxc
+  // transform reads per file — also for the `configFile: false` build() in
+  // bundleEsmDev, so neither needs an esbuild/oxc jsx block.
 
   server: {
     port: 3000,
@@ -329,10 +319,6 @@ export default defineConfig({
     // shipping original-source paths to end users.  Gated via
     // BUILD_RELEASE=1 (set by .github/workflows/test.yml on tag builds).
     sourcemap: !isRelease,
-    // Default is 4096; pin it so the threshold for inlining small icons
-    // / fonts vs. shipping them as separate dist/ files is visible in
-    // config rather than implicit in Vite version bumps.
-    assetsInlineLimit: 4096,
     // Vite's default 500 kB warning fires noisily on every build.  Vendor
     // libs (~150 kB) are now prepended as a banner and counted
     // toward the Rollup chunk size before esbuild re-minifies them.  Raise
