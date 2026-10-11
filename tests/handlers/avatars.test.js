@@ -8,8 +8,8 @@
  *     reveals the slot once one of the images fires onload, so feature
  *     detection is per-leaderboard and runs entirely in the DOM.
  *
- * The image-load gate itself is DOM-only (onload="..." inline handler in
- * views/topscore_list.html) and not unit-tested here.
+ * The image-load gate itself is DOM-only (onLoad/onError in
+ * scripts/components/TopscoreCard.tsx) and not unit-tested here.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getRanking } from '../../scripts/LocalEngine.js';

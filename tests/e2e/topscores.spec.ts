@@ -205,3 +205,28 @@ test('topscores: a state.peers mutation refreshes the leaderboard without manual
   const bobRow = page.locator('[data-testid="dd-leaderboard-row-bob@test"]').first();
   await expect(bobRow.locator('.TopscoreValue')).toContainText('999');
 });
+
+test('topscores: peer display names and addrs render as text, never as HTML', async ({ page }) => {
+  await page.goto('/?devtools=1');
+  await waitForGameReady(page);
+
+  // Any chat member picks their own display name and can forge the addr in
+  // their updates — both must stay inert in every other player's leaderboard.
+  const EVIL_NAME = '<img src=x onerror="window.__ddXss=1">';
+  const EVIL_ADDR = 'eve@test"><img src=x onerror="window.__ddXss=2">';
+  await seedAndRender(
+    page,
+    {
+      'alice@local': mkPeer({ display_name: 'Alice', last_seen_ts: Date.now() }),
+      'mallory@test': mkPeer({ display_name: EVIL_NAME, cash: 5, last_seen_ts: Date.now() }),
+      [EVIL_ADDR]: mkPeer({ display_name: 'Eve', cash: 3, last_seen_ts: Date.now() }),
+    },
+    'alice@local'
+  );
+
+  const row = page.locator('[data-testid="dd-leaderboard-row-mallory@test"]').first();
+  await expect(row).toBeAttached();
+  await expect(row.locator('.TopscoreDisplayname')).toHaveText(EVIL_NAME);
+  await expect(page.locator('.TopscoreList img[src="x"]')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__ddXss)).toBeUndefined();
+});
