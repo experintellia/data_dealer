@@ -8,26 +8,10 @@ import { ProvidedPerpPopup } from '../components/popups/ProvidedPerpPopup.js';
 import i18n from '../i18n.js';
 import { type GameNodeConfig } from './GameNode.js';
 import { GamePerp, type RenderNodeLike, type RenderPopupLike } from './GamePerp.js';
-import type { ProvidedContext } from './providedView.js';
 import { buildProxyPopupVM } from './proxyView.js';
-
-interface GameRootForProvided {
-  xp_level: { number: number };
-  DBTokens: Record<string, number>;
-  getTypeFromGestalt(gestalt?: string): string;
-}
 
 export class ProxyPerp extends GamePerp {
   override renderType = 'Perp';
-
-  private providedCtx(): ProvidedContext {
-    const g = this.groot as unknown as GameRootForProvided;
-    return {
-      xpLevel: g.xp_level.number,
-      dbTokens: g.DBTokens,
-      typeOf: (gestalt: string) => g.getTypeFromGestalt(gestalt),
-    };
-  }
 
   override openPopup(): RenderPopupLike {
     const vm = buildProxyPopupVM(
@@ -63,13 +47,7 @@ export class ProxyPerp extends GamePerp {
       ProxyPerp._stopProp(e);
       const dataRec = gnode.data as { used_slots?: number };
       dataRec.used_slots = gnode.children.set.length;
-      gnode.fetchProvided?.(function () {
-        gnode.compileProvided();
-        if (gnode.renderPopup) {
-          gnode.updatePopup();
-        }
-      });
-      gnode.openPopup();
+      gnode.openPopupAndRefetchProvided();
     });
 
     gnode.on('after_render', function () {
