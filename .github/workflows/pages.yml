@@ -8,7 +8,10 @@ name: Deploy to GitHub Pages
 # Requires Settings → Pages → Source = "GitHub Actions" (one-time).
 
 on:
-  push:
+  # Deploy only what the Tests workflow passed on master.
+  workflow_run:
+    workflows: [Tests]
+    types: [completed]
     branches: [master]
   workflow_dispatch:
 
@@ -24,6 +27,12 @@ concurrency:
 jobs:
   deploy:
     name: Build and deploy
+    # `branches` above also matches a fork PR whose head branch is called
+    # master, so require a push run.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -31,6 +40,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The commit Tests ran on, not the branch tip (empty on dispatch).
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - uses: pnpm/action-setup@v4
         with:
