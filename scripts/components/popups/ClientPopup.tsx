@@ -5,7 +5,7 @@
 // seam as Contact.  Token tile / subpop / grid / action seam are
 // the shared `perpShared.tsx`.
 
-import { useCallback, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import type { ClientPopupVM } from '../../game/clientView.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
@@ -29,19 +29,16 @@ export interface ClientPopupProps {
 export function ClientPopup({ vm, onClose, popup }: ClientPopupProps) {
   const [openToken, setOpenToken] = useState<string | null>(null);
 
-  const handleOpenToken = useCallback(
-    (gestalt: string) => {
-      if (isMobileWidth()) {
-        const token =
-          vm.providedTokens.find((t) => t.gestalt === gestalt) ??
-          vm.consumedTokens.find((t) => t.gestalt === gestalt);
-        if (token) openSubpopDialog(TokenSubpopDialog, { token });
-      } else {
-        setOpenToken(gestalt);
-      }
-    },
-    [vm.providedTokens, vm.consumedTokens]
-  );
+  const handleOpenToken = (gestalt: string): void => {
+    if (isMobileWidth()) {
+      const token =
+        vm.providedTokens.find((t) => t.gestalt === gestalt) ??
+        vm.consumedTokens.find((t) => t.gestalt === gestalt);
+      if (token) openSubpopDialog(TokenSubpopDialog, { token });
+    } else {
+      setOpenToken(gestalt);
+    }
+  };
 
   return (
     <div class="PopupBody">

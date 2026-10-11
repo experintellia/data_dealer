@@ -3,7 +3,7 @@
 // Issue #80 phase 2 tier 5a.  Token tile / subpop / pagination /
 // action-button seam live in `perpShared.tsx` (shared with Client).
 
-import { useCallback, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import type { ContactPopupVM } from '../../game/contactView.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
@@ -27,17 +27,14 @@ export interface ContactPopupProps {
 export function ContactPopup({ vm, onClose, popup }: ContactPopupProps) {
   const [openToken, setOpenToken] = useState<string | null>(null);
 
-  const handleOpenToken = useCallback(
-    (gestalt: string) => {
-      if (isMobileWidth()) {
-        const token = vm.tokens.find((t) => t.gestalt === gestalt);
-        if (token) openSubpopDialog(TokenSubpopDialog, { token });
-      } else {
-        setOpenToken(gestalt);
-      }
-    },
-    [vm.tokens]
-  );
+  const handleOpenToken = (gestalt: string): void => {
+    if (isMobileWidth()) {
+      const token = vm.tokens.find((t) => t.gestalt === gestalt);
+      if (token) openSubpopDialog(TokenSubpopDialog, { token });
+    } else {
+      setOpenToken(gestalt);
+    }
+  };
 
   return (
     <div class="PopupBody ContactPerp">

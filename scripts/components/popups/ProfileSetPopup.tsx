@@ -5,7 +5,7 @@
 // summary and one Import MainButton (routed through the same
 // `fireAction` seam, wired to `Database.mergeCued`).
 
-import { useCallback, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import type { ProfileSetPopupVM } from '../../game/profilesetView.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
@@ -29,17 +29,14 @@ export interface ProfileSetPopupProps {
 export function ProfileSetPopup({ vm, onClose, popup }: ProfileSetPopupProps) {
   const [openToken, setOpenToken] = useState<string | null>(null);
 
-  const handleOpenToken = useCallback(
-    (gestalt: string) => {
-      if (isMobileWidth()) {
-        const token = vm.tokens.find((t) => t.gestalt === gestalt);
-        if (token) openSubpopDialog(TokenSubpopDialog, { token });
-      } else {
-        setOpenToken(gestalt);
-      }
-    },
-    [vm.tokens]
-  );
+  const handleOpenToken = (gestalt: string): void => {
+    if (isMobileWidth()) {
+      const token = vm.tokens.find((t) => t.gestalt === gestalt);
+      if (token) openSubpopDialog(TokenSubpopDialog, { token });
+    } else {
+      setOpenToken(gestalt);
+    }
+  };
 
   return (
     <div class="PopupBody">

@@ -5,7 +5,7 @@
 // SuperToken profileset grid + Compute/Update footer.  Reuses the
 // shared TokenTile/TokenGrid/fireAction + the TokenUpgradeSubpop.
 
-import { useCallback, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import type { TokenPopupVM } from '../../game/tokenPopupView.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
@@ -29,17 +29,14 @@ export interface TokenPopupProps {
 
 export function TokenPopup({ vm, onClose, popup }: TokenPopupProps) {
   const [openToken, setOpenToken] = useState<string | null>(null);
-  const handleOpenToken = useCallback(
-    (gestalt: string) => {
-      if (isMobileWidth()) {
-        const sub = vm.upgradeSubpops.find((s) => s.subpopId === `token${gestalt}`);
-        if (sub) openSubpopDialog(TokenUpgradeSubpopDialog, { sub });
-      } else {
-        setOpenToken(gestalt);
-      }
-    },
-    [vm.upgradeSubpops]
-  );
+  const handleOpenToken = (gestalt: string): void => {
+    if (isMobileWidth()) {
+      const sub = vm.upgradeSubpops.find((s) => s.subpopId === `token${gestalt}`);
+      if (sub) openSubpopDialog(TokenUpgradeSubpopDialog, { sub });
+    } else {
+      setOpenToken(gestalt);
+    }
+  };
 
   return (
     <div class={vm.isSuper ? 'PopupBody TokenPerp SuperToken' : 'PopupBody TokenPerp'}>
