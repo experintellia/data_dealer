@@ -48,6 +48,9 @@ export function attachDragScroll(el: HTMLElement, axis: 'x' | 'y'): () => void {
 
   const onDown = (e: PointerEvent): void => {
     if (activeId !== -1) return;
+    // Nothing to scroll → never arm, so a wobbly tap isn't eaten as a drag.
+    if (axis === 'x' ? el.scrollWidth <= el.clientWidth : el.scrollHeight <= el.clientHeight)
+      return;
     activeId = e.pointerId;
     dragged = false;
     start = coord(e);
