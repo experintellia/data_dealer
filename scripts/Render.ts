@@ -6,8 +6,7 @@
 // `scripts/render/`, leaving only:
 //
 //   - vendor-globals binding (jQuery `$`, underscore `_`,
-//     `Scroller`, `core`, CreateJS `Easel` / `Tween` / `Sound` /
-//     `Ticker` / `Ease`),
+//     `Scroller`, `core`, CreateJS `Tween` / `Ticker` / `Ease`),
 //   - one-time seam wirings for the modules that legitimately
 //     can't pull these vendor globals on their own
 //     (`applyRenderNodeFX`),
@@ -58,9 +57,9 @@ import { renderSpriteHtml } from './render/renderSpriteHelper.js';
 
 // ── CreateJS vendor surface ────────────────────────────────────────────────
 //
-// Read off `globalThis.createjs` at factory-call time (the
-// `<script>` tag for createjs-2015.11.26 loads before the ESM
-// bundle).  Typed locally since there's no `@types/createjs`.
+// Read off `globalThis.createjs` at factory-call time (TweenJS runs
+// in the esm-bundle.js vendor banner, ahead of the IIFE game code).
+// Typed locally since there's no `@types/createjs`.
 // The CreateJS Ticker singleton + its legacy listener-array shim
 // live in `./render/renderCreatejsTicker.js` — Render.ts only needs
 // `Tween` / `Ease` for the FX seam now.
