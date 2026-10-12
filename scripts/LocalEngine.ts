@@ -1610,15 +1610,11 @@ export function buySlots(
   var newInstanceData: NodeInstanceData = Object.assign({}, node.instance_data);
   newInstanceData[slotKey] = currentSlots + nNum;
 
-  var newXp = (state.game_values.xp_value || 0) + 1;
-  var levelup = _checkLevelup(state.game_values.xp_level || 1, newXp);
-
+  // No XP (dd_app views.py buySlots: xp_increment = 0), so no level-up either.
   var newGameValues: GameValues = Object.assign({}, state.game_values, {
     cash_value: cashValue - totalCost,
     cash_spent: (state.game_values.cash_spent || 0) + totalCost,
-    xp_value: newXp,
   });
-  if (levelup) newGameValues = _applyLevelUp(newGameValues, _getLevelByXP(newXp));
 
   var newNodes = state.nodes.slice();
   newNodes[nodeIdx] = Object.assign({}, node, { instance_data: newInstanceData });
@@ -1629,18 +1625,9 @@ export function buySlots(
     full_path: node.full_path,
     instance_data: newInstanceData,
   };
-  var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
+  var result = { node: responseNode, game_values: newGameValues, levelup: false };
 
   _persistDelta(_mkDelta(state.addr, 'buySlots', [perpPath, slotType, nNum], result));
-
-  if (levelup) {
-    var _bsDisplayName = state.display_name || state.addr;
-    triggerAchievement(
-      'levelup',
-      _t('achievement_levelup', _bsDisplayName, String(newGameValues.xp_level))
-    );
-    _notifyLevelupItems(newGameValues.xp_level || 1, newNodes);
-  }
 
   return Promise.resolve({ result: result });
 }

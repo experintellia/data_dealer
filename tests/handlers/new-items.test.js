@@ -19,7 +19,6 @@ import {
   buyKarma,
   buyPerp,
   buyPowerup,
-  buySlots,
   chargePerp,
   collectPerp,
   integrateCollected,
@@ -131,7 +130,6 @@ describe('new_items after a level-up — every level-up site', () => {
       },
       () => sellPowerup(P001, 0, 'ad002'),
     ],
-    ['buySlots', 9, {}, () => buySlots(P001, 'ad', 1)],
     ['buyPerp', 9, {}, () => buyPerp('Imperium', 'client007')],
     ['chargePerp', 9, {}, () => chargePerp(JESSICA)],
     [

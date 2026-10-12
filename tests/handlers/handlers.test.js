@@ -1365,10 +1365,10 @@ describe('buySlots — happy path', () => {
     expect(result.game_values.cash_spent).toBe(before + 13);
   });
 
-  it('increments xp_value', async () => {
+  it('awards no xp_value (dd_app views.py buySlots: xp_increment = 0)', async () => {
     const before = getState().game_values.xp_value;
     const { result } = await buySlots(PROJECT_NODE.full_path, 'ad', 1);
-    expect(result.game_values.xp_value).toBeGreaterThan(before);
+    expect(result.game_values.xp_value).toBe(before);
   });
 
   it('persists updated state', async () => {
@@ -1389,9 +1389,9 @@ describe('buySlots — failure: insufficient cash', () => {
   });
 });
 
-// buySlots xp_inc=1; starting at xp_value=9/xp_level=1 lands at xp=10,
-// which meets L1's xp_max threshold and promotes to level 2 (ap_max=8).
-describe('buySlots — level-up refills ap_snapshot and raises ap_max', () => {
+// buySlots grants no XP, so it can never level up: at xp_value=9 (one short
+// of L1's xp_max) the player stays on level 1.
+describe('buySlots — no XP, no level-up', () => {
   beforeEach(() => {
     setOverride(FIXED_NOW);
     setState(
@@ -1399,9 +1399,6 @@ describe('buySlots — level-up refills ap_snapshot and raises ap_max', () => {
         game_values: Object.assign({}, freshState('test@local').game_values, {
           xp_value: 9,
           xp_level: 1,
-          ap_snapshot: 2,
-          ap_max: 6,
-          ap_update: FIXED_NOW,
           cash_value: 1000,
         }),
       })
@@ -1409,19 +1406,12 @@ describe('buySlots — level-up refills ap_snapshot and raises ap_max', () => {
   });
   afterEach(() => clearOverride());
 
-  it('returns levelup=true and refills ap_snapshot to the new ap_max', async () => {
+  it('stays at xp 9 and level 1', async () => {
     const { result } = await buySlots(PROJECT_NODE.full_path, 'ad', 1);
-    expect(result.levelup).toBe(true);
-    expect(result.game_values.xp_level).toBe(2);
-    expect(result.game_values.ap_snapshot).toBe(8);
-    expect(result.game_values.ap_max).toBe(8);
-  });
-
-  it('keeps the refill across a subsequent materialize() pass', async () => {
-    await buySlots(PROJECT_NODE.full_path, 'ad', 1);
-    const mat = materialize(getState(), FIXED_NOW + 1);
-    expect(mat.state.game_values.ap_snapshot).toBe(8);
-    expect(mat.state.game_values.ap_max).toBe(8);
+    expect(result.levelup).toBe(false);
+    expect(result.game_values.xp_value).toBe(9);
+    expect(result.game_values.xp_level).toBe(1);
+    expect(getState().game_values.xp_value).toBe(9);
   });
 });
 
