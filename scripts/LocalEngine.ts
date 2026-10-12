@@ -2389,6 +2389,23 @@ function _advanceCollectCashMissions(
 // chargePerp — Phase 3 (#16)
 // ---------------------------------------------------------------------------
 
+// dd_app chargecollect.py CollectableContact.getTokensMap: the node's
+// upgrade-merged tokens (else the ruleset's), minus the amount-0 entries an
+// upgrade has not unlocked yet.
+function _tokensMapFor(
+  node: GameNode,
+  typeData: PerpTypeData | undefined
+): Record<string, { amount: number }> {
+  var tokens: TokenSpec[] =
+    (node.instance_data && node.instance_data.tokens) || (typeData && typeData.tokens) || [];
+  var out: Record<string, { amount: number }> = {};
+  tokens.forEach(function (t) {
+    var amount = (t && t.amount) || 0;
+    if (t && t.gestalt && amount > 0) out[t.gestalt] = { amount: amount };
+  });
+  return out;
+}
+
 // dd_app chargecollect.py CollectableToken.getPerpChargeData: fold each
 // contained token's share gained since the last upgrade (weighted by
 // contained_tokens[].amount) into this token; the charge yields the increase.
@@ -2519,13 +2536,20 @@ export function chargePerp(
       ? { profiles_value: gv.profiles_value || 0, token_map: _buildTokenMap(nodes) }
       : undefined;
 
-  var chargeResult: { amount: number; last_upgrade_data?: UpgradeValuesShape } = {
+  var chargeResult: {
+    amount: number;
+    last_upgrade_data?: UpgradeValuesShape;
+    tokens_map?: Record<string, { amount: number }>;
+  } = {
     // TokenPerps charge an upgrade increment instead of a collect amount.
     amount: lastUpgradeData
       ? _tokenUpgradeIncrement(typeData, instanceData, gv, nodes)
       : _getVariatedAmount(baseAmount, now, path),
   };
   if (lastUpgradeData) chargeResult.last_upgrade_data = lastUpgradeData;
+  if (node.game_type === 'ContactPerp' || node.game_type === 'ProjectPerp') {
+    chargeResult.tokens_map = _tokensMapFor(node, typeData);
+  }
 
   var durationMs = typeData.charge_time;
   var chargeEntry = {
@@ -2796,7 +2820,11 @@ export function collectPerp(
 
   var collectEntry: {
     path: string;
-    result?: { amount?: number; last_upgrade_data?: UpgradeValuesShape };
+    result?: {
+      amount?: number;
+      last_upgrade_data?: UpgradeValuesShape;
+      tokens_map?: Record<string, { amount: number }>;
+    };
   } | null = null;
   for (var i = 0; i < ms.nodes_collect.length; i++) {
     var ne = ms.nodes_collect[i];
@@ -2847,22 +2875,8 @@ export function collectPerp(
 
   if (gameType === 'ContactPerp' || gameType === 'ProjectPerp') {
     var collectId = _generateId();
-    // ContactPerps store yielded token-types under `tokens`; TokenPerps
-    // (super-token decomposition) under `contained_tokens` — accept either.
-    // instance_data.tokens (upgrade-merged by buyPowerup) wins and amount-0
-    // (not yet unlocked) entries are skipped, as in dd_app chargecollect.py
-    // CollectableContact.getTokensMap.
-    var tokensMap: Record<string, { amount: number }> = {};
-    var contained: TokenSpec[] =
-      (node.instance_data && node.instance_data.tokens) ||
-      (typeData && (typeData.tokens || typeData.contained_tokens)) ||
-      [];
-    for (var ct = 0; ct < contained.length; ct++) {
-      var ctEntry = contained[ct];
-      if (ctEntry && ctEntry.gestalt && (ctEntry.amount || 0) > 0) {
-        tokensMap[ctEntry.gestalt] = { amount: ctEntry.amount || 0 };
-      }
-    }
+    // Fixed when the charge started; charges from older builds carry none.
+    var tokensMap = cr.tokens_map || _tokensMapFor(node, typeData);
     var profileSet = { profiles_value: cr.amount || 0, tokens_map: tokensMap };
     dbEntry = {
       origin: gperpPath,

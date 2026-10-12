@@ -19,6 +19,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   buyPowerup,
+  chargePerp,
   collectPerp,
   integrateCollected,
   loadGame,
@@ -337,5 +338,31 @@ describe('collectPerp → integrateCollected — amount-0 data points are skippe
     const tokenNodes = getState().nodes.filter((n) => n.game_type === 'TokenPerp');
     expect(tokenNodes).toHaveLength(11);
     expect(tokenNodes.filter((n) => !n.instance_data.amount)).toEqual([]);
+  });
+});
+
+// dd_app getPerpChargeData freezes tokens_map into the charge result, so a
+// powerup bought or sold while the charge runs only affects the next charge.
+describe('chargePerp → collectPerp — tokens_map is fixed when the charge starts', () => {
+  async function collectAfterCharge(midCharge) {
+    await chargePerp(PROJECT_PATH);
+    await midCharge();
+    setOverride(getState().nodes_charging[0].charge_end + 1);
+    const { result } = await collectPerp(PROJECT_PATH);
+    return result.result.profile_set.tokens_map;
+  }
+
+  it('buying Blood test mid-charge does not add token018 to this collect', async () => {
+    setState(projectState());
+    const tokensMap = await collectAfterCharge(() => buyPowerup(PROJECT_PATH, 0, 'upgrade073'));
+    expect(tokensMap.token018).toBeUndefined();
+    expect(tokensMap.token001).toEqual({ amount: 100 });
+  });
+
+  it('selling Blood test mid-charge keeps token018 in this collect', async () => {
+    setState(projectState());
+    await buyPowerup(PROJECT_PATH, 0, 'upgrade073');
+    const tokensMap = await collectAfterCharge(() => sellPowerup(PROJECT_PATH, 0, 'upgrade073'));
+    expect(tokensMap.token018).toEqual({ amount: 25 });
   });
 });
