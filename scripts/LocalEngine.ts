@@ -689,11 +689,18 @@ function _buildLoadGameResponse(state: LocalState, now: number, isNewGame: boole
   var typeRegistry = Object.assign({}, ruleset.perps, ruleset.tokens, ruleset.powerups);
 
   // ap_initial / ap_offset are recomputed on read (never stored).
-  // After materializer, ap_snapshot already reflects the current AP value.
+  // After materializer, ap_snapshot already reflects the current AP value and
+  // ap_update sits on the last regen tick, so ap_offset (dd_app views.py
+  // getGame) is the time since that tick — APTicker fires the next one on the
+  // engine's grid.
   var gv = state.game_values || {};
+  var apInterval = gv.ap_inc_interval || 0;
   var gameValues = Object.assign({}, gv, {
     ap_initial: typeof gv.ap_snapshot === 'number' ? gv.ap_snapshot : 0,
-    ap_offset: 0,
+    ap_offset:
+      typeof gv.ap_update === 'number' && apInterval > 0
+        ? Math.max(0, now - gv.ap_update) % apInterval
+        : 0,
   });
 
   return {

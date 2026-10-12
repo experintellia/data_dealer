@@ -262,6 +262,24 @@ describe('loadGame — fresh state', () => {
     expect(typeof gv.ap_initial).toBe('number');
     expect(typeof gv.ap_offset).toBe('number');
   });
+
+  // dd_app views.py getGame: ap_offset = now − the last regen tick boundary
+  // (helpers.calculateAP), so APTicker.start(offset) fires the next tick on
+  // the engine's ap_update + k·ap_inc_interval grid instead of a full
+  // interval after load.
+  it('ap_offset is the time elapsed since the last AP regen tick', async () => {
+    setOverride(FIXED_NOW);
+    setState(
+      mkState({
+        game_values: { ap_snapshot: 1, ap_update: FIXED_NOW - 250_000, ap_inc_interval: 120_000 },
+      })
+    );
+    const { result } = await loadGame();
+    clearOverride();
+    const gv = result.type_data.game_values;
+    expect(gv.ap_initial).toBe(3); // two ticks regenerated
+    expect(gv.ap_offset).toBe(10_000); // 250 000 − 2 × 120 000
+  });
 });
 
 // ── loadGame — replayed history ───────────────────────────────────────────────
