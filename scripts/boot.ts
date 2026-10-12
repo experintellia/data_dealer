@@ -20,10 +20,10 @@
 //   3. After replay quiesces, call materializer (integration point for #11).
 //   4. Engine ready; call options.onReady(state).
 //
-// This module intentionally has no test coverage of its own: it talks to the
-// webxdc global and is exercised via manual testing or a webxdc simulator.
-// The underlying state logic (freshState / applyDelta) is fully unit-tested in
-// tests/state/state.test.js.
+// Handler tests drive this module through a synchronous fake webxdc
+// (tests/handlers/_webxdc-harness.js); tests/state/untrusted-deltas.test.js
+// covers the listener's skip-on-throw.  The underlying state logic (freshState /
+// applyDelta) is fully unit-tested in tests/state/state.test.js.
 
 import { applyDelta, freshState } from './state.js';
 import type { GameSeed, LocalState } from './state.js';
@@ -91,7 +91,14 @@ export function boot(options?: BootOptions): Promise<LocalState> {
   if (typeof webxdc !== 'undefined' && webxdc) {
     listenerPromise = webxdc.setUpdateListener(function (update) {
       const prevPeers = _currentState && _currentState.peers;
-      _currentState = applyDelta(_state(), update.payload);
+      try {
+        _currentState = applyDelta(_state(), update.payload);
+      } catch (err) {
+        // Payloads are untrusted and replayed on every start: skip one that
+        // throws (applyDelta is pure, state is unchanged) rather than wedging
+        // boot for good.
+        console.error('boot.ts: skipping update', update.serial, err);
+      }
       if (_currentState && _currentState.peers !== prevPeers) {
         _notifyPeersChanged();
       }
