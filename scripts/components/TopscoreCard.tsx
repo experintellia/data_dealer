@@ -10,14 +10,9 @@
 import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import { toKSNum } from '../dd-helpers.js';
-import type { RankingRow } from '../game/Topscore.js';
+import type { RankingResult } from '../game/Topscore.js';
 
-export interface TopscoreData {
-  type_headlines?: Record<string, string>;
-  top?: RankingRow[];
-  user_rank?: number;
-  user_in_top?: boolean;
-}
+export type TopscoreData = RankingResult & { type_headlines?: Record<string, string> };
 
 export interface TopscoreCardProps {
   /** Ranking type: cash / profiles / xp / spent. */
@@ -83,9 +78,7 @@ export function TopscoreCard({ type, data }: TopscoreCardProps): JSX.Element {
           <div
             key={row.addr}
             class={row.self ? 'TopscoreRow user' : 'TopscoreRow'}
-            data-testid={
-              'dd-leaderboard-row-' + (row.addr || (row.self ? 'self' : 'rank_' + (k + 1)))
-            }
+            data-testid={'dd-leaderboard-row-' + row.addr}
           >
             <div class="TopscoreNum">{k + 1}</div>
             {row.avatar && <Avatar src={row.avatar} onLoad={() => setHasAvatars(true)} />}

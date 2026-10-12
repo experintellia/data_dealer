@@ -17,8 +17,8 @@
 //     buy-slots num control / tutorial advance).
 //   - `RenderMissionPerp` — mission-card render with state-driven
 //     `active` / `complete` / hidden styling.
-//   - `RenderTopscorePerp` — leaderboard cell with rank + list
-//     render hooks.
+//   - `RenderTopscorePerp` — leaderboard cell; mounts the Preact
+//     `TopscoreCard`.
 //
 // Plus the small template helper:
 //
@@ -731,12 +731,12 @@ export type TopscorePerpConfig = NodeConfig & {
 
 // Topscore-specific gameNode shape: the `Topscore` GameNode subclass
 // owns a `scoretype` field (Topscore.ts).  Shadow-declared on the
-// render-side `gameNode` field so the rank/list templates can read
-// it without the residual `as unknown as` cast.  Mirrors the
+// render-side `gameNode` field so render() can read it without the
+// residual `as unknown as` cast.  Mirrors the
 // (unexported) `GameNodeLike` in RenderNode.ts plus `scoretype`.
 interface TopscoreGameNodeLike {
   trigger(ev: string, params?: unknown[]): void;
-  parentNode?: { renderNode: RenderNode; data?: Record<string, unknown> };
+  parentNode?: { renderNode: RenderNode };
   states?: Record<string, boolean>;
   data?: Record<string, unknown>;
   scoretype?: string;

@@ -16,10 +16,9 @@
 //     without rewriting all 60+ files in views/.
 //
 // Plus `compileTemplate(text)`, a ~30-line replacement for
-// `_.template(text, null, { variable: 'D' })`. Templates only use
-// `<% … %>` and `<%= … %>` (no `<%- … %>` HTML-escape interpolation
-// — verified by `grep -rn '<%-' views/` returning nothing), so the
-// implementation is intentionally minimal.
+// `_.template(text, null, { variable: 'D' })`. Templates use `<% … %>`,
+// raw `<%= … %>` and HTML-escaping `<%- … %>` (for anything a peer or
+// the player controls), so the implementation is intentionally minimal.
 
 // ── primitive helpers ──────────────────────────────────────────────────────
 
@@ -242,7 +241,6 @@ function compile(text: string): (D: unknown, helpers: TemplateHelpers) => string
     if (tag.charAt(0) === '=') {
       body += '__t=(' + tag.slice(1) + ');__p+=(__t==null?"":__t);\n';
     } else if (tag.charAt(0) === '-') {
-      // Templates don't use this today, but keep the surface complete.
       body += '__t=(' + tag.slice(1) + ');__p+=__esc(__t==null?"":__t);\n';
     } else {
       body += tag + '\n';
