@@ -8,9 +8,10 @@ const LOCAL_CHROMIUM = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const chromiumExecutablePath = existsSync(LOCAL_CHROMIUM) ? LOCAL_CHROMIUM : undefined;
 
 // Variant the dev server (and therefore the e2e run) builds against.
-// Defaults to 'hq' to preserve historical behaviour; CI sets BUILD_VARIANT
-// explicitly to exercise both variants on every push.  Validate early so a
-// typo fails fast instead of being silently treated as 'hq' by vite.config.js.
+// Defaults to 'hq'; CI doesn't set BUILD_VARIANT, so it runs the suite once
+// against HQ.  Set BUILD_VARIANT=casual locally to exercise the casual
+// variant.  Validate early so a typo fails fast instead of being silently
+// treated as 'hq' by vite.config.js.
 const BUILD_VARIANT = process.env.BUILD_VARIANT ?? 'hq';
 if (BUILD_VARIANT !== 'hq' && BUILD_VARIANT !== 'casual') {
   throw new Error(`BUILD_VARIANT must be 'hq' or 'casual', got '${BUILD_VARIANT}'`);
@@ -21,6 +22,9 @@ export default defineConfig({
   timeout: 60_000,
   retries: 0,
   forbidOnly: !!process.env.CI,
+  // CI: `dot` for the log plus an HTML report in playwright-report/, which
+  // the workflow uploads on failure.
+  reporter: process.env.CI ? [['dot'], ['html', { open: 'never' }]] : 'list',
 
   // `toHaveScreenshot` defaults to a pixel-perfect match; tiny
   // anti-aliasing differences between local Chromium and CI's
@@ -37,7 +41,8 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3000',
     // Traces and screenshots are captured on failure for CI artifact upload.
-    trace: 'on-first-retry',
+    // (`on-first-retry` would never fire: retries is 0.)
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'off',
     // Pre-seed the webxdc-shim localStorage with a setLocale:'en' delta so
@@ -71,8 +76,7 @@ export default defineConfig({
     stdout: 'ignore',
     stderr: 'pipe',
     // Propagate the variant so vite picks it up (vite.config.js reads
-    // process.env.BUILD_VARIANT at config time).  CI runs the suite twice
-    // — once per variant — to keep both code paths exercised.
+    // process.env.BUILD_VARIANT at config time).
     env: {
       BUILD_VARIANT,
     },

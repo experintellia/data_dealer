@@ -8,7 +8,10 @@ name: Deploy to GitHub Pages
 # Requires Settings → Pages → Source = "GitHub Actions" (one-time).
 
 on:
-  push:
+  # Deploy only what the Tests workflow passed on master.
+  workflow_run:
+    workflows: [Tests]
+    types: [completed]
     branches: [master]
   workflow_dispatch:
 
@@ -17,13 +20,24 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
 jobs:
   deploy:
     name: Build and deploy
+    # `branches` above also matches a fork PR whose head branch is called
+    # master, so require a push run.  head_sha == github.sha (the master tip
+    # on workflow_run) stops a re-run or late-finishing run for an older
+    # commit from deploying over a newer one; checkout then gets that commit.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_sha == github.sha)
+    # Job level, so runs skipped by the `if` never join the group; a running
+    # deploy finishes and the newest one queues behind it (as in GitHub's
+    # Pages starter workflow).
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     environment:
       name: github-pages

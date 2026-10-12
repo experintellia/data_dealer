@@ -11,16 +11,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-// Skip the rebuild if both `.xdc` artifacts are already present at the
-// repo root.  Avoids spending ~60 s on a redundant `pnpm build:all` in
-// CI (where the workflow already ran the build as a previous step) and
-// avoids tripping vitest's worker-RPC heartbeat timeout on the long
-// `oxipng -o max` pass.  Local cold-start `pnpm test` still gets a
-// clean build.
+// Always rebuild: leftover `.xdc` files at the repo root may come from an
+// older vite config, and asserting against them would hide a broken build.
 beforeAll(() => {
-  const haveHq = existsSync(join(root, 'data-dealer-hq.xdc'));
-  const haveCasual = existsSync(join(root, 'data-dealer-casual.xdc'));
-  if (haveHq && haveCasual) return;
   execSync('pnpm build:all', { cwd: root, stdio: 'pipe' });
 }, 180_000);
 
