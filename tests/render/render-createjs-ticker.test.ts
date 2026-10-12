@@ -18,8 +18,6 @@ it('tickerSetUseRAF drives Ticker.timingMode', async () => {
   (globalThis as { createjs?: unknown }).createjs = { Ticker };
   const { tickerSetUseRAF } = await import('../../scripts/render/renderCreatejsTicker.js');
 
-  tickerSetUseRAF(true);
+  tickerSetUseRAF();
   expect(Ticker.timingMode).toBe('synched');
-  tickerSetUseRAF(false);
-  expect(Ticker.timingMode).toBe('timeout');
 });

@@ -34,8 +34,20 @@ async function touchDrag(page: Page, x: number, y: number, dx: number, dy: numbe
   await cdp.detach();
 }
 
-test('touch-drag scrolls a ViewTab natively', async ({ page }) => {
+test('touch-drag scrolls a ViewTab natively, even right after a zoom-button tap', async ({
+  page,
+}) => {
   await bootGame(page);
+  // A tap on the map's ZoomIn starts the scroller; its touchend handler
+  // stops propagation, which must not leave the scroller tracking (and
+  // swallowing the next swipe) — and the tap must still zoom.
+  const zoom = () => page.evaluate(() => (window as any).__dd.getZoom() as number);
+  const zoomBefore = await zoom();
+  const zoomIn = await page.locator('#Imperium .ZoomControls .ZoomIn').boundingBox();
+  if (!zoomIn) throw new Error('ZoomIn has no box');
+  await touchDrag(page, zoomIn.x + zoomIn.width / 2, zoomIn.y + zoomIn.height / 2, 0, 0);
+  await expect.poll(zoom).toBeGreaterThan(zoomBefore);
+
   await page.locator('.mm-tab[data-button-id="Missions"]').dispatchEvent('click');
   await expect(page.locator('#Missions.ViewTab.active')).toBeVisible();
   // Boot state has too few missions to overflow a phone screen — pad it.

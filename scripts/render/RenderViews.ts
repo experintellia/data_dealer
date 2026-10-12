@@ -708,13 +708,16 @@ export class RenderViewMap extends RenderNode {
         },
         { passive: false }
       );
+      // Capture phase: ZoomControls / .mm-tab touchend handlers
+      // stopPropagation, which used to leave the scroller tracking (so
+      // the touchmove guard above kept swallowing the next swipe).
       addNative(
         dragDom,
         'touchend',
         (e) => {
           scroller.doTouchEnd((e as TouchEvent).timeStamp);
         },
-        false
+        true
       );
       addNative(
         dragDom,
@@ -722,7 +725,7 @@ export class RenderViewMap extends RenderNode {
         (e) => {
           scroller.doTouchEnd((e as TouchEvent).timeStamp);
         },
-        false
+        true
       );
     }
 
