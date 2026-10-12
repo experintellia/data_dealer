@@ -2382,6 +2382,57 @@ function _advanceCollectCashMissions(
 // chargePerp — Phase 3 (#16)
 // ---------------------------------------------------------------------------
 
+// dd_app chargecollect.py CollectableToken.getPerpChargeData: fold each
+// contained token's share gained since the last upgrade (weighted by
+// contained_tokens[].amount) into this token; the charge yields the increase.
+function _tokenUpgradeIncrement(
+  typeData: PerpTypeData,
+  idata: NodeInstanceData,
+  gv: GameValues,
+  nodes: GameNode[]
+): number {
+  var p = gv.profiles_value || 0;
+  var pmax = gv.profiles_max || 0;
+  if (p <= 0 || pmax <= 0) return 0; // dd_app divides by both
+  var weights: Record<string, number> = {};
+  (typeData.contained_tokens || []).forEach(function (t) {
+    if (t.gestalt) weights[t.gestalt] = t.amount || 0;
+  });
+  var last = (idata.last_upgrade_values || {}) as Partial<UpgradeValuesShape>;
+  var lastP = last.profiles_value || 0;
+  var sum = 0;
+  nodes.forEach(function (n) {
+    var g = n.gestalt || '';
+    var w = weights[g];
+    if (w === undefined) return;
+    var lastAmount = (last.token_map && last.token_map[g]) || 0;
+    var usable = Math.max(
+      0,
+      (n.instance_data.amount || 0) - (lastP ? lastAmount / (p / lastP) : 0)
+    );
+    sum = _mergeUpgradeShare(sum, (usable * w) / 100, p, pmax);
+  });
+  var old = idata.amount || 0;
+  return _mergeUpgradeShare(old, sum, p, pmax) - old;
+}
+
+// dd_app dd_merger.py UpgradeToken.__add__: dd_calc.py Database.merge of a
+// one-feature set of p profiles at `share` into a p-of-pmax database at
+// `base`; returns the merged share rescaled to p, capped at 100.
+// ponytail: dd_app's per-worker merge counter (mergefactor) is taken as 0; it
+// only adds dupes after ~1e5 merges.
+function _mergeUpgradeShare(base: number, share: number, p: number, pmax: number): number {
+  var u = _rng(); // random.triangular(0, 0.05)
+  var rand = u > 0.5 ? 0.05 - 0.05 * Math.sqrt((1 - u) * 0.5) : 0.05 * Math.sqrt(u * 0.5);
+  var minDupes = Math.min(Math.max(Math.floor((p / pmax) ** 2 * p), 2 * p - pmax), p);
+  var dupes = Math.min(p - 1, minDupes + Math.floor((p - 1) * rand));
+  var number = Math.min(pmax, 2 * p - dupes);
+  var inc = number - p;
+  var mix = Math.max(base, (base + share) / 2);
+  var merged = Math.min(100, (base * (p - dupes) + (p - inc) * mix + share * inc) / number);
+  return Math.min(100, (merged * number) / p);
+}
+
 export function chargePerp(
   path: string
 ): Promise<{ result: { error: number } | Record<string, unknown> }> {
@@ -2462,7 +2513,10 @@ export function chargePerp(
       : undefined;
 
   var chargeResult: { amount: number; last_upgrade_data?: UpgradeValuesShape } = {
-    amount: _getVariatedAmount(baseAmount, now, path),
+    // TokenPerps charge an upgrade increment instead of a collect amount.
+    amount: lastUpgradeData
+      ? _tokenUpgradeIncrement(typeData, instanceData, gv, nodes)
+      : _getVariatedAmount(baseAmount, now, path),
   };
   if (lastUpgradeData) chargeResult.last_upgrade_data = lastUpgradeData;
 
@@ -2733,7 +2787,10 @@ export function collectPerp(
     return Promise.resolve({ result: { error: 4, ap_snapshot: apSnap } });
   }
 
-  var collectEntry: { path: string; result?: { amount?: number } } | null = null;
+  var collectEntry: {
+    path: string;
+    result?: { amount?: number; last_upgrade_data?: UpgradeValuesShape };
+  } | null = null;
   for (var i = 0; i < ms.nodes_collect.length; i++) {
     var ne = ms.nodes_collect[i];
     if (ne && ne.path === gperpPath) {
@@ -2816,7 +2873,12 @@ export function collectPerp(
   } else if (gameType === 'TokenPerp') {
     var tpIdata: NodeInstanceData = node.instance_data || {};
     var prevAmount = typeof tpIdata.amount === 'number' ? tpIdata.amount : 0;
-    var newAmount = prevAmount + (cr.amount || 0);
+    // dd_app collectPerp: rescale by charge-time / current profiles_value
+    // (the DB may have grown meanwhile), capped at 100.
+    var chargeP = (cr.last_upgrade_data && cr.last_upgrade_data.profiles_value) || 0;
+    var nowP = ms.game_values.profiles_value || 0;
+    var tokenInc = chargeP > 0 && nowP > 0 ? (cr.amount || 0) / (nowP / chargeP) : cr.amount || 0;
+    var newAmount = prevAmount + Math.min(100 - prevAmount, tokenInc);
     tokenUpdate = { path: gperpPath, amount: newAmount };
     newNodes = ms.nodes.map(function (n) {
       if (n.full_path !== gperpPath) return n;
