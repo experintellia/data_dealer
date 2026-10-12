@@ -802,7 +802,9 @@ export class RenderViewMap extends RenderNode {
     // the bounds.
     const zoom = this.zoomScale ?? 1;
     this.scroller.scrollTo(pos.x * zoom - vpCenter.x, pos.y * zoom - vpCenter.y, true);
-    this.scroller.options.animating = false;
+    // Restore the init defaults: Zynga only tweens zooms and
+    // flick-decelerates while `animating` is true.
+    this.scroller.options.animating = true;
     this.scroller.options.animationDuration = 300;
   }
 

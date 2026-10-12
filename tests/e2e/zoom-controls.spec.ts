@@ -11,6 +11,7 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { bootGame } from './_helpers';
 
 interface DDHook {
   __dd?: {
@@ -73,4 +74,23 @@ test('zoom-controls: Fullscreen button resets zoom to 1.0 from any zoom level', 
 
   // Scroller animation duration is 300 ms; allow some headroom.
   await expect.poll(getZoom, { timeout: 3_000 }).toBeCloseTo(1, 2);
+});
+
+test('zoom-controls: zoom buttons still animate after a camera scrollTo', async ({ page }) => {
+  // RenderViewMap.scrollTo() used to leave `scroller.options.animating`
+  // false, and Zynga only tweens zooms / flick-decelerates while it is
+  // true — so after the first camera move every zoom jumped instantly.
+  await bootGame(page);
+  const r = await page.evaluate(() => {
+    const vm = (window as any).__dd._app.game.activeView.renderNode;
+    vm.scroller.zoomTo(1, false);
+    vm.scrollTo({ x: 1024, y: 840 }, 0);
+    const animatingAfterScrollTo = vm.scroller.options.animating;
+    document
+      .querySelector<HTMLElement>('#Imperium .ZoomControls .ZoomOut')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    return { animatingAfterScrollTo, tweening: !!vm.scroller.__isAnimating };
+  });
+  expect(r.animatingAfterScrollTo).toBe(true);
+  expect(r.tweening, 'ZoomOut starts a tween instead of jumping').toBe(true);
 });
