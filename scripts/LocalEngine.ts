@@ -73,7 +73,6 @@ interface PerpTypeData {
   profileset_size?: number;
   profiles_max?: number;
   slot_cost?: number;
-  slot_cost_modifier?: number;
   max_slots?: number;
   slots?: SlotEntry[];
   origin_full_type?: string;
@@ -1537,7 +1536,8 @@ export function sellPowerup(
  * buySlots — purchase additional powerup/ad/upgrade/teammember slots.
  *
  * Validates: cash >= total slot cost.
- * Cost per slot: slot_cost + slot_cost_modifier * (current_slots + i).
+ * Cost: slot_cost * num, as in dd_app views.py and the buy-slots UI — the
+ * ruleset's slot_cost_modifier is never read by the original game.
  * Errors: 0 = node/type not found, 2 = would exceed max slots, 3 = no cash.
  * Returns: { node, game_values, levelup }
  */
@@ -1567,12 +1567,7 @@ export function buySlots(
 
   if (currentSlots + nNum > maxSlots) return Promise.resolve({ result: { error: 2 } });
 
-  var slotCost = perpTypeData.slot_cost || 0;
-  var slotCostModifier = perpTypeData.slot_cost_modifier || 0;
-  var totalCost = 0;
-  for (var i = 0; i < nNum; i++) {
-    totalCost += slotCost + slotCostModifier * (currentSlots + i);
-  }
+  var totalCost = (perpTypeData.slot_cost || 0) * nNum;
 
   var cashValue = state.game_values.cash_value || 0;
   if (cashValue < totalCost) return Promise.resolve({ result: { error: 3 } });

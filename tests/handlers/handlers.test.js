@@ -1324,16 +1324,16 @@ describe('buySlots — happy path', () => {
   });
 
   it('deducts the correct cost from cash_value', async () => {
-    // cost = slot_cost + slot_cost_modifier * currentSlots = 10 + 1*3 = 13
+    // cost = slot_cost * num = 10 (dd_app ignores slot_cost_modifier)
     const before = getState().game_values.cash_value;
     const { result } = await buySlots(PROJECT_NODE.full_path, 'ad', 1);
-    expect(result.game_values.cash_value).toBe(before - 13);
+    expect(result.game_values.cash_value).toBe(before - 10);
   });
 
   it('increments cash_spent by the slot cost', async () => {
     const before = getState().game_values.cash_spent;
     const { result } = await buySlots(PROJECT_NODE.full_path, 'ad', 1);
-    expect(result.game_values.cash_spent).toBe(before + 13);
+    expect(result.game_values.cash_spent).toBe(before + 10);
   });
 
   it('increments xp_value', async () => {
@@ -2343,11 +2343,10 @@ describe('buyPowerup — error: exactly one coin short of powerup price', () => 
 });
 
 describe('buySlots — error: exactly one coin short of slot cost', () => {
-  // First ad slot cost = slot_cost(10) + slot_cost_modifier(1) × current_slots(3) = 13.
-  // cash=12 is one coin short.
+  // First ad slot cost = slot_cost(10).  cash=9 is one coin short.
   it('returns error:3 when cash_value is slot cost − 1', async () => {
     const oneCoinShort = mkProjectState({
-      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 12 }),
+      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 9 }),
     });
     setState(oneCoinShort);
     const { result } = await buySlots(PROJECT_NODE.full_path, 'ad', 1);
@@ -2356,7 +2355,7 @@ describe('buySlots — error: exactly one coin short of slot cost', () => {
 
   it('does not mutate state on partial-funds failure', async () => {
     const oneCoinShort = mkProjectState({
-      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 12 }),
+      game_values: Object.assign({}, freshState('test@local').game_values, { cash_value: 9 }),
     });
     setState(oneCoinShort);
     const before = getState().game_values.cash_value;
