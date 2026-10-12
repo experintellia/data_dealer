@@ -1526,8 +1526,10 @@ test.describe('Section M — Subpop close + simple TokenPerp', () => {
 
     // Click the SubpopClose X.  The handler at RenderTopLevelUI.ts:822
     // strips .open from the subpop and clears .hasPopup from the parent
-    // .PopupTab, but the parent popup itself stays mounted.
-    await subpop.locator('.SubpopClose').first().click({ force: true });
+    // .PopupTab, but the parent popup itself stays mounted.  No `force`:
+    // the subpop scales in over 0.2s, and a forced click mid-transition
+    // lands beside the still-moving X.
+    await subpop.locator('.SubpopClose').first().click();
 
     // Subpop is no longer .open; parent popup still has lockOn.
     await expect(

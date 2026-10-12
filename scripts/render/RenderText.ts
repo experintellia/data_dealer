@@ -71,23 +71,22 @@ export class RenderText extends RenderNode {
     // When inserted under a display:none ancestor (e.g. an inactive
     // Stage), offsetWidth is 0 and the surrounding setSize then locks
     // the inline CSS to width:0px — the centering offset can never
-    // recover on its own.  Retry on rAF until the layout fires.
+    // recover on its own.  Remeasure once it is laid out: a
+    // ResizeObserver fires when the element leaves display:none, so a
+    // hidden view costs nothing per frame.
     const el = this.domelem as HTMLElement;
     if (el.offsetWidth === 0 && t.length > 0 && !this._remeasureScheduled) {
       this._remeasureScheduled = true;
-      const retry = (): void => {
-        if (!this.domelem.isConnected) return;
+      const ro = new ResizeObserver(() => {
         el.style.width = 'auto';
         el.style.height = 'auto';
-        if (el.offsetWidth === 0) {
-          requestAnimationFrame(retry);
-          return;
-        }
+        if (el.offsetWidth === 0) return;
+        ro.disconnect();
         this._remeasureScheduled = false;
         this.updateText();
         this.draw();
-      };
-      requestAnimationFrame(retry);
+      });
+      ro.observe(el);
     }
   }
 
