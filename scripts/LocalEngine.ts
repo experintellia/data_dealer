@@ -616,11 +616,14 @@ export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameRe
   var startupRepair = _repairStuckMissionGoals(seededState);
   var startupLevelup = 0;
   if (startupRepair && startupRepair.missions) {
-    // Reward XP banked while away may cross a level threshold; _applyRepairRewards
+    // Reward XP banked while away may cross a level threshold; _applyRewardsAndLevelUp
     // refills AP and advances ap_max/xp_level so the next materialize() pass
     // doesn't clamp the snapshot back to the old ceiling. The level number is
     // remembered so the load can surface the popup below.
-    var rewardResult = _applyRepairRewards(seededState.game_values || {}, startupRepair.rewards);
+    var rewardResult = _applyRewardsAndLevelUp(
+      seededState.game_values || {},
+      startupRepair.rewards
+    );
     var startupGv = rewardResult.game_values;
     startupLevelup = rewardResult.levelup;
     var recheckDelta = _mkDelta(seededState.addr, 'recheckMissions', [], {
@@ -1322,28 +1325,21 @@ export function buyPowerup(
     tokens: _computeUpgradeTokens(perpTypeData, newPowerups),
   });
 
-  var newXp = (state.game_values.xp_value || 0) + (perpTypeData.xp_inc || 1);
-  var levelup = _checkLevelup(state.game_values.xp_level || 1, newXp);
-
   var newGameValues: GameValues = Object.assign({}, state.game_values, {
     cash_value: cashValue - price,
     cash_spent: (state.game_values.cash_spent || 0) + price,
-    xp_value: newXp,
+    xp_value: (state.game_values.xp_value || 0) + (perpTypeData.xp_inc || 1),
     karma_value: Math.min(100, Math.max(-100, (state.game_values.karma_value || 0) + 1)),
   });
-  if (levelup) newGameValues = _applyLevelUp(newGameValues, _getLevelByXP(newXp));
 
   var newNodes = state.nodes.slice();
   newNodes[nodeIdx] = Object.assign({}, node, { instance_data: newInstanceData });
 
   var preMissionStatePu = Object.assign({}, state, { nodes: newNodes, game_values: newGameValues });
   var puMissionResult = _advanceBuyPowerupMissions(preMissionStatePu, gestalt);
-  newGameValues = _applyRewardsToGv(newGameValues, puMissionResult.rewards);
-  // Mission rewards may add XP that crosses another level threshold — check again.
-  if (_checkLevelup(newGameValues.xp_level || 1, newGameValues.xp_value || 0)) {
-    levelup = true;
-    newGameValues = _applyLevelUp(newGameValues, _getLevelByXP(newGameValues.xp_value || 0));
-  }
+  var rewarded = _applyRewardsAndLevelUp(newGameValues, puMissionResult.rewards);
+  newGameValues = rewarded.game_values;
+  var levelup = rewarded.levelup > 0;
 
   var responseNode = {
     game_id: node.game_id,
@@ -1702,11 +1698,6 @@ export function buyPerp(
     profiles_max: (gv.profiles_max || 0) + profilesMaxInc,
   });
 
-  var oldLevel = gv.xp_level || 1;
-  var newLevel = _getLevelByXP(newGv.xp_value || 0);
-  var levelup = newLevel > oldLevel;
-  if (levelup) newGv = _applyLevelUp(newGv, newLevel);
-
   // Project the just-bought node in before the mission cascade so a
   // cascade-unlocked buy_perp goal targeting this perp auto-completes now
   // instead of staying stuck until a reload replays the buy delta.
@@ -1714,7 +1705,9 @@ export function buyPerp(
     nodes: state.nodes.concat([newNode]),
   });
   var missionResult = _advanceBuyPerpMissions(preMissionStateBuy, gestalt);
-  newGv = _applyRewardsToGv(newGv, missionResult.rewards);
+  var rewarded = _applyRewardsAndLevelUp(newGv, missionResult.rewards);
+  newGv = rewarded.game_values;
+  var levelup = rewarded.levelup > 0;
 
   // profile_set for project*/contact*/city* gestalts:
   // initial data batch pushed to db_queue; city-buy path also read by Game.js:3816.
@@ -2154,12 +2147,13 @@ function _applyRewardsToGv(gv: GameValues, rewards: RewardSet | undefined): Game
   });
 }
 
-// Folds mission-repair reward totals into game_values and, when the reward XP
-// crosses a level threshold, applies the level-up (energy refill + raised
-// ap_max). Returns the new level number, or 0 when no level-up occurred.
-// Shared by the loadGame startup repair and the recheckMissions handler so
-// the two stay in lockstep.
-function _applyRepairRewards(
+// Folds mission reward totals into game_values and, when the XP now crosses a
+// level threshold above gv.xp_level, applies the level-up (energy refill +
+// raised ap_max). Returns the new level number, or 0 when no level-up occurred.
+// Every handler that grants mission rewards runs its single level check here,
+// after the rewards — dd_app checks `xp + xp_increment + rewards xp` once via
+// views.py _handle_levelup, so reward XP can level the player up too.
+function _applyRewardsAndLevelUp(
   gv: GameValues,
   rewards: RewardSet | undefined
 ): { game_values: GameValues; levelup: number } {
@@ -2431,11 +2425,6 @@ export function chargePerp(
     ap_snapshot: Math.max(0, (gv.ap_snapshot || 0) - 1),
   });
 
-  var oldLevelNum = gv.xp_level || 1;
-  var newLevelNum = _getLevelByXP(newGv.xp_value || 0);
-  var levelup = newLevelNum > oldLevelNum;
-  if (levelup) newGv = _applyLevelUp(newGv, newLevelNum);
-
   var preMissionStateCharge = Object.assign({}, state, {
     nodes: newNodes,
     nodes_charging: charging.concat([chargeEntry]),
@@ -2443,7 +2432,10 @@ export function chargePerp(
   });
 
   var chargeMissionResult = _advanceChargePerpMissions(preMissionStateCharge, gestalt);
-  newGv = _applyRewardsToGv(newGv, chargeMissionResult.rewards);
+  var rewarded = _applyRewardsAndLevelUp(newGv, chargeMissionResult.rewards);
+  newGv = rewarded.game_values;
+  var newLevelNum = rewarded.levelup;
+  var levelup = newLevelNum > 0;
 
   _persistDelta(
     _mkDelta(state.addr, 'chargePerp', [path], {
@@ -2790,11 +2782,6 @@ export function collectPerp(
     });
   }
 
-  var oldLevel = (ms.game_values && ms.game_values.xp_level) || 1;
-  var newLevel = _getLevelByXP(newGv.xp_value || 0);
-  var levelup = newLevel > oldLevel;
-  if (levelup) newGv = _applyLevelUp(newGv, newLevel);
-
   var preMissionState = Object.assign({}, ms, {
     nodes: newNodes,
     nodes_collect: newCollect,
@@ -2822,7 +2809,10 @@ export function collectPerp(
       active_missions: preMissionState.active_missions,
     };
   }
-  newGv = _applyRewardsToGv(newGv, collectMissionResult.rewards);
+  var rewarded = _applyRewardsAndLevelUp(newGv, collectMissionResult.rewards);
+  newGv = rewarded.game_values;
+  var newLevel = rewarded.levelup;
+  var levelup = newLevel > 0;
   var newState = Object.assign({}, preMissionState, {
     game_values: newGv,
     mission_goals: collectMissionResult.mission_goals,
@@ -2955,7 +2945,7 @@ export function integrateCollected(
   var newIntegratedIds = Object.assign({}, integratedIds, { [collectId]: true });
 
   // Production integrate rewards (xp / cash / karma) come from mission rewards,
-  // applied via _applyRewardsToGv on missionResult.rewards below — this mirrors
+  // applied via _applyRewardsAndLevelUp on missionResult.rewards below — this mirrors
   // dd_app views.py:320, where integrate karma is `rewards.get('karma_value')`
   // from MissionHandler.compute_rewards (currently no ruleset mission grants
   // karma, only xp_value/cash_value — original-faithful).  The profile_set's
@@ -3041,11 +3031,6 @@ export function integrateCollected(
       updatedNodes.push(newNode);
     });
 
-  var oldLevel = (state.game_values && state.game_values.xp_level) || 1;
-  var newLevel = _getLevelByXP(newGv.xp_value || 0);
-  var levelup = newLevel > oldLevel;
-  if (levelup) newGv = _applyLevelUp(newGv, newLevel);
-
   var preMissionState = Object.assign({}, state, {
     db_queue: newQueue,
     nodes: newNodes,
@@ -3060,7 +3045,10 @@ export function integrateCollected(
     newGv.profiles_value || 0,
     newNodes
   );
-  newGv = _applyRewardsToGv(newGv, missionResult.rewards);
+  var rewarded = _applyRewardsAndLevelUp(newGv, missionResult.rewards);
+  newGv = rewarded.game_values;
+  var newLevel = rewarded.levelup;
+  var levelup = newLevel > 0;
   var newState = Object.assign({}, preMissionState, {
     game_values: newGv,
     mission_goals: missionResult.mission_goals,
@@ -3174,9 +3162,9 @@ export function recheckMissions(): Promise<{
   if (!repair || !repair.missions) {
     return Promise.resolve({ result: { repaired: false } });
   }
-  // Reward XP may push the player into a new level — _applyRepairRewards
+  // Reward XP may push the player into a new level — _applyRewardsAndLevelUp
   // applies the energy refill if so.
-  var rewardResult = _applyRepairRewards(state.game_values || {}, repair.rewards);
+  var rewardResult = _applyRewardsAndLevelUp(state.game_values || {}, repair.rewards);
   var newGv = rewardResult.game_values;
   var rewardLevelup = rewardResult.levelup > 0;
   // `levelup` is intentionally not included in the persisted delta payload:
