@@ -113,6 +113,7 @@ export interface JQueryRenderElem<E extends HTMLElement = HTMLElement> {
 export interface JQueryRenderEvent {
   pageX?: number;
   pageY?: number;
+  buttons?: number;
   shiftKey?: boolean;
   type?: string;
   scale?: number;

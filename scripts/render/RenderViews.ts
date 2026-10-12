@@ -592,9 +592,15 @@ export class RenderViewMap extends RenderNode {
 
     if (this.useDragHandler) {
       this.useDragHandler.on('mousemove', (e) => {
-        if (this.dragging) {
-          scroller.doTouchMove([{ pageX: e.pageX ?? 0, pageY: e.pageY ?? 0 }], e.timeStamp);
+        if (!this.dragging) return;
+        // No button held: the mouseup was missed (blur, tab hide,
+        // release outside the window) — end the pan, don't follow hover.
+        if (e.buttons === 0) {
+          this.dragging = false;
+          scroller.doTouchEnd(e.timeStamp);
+          return;
         }
+        scroller.doTouchMove([{ pageX: e.pageX ?? 0, pageY: e.pageY ?? 0 }], e.timeStamp);
       });
       this.useDragHandler.on('mouseup', (e) => {
         this.dragging = false;
