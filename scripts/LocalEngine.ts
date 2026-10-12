@@ -1109,10 +1109,10 @@ export function buyKarma(
     _notifyLevelupItems(newLevel, state.nodes);
   }
   var _bkOldKarma = gv.karma_value || 0;
-  if (_bkOldKarma !== 100 && newKarma === 100) {
+  if (_bkOldKarma < 100 && newKarma === 100) {
     triggerAchievement('karma_saint', _t('achievement_karma_saint', _bkDisplayName));
   }
-  if (_bkOldKarma !== -100 && newKarma === -100) {
+  if (_bkOldKarma > -100 && newKarma === -100) {
     triggerAchievement('karma_devil', _t('achievement_karma_devil', _bkDisplayName));
   }
 
@@ -1453,7 +1453,7 @@ export function buyPowerup(
   }
   var _bpuOldKarma = state.game_values.karma_value || 0;
   var _bpuNewKarma = newGameValues.karma_value || 0;
-  if (_bpuOldKarma !== 100 && _bpuNewKarma === 100) {
+  if (_bpuOldKarma < 100 && _bpuNewKarma === 100) {
     triggerAchievement('karma_saint', _t('achievement_karma_saint', _bpuDisplayName));
   }
 
@@ -3008,7 +3008,7 @@ export function collectPerp(
   var _clpOldKarma = (ms.game_values && ms.game_values.karma_value) || 0;
   var _clpNewKarma = newGv.karma_value || 0;
   if (incident) {
-    if (_clpOldKarma !== -100 && _clpNewKarma === -100) {
+    if (_clpOldKarma > -100 && _clpNewKarma === -100) {
       triggerAchievement('karma_devil', _t('achievement_karma_devil', _clpDisplayName));
     }
   }
@@ -3243,10 +3243,10 @@ export function integrateCollected(
   }
   var _icOldKarma = (state.game_values && state.game_values.karma_value) || 0;
   var _icNewKarma = newGv.karma_value || 0;
-  if (_icOldKarma !== 100 && _icNewKarma === 100) {
+  if (_icOldKarma < 100 && _icNewKarma === 100) {
     triggerAchievement('karma_saint', _t('achievement_karma_saint', _icDisplayName));
   }
-  if (_icOldKarma !== -100 && _icNewKarma === -100) {
+  if (_icOldKarma > -100 && _icNewKarma === -100) {
     triggerAchievement('karma_devil', _t('achievement_karma_devil', _icDisplayName));
   }
 

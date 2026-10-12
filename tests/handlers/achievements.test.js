@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buyKarma,
   buyPerp,
+  buyPowerup,
   integrateCollected,
   setEmitter,
   setSendAchievement,
@@ -29,7 +30,7 @@ afterEach(() => {
 });
 import { clearOverride, setOverride } from '../../scripts/clock.js';
 import { applyDelta, freshState } from '../../scripts/state.js';
-import { FIXED_NOW, mkGv, mkState } from './_fixtures.js';
+import { FIXED_NOW, mkGv, mkNode, mkState } from './_fixtures.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -495,5 +496,50 @@ describe('achievement — i18n locale selection', () => {
     // English template: "%s reached level %s"
     expect(levelupCall[0].info).toContain('Mike');
     expect(levelupCall[0].info).toMatch(/reached level \d+/);
+  });
+});
+
+// Saves from builds whose buyPowerup didn't clamp karma can hold 101+ (or
+// -101-); the first clamped action must not re-announce the milestone.
+describe('achievement — karma milestones from out-of-range saved karma', () => {
+  const P001 = 'Imperium.project001';
+  function seed(karma) {
+    setOverride(FIXED_NOW);
+    setState(
+      mkState({
+        nodes: [mkNode('ProjectPerp', P001)],
+        db_queue: [{ origin: P001, collect_id: 'c1', profile_set: { profiles_value: 0 } }],
+        game_values: mkGv({ karma_value: karma, cash_value: 5000 }),
+      })
+    );
+    return mkAchievementSpy();
+  }
+  afterEach(() => {
+    clearOverride();
+    setSendAchievement(null);
+  });
+
+  it.each([
+    ['buyPowerup', () => buyPowerup(P001, 0, 'ad002')],
+    ['buyKarma', () => buyKarma('karma001')],
+    ['integrateCollected', () => integrateCollected('c1')],
+  ])('%s from karma 101 does not re-fire karma_saint', async (_name, call) => {
+    const spy = seed(101);
+    const { result } = await call();
+    expect((result.game_values || result.result.game_values).karma_value).toBe(100);
+    expect(callsOfKind(spy, 'karma_saint')).toHaveLength(0);
+  });
+
+  it('integrateCollected from karma -101 does not re-fire karma_devil', async () => {
+    const spy = seed(-101);
+    const { result } = await integrateCollected('c1');
+    expect(result.game_values.karma_value).toBe(-100);
+    expect(callsOfKind(spy, 'karma_devil')).toHaveLength(0);
+  });
+
+  it('reaching 100 from below still fires karma_saint once', async () => {
+    const spy = seed(99);
+    await buyPowerup(P001, 0, 'ad002');
+    expect(callsOfKind(spy, 'karma_saint')).toHaveLength(1);
   });
 });
