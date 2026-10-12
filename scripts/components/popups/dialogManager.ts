@@ -173,7 +173,10 @@ interface ActiveDialog {
 let active: ActiveDialog | null = null;
 
 export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
-  if (!opts.keepParent && active) active.handle.close();
+  // Close the whole stack, not just its top — a stacked subpop's parent
+  // would otherwise stay mounted but untracked.  `.open` guards against
+  // spinning on a dialog that is mid-close (re-entrant open).
+  while (!opts.keepParent && active?.handle.open) active.handle.close();
 
   let isOpen = true;
   const savedActive: ActiveDialog | null = opts.keepParent ? active : null;
@@ -222,10 +225,10 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
 
   const close = (): void => {
     if (!isOpen) return;
-    // If a child dialog was stacked on top of this one (keepParent), close
-    // it first so its container is torn down and `active` is restored to
-    // this dialog before our own cleanup runs.
-    if (active && active.handle !== ownHandle) active.handle.close();
+    // If child dialogs were stacked on top of this one (keepParent), close
+    // them first so their containers are torn down and `active` is restored
+    // to this dialog before our own cleanup runs.
+    while (active?.handle.open && active.handle !== ownHandle) active.handle.close();
     isOpen = false;
     // Fire popup_close listeners before tearing down the DOM.
     // GameNode.initPopupEvents registers badge cleanup (DecoratorNew
