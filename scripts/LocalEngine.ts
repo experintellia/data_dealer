@@ -626,6 +626,7 @@ export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameRe
     );
     var startupGv = rewardResult.game_values;
     startupLevelup = rewardResult.levelup;
+    if (startupLevelup) _notifyLevelupItems(startupLevelup, seededState.nodes);
     var recheckDelta = _mkDelta(seededState.addr, 'recheckMissions', [], {
       game_values: startupGv,
       missions: startupRepair.missions,
@@ -778,9 +779,14 @@ interface PowerupListEntry {
 export function getPowerups(
   projectGestalt: string /*, version */
 ): Promise<{ result: PowerupListEntry[] }> {
+  return Promise.resolve({ result: _powerupsForProject(projectGestalt) });
+}
+
+// dd_app rules get_powerups_for_project.
+function _powerupsForProject(projectGestalt: string): PowerupListEntry[] {
   var ruleset = _getRuleset();
   var def = ruleset.perps[projectGestalt];
-  if (!def) return Promise.resolve({ result: [] });
+  if (!def) return [];
 
   var td: PerpTypeData = def.type_data || {};
   var entries: PowerupDef[] = (td.provided_ads || []).concat(
@@ -801,7 +807,66 @@ export function getPowerups(
     });
   }
 
-  return Promise.resolve({ result: result });
+  return result;
+}
+
+// `new_items` notifications — dd_app tasks.py notifyLevelupItems /
+// notifyBuyperpItems, which views.py defers with countdown=2.  The delay also
+// lets GameRoot apply the handler response (new xp_level) before
+// makeNotifications reads it.
+function _emitNewItems(payload: Record<string, unknown>): void {
+  setTimeout(function () {
+    _emit('new_items', payload);
+  }, 2000);
+}
+
+var _LEVELUP_NOTIFY_TYPES = ['AgentPerp', 'ContactPerp', 'ProxyPerp', 'ProjectPerp', 'CityPerp'];
+
+// After a level-up: the perps that require exactly this level, plus each
+// owned project's powerups that do (rules get_levelup_items /
+// get_levelup_powerups).
+function _notifyLevelupItems(level: number, nodes: GameNode[]): void {
+  var ruleset = _getRuleset();
+  var perps = Object.keys(ruleset.perps).filter(function (g) {
+    var def = ruleset.perps[g];
+    return (
+      !!def &&
+      _LEVELUP_NOTIFY_TYPES.indexOf(def.game_type || '') >= 0 &&
+      ((def.type_data && def.type_data.required_level) || 0) === level
+    );
+  });
+  var powerups: Record<string, PowerupListEntry[]> = {};
+  nodes.forEach(function (n) {
+    if (!n.gestalt || n.gestalt.indexOf('project') !== 0) return;
+    var list = _powerupsForProject(n.gestalt).filter(function (p) {
+      return p.type_data.required_level === level;
+    });
+    if (list.length) powerups[n.gestalt] = list;
+  });
+  if (perps.length || Object.keys(powerups).length) {
+    _emitNewItems({ perps: perps, powerups: powerups, trigger: 'levelup', level: level });
+  }
+}
+
+// After buying a project/contact the player did not own yet: the pushers and
+// clients it provides at this level (rules get_new_consumers_for_provider).
+function _notifyBuyperpItems(level: number, provider: string, nodesBefore: GameNode[]): void {
+  if (provider.indexOf('project') !== 0 && provider.indexOf('contact') !== 0) return;
+  if (_getNodeMaps(nodesBefore).gestalts[provider]) return;
+  var ruleset = _getRuleset();
+  var perps = Object.keys(ruleset.perps).filter(function (g) {
+    var def = ruleset.perps[g];
+    var td = (def && def.type_data) || {};
+    return (
+      !!def &&
+      (def.game_type === 'PusherPerp' || def.game_type === 'ClientPerp') &&
+      (td.required_level || 0) <= level &&
+      (td.required_providers || []).indexOf(provider) >= 0
+    );
+  });
+  if (perps.length) {
+    _emitNewItems({ perps: perps, trigger: 'buy_provider', level: level, provider: provider });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1034,6 +1099,7 @@ export function buyKarma(
   var _bkDisplayName = state.display_name || state.addr;
   if (levelup) {
     triggerAchievement('levelup', _t('achievement_levelup', _bkDisplayName, String(newLevel)));
+    _notifyLevelupItems(newLevel, state.nodes);
   }
   var _bkOldKarma = gv.karma_value || 0;
   if (_bkOldKarma !== 100 && newKarma === 100) {
@@ -1363,6 +1429,7 @@ export function buyPowerup(
       'levelup',
       _t('achievement_levelup', _bpuDisplayName, String(newGameValues.xp_level))
     );
+    _notifyLevelupItems(newGameValues.xp_level || 1, newNodes);
   }
   var _bpuCompletedMissions =
     (puMissionResult.missions && puMissionResult.missions.complete_missions) || [];
@@ -1479,6 +1546,7 @@ export function sellPowerup(
       'levelup',
       _t('achievement_levelup', _spDisplayName, String(newGameValues.xp_level))
     );
+    _notifyLevelupItems(newGameValues.xp_level || 1, newNodes);
   }
 
   return Promise.resolve({ result: result });
@@ -1564,6 +1632,7 @@ export function buySlots(
       'levelup',
       _t('achievement_levelup', _bsDisplayName, String(newGameValues.xp_level))
     );
+    _notifyLevelupItems(newGameValues.xp_level || 1, newNodes);
   }
 
   return Promise.resolve({ result: result });
@@ -1760,7 +1829,9 @@ export function buyPerp(
       'levelup',
       _t('achievement_levelup', _bpDisplayName, String(newGv.xp_level))
     );
+    _notifyLevelupItems(newGv.xp_level || 1, preMissionStateBuy.nodes);
   }
+  _notifyBuyperpItems(newGv.xp_level || 1, gestalt, state.nodes);
   var _bpCompletedMissions =
     (missionResult.missions && missionResult.missions.complete_missions) || [];
   for (var _bpMi = 0; _bpMi < _bpCompletedMissions.length; _bpMi++) {
@@ -2455,6 +2526,7 @@ export function chargePerp(
   var _cpDisplayName = state.display_name || state.addr;
   if (levelup) {
     triggerAchievement('levelup', _t('achievement_levelup', _cpDisplayName, String(newLevelNum)));
+    _notifyLevelupItems(newLevelNum, newNodes);
   }
   var _cpCompletedMissions =
     (chargeMissionResult.missions && chargeMissionResult.missions.complete_missions) || [];
@@ -2844,6 +2916,7 @@ export function collectPerp(
   var _clpDisplayName = state.display_name || state.addr;
   if (levelup) {
     triggerAchievement('levelup', _t('achievement_levelup', _clpDisplayName, String(newLevel)));
+    _notifyLevelupItems(newLevel, newNodes);
   }
   var _clpCompletedMissions =
     (collectMissionResult.missions && collectMissionResult.missions.complete_missions) || [];
@@ -2866,17 +2939,12 @@ export function collectPerp(
     }
   }
 
-  // Emit materializer events + optional levelup new_items after the caller's
-  // microtask resolves (mirrors dd_app's deferred Celery notifyLevelupItems).
+  // Emit materializer events after the caller's microtask resolves.
   var matEvents = mat.events;
-  var emitLevel = levelup ? newLevel : 0;
   queueMicrotask(function () {
     for (var ei = 0; ei < matEvents.length; ei++) {
       var ev = matEvents[ei];
       if (ev) _emit(ev.ev, ev.pl);
-    }
-    if (emitLevel) {
-      _emit('new_items', { perps: [], powerups: {}, trigger: 'levelup', level: emitLevel });
     }
   });
 
@@ -3073,16 +3141,11 @@ export function integrateCollected(
     missions: missionResult.missions || { complete_missions: [], updated_missions: [] },
   };
 
-  if (levelup) {
-    queueMicrotask(function () {
-      _emit('new_items', { perps: [], powerups: {}, trigger: 'levelup', level: newLevel });
-    });
-  }
-
   // Achievements
   var _icDisplayName = state.display_name || state.addr;
   if (levelup) {
     triggerAchievement('levelup', _t('achievement_levelup', _icDisplayName, String(newLevel)));
+    _notifyLevelupItems(newLevel, newNodes);
   }
   var _icCompletedMissions =
     (missionResult.missions && missionResult.missions.complete_missions) || [];
@@ -3167,6 +3230,7 @@ export function recheckMissions(): Promise<{
   var rewardResult = _applyRewardsAndLevelUp(state.game_values || {}, repair.rewards);
   var newGv = rewardResult.game_values;
   var rewardLevelup = rewardResult.levelup > 0;
+  if (rewardLevelup) _notifyLevelupItems(rewardResult.levelup, state.nodes);
   // `levelup` is intentionally not included in the persisted delta payload:
   // game_values (which already carries the updated ap_max/ap_snapshot/xp_level)
   // is the authoritative source for replay. Callers that need to show a
