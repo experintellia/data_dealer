@@ -85,12 +85,14 @@ test('zoom-controls: zoom buttons still animate after a camera scrollTo', async 
     const vm = (window as any).__dd._app.game.activeView.renderNode;
     vm.scroller.zoomTo(1, false);
     vm.scrollTo({ x: 1024, y: 840 }, 0);
+    const instantScroll = !vm.scroller.__isAnimating;
     const animatingAfterScrollTo = vm.scroller.options.animating;
     document
       .querySelector<HTMLElement>('#Imperium .ZoomControls .ZoomOut')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    return { animatingAfterScrollTo, tweening: !!vm.scroller.__isAnimating };
+    return { instantScroll, animatingAfterScrollTo, tweening: !!vm.scroller.__isAnimating };
   });
+  expect(r.instantScroll, 'scrollTo(pos, 0) moves without a tween').toBe(true);
   expect(r.animatingAfterScrollTo).toBe(true);
   expect(r.tweening, 'ZoomOut starts a tween instead of jumping').toBe(true);
 });

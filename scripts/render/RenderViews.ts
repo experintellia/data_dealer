@@ -807,7 +807,6 @@ export class RenderViewMap extends RenderNode {
     const root = this.gameNode?.GameRoot;
     root?._cancelPendingCenter?.();
     this._finishTween();
-    this.scroller.options.animating = duration > 0;
     this.scroller.options.animationDuration = duration;
     // `pos` is in the ViewMap's unscaled native coordinates (e.g.
     // the Database perp at `viewmapPos: {x: 1024, y: 840}`), but
@@ -822,10 +821,7 @@ export class RenderViewMap extends RenderNode {
     // viewport-pixel centre — the scroller's internal clamp handles
     // the bounds.
     const zoom = this.zoomScale ?? 1;
-    this.scroller.scrollTo(pos.x * zoom - vpCenter.x, pos.y * zoom - vpCenter.y, true);
-    // Restore the init defaults: Zynga only tweens zooms and
-    // flick-decelerates while `animating` is true.
-    this.scroller.options.animating = true;
+    this.scroller.scrollTo(pos.x * zoom - vpCenter.x, pos.y * zoom - vpCenter.y, duration > 0);
     this.scroller.options.animationDuration = 300;
   }
 
