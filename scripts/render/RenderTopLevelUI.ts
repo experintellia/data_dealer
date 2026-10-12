@@ -17,8 +17,8 @@
 //     buy-slots num control / tutorial advance).
 //   - `RenderMissionPerp` — mission-card render with state-driven
 //     `active` / `complete` / hidden styling.
-//   - `RenderTopscorePerp` — leaderboard cell with rank + list
-//     render hooks.
+//   - `RenderTopscorePerp` — leaderboard cell; mounts the Preact
+//     `TopscoreCard`.
 //
 // Plus the small template helper:
 //
@@ -39,6 +39,7 @@
 import { h, render as preactRender } from 'preact';
 import appModule from '../app.js';
 import { MissionCard } from '../components/MissionCard.js';
+import { TopscoreCard, type TopscoreData } from '../components/TopscoreCard.js';
 import { span, sprintf, toKSNum, toTime } from '../dd-helpers.js';
 import { buildMissionCardProps } from '../game/missionView.js';
 import i18n from '../i18n.js';
@@ -730,12 +731,12 @@ export type TopscorePerpConfig = NodeConfig & {
 
 // Topscore-specific gameNode shape: the `Topscore` GameNode subclass
 // owns a `scoretype` field (Topscore.ts).  Shadow-declared on the
-// render-side `gameNode` field so the rank/list templates can read
-// it without the residual `as unknown as` cast.  Mirrors the
+// render-side `gameNode` field so render() can read it without the
+// residual `as unknown as` cast.  Mirrors the
 // (unexported) `GameNodeLike` in RenderNode.ts plus `scoretype`.
 interface TopscoreGameNodeLike {
   trigger(ev: string, params?: unknown[]): void;
-  parentNode?: { renderNode: RenderNode; data?: Record<string, unknown> };
+  parentNode?: { renderNode: RenderNode };
   states?: Record<string, boolean>;
   data?: Record<string, unknown>;
   scoretype?: string;
@@ -745,15 +746,10 @@ export class RenderTopscorePerp extends RenderNode {
   declare frameSrc: string | undefined;
   declare frameMap: SpriteFrameMap | undefined;
   declare frame: string;
-  declare template: string;
   // Shadow the inherited `gameNode: GameNodeLike | undefined` with a
-  // Topscore-specific shape so renderRank/renderList can read
-  // `scoretype` without a cast.
+  // Topscore-specific shape so render() can read `scoretype` without a
+  // cast.
   declare gameNode: TopscoreGameNodeLike | undefined;
-
-  static {
-    RenderTopscorePerp.prototype.template = 'topscore.html';
-  }
 
   constructor(config: TopscorePerpConfig = {}) {
     const $ = getRenderJQuery('RenderTopLevelUI');
@@ -793,11 +789,22 @@ export class RenderTopscorePerp extends RenderNode {
   }
 
   render(): void {
-    const jq = this.jdomelem;
-    jq.empty();
-    const html = getApp().renderView(this.template, this);
-    jq.append(html);
+    // Preact owns the `.TopscorePerp` node's children, as in
+    // RenderMissionPerp — no `jq.empty()`; unmounted in `remove()`.
+    const el = this.jdomelem[0];
+    if (el) {
+      const data = (this.gameNode?.data ?? {}) as TopscoreData;
+      preactRender(h(TopscoreCard, { type: this.gameNode?.scoretype || 'cash', data }), el);
+    }
     this.draw();
+  }
+
+  override remove(): void {
+    const el = this.jdomelem?.[0];
+    if (el) {
+      preactRender(null, el);
+    }
+    super.remove();
   }
 
   override draw(): void {
@@ -826,32 +833,6 @@ export class RenderTopscorePerp extends RenderNode {
     this.on('states_active', (e) => {
       e.stopPropagation();
     });
-  }
-
-  renderRank(): void {
-    const jq = this.jdomelem;
-    const rank = jq.find('.TopscoreRank');
-    rank.empty();
-    const gnode = this.gameNode;
-    const html = getApp().renderView('topscore_rank.html', {
-      data: gnode?.data,
-      parentdata: gnode?.parentNode?.data,
-      type: gnode?.scoretype,
-    });
-    rank.append(html);
-  }
-
-  renderList(): void {
-    const jq = this.jdomelem;
-    const list = jq.find('.TopscoreList');
-    list.empty();
-    const gnode = this.gameNode;
-    const html = getApp().renderView('topscore_list.html', {
-      data: gnode?.data,
-      parentdata: gnode?.parentNode?.data,
-      type: gnode?.scoretype,
-    });
-    list.append(html);
   }
 }
 

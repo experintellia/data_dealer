@@ -1,7 +1,0 @@
-<%
-  var data = D.data || {};
-  var rank = data.user_rank;
-%>
-<% if (!data.user_in_top) { %>
-  <div class="TopscoreRankBarWrap"><div class="TopscoreRankBarPerc"><%= _.toKSNum(rank*100) + "%" %></div><div class="TopscoreRankBar" style="width:<%= rank * 200 %>px;"></div></div>
-<% } %>

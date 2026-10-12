@@ -3,13 +3,13 @@
  * Tests for webxdc avatar plumbing (PR: highscore avatars).
  *
  *   - getAvatarUrl returns the expected `__webxdc__/avatar/<addr>.jpg` shape
- *   - getRanking decorates every peer row with an `avatar` URL; the
- *     template emits the <img> and the .TopscoreList container only
- *     reveals the slot once one of the images fires onload, so feature
+ *   - getRanking decorates every peer row with an `avatar` URL;
+ *     TopscoreCard renders the <img> and the .TopscoreList container only
+ *     reveals the slot once one of the images loads, so feature
  *     detection is per-leaderboard and runs entirely in the DOM.
  *
- * The image-load gate itself is DOM-only (onload="..." inline handler in
- * views/topscore_list.html) and not unit-tested here.
+ * The image-load gate itself is DOM-only (onLoad/onError in
+ * scripts/components/TopscoreCard.tsx) and not unit-tested here.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getRanking } from '../../scripts/LocalEngine.js';

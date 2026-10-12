@@ -1178,10 +1178,10 @@
   text-align: right;
 }
 
-/* Avatar slot — collapsed by default; .TopscoreList flips `hasAvatars`
-   from each <img>'s inline onload once any one succeeds, after which
-   every row reserves the slot so names stay aligned. Rows whose <img>
-   404s remove the broken element via onerror and add `.failed`, which
+/* Avatar slot — collapsed by default; TopscoreCard adds `hasAvatars`
+   to .TopscoreList once any <img> loads, after which every row
+   reserves the slot so names stay aligned. Rows whose <img> 404s drop
+   the broken element and add `.failed`, which
    reveals the ::before placeholder (the in-game Profiles token sprite,
    scaled up). On messengers that never serve avatars the container
    class is never set and the slot stays display:none. */

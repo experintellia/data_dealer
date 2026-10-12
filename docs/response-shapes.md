@@ -388,7 +388,7 @@ Failure path also reads `data` only for the console.error log.
 
 - Registered: scripts/app.js:153
 - Args: `(token, type)` — `type` is one of `cash | profiles | xp | spent`
-  (icon map at views/topscore_list.html:4).
+  (icons in scripts/components/TopscoreCard.tsx).
 - Called from: scripts/Game.js:3306 (`Topscore.fetchScore`)
 
 Expected response shape (merged into `gnode.data` via `mergeData`):

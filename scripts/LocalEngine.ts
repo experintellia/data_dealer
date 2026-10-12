@@ -841,9 +841,9 @@ interface RankingRow {
   display_name: string;
   value: number;
   self: boolean;
-  /** Speculative webxdc avatar URL; the row template always emits the
+  /** Speculative webxdc avatar URL; TopscoreCard always renders the
    *  <img> and the .TopscoreList container only reserves slot space
-   *  after at least one image has fired onload. */
+   *  after at least one image has loaded. */
   avatar?: string;
 }
 

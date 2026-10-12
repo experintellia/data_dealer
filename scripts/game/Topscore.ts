@@ -16,7 +16,7 @@ import { mergeData } from './mergeData.js';
 // the app.js → Game.js → Topscore.ts circular import on first eval —
 // resolve lazily.
 
-interface RankingRow {
+export interface RankingRow {
   addr: string;
   display_name: string;
   value: number;
@@ -47,8 +47,7 @@ interface TopscoreRenderNode {
     addClass?: (c: string) => void;
     removeClass?: (c: string) => void;
   };
-  renderRank?: () => void;
-  renderList?: () => void;
+  render?: () => void;
 }
 
 // Cache fetching for 30 seconds; force-bypass via the second arg.
@@ -87,8 +86,7 @@ export class Topscore extends GameNode {
           (merged as Record<string, unknown>).user_in_top = top.some((row) => row.self === true);
           gnode.data = merged as Record<string, unknown>;
           const rn = gnode.renderNode as TopscoreRenderNode | undefined;
-          rn?.renderRank?.();
-          rn?.renderList?.();
+          rn?.render?.();
           rn?.jdomelem?.removeClass?.('loading');
           gnode.lastFetch = new Date();
         } else {
