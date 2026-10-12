@@ -33,6 +33,22 @@ test('idle board with a hidden Database does not spin requestAnimationFrame', as
       w.__rafCount++;
       return raf(cb);
     };
+    // Track which elements a still-connected ResizeObserver watches.
+    const watched = new Set<Element>();
+    (window as unknown as { __roWatched: Set<Element> }).__roWatched = watched;
+    const RO = window.ResizeObserver;
+    window.ResizeObserver = class extends RO {
+      els: Element[] = [];
+      override observe(el: Element, o?: ResizeObserverOptions): void {
+        this.els.push(el);
+        watched.add(el);
+        super.observe(el, o);
+      }
+      override disconnect(): void {
+        for (const el of this.els) watched.delete(el);
+        super.disconnect();
+      }
+    };
   });
   await bootGame(page);
 
@@ -73,6 +89,17 @@ test('idle board with a hidden Database does not spin requestAnimationFrame', as
     return w.__rafCount - start;
   });
   expect(perSecond, 'rAF callbacks per idle second').toBeLessThan(30);
+
+  // A label removed before it was ever laid out must release its observer,
+  // or the observer pins the detached label (and its node) in memory.
+  const removed = await page.evaluate(() => {
+    const w = window as any;
+    const label = w.__dd._app.game.getDatabase().getToken('token001').renderNode.DecoratorLabel;
+    const watchedBefore = w.__roWatched.has(label.domelem);
+    label.remove();
+    return { watchedBefore, watchedAfter: w.__roWatched.has(label.domelem) };
+  });
+  expect(removed).toEqual({ watchedBefore: true, watchedAfter: false });
 
   // Showing the Database must still measure the labels to their text width
   // (not the 200 px fallback a hidden measure produces).

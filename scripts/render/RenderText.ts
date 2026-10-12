@@ -17,7 +17,7 @@ export type TextConfig = NodeConfig & {
 export class RenderText extends RenderNode {
   declare text: string;
   declare textAlign: string;
-  private _remeasureScheduled = false;
+  private _remeasure: ResizeObserver | undefined = undefined;
 
   static {
     RenderText.prototype.text = '';
@@ -75,19 +75,27 @@ export class RenderText extends RenderNode {
     // ResizeObserver fires when the element leaves display:none, so a
     // hidden view costs nothing per frame.
     const el = this.domelem as HTMLElement;
-    if (el.offsetWidth === 0 && t.length > 0 && !this._remeasureScheduled) {
-      this._remeasureScheduled = true;
+    if (el.offsetWidth === 0 && t.length > 0 && !this._remeasure) {
       const ro = new ResizeObserver(() => {
         el.style.width = 'auto';
         el.style.height = 'auto';
         if (el.offsetWidth === 0) return;
         ro.disconnect();
-        this._remeasureScheduled = false;
+        this._remeasure = undefined;
         this.updateText();
         this.draw();
       });
       ro.observe(el);
+      this._remeasure = ro;
     }
+  }
+
+  override remove(): void {
+    // A label removed before it was ever laid out never fires its
+    // observer, which would otherwise pin the detached label and node.
+    this._remeasure?.disconnect();
+    this._remeasure = undefined;
+    super.remove();
   }
 
   updateSize(): void {
