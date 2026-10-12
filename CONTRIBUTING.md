@@ -28,8 +28,8 @@ See the README for what the two bundle variants are.
 
 Unit tests are the `*.test.*` / `*.spec.*` files under `tests/` (outside
 `tests/e2e/`) and run in plain Node.
-`tests/build/` runs `pnpm build:all` first unless both `.xdc` files already
-exist at the repo root, so delete them to test a fresh build.
+`tests/build/build.test.js` runs `pnpm build:all` before checking both
+`.xdc` files (delete stale `data-dealer-*.xdc` at the repo root if in doubt).
 
 Playwright specs live in `tests/e2e/`; `pnpm test:e2e` starts `pnpm dev` itself
 (reusing a server already on port 3000 outside CI). Install the browser once with

@@ -503,7 +503,7 @@ test.describe('Section G — extended notification popups', () => {
     // (different from the karma-status info popup, which has no extendClass).
     await page.evaluate(() => {
       const groot = (window as any).__dd?._app?.game;
-      groot.makeNotifications({ karma: { gestalt: 'karma013', dec: 5 } });
+      groot.makeNotifications({ karma: { gestalt: 'karma013' } });
     });
     await expect(page.locator('.PopupContainer.lockOn.Alert')).toBeVisible({ timeout: 5_000 });
     // popup_karma.html for a Karmalizer payload renders the title as "karma

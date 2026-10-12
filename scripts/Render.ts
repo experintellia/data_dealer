@@ -50,7 +50,7 @@ import {
 } from './render/RenderTopLevelUI.js';
 import { RenderMainMenu, RenderStage, RenderViewMap, RenderViewTab } from './render/RenderViews.js';
 import { tickerSetFPS, tickerSetUseRAF } from './render/renderCreatejsTicker.js';
-import { _ids, _instances, clearAllNodes, getNode, getNodeById } from './render/renderRegistry.js';
+import { _ids, _instances, getNode, getNodeById } from './render/renderRegistry.js';
 import { renderSpriteHtml } from './render/renderSpriteHelper.js';
 
 // ── CreateJS vendor surface ────────────────────────────────────────────────
@@ -81,7 +81,6 @@ export interface RenderApi {
   _ids: Record<string, RenderNode>;
   get(id: number): RenderNode | undefined;
   getById(id: string): RenderNode | undefined;
-  clear(): void;
   DragHandler: typeof RenderDragHandler;
   Set: typeof RenderSet;
   Node: typeof RenderNode;
@@ -150,7 +149,6 @@ function Render(): RenderApi {
     _ids,
     get: getNode,
     getById: getNodeById,
-    clear: clearAllNodes,
     DragHandler: RenderDragHandler,
     Set: RenderSet,
     Node: RenderNode,

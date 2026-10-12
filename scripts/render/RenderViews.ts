@@ -980,26 +980,22 @@ export class RenderMainMenu extends RenderStage {
     // Setup Button Events
     const root = this.gameNode?.GameRoot;
 
-    this.jdomelem.on('click touchend', '#LocaleToggle:not(.disabled)', (e) => {
+    this.jdomelem.on('click touchend', '#LocaleToggle', (e) => {
       e.stopPropagation();
       e.preventDefault();
       root?.trigger?.('toggle_locale');
     });
-    this.jdomelem.on('click touchend', '#UserData:not(.disabled)', (e) => {
+    this.jdomelem.on('click touchend', '#UserData', (e) => {
       e.stopPropagation();
       e.preventDefault();
       root?.trigger?.('user_data');
     });
-    this.jdomelem.on(
-      'click touchend',
-      '.mm-tab:not(.disabled)',
-      function (this: HTMLElement, e: ViewDomEvent) {
-        e.stopPropagation();
-        e.preventDefault();
-        const buttonId = $(this).attr('data-button-id') as string | undefined;
-        root?.trigger?.('switch_view', [buttonId]);
-      }
-    );
+    this.jdomelem.on('click touchend', '.mm-tab', function (this: HTMLElement, e: ViewDomEvent) {
+      e.stopPropagation();
+      e.preventDefault();
+      const buttonId = $(this).attr('data-button-id') as string | undefined;
+      root?.trigger?.('switch_view', [buttonId]);
+    });
 
     // Forward .mm-xp taps to the same `click_status.XP` event.
     this.jdomelem.on(
