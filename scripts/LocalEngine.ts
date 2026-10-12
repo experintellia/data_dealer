@@ -2849,8 +2849,9 @@ export function collectPerp(
     var collectId = _generateId();
     // ContactPerps store yielded token-types under `tokens`; TokenPerps
     // (super-token decomposition) under `contained_tokens` — accept either.
-    // instance_data.tokens (upgrade-merged by buyPowerup) wins, as in dd_app
-    // chargecollect.py CollectableContact.getTokensMap.
+    // instance_data.tokens (upgrade-merged by buyPowerup) wins and amount-0
+    // (not yet unlocked) entries are skipped, as in dd_app chargecollect.py
+    // CollectableContact.getTokensMap.
     var tokensMap: Record<string, { amount: number }> = {};
     var contained: TokenSpec[] =
       (node.instance_data && node.instance_data.tokens) ||
@@ -2858,7 +2859,7 @@ export function collectPerp(
       [];
     for (var ct = 0; ct < contained.length; ct++) {
       var ctEntry = contained[ct];
-      if (ctEntry && ctEntry.gestalt) {
+      if (ctEntry && ctEntry.gestalt && (ctEntry.amount || 0) > 0) {
         tokensMap[ctEntry.gestalt] = { amount: ctEntry.amount || 0 };
       }
     }

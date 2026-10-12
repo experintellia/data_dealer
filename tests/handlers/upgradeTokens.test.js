@@ -17,11 +17,17 @@
  * amounts back to the base venture defaults (0 for upgrade-gated tokens).
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { buyPowerup, collectPerp, loadGame, sellPowerup } from '../../scripts/LocalEngine.js';
+import {
+  buyPowerup,
+  collectPerp,
+  integrateCollected,
+  loadGame,
+  sellPowerup,
+} from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { clearOverride, setOverride } from '../../scripts/clock.js';
 import { applyDelta } from '../../scripts/state.js';
-import { FIXED_NOW, mkState } from './_fixtures.js';
+import { FIXED_NOW, mkNode, mkState } from './_fixtures.js';
 import { installWebxdc, uninstallWebxdc } from './_webxdc-harness.js';
 
 // project009 = "Preventive checkup" (ruleset_3.en.json:7531)
@@ -297,5 +303,39 @@ describe('collectPerp — upgrade-unlocked data points are collected', () => {
     expect(tokensMap.token018).toEqual({ amount: 25 });
     expect(tokensMap.token125).toEqual({ amount: 100 });
     expect(getState().db_queue[0].profile_set.tokens_map.token018).toEqual({ amount: 25 });
+  });
+});
+
+// getTokensMap also skips amount-0 entries, so upgrade-gated data points the
+// player hasn't unlocked never turn into 0 % Database tokens.
+describe('collectPerp → integrateCollected — amount-0 data points are skipped', () => {
+  const P001 = 'Imperium.CityVienna.project001';
+  const GATED = [
+    'token011',
+    'token012',
+    'token064',
+    'token065',
+    'token129',
+    'token130',
+    'token132',
+  ];
+
+  it('project001 queues only its 11 unlocked tokens and seeds no 0 % nodes', async () => {
+    setState(
+      mkState({
+        nodes: [mkNode('ProjectPerp', P001)],
+        nodes_collect: [{ path: P001, result: { amount: 100 } }],
+      })
+    );
+
+    const { result } = await collectPerp(P001);
+    const tokensMap = result.result.profile_set.tokens_map;
+    expect(Object.keys(tokensMap)).toHaveLength(11);
+    for (const g of GATED) expect(tokensMap[g]).toBeUndefined();
+
+    await integrateCollected(result.result.collect_id);
+    const tokenNodes = getState().nodes.filter((n) => n.game_type === 'TokenPerp');
+    expect(tokenNodes).toHaveLength(11);
+    expect(tokenNodes.filter((n) => !n.instance_data.amount)).toEqual([]);
   });
 });
