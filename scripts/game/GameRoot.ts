@@ -125,6 +125,7 @@ interface ViewMapRenderLike extends RenderRootLike {
     scrollTo(x: number, y: number, animate?: boolean | unknown, zoom?: number): void;
   };
   updateScroller?(): void;
+  _finishTween?(): void;
   parentNode?: { width?: number; height?: number };
   getPosition?(): { x: number; y: number };
   /** Current zoom scale applied to the ViewMap content.  Default
@@ -892,6 +893,7 @@ export class GameRoot extends GameNode {
       const view = this.activeView ?? this.getImperium();
       const vm = view?.renderNode as ViewMapRenderLike | undefined;
       if (!vm?.scroller || !vm.parentNode) return;
+      vm._finishTween?.();
       const vw = vm.parentNode.width ?? 0;
       const vh = vm.parentNode.height ?? 0;
       // `vm.width` / `homeX` are in unscaled native ViewMap coords;
