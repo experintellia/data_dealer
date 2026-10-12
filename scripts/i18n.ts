@@ -15,8 +15,6 @@ import setup from './setup.js';
 
 /** Union of all known translation keys derived directly from the canonical locale file. */
 type I18nKey = keyof typeof enUS;
-/** Locale-table entry: the actual value type from the JSON (metadata object or [msgctxt, msgstr] tuple). */
-type I18nEntry = (typeof enUS)[I18nKey];
 /** Typed over the exact key set of the canonical locale file — no unknown-key undefined overhead. */
 type I18nTable = typeof enUS;
 

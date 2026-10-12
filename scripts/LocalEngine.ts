@@ -64,7 +64,6 @@ interface PerpTypeData {
   collect_amount?: number;
   collect_risk?: number;
   charge_time?: number;
-  collect_time?: number;
   tokens?: TokenSpec[];
   contained_tokens?: TokenSpec[];
   income_base?: number;
@@ -75,17 +74,7 @@ interface PerpTypeData {
   slot_cost?: number;
   slot_cost_modifier?: number;
   max_slots?: number;
-  slots?: SlotEntry[];
-  origin_full_type?: string;
-  origin_gestalt?: string;
   title?: string;
-  [key: string]: unknown;
-}
-
-interface SlotEntry {
-  type: string;
-  count: number;
-  price?: number;
   [key: string]: unknown;
 }
 
@@ -199,8 +188,6 @@ interface Ruleset {
 
 /** Union of all known translation keys derived from the canonical locale file. */
 type I18nKey = keyof typeof i18nEn;
-/** Locale-table entry: the actual value type from the JSON (metadata object or [msgctxt, msgstr] tuple). */
-type I18nEntry = (typeof i18nEn)[I18nKey];
 /** Typed over the exact key set of the canonical locale file. */
 type I18nTable = typeof i18nEn;
 
@@ -977,19 +964,6 @@ export function setPerpCoordinates(updates: unknown): Promise<{ result: 1 }> {
   var state = getState();
   if (!state || !Array.isArray(state.nodes)) {
     return Promise.resolve({ result: 1 });
-  }
-
-  // Build a lookup map: full_path → {x, y}.  Result is unused (the reducer
-  // walks `updates` itself) — we just validate each entry's shape here so
-  // malformed inputs are dropped before persistence.
-  var coordMap: Record<string, unknown> = {};
-  for (var i = 0; i < updates.length; i++) {
-    var entry = updates[i];
-    if (!Array.isArray(entry) || entry.length < 2) continue;
-    var path = entry[0];
-    var pos = entry[1];
-    if (typeof path !== 'string' || !pos || typeof pos !== 'object') continue;
-    coordMap[path] = pos;
   }
 
   _persistDelta(_mkDelta(state.addr, 'setPerpCoordinates', [updates], {}));
@@ -3226,19 +3200,6 @@ export function recheckMissions(): Promise<{
 }
 
 // ---------------------------------------------------------------------------
-// Stub handlers — Wave 4+ issues fill these in.
-// ---------------------------------------------------------------------------
-var _STUBS = ['checkUsername'] as const;
-
-type StubName = (typeof _STUBS)[number];
-var _stubHandlers: Record<string, () => Promise<never>> = {};
-_STUBS.forEach(function (name: StubName) {
-  _stubHandlers[name] = function () {
-    return Promise.reject('NotImplemented: ' + name);
-  };
-});
-
-// ---------------------------------------------------------------------------
 // Default export — object consumed by app.js via require('LocalEngine').
 // Includes setEmitter so app.js can wire the DOM event bus after jQuery loads.
 //
@@ -3247,36 +3208,33 @@ _STUBS.forEach(function (name: StubName) {
 //
 // HandlerResult shapes are documented in docs/response-shapes.md.
 // ---------------------------------------------------------------------------
-var LocalEngine = Object.assign(
-  {
-    getToken: getToken,
-    ping: ping,
-    getSessionLocale: getSessionLocale,
-    setLocale: setLocale,
-    exportSave: exportSave,
-    importSave: importSave,
-    loadGame: loadGame,
-    getRanking: getRanking,
-    setDisplayName: setDisplayName,
-    setPerpCoordinates: setPerpCoordinates,
-    getProvidedPerps: getProvidedPerps,
-    getPowerups: getPowerups,
-    buyKarma: buyKarma,
-    buyPowerup: buyPowerup,
-    sellPowerup: sellPowerup,
-    buySlots: buySlots,
-    buyPerp: buyPerp,
-    chargePerp: chargePerp,
-    collectPerp: collectPerp,
-    integrateCollected: integrateCollected,
-    dismissMissionBriefing: dismissMissionBriefing,
-    markTokenSeen: markTokenSeen,
-    recheckMissions: recheckMissions,
-    setEmitter: setEmitter,
-    setSendAchievement: setSendAchievement,
-    setPrngSeed: setPrngSeed,
-  },
-  _stubHandlers
-);
+var LocalEngine = {
+  getToken: getToken,
+  ping: ping,
+  getSessionLocale: getSessionLocale,
+  setLocale: setLocale,
+  exportSave: exportSave,
+  importSave: importSave,
+  loadGame: loadGame,
+  getRanking: getRanking,
+  setDisplayName: setDisplayName,
+  setPerpCoordinates: setPerpCoordinates,
+  getProvidedPerps: getProvidedPerps,
+  getPowerups: getPowerups,
+  buyKarma: buyKarma,
+  buyPowerup: buyPowerup,
+  sellPowerup: sellPowerup,
+  buySlots: buySlots,
+  buyPerp: buyPerp,
+  chargePerp: chargePerp,
+  collectPerp: collectPerp,
+  integrateCollected: integrateCollected,
+  dismissMissionBriefing: dismissMissionBriefing,
+  markTokenSeen: markTokenSeen,
+  recheckMissions: recheckMissions,
+  setEmitter: setEmitter,
+  setSendAchievement: setSendAchievement,
+  setPrngSeed: setPrngSeed,
+};
 
 export default LocalEngine;

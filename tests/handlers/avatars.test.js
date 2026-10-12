@@ -1,4 +1,3 @@
-// @ts-nocheck — mirrors the strict-TS quarantine on sibling handler tests.
 /**
  * Tests for webxdc avatar plumbing (PR: highscore avatars).
  *

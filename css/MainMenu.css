@@ -54,12 +54,7 @@
 .mm-user-btn:hover {
   transform: scale(1.1, 1.1);
 }
-.mm-user-btn.disabled,
-.mm-user-btn.disabled:hover {
-  transform: none;
-  opacity: 0.5;
-}
-.mm-user-btn:not(.disabled):active {
+.mm-user-btn:active {
   background: #ecf8fc;
   transform: scale(0.97);
 }
@@ -100,18 +95,7 @@
 .mm-tab:hover {
   background: #ecf8fc;
 }
-.mm-tab.disabled,
-.mm-tab.disabled:hover {
-  transform: none;
-  opacity: 0.5;
-}
-.mm-tab.disabled:hover {
-  background: #b7dded;
-}
-.mm-tab.active.disabled:hover {
-  background: #ecf8fc;
-}
-.mm-tab:not(.disabled):active {
+.mm-tab:active {
   background: #ecf8fc;
   transform: scale(0.97);
 }

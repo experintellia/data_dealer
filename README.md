@@ -32,25 +32,25 @@ Planning and implementation of this port was done with [Claude](https://www.anth
 
 Install dependencies:
 
-    $ npm install
+    $ pnpm install
 
 Start the dev server (with webxdc shim):
 
-    $ npm run dev
+    $ pnpm dev
 
 Run tests:
 
-    $ npm test
+    $ pnpm test
 
 Build the `.xdc` files:
 
-    $ npm run build:all       # both: data-dealer-hq.xdc + data-dealer-casual.xdc
-    $ npm run build:hq        # HQ only — bit-exact lossless pixels
-    $ npm run build:casual    # casual only — pre-quantized assets
+    $ pnpm build:all       # both: data-dealer-hq.xdc + data-dealer-casual.xdc
+    $ pnpm build:hq        # HQ only — bit-exact lossless pixels
+    $ pnpm build:casual    # casual only — pre-quantized assets
 
 Build the standalone browser version (what GitHub Pages serves):
 
-    $ npm run build:pages   # dist-pages/ — no .xdc, ships a webxdc stub instead
+    $ pnpm build:pages   # dist-pages/ — no .xdc, ships a webxdc stub instead
 
 It builds the HQ assets (lossless sprites): unlike a `.xdc`, which travels
 through a chat, the web version is served once and cached, so there is no
@@ -64,7 +64,7 @@ Since there is no messenger to inject `webxdc.js`, the build ships the
 game is fully playable, "Add Peer" opens a second local player in a new tab,
 and the dev-tools panel has a close button so it can be dismissed.
 
-The casual variant ships pre-quantized PNGs from [`img-casual/`](./img-casual/) and `icon-casual.png` (committed to the repo). If you change anything in [`img/`](./img/) or `icon.png`, run `npm run quantize-assets` (requires `pngquant` and `oxipng`) and commit the resulting diff.
+The casual variant ships pre-quantized PNGs from [`img-casual/`](./img-casual/) and `icon-casual.png` (committed to the repo). If you change anything in [`img/`](./img/) or `icon.png`, run `pnpm quantize-assets` (requires `pngquant` and `oxipng`) and commit the resulting diff.
 
 ## Licensing & credits
 

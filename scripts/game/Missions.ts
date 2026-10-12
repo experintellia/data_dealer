@@ -35,12 +35,10 @@ export class Missions extends GameNode {
   /** Per-gestalt registry of mission instances; lookup target for getMission(). */
   Missions: Record<string, Mission> = {};
   ViewMap?: Missions;
-  queue?: OrderedSet<unknown>;
 
   constructor(config?: GameNodeConfig) {
     super(config);
     this.ViewMap = this;
-    this.queue = new OrderedSet();
   }
 
   override extendRender(): void {
@@ -166,12 +164,6 @@ export class Missions extends GameNode {
   getVisibleMissions(): Mission[] {
     return Object.values(this.Missions).filter(
       (m) => m.states.active === true || m.states.complete === true
-    );
-  }
-
-  getCompletedMissions(): Mission[] {
-    return Object.values(this.Missions).filter(
-      (m) => m.states.active === false && m.states.complete === true
     );
   }
 

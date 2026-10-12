@@ -1,4 +1,3 @@
-// @ts-nocheck — strict-TS quarantine
 import { describe, expect, it } from 'vitest';
 import { injectTranslations } from '../../scripts/inject-translations.ts';
 

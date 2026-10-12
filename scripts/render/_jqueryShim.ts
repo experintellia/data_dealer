@@ -27,7 +27,7 @@
 /**
  * The wide jQuery-wrapper surface that every Render* module needs.
  * Generic in the underlying DOM element type so canvas-backed
- * wrappers (Cable, Circle) can narrow `[0]` to `HTMLCanvasElement`
+ * wrappers (Cable) can narrow `[0]` to `HTMLCanvasElement`
  * via `JQueryRenderElem<HTMLCanvasElement>`.
  *
  * Method overload signatures match jQuery 3.x's runtime:

@@ -51,16 +51,3 @@ export function getNode(id: number): RenderNode | undefined {
 export function getNodeById(id: string): RenderNode | undefined {
   return _ids[id];
 }
-
-/** Clear everything that has been rendered so far — calls
- *  `node.remove()` on each live node and truncates the
- *  `_instances` array.  Used by Game.lock / reset paths. */
-export function clearAllNodes(): void {
-  for (let n = 0; n < _instances.length; n++) {
-    const node = _instances[n];
-    if (node) {
-      node.remove();
-    }
-  }
-  _instances.length = 0;
-}

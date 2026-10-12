@@ -241,14 +241,6 @@ export class RenderViewTab extends RenderNode {
     return child;
   }
 
-  lock(): void {
-    this.jdomelem3.addClass('lockOn');
-  }
-
-  unlock(): void {
-    this.jdomelem3.removeClass('lockOn');
-  }
-
   override onAddInit(): void {
     this.render();
     this.draw();
@@ -267,15 +259,6 @@ export class RenderViewTab extends RenderNode {
 
   FXHide(): void {
     this.jdomelem.removeClass('active');
-  }
-
-  /** Legacy stub — body computed dimensions but didn't apply them.
-   *  Preserved verbatim. */
-  updateScroller(): void {
-    const stage = this.parentNode;
-    if (!stage) return;
-    void stage.width;
-    void stage.height;
   }
 }
 
@@ -418,14 +401,6 @@ export class RenderViewMap extends RenderNode {
     child.useDragHandler = this.dragHandler;
     child.onAddInit();
     return child;
-  }
-
-  lock(): void {
-    this.jdomelem3.addClass('lockOn');
-  }
-
-  unlock(): void {
-    this.jdomelem3.removeClass('lockOn');
   }
 
   override onAddInit(): void {
@@ -923,14 +898,6 @@ export class RenderStage extends RenderNode {
     });
   }
 
-  lock(): void {
-    this.jdomelem2.addClass('lockOn');
-  }
-
-  unlock(): void {
-    this.jdomelem2.removeClass('lockOn');
-  }
-
   override setSize(size: { width?: number; height?: number }): void {
     this.setAttrs(size as Record<string, unknown>);
     this.css({
@@ -1013,26 +980,22 @@ export class RenderMainMenu extends RenderStage {
     // Setup Button Events
     const root = this.gameNode?.GameRoot;
 
-    this.jdomelem.on('click touchend', '#LocaleToggle:not(.disabled)', (e) => {
+    this.jdomelem.on('click touchend', '#LocaleToggle', (e) => {
       e.stopPropagation();
       e.preventDefault();
       root?.trigger?.('toggle_locale');
     });
-    this.jdomelem.on('click touchend', '#UserData:not(.disabled)', (e) => {
+    this.jdomelem.on('click touchend', '#UserData', (e) => {
       e.stopPropagation();
       e.preventDefault();
       root?.trigger?.('user_data');
     });
-    this.jdomelem.on(
-      'click touchend',
-      '.mm-tab:not(.disabled)',
-      function (this: HTMLElement, e: ViewDomEvent) {
-        e.stopPropagation();
-        e.preventDefault();
-        const buttonId = $(this).attr('data-button-id') as string | undefined;
-        root?.trigger?.('switch_view', [buttonId]);
-      }
-    );
+    this.jdomelem.on('click touchend', '.mm-tab', function (this: HTMLElement, e: ViewDomEvent) {
+      e.stopPropagation();
+      e.preventDefault();
+      const buttonId = $(this).attr('data-button-id') as string | undefined;
+      root?.trigger?.('switch_view', [buttonId]);
+    });
 
     // Forward .mm-xp taps to the same `click_status.XP` event.
     this.jdomelem.on(
@@ -1128,18 +1091,6 @@ export class RenderMainMenu extends RenderStage {
     if (text) text.textContent = current + '/' + total;
     if (level) level.textContent = String(sb.XP_level);
     item.classList.toggle('active', sb.XP_active > 0.2);
-  }
-
-  override lock(): void {
-    const jq = this.jdomelem;
-    jq.addClass('locked');
-    jq.find('.mm-user-btn, .mm-tab').addClass('disabled');
-  }
-
-  override unlock(): void {
-    const jq = this.jdomelem;
-    jq.removeClass('locked');
-    jq.find('.mm-user-btn, .mm-tab').removeClass('disabled');
   }
 
   addButton(text: string, id: string, states?: Record<string, boolean>): void {

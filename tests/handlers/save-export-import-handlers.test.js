@@ -1,5 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
-//
 // Handler-level tests for exportSave / importSave (issue #127).
 //
 // These assert the webxdc-facing behaviour the pure state tests can't:

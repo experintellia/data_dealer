@@ -1,4 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
 // Shared utilities for source-text guard tests under tests/render/.
 // The render layer can't be instantiated under vitest (needs createjs +
 // Scroller globals + real DOM), so the regression tests read the

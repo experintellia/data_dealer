@@ -568,10 +568,8 @@ export class ProjectPerp extends GamePerp {
             data.result.missions
           );
           if (data.result.karma_incident) {
-            const newKarma = data.result.game_values?.karma_value ?? 0;
-            const karma_dec = newKarma - groot.karma_value;
             groot.makeNotifications({
-              karma: { gestalt: data.result.karma_incident, dec: karma_dec },
+              karma: { gestalt: data.result.karma_incident },
             });
           }
           deco.FXBling({ text: toKSNum(amount), extendClass: 'ProfileBling' });

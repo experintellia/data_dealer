@@ -10,8 +10,6 @@ import i18n from '../../i18n.js';
 import { MarcoSpeech } from '../MarcoSpeech.js';
 import { MissionGoalRow, type MissionGoalVM, type MissionRewardVM } from '../MissionGoal.js';
 
-export type { MissionGoalVM, MissionRewardVM };
-
 export interface MissionPopupProps {
   /** `complete` renders the `.Complete` body modifier + the
    *  mission-done text/button; `briefing` is the active-mission /

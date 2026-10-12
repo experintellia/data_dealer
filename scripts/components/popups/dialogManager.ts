@@ -80,10 +80,6 @@ function applyFxFeedback(
   container.appendChild(bling);
 }
 
-/** Extend-class values accepted by `openDialog`.  Each is a CSS hook
- *  in `css/Render.css` (`.PopupContainer.lockOn.<class>`). */
-export type ExtendClass = 'Tutorial' | 'Alert' | 'NewItems' | 'LevelUp' | 'Mission';
-
 /** Minimal `addClass` / `removeClass` surface (jQuery-shaped) used by
  *  the FX-feedback `trigger` events.  Exported so perp components
  *  typing `popup.lastButton` share the contract. */
@@ -149,9 +145,9 @@ export interface OpenDialogOptions<P> {
   props: P;
   /** Active view's `popupContainerDomelem`. */
   container: HTMLElement;
-  /** Optional extra class — typically one of `ExtendClass`, but kept as
-   *  `string` so legacy call sites and forward extensions don't need to
-   *  thread the literal type through every config. */
+  /** Optional extra class — a CSS hook in `css/Render.css`
+   *  (`.PopupContainer.lockOn.<class>`: Tutorial / Alert / NewItems /
+   *  LevelUp / Mission). */
   extendClass?: string;
   /** Dock the dialog at the bottom of the viewport instead of centred
    *  (legacy `RenderPopup.placeBottom` — Tutorial / Story / LevelUp). */
@@ -229,7 +225,7 @@ export function openDialog<P>(opts: OpenDialogOptions<P>): PreactDialogHandle {
     isOpen = false;
     // Fire popup_close listeners before tearing down the DOM.
     // GameNode.initPopupEvents registers badge cleanup (DecoratorNew
-    // removal, mission dismissal, highlightTabs reset) here.  The
+    // removal, mission dismissal) here.  The
     // p.close() those listeners call is a no-op — isOpen is already false.
     const closeSet = listeners.get('popup_close');
     if (closeSet) for (const fn of closeSet) fn(evStub);

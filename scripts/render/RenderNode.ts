@@ -1,6 +1,6 @@
 // Render-side `Node` base class — the foundation that every render
-// primitive (Sprite, Circle, Text, Perp, Decorator, Cable, Popup,
-// Statusbar, ViewMap, …) extends via util.extend.  Owns positioning,
+// primitive (Sprite, Text, Perp, Decorator, Cable, Statusbar, ViewMap,
+// …) extends.  Owns positioning,
 // transforms, opacity, the DOM/jQuery wrapper, the children/decorators
 // collections, and the click/drag wiring.
 // The `_instances` / `_ids` registry lives in scripts/render/renderRegistry.ts.
@@ -102,12 +102,9 @@ export class RenderNode {
   children!: RenderSet<RenderNode>;
   decorators!: RenderSet<RenderNode>;
 
-  // Defaults live on the prototype (see static-init block below) so that
-  // legacy function-constructor subclasses extended via util.extend pick
-  // them up through the prototype chain even when they don't call into
-  // RenderNode's constructor.  `declare` keeps TS aware of the shape
-  // without emitting per-instance initialisers that would shadow the
-  // prototype defaults.
+  // Defaults live on the prototype (see static-init block below).
+  // `declare` keeps TS aware of the shape without emitting per-instance
+  // initialisers that would shadow the prototype defaults.
   declare x: number;
   declare y: number;
   declare z: number;
@@ -130,14 +127,12 @@ export class RenderNode {
   declare sticky: boolean;
   declare extendClass: string | undefined;
 
-  // Optional links set by addChild / addDecorator / addPopup or by
+  // Optional links set by addChild / addDecorator or by
   // subclasses.  Declared as `T | undefined` (rather than optional
   // `T?`) so that legacy assignments such as `child.useDragHandler =
   // this.dragHandler` survive `exactOptionalPropertyTypes` even when
   // the right-hand side is itself undefined.  `declare` keeps the
-  // declarations type-only — legacy `extend()` subclasses don't pass
-  // through RenderNode's constructor, so emitting per-instance
-  // initialisers would just shadow the prototype-chain lookup.
+  // declarations type-only, so no per-instance initialisers are emitted.
   declare parentNode: RenderNode | undefined;
   declare decoratedNode: RenderNode | undefined;
   declare dragHandler: DragHandlerLike | undefined;
@@ -299,20 +294,6 @@ export class RenderNode {
     return child;
   }
 
-  addPopup(popup: RenderNode): RenderNode | undefined {
-    if (!this.popupContainerDomelem) {
-      return undefined;
-    }
-    this.popupContainerDomelem.empty();
-    this.popupContainerDomelem.append(popup.jdomelem);
-    popup.parentNode = this;
-    this.children.add(popup);
-    popup.dragHandler = popup.dragHandler ?? this.dragHandler;
-    popup.useDragHandler = this.dragHandler;
-    popup.onAddInit();
-    return popup;
-  }
-
   addDecorator(deco: RenderNode): RenderNode | string {
     if (!this.parentNode) {
       return 'Could not decorate';
@@ -334,10 +315,6 @@ export class RenderNode {
     deco.decoratedNode = this;
     this.parentNode.addChild(deco);
     return deco;
-  }
-
-  removeChild(node: RenderNode): void {
-    this.children.remove(node);
   }
 
   getPosition(): { x: number; y: number } {
@@ -403,22 +380,8 @@ export class RenderNode {
     };
   }
 
-  getScaledPosition(): { x: number; y: number } {
-    return {
-      x: this.x + this.getScaledSize().width / 2,
-      y: this.y + this.getScaledSize().height / 2,
-    };
-  }
-
   moveTo(pos: { x: number; y: number }): void {
     this.setPosition(pos);
-  }
-
-  moveBy(vector: { x: number; y: number }): void {
-    this.moveTo({
-      x: this.getPosition().x + vector.x,
-      y: this.getPosition().y + vector.y,
-    });
   }
 
   clipCablePos(newPos: { x: number; y: number }): { x: number; y: number } {

@@ -4,8 +4,7 @@
 //   - DB-token state mirrors (`DBTokens`, `DBTokensAbsolute`,
 //     `DBOriginTokens`, `IPerps`) that drive the income / charge
 //     calculations on TokenPerp / ClientPerp / Database;
-//   - the notification queue and a handful of lifecycle hooks (`kill`,
-//     `lock`, `unlock`).
+//   - the notification queue.
 //
 // Extracted from scripts/Game.js's IIFE in PR 19 of issue #147.  This
 // PR moves the GameRoot **class shell** + the simplest method groups
@@ -89,8 +88,6 @@ interface OriginToken {
  *  and `setSize` methods.  Collapses when Render.js is typed (later
  *  in #147). */
 interface RenderRootLike {
-  lock?(): void;
-  unlock?(): void;
   width?: number;
   height?: number;
   jdomelem?: {
@@ -103,7 +100,6 @@ interface RenderRootLike {
   };
   setSize?(opts: { width?: number; height?: number }): void;
   render?(): void;
-  addPopup?(popup: unknown): void;
   /** Owned by RenderMainMenu (RenderViews.ts).  Cloned-XP-bar slot
    *  refresh; `sb` is structurally a RenderStatusbar (XP_* scalars). */
   renderXP?(sb: unknown): void;
@@ -313,7 +309,6 @@ interface Notification {
   says?: string | undefined;
   description?: string | undefined;
   selectortitle?: string | undefined;
-  karma_dec?: number | undefined;
   button?: string | undefined;
   providedKarma?: ProvidedKarmaRow[] | undefined;
   data?: Record<string, unknown> | undefined;
@@ -372,7 +367,7 @@ interface MakeNotificationsPayload {
   levelup?: number | true;
   perps?: string[];
   powerups?: Record<string, Array<{ game_gestalt: string; [key: string]: unknown }>>;
-  karma?: { gestalt: string; dec: number; karma_value?: number };
+  karma?: { gestalt: string; karma_value?: number };
   simplemessage?: { text: string };
   story?: { text: string };
   storyPerp?: GameNode & {
@@ -389,7 +384,6 @@ interface NewItemsLike {
   markNewItems?(): void;
   checkProvidedByLevel?(): void;
   checkProvidedByRequiredPerps?(): void;
-  highlightTabs?: string[];
 }
 
 // File-local versions of the stopPropagation / preventDefault narrows
@@ -561,7 +555,7 @@ export class GameRoot extends GameNode {
   } = {};
   override renderNode?: NonNullable<GameNode['renderNode']> & RenderRootLike;
   // `renderMenu` widens GameNode's typed declaration to also expose the
-  // RenderRoot lock/unlock surface the lifecycle methods touch.
+  // RenderRoot surface.
   override renderMenu?: NonNullable<GameNode['renderMenu']> &
     RenderRootLike & {
       addButton?(label: string, id: string, states: unknown): void;
@@ -591,7 +585,6 @@ export class GameRoot extends GameNode {
     render?(): void;
     notificationMission?: string | null;
   };
-  retryDelay?: number;
 
   // -------------------------------------------------------------------
   // Type registry
@@ -646,10 +639,6 @@ export class GameRoot extends GameNode {
     return undefined;
   }
 
-  removeType(gestalt: string): void {
-    delete this.typeRegistry[gestalt];
-  }
-
   override getType(gestalt?: string): TypeEntry | undefined {
     if (gestalt === undefined) return undefined;
     return this.typeRegistry[gestalt];
@@ -676,9 +665,8 @@ export class GameRoot extends GameNode {
     return this.typeRegistry[gestalt]?.game_type ?? '';
   }
 
-  /** Predicate shared by `getParentType` / `getParentTypeData` /
-   *  `getParentTypes`: a typeRegistry entry whose `provided_perps` list
-   *  contains `gestalt`. */
+  /** Predicate for `getParentTypes`: a typeRegistry entry whose
+   *  `provided_perps` list contains `gestalt`. */
   private _providesGestalt(t: TypeEntry, gestalt: string): boolean {
     const provided = (t.type_data as { provided_perps?: string[] } | undefined)?.provided_perps;
     return !!provided?.includes(gestalt);
@@ -686,17 +674,6 @@ export class GameRoot extends GameNode {
 
   getParentTypes(gestalt: string): TypeEntry[] {
     return Object.values(this.typeRegistry).filter((t) => this._providesGestalt(t, gestalt));
-  }
-
-  getParentTypeData(gestalt: string): Record<string, unknown> {
-    return (
-      Object.values(this.typeRegistry).find((t) => this._providesGestalt(t, gestalt))?.type_data ??
-      {}
-    );
-  }
-
-  getParentType(gestalt: string): TypeEntry {
-    return Object.values(this.typeRegistry).find((t) => this._providesGestalt(t, gestalt)) ?? {};
   }
 
   // -------------------------------------------------------------------
@@ -799,43 +776,6 @@ export class GameRoot extends GameNode {
     getByType('TokenPerp').forEach((t) => {
       (t as GameNode & { updateGear?(): void }).updateGear?.();
     });
-  }
-
-  // -------------------------------------------------------------------
-  // Lifecycle
-  // -------------------------------------------------------------------
-
-  kill(): void {
-    console.warn('Killing Game');
-    // `clear()` lives in GameNode.ts; legacy bound it as a free import.
-    // Imported at the top of this file via the registry helpers.
-    clearRegistry();
-    const app = appModule.getApplication() as { game?: unknown };
-    delete app.game;
-  }
-
-  lock(): void {
-    // Lock the whole stage and turn off triggering of render Events.
-    // TODO: make stage spinner in Render and use proper method to
-    // unbind events.  Unlock currently wouldn't work since all events
-    // are destroyed (FIXME for popups).
-    if (this.renderNode) {
-      this.renderNode.lock?.();
-      this.renderMenu?.lock?.();
-      _aniTicker?.stop();
-    }
-  }
-
-  unlock(): void {
-    if (this.NotificationQueue && this.NotificationQueue.length < 2) {
-      this.renderNode?.unlock?.();
-      this.renderMenu?.unlock?.();
-      _aniTicker?.start();
-    } else if (!this.NotificationQueue) {
-      this.renderNode?.unlock?.();
-      this.renderMenu?.unlock?.();
-      _aniTicker?.start();
-    }
   }
 
   // -------------------------------------------------------------------
@@ -1275,11 +1215,6 @@ export class GameRoot extends GameNode {
     this.NotificationQueue.push(notification);
   }
 
-  /** No-op stub preserved from legacy.  Likely intended to kick the
-   *  queue but never wired — `openNotification` runs at the tail of
-   *  `makeNotifications` instead. */
-  startNotificationQueue(): void {}
-
   uncueNotification(notification: Notification): void {
     const index = this.NotificationQueue.indexOf(notification);
     if (index !== -1) this.NotificationQueue.splice(index, 1);
@@ -1660,8 +1595,6 @@ export class GameRoot extends GameNode {
                 sub.markNewItems?.();
                 sub.checkProvidedByLevel?.();
                 sub.checkProvidedByRequiredPerps?.();
-                sub.highlightTabs = sub.highlightTabs ?? [];
-                if (n.game_type) sub.highlightTabs.push(n.game_type);
               }
             });
           } else {
@@ -1725,8 +1658,6 @@ export class GameRoot extends GameNode {
         // add those decorators and make the projects notification text
         reg.projects.forEach((project, k) => {
           project.markNewItems?.();
-          project.highlightTabs = project.highlightTabs ?? [];
-          if (n.game_type) project.highlightTabs.push(n.game_type);
           const sep = k < reg.projects.length - 1 ? ', ' : '';
           projectstext = projectstext + (project.data?.title ?? '') + sep;
         });
@@ -1744,7 +1675,6 @@ export class GameRoot extends GameNode {
       const td = this.getTypeData(gestalt) as Record<string, unknown> | undefined;
       const n: Notification = { ...(td ?? {}) };
       n.selectortitle = i18n.gettext('Choose your counter measures');
-      n.karma_dec = data.karma.dec;
       n.button = i18n.gettext('Do nothing');
       n.providedKarma = this.data.providedKarma;
       const type = this.getType(gestalt);
@@ -1924,7 +1854,7 @@ export class GameRoot extends GameNode {
   }
 
   // -------------------------------------------------------------------
-  // View getters, BuyPerp dispatch, render hooks, refresh, loadGame
+  // View getters, BuyPerp dispatch, render hooks, loadGame
   // -------------------------------------------------------------------
 
   /** FIXME: this is just a wrapper. */
@@ -1963,58 +1893,6 @@ export class GameRoot extends GameNode {
     // as `undefined` (the call would have thrown ReferenceError at
     // runtime, masking what was clearly a copy-paste bug).
     this.Error('The computer says NOOOO', undefined);
-  }
-
-  /** Reload the game data and reinit the whole Game (like a page
-   *  reload).  On retry-failure, escalates the retry interval and
-   *  finally redirects to `/` if the cap is exceeded. */
-  refresh(): void {
-    this.retryDelay = this.retryDelay || 2000;
-    this.lock();
-
-    const app = appModule.getApplication() as {
-      remote: {
-        getSessionLocale?(): {
-          then(onResolved: (data: { result?: string }) => unknown): {
-            fail(cb: (data: unknown) => void): unknown;
-          };
-        };
-        loadGame?(): { then(cb: (data: { result?: LoadGameData }) => void): unknown };
-      };
-      version?: unknown;
-      renderView?(name: string): string;
-    };
-    const $ = globalThis.$;
-    if (!app.remote.getSessionLocale || !$) return;
-    const chain = app.remote.getSessionLocale().then((data) => {
-      const locale = data.result === 'de' ? 'de_AT' : 'en_US';
-      i18n.setLocale(locale);
-      const html = app.renderView?.('game.html') ?? '';
-      $('#dd-control').html(html);
-      return app.remote.loadGame?.().then((d) => {
-        const gameData = d.result;
-        if (!gameData) return;
-        app.version = gameData.version;
-        const Game = appModule.getApplication() as unknown as { game?: GameRoot };
-        // Re-init through the bootstrap path; Game.js's `init` factory
-        // creates a fresh GameRoot and calls `loadGame(gameData)`.
-        const init = (appModule.getApplication() as { init?: (d: LoadGameData) => unknown }).init;
-        if (init) init(gameData);
-        else if (Game.game) Game.game.loadGame(gameData);
-      });
-    });
-    (chain as unknown as { fail(cb: (data: unknown) => void): void }).fail((_data) => {
-      if (this.notificationPopup) {
-        this.notificationPopup.trigger('error');
-        window.setTimeout(() => {
-          this.notificationPopup?.render?.();
-        }, this.retryDelay);
-        this.retryDelay = (this.retryDelay ?? 0) + 1000;
-        if ((this.retryDelay ?? 0) > 6000) {
-          document.location.href = '/';
-        }
-      }
-    });
   }
 
   override extendRender(): void {

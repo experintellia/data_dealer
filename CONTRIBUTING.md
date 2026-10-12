@@ -2,202 +2,45 @@
 
 ## Prerequisites
 
-- [pnpm](https://pnpm.io/) ≥ 9
-- Node.js ≥ 18
+- [pnpm](https://pnpm.io/) 10
+- Node.js 22.12+ or 24+ (required by Vite 8 and vite-plugin-static-copy; CI uses Node 22)
 
-## Quick start
+`pnpm install` also installs the [lefthook](https://lefthook.dev/) git hooks:
+`biome check` on staged JS/TS/CSS files before each commit, `pnpm typecheck` and
+`pnpm test` before each push.
 
-```bash
-pnpm install
-pnpm build    # produces dist/ and data-dealer.xdc
-pnpm test     # runs vitest
-```
+## Scripts
 
-To open the game locally:
+| Command | What it does |
+|---|---|
+| `pnpm dev` | Vite dev server on http://localhost:3000 with a mock `webxdc.js` (`pnpm dev:debug` also loads `preact/debug`) |
+| `pnpm build:all` | Both bundles: `data-dealer-hq.xdc` and `data-dealer-casual.xdc` (`build:hq` / `build:casual` build one) |
+| `pnpm build:pages` | Standalone browser build in `dist-pages/` (what GitHub Pages serves) |
+| `pnpm quantize-assets` | Regenerate `img-casual/` and `icon-casual.png` from `img/` and `icon.png` (needs `pngquant` and `oxipng`) |
+| `pnpm test` / `pnpm test:coverage` | Unit tests (vitest), optionally with coverage in `coverage/` |
+| `pnpm test:e2e` | Playwright end-to-end tests (Chromium) against the dev server |
+| `pnpm typecheck` | `tsc --noEmit` for `scripts/`, `tests/` and `types/`, then for the config files and `tools/` |
+| `pnpm lint` / `pnpm lint:fix` | Biome lint + format check / auto-fix |
 
-```bash
-pnpm build
-cd dist && python3 -m http.server 8080
-# open http://localhost:8080
-```
-
-Expected result: the page loads but the console shows
-`NotImplemented: getToken` (the "boots-to-broken" state from issue #9).
-No Bower, no Grunt, no RequireJS optimiser is involved anywhere.
-
-## Dev server (live-reload)
-
-```bash
-pnpm dev     # Vite dev server on http://localhost:3000
-```
-
-Legacy AMD files are served as static files — no hot-reload for those until #58.
-A webxdc.js emulator is served by the dev plugin so the `window.webxdc` API
-is available in the browser.
-
-## Building the webxdc archive
-
-```bash
-pnpm build    # produces dist/ and data-dealer.xdc in one step
-```
-
-The `.xdc` file can be sent as an attachment in Delta Chat.
-The archive is produced by `@webxdc/vite-plugins`'s `buildXDC` plugin — no
-shell scripts or manual `zip` invocations are required.
-
-## Project layout
-
-```
-scripts/          AMD source (legacy, unchanged until #58)
-  Game.js         5 669-line main game loop — DO NOT TOUCH in this phase
-  Render.js       5 242-line renderer — DO NOT TOUCH in this phase
-  LocalEngine.js  stub RPC back-end; will be filled by Wave 2 issues
-  esm-entry.js    ESM bundle entry — add imports here as #10/#11 land
-vendor/           Vendored runtime libs (committed; see below)
-tests/
-  build/          build smoke tests (dist/ layout + .xdc contents)
-  state/          state model unit tests  (seed tests land with #10)
-  materializer/   materializer unit tests (seed tests land with #11)
-  handlers/       one file per RPC handler (land alongside each Wave 3 PR)
-vite.config.js    Build + dev server config (also produces data-dealer.xdc)
-vitest.config.js  Test runner config
-```
+See the README for what the two bundle variants are.
 
 ## Tests
 
-Tests live in `tests/` and are run with [vitest](https://vitest.dev/) in a
-pure Node context — no browser, no jQuery, no RequireJS globals.
+Unit tests are the `*.test.*` / `*.spec.*` files under `tests/` (outside
+`tests/e2e/`) and run in plain Node.
+`tests/build/build.test.js` runs `pnpm build:all` before checking both
+`.xdc` files (delete stale `data-dealer-*.xdc` at the repo root if in doubt).
 
-```bash
-pnpm test            # single run
-pnpm test:coverage   # single run + coverage report in ./coverage/
-```
-
-Test files are named `<module>.test.js` and live in the subdirectory that
-matches the module under test (e.g. `tests/handlers/buyPowerup.test.js`).
-
-### Handler PR requirements (Wave 3, #12–#21)
-
-Every handler-port PR must ship with unit tests. Minimum per handler:
-
-| Case | What to test |
-|------|-------------|
-| Happy path | Normal input produces expected state delta |
-| Failure mode | At least one guard (insufficient cash, bad args, …) rejects/returns the expected error |
-
-Tests must import the handler as a plain ES module function — no browser
-globals, no jQuery, no RequireJS `define()` wrappers.
-
-### Module portability rule
-
-New modules (LocalEngine, state, materializer, handlers) **must be importable
-from Node** without a browser or AMD runtime. Concretely:
-
-- Do not use `define(function(require) { … })` in any module that will be tested.
-- Do not call `$`, `window`, `document`, or browser-only globals at module load time.
-- If a legacy module wraps itself in `define(...)`, extract core logic into a plain
-  ESM export and keep the AMD wrapper as a thin shim.
-
-## Adding a new ESM module
-
-1. Create your module as a plain ESM file, e.g. `scripts/state.js`.
-2. Add a named export to `scripts/esm-entry.js`:
-   ```js
-   export { default as state } from './state.js';
-   ```
-3. `pnpm build` bundles it into `dist/scripts/esm-bundle.js`.
-4. Add a script tag in `index.html` **after** `vendor/requirejs.js`:
-   ```html
-   <script src="vendor/requirejs.js" data-main="scripts/require.config"></script>
-   <script src="scripts/esm-bundle.js"></script>  <!-- must be after requirejs -->
-   ```
-5. The AMD bridge in `vite.config.js` calls
-   `define('state', [], () => stateModule)` so legacy requirejs code
-   can `require('state')` without any changes.
-
-## AMD ↔ ESM bridge
-
-Legacy code (Game.js, Render.js, app.js, bootstrap.js, …) runs under
-RequireJS and uses `define()` / `require()`. New Wave 2 modules are
-written as standard ESM.
-
-The bridge works like this:
-
-1. **Vite/Rollup** bundles `scripts/esm-entry.js` into an IIFE that sets
-   `window.__DD = { moduleName: defaultExport, … }`.
-2. A footer appended by `vite.config.js` loops over `__DD` and calls
-   `define(name, [], () => __DD[name])` for each key.
-3. `dist/index.html` loads `esm-bundle.js` **after** `vendor/requirejs.js`
-   so that `window.define` is available when the bridge footer runs.
-
-**Load order is critical:** `esm-bundle.js` must come after `requirejs.js`
-in the HTML. The footer checks `typeof define === 'function'` — if requirejs
-hasn't run yet, the check fails silently and no modules are registered.
-
-## Vendor libs
-
-`vendor/` is committed to the repo. It contains pinned copies of the
-runtime libs the legacy AMD code loads via RequireJS.
-
-To regenerate `vendor/` (e.g. after a version upgrade):
-
-```bash
-node scripts/vendor-install.js
-```
-
-### Version notes
-
-Most libs are sourced from npm at the latest available version.
-Where the original bower.json pinned ancient commits or versions that
-are no longer on npm, a compatibility stub was written in-tree:
-
-| File | Source | Note |
-|------|--------|------|
-| `routie.js` | in-tree stub | API-compatible with joestrong/routie 0.3.2 |
-| `tpl.js` | in-tree impl | Uses `text` + `underscore`, same API as dawsontoth/requirejs-tpl |
-| `zynga-animate.js` | in-tree stub | Zynga scroller Animate.js (commit 7d460ea) |
-| `zynga-scroller.js` | in-tree stub | Zynga Scroller.js (commit dadd850) |
-| `jquery-mobile.js` | in-tree stub | jQM 1.3.2; only used post-getToken |
-| `native-console.js` | in-tree stub | No-op; modern browsers always have console |
-
-If internet access is available, replace the stubs with their original
-pinned versions using the URLs documented in `scripts/vendor-install.js`.
-
-## Linting and formatting (Biome)
-
-This project uses [Biome](https://biomejs.dev/) for both formatting and linting.
-The config lives in `biome.json`. High-churn style rules are disabled for legacy
-code; the enabled set focuses on catching real bugs in new code.
-
-```bash
-pnpm lint          # check only (what CI runs)
-pnpm lint:fix      # apply safe + unsafe auto-fixes
-pnpm exec biome format --write .  # reformat all files
-```
-
-A `lefthook` pre-commit hook runs `biome check` on staged JS/TS/CSS files
-automatically after `pnpm install`. To install it manually: `pnpm exec lefthook install`.
-
-When suppressing a violation that isn't worth fixing in legacy code, use an
-inline directive with a reason:
-
-```js
-// biome-ignore lint/suspicious/noShadowRestrictedNames: legacy class predates ES6 Set
-var Set = function(set) { … };
-```
+Playwright specs live in `tests/e2e/`; `pnpm test:e2e` starts `pnpm dev` itself
+(reusing a server already on port 3000 outside CI). Install the browser once with
+`pnpm exec playwright install chromium`. Set `BUILD_VARIANT=casual` to run
+them against the casual assets.
 
 ## CI
 
-`.github/workflows/test.yml` runs on every push to `main`/`master` and on every
-pull request. Required steps: Biome check → tsc --noEmit → build → tests.
-Coverage is uploaded as a workflow artifact.
-
-To make checks required, enable branch protection on `main`:
-**Settings → Branches → Add rule** → "Require status checks to pass before merging"
-→ add the `Unit tests` job.
-
-## Out of scope in this PR
-
-- Converting `Game.js` / `Render.js` / AMD modules to ESM → issue #58
-- TypeScript adoption → issue #32
-- CI workflow for `.xdc` builds → issue #27
+`.github/workflows/test.yml` runs on pull requests and on pushes to `master`:
+Biome, typecheck, unit tests with coverage, both `.xdc` builds (with a
+1.9 MB ceiling on `scripts/esm-bundle.js` and a PR comment linking the
+artifacts), and the Playwright suite. Pushing a `v*` tag also attaches both
+`.xdc` files to a GitHub Release. `.github/workflows/pages.yml` deploys
+`pnpm build:pages` to GitHub Pages on every push to `master`.

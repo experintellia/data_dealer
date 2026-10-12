@@ -118,7 +118,7 @@ export function boot(options?: BootOptions): Promise<LocalState> {
 
   // Promise.resolve handles three shapes uniformly:
   //   - real webxdc returns a Promise → awaited
-  //   - dev shim (webxdc-shim.ts) returns undefined → already resolved
+  //   - a mock that returns nothing → already resolved
   //   - typeof webxdc === 'undefined' (node) → already resolved
   _bootPromise = Promise.resolve(listenerPromise).then(function () {
     _replayProgress.done = true;

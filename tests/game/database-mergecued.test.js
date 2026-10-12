@@ -1,5 +1,3 @@
-// @ts-nocheck — strict-TS quarantine; remove when this file is migrated to TS (issue #147)
-//
 // Regression guard for the Database.mergeCued duplicate-updateGameValues
 // fix. The function used to call `updateGameValues(gv, …, true)` twice:
 // once silently at the top of the merge (line ~553) and again at the

@@ -22,9 +22,7 @@
 //     unchanged.
 
 import { registerTemplateHelpers } from './dd-helpers.js';
-import { RenderButtonInline } from './render/RenderButtonInline.js';
 import { RenderCable, RenderPerpCable } from './render/RenderCables.js';
-import { RenderCircle } from './render/RenderCircle.js';
 import {
   RenderDecorator,
   RenderDecoratorAmount,
@@ -46,14 +44,13 @@ import { RenderText } from './render/RenderText.js';
 import {
   RenderDBQueue,
   RenderMissionPerp,
-  RenderStatusItem,
   RenderStatusbar,
   RenderTopscorePerp,
   renderAmountHtml,
 } from './render/RenderTopLevelUI.js';
 import { RenderMainMenu, RenderStage, RenderViewMap, RenderViewTab } from './render/RenderViews.js';
 import { tickerSetFPS, tickerSetUseRAF } from './render/renderCreatejsTicker.js';
-import { _ids, _instances, clearAllNodes, getNode, getNodeById } from './render/renderRegistry.js';
+import { _ids, _instances, getNode, getNodeById } from './render/renderRegistry.js';
 import { renderSpriteHtml } from './render/renderSpriteHelper.js';
 
 // ── CreateJS vendor surface ────────────────────────────────────────────────
@@ -84,11 +81,9 @@ export interface RenderApi {
   _ids: Record<string, RenderNode>;
   get(id: number): RenderNode | undefined;
   getById(id: string): RenderNode | undefined;
-  clear(): void;
   DragHandler: typeof RenderDragHandler;
   Set: typeof RenderSet;
   Node: typeof RenderNode;
-  Circle: typeof RenderCircle;
   Text: typeof RenderText;
   Sprite: typeof RenderSprite;
   Perp: typeof RenderPerp;
@@ -107,7 +102,6 @@ export interface RenderApi {
   ViewTab: typeof RenderViewTab;
   ViewMap: typeof RenderViewMap;
   MainMenu: typeof RenderMainMenu;
-  ButtonInline: typeof RenderButtonInline;
   Stage: typeof RenderStage;
   SlowTicker: typeof RenderSlowTicker;
   Statusbar: typeof RenderStatusbar;
@@ -155,11 +149,9 @@ function Render(): RenderApi {
     _ids,
     get: getNode,
     getById: getNodeById,
-    clear: clearAllNodes,
     DragHandler: RenderDragHandler,
     Set: RenderSet,
     Node: RenderNode,
-    Circle: RenderCircle,
     Text: RenderText,
     Sprite: RenderSprite,
     Perp: RenderPerp,
@@ -178,7 +170,6 @@ function Render(): RenderApi {
     ViewTab: RenderViewTab,
     ViewMap: RenderViewMap,
     MainMenu: RenderMainMenu,
-    ButtonInline: RenderButtonInline,
     Stage: RenderStage,
     SlowTicker: RenderSlowTicker,
     Statusbar: RenderStatusbar,

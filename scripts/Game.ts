@@ -199,10 +199,11 @@ const Game = (): GameApi => {
     GameNode,
   };
 
-  // Inject AniTicker into GamePerp / GameRoot so their lock/unlock
-  // and initEventHandlers can register listeners on the legacy ticker
-  // singleton (which still lives in this module).  Disposable seam;
-  // retires when AniTicker is itself extracted.
+  // Inject AniTicker into GamePerp / GameRoot so GamePerp's
+  // initEventHandlers can register listeners on the legacy ticker
+  // singleton (which still lives in this module) and GameRoot can start
+  // it after the first render.  Disposable seam; retires when AniTicker
+  // is itself extracted.
   setAniTicker(AniTicker);
   setAniTickerForGameRoot(AniTicker);
   // APTicker (level-derived AP regen interval) is consumed by
