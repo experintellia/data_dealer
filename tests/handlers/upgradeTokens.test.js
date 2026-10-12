@@ -17,7 +17,7 @@
  * amounts back to the base venture defaults (0 for upgrade-gated tokens).
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { buyPowerup, loadGame, sellPowerup } from '../../scripts/LocalEngine.js';
+import { buyPowerup, collectPerp, loadGame, sellPowerup } from '../../scripts/LocalEngine.js';
 import { getState, setState } from '../../scripts/boot.js';
 import { clearOverride, setOverride } from '../../scripts/clock.js';
 import { applyDelta } from '../../scripts/state.js';
@@ -275,5 +275,27 @@ describe('sellPowerup — drops upgrade token amounts back to base', () => {
     expect(findToken(tokens, 'token125').amount).toBe(0);
     // Base tokens (always-100 ones) remain unchanged.
     expect(findToken(tokens, 'token001').amount).toBe(100);
+  });
+});
+
+// dd_app chargecollect.py CollectableContact.getTokensMap reads
+// instance_data.tokens (falling back to type_data.tokens), so an upgrade's
+// data points are part of every later collect.
+describe('collectPerp — upgrade-unlocked data points are collected', () => {
+  it('Blood test (upgrade073) yields token018 in the collected tokens_map', async () => {
+    setState(projectState());
+    await buyPowerup(PROJECT_PATH, 0, 'upgrade073');
+    setState(
+      Object.assign({}, getState(), {
+        nodes_collect: [{ path: PROJECT_PATH, result: { amount: 100 } }],
+      })
+    );
+
+    const { result } = await collectPerp(PROJECT_PATH);
+
+    const tokensMap = result.result.profile_set.tokens_map;
+    expect(tokensMap.token018).toEqual({ amount: 25 });
+    expect(tokensMap.token125).toEqual({ amount: 100 });
+    expect(getState().db_queue[0].profile_set.tokens_map.token018).toEqual({ amount: 25 });
   });
 });
