@@ -20,10 +20,10 @@
 //   3. After replay quiesces, call materializer (integration point for #11).
 //   4. Engine ready; call options.onReady(state).
 //
-// This module intentionally has no test coverage of its own: it talks to the
-// webxdc global and is exercised via manual testing or a webxdc simulator.
-// The underlying state logic (freshState / applyDelta) is fully unit-tested in
-// tests/state/state.test.js.
+// Handler tests drive this module through a synchronous fake webxdc
+// (tests/handlers/_webxdc-harness.js); tests/state/untrusted-deltas.test.js
+// covers the listener's skip-on-throw.  The underlying state logic (freshState /
+// applyDelta) is fully unit-tested in tests/state/state.test.js.
 
 import { applyDelta, freshState } from './state.js';
 import type { GameSeed, LocalState } from './state.js';

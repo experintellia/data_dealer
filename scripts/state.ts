@@ -413,29 +413,27 @@ export function parseSaveFile(text: string): ParsedSave {
   return { ok: true, save: data as SaveFile };
 }
 
-// Collections the reducers / materializer iterate: a non-array one would throw
-// on every replay once imported, so it can never be fixed by re-importing.
-var _SAVE_ARRAYS = [
-  'nodes',
-  'nodes_charging',
-  'nodes_collect',
-  'db_queue',
-  'mission_goals',
-  'active_missions',
-];
+// Collections of objects the reducers / materializer / loadGame iterate.  A
+// non-array one (or a null element) would throw on every cold start once
+// stored, and a wedged boot can't even reach the import screen.
+var _SAVE_ARRAYS = ['nodes', 'nodes_charging', 'nodes_collect', 'db_queue', 'mission_goals'];
 
-// A valid save state is an object carrying an object game_values (the one field
-// every real game has) and, where present, array collections.
-// ponytail: top-level shape only, elements aren't checked; add that if crafted
-// saves turn out to crash on element shape too.
+function _isObj(v: any): boolean {
+  return !!v && typeof v === 'object';
+}
+
+// A valid save state (and every state applyDelta returns) is an object with an
+// object game_values (the one field every real game has) and, where present,
+// array collections of objects; active_missions holds gestalt strings.
+// ponytail: shape only, element fields (instance_data, full_path…) aren't
+// checked; add them if a crafted one turns out to wedge loadGame too.
 function _isSaveState(s: any): boolean {
   return (
-    !!s &&
-    typeof s === 'object' &&
-    !!s.game_values &&
-    typeof s.game_values === 'object' &&
+    _isObj(s) &&
+    _isObj(s.game_values) &&
+    (s.active_missions === undefined || Array.isArray(s.active_missions)) &&
     _SAVE_ARRAYS.every(function (k) {
-      return s[k] === undefined || Array.isArray(s[k]);
+      return s[k] === undefined || (Array.isArray(s[k]) && s[k].every(_isObj));
     })
   );
 }
@@ -854,7 +852,7 @@ reducers.dismissMissionBriefing = function dismissMissionBriefingReducer(state, 
 // the snapshot is merged onto `base`.
 reducers.importSave = function importSaveReducer(state, delta) {
   var snap = delta.result && delta.result.state;
-  if (!_isSaveState(snap)) return state;
+  if (!snap || typeof snap !== 'object') return state;
 
   var base = freshState(state.addr);
   var merged: LocalState = Object.assign({}, base, snap, {
@@ -886,8 +884,9 @@ reducers.importSave = function importSaveReducer(state, delta) {
 // aggregator timestamp-LWW rather than insertion-order-LWW.
 function _applyPeerDelta(state: LocalState, delta: Delta): LocalState {
   var addr = delta.addr;
-  // '__proto__' would replace newPeers' prototype below instead of adding a row.
-  if (!addr || addr === '__proto__') return state;
+  // '__proto__' would replace newPeers' prototype below instead of adding a row
+  // (a non-string addr like ['__proto__'] coerces to that key).
+  if (typeof addr !== 'string' || !addr || addr === '__proto__') return state;
 
   var peers = state.peers || {};
   var existing: PeerEntry = peers[addr] || {};
@@ -940,6 +939,7 @@ function _applyPeerDelta(state: LocalState, delta: Delta): LocalState {
  *   3. Other-peer or missing addr → skip (Phase 6 leaderboard handles cross-user deltas)
  *   4. Clock-skew guard → last_seen_ts = max(Date.now(), last_seen_ts)
  *   5. Dispatch to reducer[delta.op]; unknown op → return guarded state as-is
+ *   6. Reducer result failing _isSaveState → return guarded state as-is
  */
 export function applyDelta(state: LocalState, delta: any): LocalState {
   if (!delta || typeof delta !== 'object' || delta.kind !== 'delta') {
@@ -965,7 +965,9 @@ export function applyDelta(state: LocalState, delta: any): LocalState {
   // Guard 3: ignore other peers' deltas (multi-device: only own addr mutates).
   // Runs before any state.addr mutation; also fires when state.addr is empty
   // so a foreign delta can never seed our identity (closes #130).  An addr-less
-  // delta is never ours — every own delta carries state.addr (_mkDelta).
+  // delta is never ours — every own delta carries state.addr (_mkDelta).  addr
+  // is unauthenticated, so a forged `addr: <ours>` still gets through; the
+  // shape check below only keeps such a delta from wedging boot.
   if (!delta.addr || delta.addr !== state.addr) {
     return state;
   }
@@ -980,5 +982,8 @@ export function applyDelta(state: LocalState, delta: any): LocalState {
   if (!reducer) {
     return next;
   }
-  return reducer(next, delta as Delta);
+  // Guard 6: drop a result that loadGame / the materializer couldn't iterate.
+  // ponytail: rescans the whole state per delta, O(nodes); cheap at game sizes.
+  var out = reducer(next, delta as Delta);
+  return _isSaveState(out) ? out : next;
 }
