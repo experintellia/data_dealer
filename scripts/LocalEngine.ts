@@ -1752,14 +1752,10 @@ export function buyPerp(
   var missionResult = _advanceBuyPerpMissions(preMissionStateBuy, gestalt);
   newGv = _applyRewardsToGv(newGv, missionResult.rewards);
 
-  // profile_set for project*/contact*/city* gestalts:
-  // initial data batch pushed to db_queue; city-buy path also read by Game.js:3816.
+  // profile_set for CityPerp buys only (dd_app views.py buyPerp):
+  // initial data batch pushed to db_queue, cued by DatabasePerp.BuyCity.
   var profileSetPayload: BuyPerpProfileSetPayload | null = null;
-  var isProfileGestalt =
-    gestalt.indexOf('project') === 0 ||
-    gestalt.indexOf('contact') === 0 ||
-    gestalt.indexOf('city') === 0;
-  if (isProfileGestalt) {
+  if (gameType === 'CityPerp') {
     var collectId = 'cq_' + nodeCounter;
     var tokensMap: Record<string, { amount: number }> = {};
     var tokList = typeData.tokens || [];

@@ -1163,19 +1163,15 @@ describe('buyPerp — happy path (contact gestalt)', () => {
     expect(s.nodes.find((n) => n.full_path === 'Imperium.contact001')).toBeTruthy();
   });
 
-  it('returns profile_set for contact* gestalt', async () => {
+  // dd_app views.py buyPerp queues a profile_set for CityPerp buys only.
+  it('returns no profile_set for contact* gestalt', async () => {
     const { result } = await buyPerp('Imperium', 'contact001');
-    expect(result.profile_set).toBeDefined();
-    expect(result.profile_set).toHaveProperty('profile_set');
-    expect(result.profile_set).toHaveProperty('origin', 'Imperium.contact001');
-    expect(result.profile_set).toHaveProperty('collect_id');
+    expect(result.profile_set).toBeUndefined();
   });
 
-  it('pushes a db_queue entry for contact* gestalt', async () => {
+  it('pushes no db_queue entry for contact* gestalt', async () => {
     await buyPerp('Imperium', 'contact001');
-    const s = getState();
-    expect(s.db_queue).toHaveLength(1);
-    expect(s.db_queue[0].origin).toBe('Imperium.contact001');
+    expect(getState().db_queue).toHaveLength(0);
   });
 
   it('game_id is stable and unique across two buys', async () => {

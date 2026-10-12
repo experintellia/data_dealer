@@ -317,12 +317,12 @@ describe('buyPerp — listener echo idempotence (regression guard)', () => {
     expect(echoed.nodes.length).toBe(handlerState.nodes.length);
   });
 
-  it('listener echo does not double-grow db_queue for contact gestalt', async () => {
+  it('listener echo does not double-grow db_queue for city gestalt', async () => {
     const captured = [];
     setSendDelta((d) => captured.push(d));
     setState(mkBuyPerpState());
 
-    await buyPerp('Imperium', 'contact001');
+    await buyPerp('Imperium', 'city002');
     const handlerState = getState();
     const echoed = applyDelta(handlerState, captured[0]);
 
