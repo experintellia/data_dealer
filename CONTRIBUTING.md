@@ -42,5 +42,5 @@ them against the casual assets.
 Biome, typecheck, unit tests with coverage, both `.xdc` builds (with a
 1.9 MB ceiling on `scripts/esm-bundle.js` and a PR comment linking the
 artifacts), and the Playwright suite. Pushing a `v*` tag also attaches both
-`.xdc` files to a GitHub Release. `.github/workflows/pages.yml` deploys
+`.xdc` files to a GitHub Release (see `docs/releasing.md`). `.github/workflows/pages.yml` deploys
 `pnpm build:pages` to GitHub Pages on every push to `master`.
