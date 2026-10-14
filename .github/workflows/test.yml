@@ -272,9 +272,23 @@ jobs:
       # xdcget (webxdc store) takes the first *.xdc asset of the latest
       # release.  GitHub lists assets by name, not upload order, so casual
       # wins only because "casual" < "hq".  Keep it sorting first if renaming.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: CHANGELOG.md
+          sparse-checkout-cone-mode: false
+          path: src
+
+      # Release body = this version's CHANGELOG.md section.  Fails if the
+      # section is missing, so a tag can't ship without a changelog entry.
+      - name: Extract release notes
+        run: |
+          awk -v v="${GITHUB_REF_NAME#v}" '/^## \[/ { p = index($0, "## [" v "]") == 1; next } p' src/CHANGELOG.md > release-notes.md
+          test -s release-notes.md || { echo "::error::CHANGELOG.md has no '## [${GITHUB_REF_NAME#v}]' section"; exit 1; }
+
       - name: Attach to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: release-notes.md
           files: |
             data-dealer-hq.xdc
             data-dealer-casual.xdc
