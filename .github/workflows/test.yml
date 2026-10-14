@@ -269,6 +269,9 @@ jobs:
         with:
           name: data-dealer-casual-xdc
 
+      # xdcget (webxdc store) takes the first *.xdc asset of the latest
+      # release.  GitHub lists assets by name, not upload order, so casual
+      # wins only because "casual" < "hq".  Keep it sorting first if renaming.
       - name: Attach to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
