@@ -1,12 +1,4 @@
-import {
-  cpSync,
-  existsSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildXDC } from '@webxdc/vite-plugins';
@@ -24,9 +16,10 @@ function readVendorLibs() {
   const libs = [
     'vendor/jquery.js',
     'vendor/sprintf.js',
-    'vendor/easeljs.js',
+    // ponytail: tweenjs.js is the standalone CreateJS build (own Ticker,
+    // EventDispatcher, Event) — the game only touches Tween / Ease / Ticker,
+    // so EaselJS and SoundJS are not shipped.
     'vendor/tweenjs.js',
-    'vendor/soundjs.js',
     'vendor/zynga-animate.js',
     'vendor/zynga-scroller.js',
   ];
@@ -95,61 +88,6 @@ function swapInCasualAssets() {
       console.log(
         `[swap-in-casual-assets] ${outDir}/img/ and ${outDir}/icon.png replaced with casual variants`
       );
-    },
-  };
-}
-
-// Strip whitespace from runtime-loaded JSON (rulesets in data/, locale
-// catalogs in i18n/).  These files are copied verbatim by
-// vite-plugin-static-copy from the source-tree pretty-printed originals;
-// inside the .xdc the indentation is dead bytes — JSON.parse / stringify
-// cuts ~38% (1.24 MB → 770 kB on the current ruleset corpus) with no
-// runtime semantics change.
-//
-// Order in plugins[] matters: this must run AFTER viteStaticCopy (so
-// the files exist in dist/) and BEFORE buildXDC zips dist/.
-function minifyStaticJson() {
-  const targets = [`${outDir}/data`, `${outDir}/i18n`];
-  const root = fileURLToPath(new URL('.', import.meta.url));
-
-  function walkJson(dir) {
-    const out = [];
-    for (const name of readdirSync(dir)) {
-      const full = join(dir, name);
-      if (statSync(full).isDirectory()) out.push(...walkJson(full));
-      else if (name.endsWith('.json')) out.push(full);
-    }
-    return out;
-  }
-
-  return {
-    name: 'minify-static-json',
-    apply: 'build',
-    closeBundle() {
-      let totalSaved = 0;
-      let fileCount = 0;
-      for (const rel of targets) {
-        const dir = join(root, rel);
-        if (!existsSync(dir)) continue;
-        for (const f of walkJson(dir)) {
-          const original = readFileSync(f, 'utf-8');
-          // Re-stringify without whitespace.  Throws on malformed JSON
-          // — we want that: a bad ruleset should fail the build, not
-          // silently ship.
-          const compact = JSON.stringify(JSON.parse(original));
-          if (compact.length < original.length) {
-            writeFileSync(f, compact);
-            totalSaved += original.length - compact.length;
-            fileCount++;
-          }
-        }
-      }
-      if (fileCount > 0) {
-        const kb = (totalSaved / 1024).toFixed(1);
-        console.log(
-          `[minify-static-json] compacted ${fileCount} file${fileCount === 1 ? '' : 's'}, saved ${kb} kB`
-        );
-      }
     },
   };
 }
@@ -270,10 +208,6 @@ function bundleEsmDev() {
           configFile: false,
           root: process.cwd(),
           logLevel: 'error',
-          esbuild: {
-            jsx: 'automatic',
-            jsxImportSource: 'preact',
-          },
           build: {
             write: false,
             emptyOutDir: false,
@@ -358,16 +292,10 @@ export default defineConfig({
   root: '.',
   publicDir: false,
 
-  // JSX → Preact via esbuild's automatic runtime (`preact/jsx-runtime`).
-  // Using esbuild config instead of `@preact/preset-vite` because the .xdc
-  // bundle is built by an inline `build()` call (see `bundleEsmDev` above
-  // and the `rollupOptions` in `build` below) with `configFile: false`,
-  // which doesn't pick up plugins from this config.  HMR / debug-name
-  // niceties from the preset aren't needed in the webxdc target anyway.
-  esbuild: {
-    jsx: 'automatic',
-    jsxImportSource: 'preact',
-  },
+  // ponytail: JSX → Preact (`preact/jsx-runtime`) comes from tsconfig.json's
+  // `jsx: react-jsx` + `jsxImportSource: preact`, which Vite 8's Oxc
+  // transform reads per file — also for the `configFile: false` build() in
+  // bundleEsmDev, so neither needs an esbuild/oxc jsx block.
 
   server: {
     port: 3000,
@@ -391,15 +319,11 @@ export default defineConfig({
     // shipping original-source paths to end users.  Gated via
     // BUILD_RELEASE=1 (set by .github/workflows/test.yml on tag builds).
     sourcemap: !isRelease,
-    // Default is 4096; pin it so the threshold for inlining small icons
-    // / fonts vs. shipping them as separate dist/ files is visible in
-    // config rather than implicit in Vite version bumps.
-    assetsInlineLimit: 4096,
     // Vite's default 500 kB warning fires noisily on every build.  Vendor
-    // libs (~520 kB unminified) are now prepended as a banner and counted
+    // libs (~150 kB) are now prepended as a banner and counted
     // toward the Rollup chunk size before esbuild re-minifies them.  Raise
     // the threshold to 2000 kB so the warning only fires for truly unexpected
-    // growth; esbuild's final output should be ~1.3–1.4 MB.
+    // growth; esbuild's final output should be ~1.1–1.2 MB.
     chunkSizeWarningLimit: 2000,
     rollupOptions: {
       input: 'scripts/esm-entry.js',
@@ -443,14 +367,12 @@ export default defineConfig({
         { src: 'font/Skranji-Regular.ttf', dest: '' },
         { src: 'font/SourceSansPro-Black.woff', dest: '' },
         { src: 'font/LICENSE', dest: '' },
-        // views/*.html templates are now `?raw`-imported and bundled
-        // into esm-bundle.js; the directory itself is no longer shipped.
-        { src: 'data', dest: '' },
-        { src: 'i18n', dest: '' },
+        // views/*.html, data/*.json and i18n/*.json are imported into
+        // esm-bundle.js; none of those directories is shipped.  Their
+        // CC BY-SA notice ships as LICENSE-ASSETS.txt + CREDITS.txt above.
       ],
     }),
     swapInCasualAssets(),
-    minifyStaticJson(),
     isPages
       ? pagesWebxdc()
       : buildXDC({ inDir: 'dist', outDir: '.', outFileName: `data-dealer-${variant}.xdc` }),

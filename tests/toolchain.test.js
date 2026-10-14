@@ -11,9 +11,7 @@ describe('vendor files', () => {
   // The libs index.html `<script>`-loads, in dependency order.
   const required = [
     'jquery.js',
-    'easeljs.js',
     'tweenjs.js',
-    'soundjs.js',
     'sprintf.js',
     'zynga-animate.js',
     'zynga-scroller.js',

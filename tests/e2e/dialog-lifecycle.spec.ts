@@ -447,7 +447,7 @@ test.describe('Section D — perp popups', () => {
 
 // ── Section F: button-level FX animations (no_cash / no_AP / error) ──────
 //
-// These aren't standalone overlays — they are CSS class toggles + EaselJS
+// These aren't standalone overlays — they are CSS class toggles + TweenJS
 // tweens on a button inside an open popup, fired when the engine returns an
 // insufficient-cash / insufficient-AP / generic error response.  The
 // RenderPopup wrapper exposes them as `popup.trigger('no_cash')` etc.; we
