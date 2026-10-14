@@ -22,11 +22,12 @@ What changed for players in each release. For the full technical history, see
 - Malformed or tampered game updates from other chat members are now ignored
   instead of corrupting or freezing the game.
 - Karma incidents can no longer be dodged by closing and reopening the app.
-- Buying karma levels and power-ups now follows the same rules as the rest of
-  the game.
+- Buying karma now levels you up when it lands exactly on the next level, and
+  power-ups no longer push karma above 100.
 - Some popups and messages showed up twice.
-- Requirement lists now also show tokens you have none of yet, and the
-  "Requires either… or…" text no longer lists the wrong options.
+- Requirement lists now also show tokens you have none of yet.
+- Locked pushers now say they need all of the listed providers, instead of
+  "either … or", which wrongly suggested one was enough.
 - Fixed layout problems on phones: the conveyor belt scale on Firefox and
   Android, the new-contact and new-items cards overflowing, the squashed
   empty buy popup, and overlong names on the leaderboard.
