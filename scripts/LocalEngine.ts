@@ -616,13 +616,17 @@ export function loadGame(): Promise<{ result: ReturnType<typeof _buildLoadGameRe
   var startupRepair = _repairStuckMissionGoals(seededState);
   var startupLevelup = 0;
   if (startupRepair && startupRepair.missions) {
-    // Reward XP banked while away may cross a level threshold; _applyRepairRewards
+    // Reward XP banked while away may cross a level threshold; _applyRewardsAndLevelUp
     // refills AP and advances ap_max/xp_level so the next materialize() pass
     // doesn't clamp the snapshot back to the old ceiling. The level number is
     // remembered so the load can surface the popup below.
-    var rewardResult = _applyRepairRewards(seededState.game_values || {}, startupRepair.rewards);
+    var rewardResult = _applyRewardsAndLevelUp(
+      seededState.game_values || {},
+      startupRepair.rewards
+    );
     var startupGv = rewardResult.game_values;
     startupLevelup = rewardResult.levelup;
+    if (startupLevelup) _notifyLevelupItems(startupLevelup, seededState.nodes);
     var recheckDelta = _mkDelta(seededState.addr, 'recheckMissions', [], {
       game_values: startupGv,
       missions: startupRepair.missions,
@@ -685,11 +689,18 @@ function _buildLoadGameResponse(state: LocalState, now: number, isNewGame: boole
   var typeRegistry = Object.assign({}, ruleset.perps, ruleset.tokens, ruleset.powerups);
 
   // ap_initial / ap_offset are recomputed on read (never stored).
-  // After materializer, ap_snapshot already reflects the current AP value.
+  // After materializer, ap_snapshot already reflects the current AP value and
+  // ap_update sits on the last regen tick, so ap_offset (dd_app views.py
+  // getGame) is the time since that tick — APTicker fires the next one on the
+  // engine's grid.
   var gv = state.game_values || {};
+  var apInterval = gv.ap_inc_interval || 0;
   var gameValues = Object.assign({}, gv, {
     ap_initial: typeof gv.ap_snapshot === 'number' ? gv.ap_snapshot : 0,
-    ap_offset: 0,
+    ap_offset:
+      typeof gv.ap_update === 'number' && apInterval > 0
+        ? Math.max(0, now - gv.ap_update) % apInterval
+        : 0,
   });
 
   return {
@@ -775,9 +786,14 @@ interface PowerupListEntry {
 export function getPowerups(
   projectGestalt: string /*, version */
 ): Promise<{ result: PowerupListEntry[] }> {
+  return Promise.resolve({ result: _powerupsForProject(projectGestalt) });
+}
+
+// dd_app rules get_powerups_for_project.
+function _powerupsForProject(projectGestalt: string): PowerupListEntry[] {
   var ruleset = _getRuleset();
   var def = ruleset.perps[projectGestalt];
-  if (!def) return Promise.resolve({ result: [] });
+  if (!def) return [];
 
   var td: PerpTypeData = def.type_data || {};
   var entries: PowerupDef[] = (td.provided_ads || []).concat(
@@ -798,7 +814,66 @@ export function getPowerups(
     });
   }
 
-  return Promise.resolve({ result: result });
+  return result;
+}
+
+// `new_items` notifications — dd_app tasks.py notifyLevelupItems /
+// notifyBuyperpItems, which views.py defers with countdown=2.  The delay also
+// lets GameRoot apply the handler response (new xp_level) before
+// makeNotifications reads it.
+function _emitNewItems(payload: Record<string, unknown>): void {
+  setTimeout(function () {
+    _emit('new_items', payload);
+  }, 2000);
+}
+
+var _LEVELUP_NOTIFY_TYPES = ['AgentPerp', 'ContactPerp', 'ProxyPerp', 'ProjectPerp', 'CityPerp'];
+
+// After a level-up: the perps that require exactly this level, plus each
+// owned project's powerups that do (rules get_levelup_items /
+// get_levelup_powerups).
+function _notifyLevelupItems(level: number, nodes: GameNode[]): void {
+  var ruleset = _getRuleset();
+  var perps = Object.keys(ruleset.perps).filter(function (g) {
+    var def = ruleset.perps[g];
+    return (
+      !!def &&
+      _LEVELUP_NOTIFY_TYPES.indexOf(def.game_type || '') >= 0 &&
+      ((def.type_data && def.type_data.required_level) || 0) === level
+    );
+  });
+  var powerups: Record<string, PowerupListEntry[]> = {};
+  nodes.forEach(function (n) {
+    if (!n.gestalt || n.gestalt.indexOf('project') !== 0) return;
+    var list = _powerupsForProject(n.gestalt).filter(function (p) {
+      return p.type_data.required_level === level;
+    });
+    if (list.length) powerups[n.gestalt] = list;
+  });
+  if (perps.length || Object.keys(powerups).length) {
+    _emitNewItems({ perps: perps, powerups: powerups, trigger: 'levelup', level: level });
+  }
+}
+
+// After buying a project/contact the player did not own yet: the pushers and
+// clients it provides at this level (rules get_new_consumers_for_provider).
+function _notifyBuyperpItems(level: number, provider: string, nodesBefore: GameNode[]): void {
+  if (provider.indexOf('project') !== 0 && provider.indexOf('contact') !== 0) return;
+  if (_getNodeMaps(nodesBefore).gestalts[provider]) return;
+  var ruleset = _getRuleset();
+  var perps = Object.keys(ruleset.perps).filter(function (g) {
+    var def = ruleset.perps[g];
+    var td = (def && def.type_data) || {};
+    return (
+      !!def &&
+      (def.game_type === 'PusherPerp' || def.game_type === 'ClientPerp') &&
+      (td.required_level || 0) <= level &&
+      (td.required_providers || []).indexOf(provider) >= 0
+    );
+  });
+  if (perps.length) {
+    _emitNewItems({ perps: perps, trigger: 'buy_provider', level: level, provider: provider });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1031,12 +1106,13 @@ export function buyKarma(
   var _bkDisplayName = state.display_name || state.addr;
   if (levelup) {
     triggerAchievement('levelup', _t('achievement_levelup', _bkDisplayName, String(newLevel)));
+    _notifyLevelupItems(newLevel, state.nodes);
   }
   var _bkOldKarma = gv.karma_value || 0;
-  if (_bkOldKarma !== 100 && newKarma === 100) {
+  if (_bkOldKarma < 100 && newKarma === 100) {
     triggerAchievement('karma_saint', _t('achievement_karma_saint', _bkDisplayName));
   }
-  if (_bkOldKarma !== -100 && newKarma === -100) {
+  if (_bkOldKarma > -100 && newKarma === -100) {
     triggerAchievement('karma_devil', _t('achievement_karma_devil', _bkDisplayName));
   }
 
@@ -1322,28 +1398,21 @@ export function buyPowerup(
     tokens: _computeUpgradeTokens(perpTypeData, newPowerups),
   });
 
-  var newXp = (state.game_values.xp_value || 0) + (perpTypeData.xp_inc || 1);
-  var levelup = _checkLevelup(state.game_values.xp_level || 1, newXp);
-
   var newGameValues: GameValues = Object.assign({}, state.game_values, {
     cash_value: cashValue - price,
     cash_spent: (state.game_values.cash_spent || 0) + price,
-    xp_value: newXp,
+    xp_value: (state.game_values.xp_value || 0) + (perpTypeData.xp_inc || 1),
     karma_value: Math.min(100, Math.max(-100, (state.game_values.karma_value || 0) + 1)),
   });
-  if (levelup) newGameValues = _applyLevelUp(newGameValues, _getLevelByXP(newXp));
 
   var newNodes = state.nodes.slice();
   newNodes[nodeIdx] = Object.assign({}, node, { instance_data: newInstanceData });
 
   var preMissionStatePu = Object.assign({}, state, { nodes: newNodes, game_values: newGameValues });
   var puMissionResult = _advanceBuyPowerupMissions(preMissionStatePu, gestalt);
-  newGameValues = _applyRewardsToGv(newGameValues, puMissionResult.rewards);
-  // Mission rewards may add XP that crosses another level threshold — check again.
-  if (_checkLevelup(newGameValues.xp_level || 1, newGameValues.xp_value || 0)) {
-    levelup = true;
-    newGameValues = _applyLevelUp(newGameValues, _getLevelByXP(newGameValues.xp_value || 0));
-  }
+  var rewarded = _applyRewardsAndLevelUp(newGameValues, puMissionResult.rewards);
+  newGameValues = rewarded.game_values;
+  var levelup = rewarded.levelup > 0;
 
   var responseNode = {
     game_id: node.game_id,
@@ -1367,6 +1436,7 @@ export function buyPowerup(
       'levelup',
       _t('achievement_levelup', _bpuDisplayName, String(newGameValues.xp_level))
     );
+    _notifyLevelupItems(newGameValues.xp_level || 1, newNodes);
   }
   var _bpuCompletedMissions =
     (puMissionResult.missions && puMissionResult.missions.complete_missions) || [];
@@ -1383,7 +1453,7 @@ export function buyPowerup(
   }
   var _bpuOldKarma = state.game_values.karma_value || 0;
   var _bpuNewKarma = newGameValues.karma_value || 0;
-  if (_bpuOldKarma !== 100 && _bpuNewKarma === 100) {
+  if (_bpuOldKarma < 100 && _bpuNewKarma === 100) {
     triggerAchievement('karma_saint', _t('achievement_karma_saint', _bpuDisplayName));
   }
 
@@ -1483,6 +1553,7 @@ export function sellPowerup(
       'levelup',
       _t('achievement_levelup', _spDisplayName, String(newGameValues.xp_level))
     );
+    _notifyLevelupItems(newGameValues.xp_level || 1, newNodes);
   }
 
   return Promise.resolve({ result: result });
@@ -1539,15 +1610,11 @@ export function buySlots(
   var newInstanceData: NodeInstanceData = Object.assign({}, node.instance_data);
   newInstanceData[slotKey] = currentSlots + nNum;
 
-  var newXp = (state.game_values.xp_value || 0) + 1;
-  var levelup = _checkLevelup(state.game_values.xp_level || 1, newXp);
-
+  // No XP (dd_app views.py buySlots: xp_increment = 0), so no level-up either.
   var newGameValues: GameValues = Object.assign({}, state.game_values, {
     cash_value: cashValue - totalCost,
     cash_spent: (state.game_values.cash_spent || 0) + totalCost,
-    xp_value: newXp,
   });
-  if (levelup) newGameValues = _applyLevelUp(newGameValues, _getLevelByXP(newXp));
 
   var newNodes = state.nodes.slice();
   newNodes[nodeIdx] = Object.assign({}, node, { instance_data: newInstanceData });
@@ -1558,17 +1625,9 @@ export function buySlots(
     full_path: node.full_path,
     instance_data: newInstanceData,
   };
-  var result = { node: responseNode, game_values: newGameValues, levelup: levelup };
+  var result = { node: responseNode, game_values: newGameValues, levelup: false };
 
   _persistDelta(_mkDelta(state.addr, 'buySlots', [perpPath, slotType, nNum], result));
-
-  if (levelup) {
-    var _bsDisplayName = state.display_name || state.addr;
-    triggerAchievement(
-      'levelup',
-      _t('achievement_levelup', _bsDisplayName, String(newGameValues.xp_level))
-    );
-  }
 
   return Promise.resolve({ result: result });
 }
@@ -1702,11 +1761,6 @@ export function buyPerp(
     profiles_max: (gv.profiles_max || 0) + profilesMaxInc,
   });
 
-  var oldLevel = gv.xp_level || 1;
-  var newLevel = _getLevelByXP(newGv.xp_value || 0);
-  var levelup = newLevel > oldLevel;
-  if (levelup) newGv = _applyLevelUp(newGv, newLevel);
-
   // Project the just-bought node in before the mission cascade so a
   // cascade-unlocked buy_perp goal targeting this perp auto-completes now
   // instead of staying stuck until a reload replays the buy delta.
@@ -1714,7 +1768,9 @@ export function buyPerp(
     nodes: state.nodes.concat([newNode]),
   });
   var missionResult = _advanceBuyPerpMissions(preMissionStateBuy, gestalt);
-  newGv = _applyRewardsToGv(newGv, missionResult.rewards);
+  var rewarded = _applyRewardsAndLevelUp(newGv, missionResult.rewards);
+  newGv = rewarded.game_values;
+  var levelup = rewarded.levelup > 0;
 
   // profile_set for project*/contact*/city* gestalts:
   // initial data batch pushed to db_queue; city-buy path also read by Game.js:3816.
@@ -1767,7 +1823,9 @@ export function buyPerp(
       'levelup',
       _t('achievement_levelup', _bpDisplayName, String(newGv.xp_level))
     );
+    _notifyLevelupItems(newGv.xp_level || 1, preMissionStateBuy.nodes);
   }
+  _notifyBuyperpItems(newGv.xp_level || 1, gestalt, state.nodes);
   var _bpCompletedMissions =
     (missionResult.missions && missionResult.missions.complete_missions) || [];
   for (var _bpMi = 0; _bpMi < _bpCompletedMissions.length; _bpMi++) {
@@ -2154,12 +2212,13 @@ function _applyRewardsToGv(gv: GameValues, rewards: RewardSet | undefined): Game
   });
 }
 
-// Folds mission-repair reward totals into game_values and, when the reward XP
-// crosses a level threshold, applies the level-up (energy refill + raised
-// ap_max). Returns the new level number, or 0 when no level-up occurred.
-// Shared by the loadGame startup repair and the recheckMissions handler so
-// the two stay in lockstep.
-function _applyRepairRewards(
+// Folds mission reward totals into game_values and, when the XP now crosses a
+// level threshold above gv.xp_level, applies the level-up (energy refill +
+// raised ap_max). Returns the new level number, or 0 when no level-up occurred.
+// Every handler that grants mission rewards runs its single level check here,
+// after the rewards — dd_app checks `xp + xp_increment + rewards xp` once via
+// views.py _handle_levelup, so reward XP can level the player up too.
+function _applyRewardsAndLevelUp(
   gv: GameValues,
   rewards: RewardSet | undefined
 ): { game_values: GameValues; levelup: number } {
@@ -2317,6 +2376,74 @@ function _advanceCollectCashMissions(
 // chargePerp — Phase 3 (#16)
 // ---------------------------------------------------------------------------
 
+// dd_app chargecollect.py CollectableContact.getTokensMap: the node's
+// upgrade-merged tokens (else the ruleset's), minus the amount-0 entries an
+// upgrade has not unlocked yet.
+function _tokensMapFor(
+  node: GameNode,
+  typeData: PerpTypeData | undefined
+): Record<string, { amount: number }> {
+  var tokens: TokenSpec[] =
+    (node.instance_data && node.instance_data.tokens) || (typeData && typeData.tokens) || [];
+  var out: Record<string, { amount: number }> = {};
+  tokens.forEach(function (t) {
+    var amount = (t && t.amount) || 0;
+    if (t && t.gestalt && amount > 0) out[t.gestalt] = { amount: amount };
+  });
+  return out;
+}
+
+// dd_app chargecollect.py CollectableToken.getPerpChargeData: fold each
+// contained token's share gained since the last upgrade (weighted by
+// contained_tokens[].amount) into this token; the charge yields the increase.
+function _tokenUpgradeIncrement(
+  typeData: PerpTypeData,
+  idata: NodeInstanceData,
+  gv: GameValues,
+  nodes: GameNode[]
+): number {
+  var p = gv.profiles_value || 0;
+  var pmax = gv.profiles_max || 0;
+  if (p <= 0 || pmax <= 0) return 0; // dd_app divides by both
+  var weights: Record<string, number> = {};
+  (typeData.contained_tokens || []).forEach(function (t) {
+    if (t.gestalt) weights[t.gestalt] = t.amount || 0;
+  });
+  var last = (idata.last_upgrade_values || {}) as Partial<UpgradeValuesShape>;
+  var lastP = last.profiles_value || 0;
+  var sum = 0;
+  nodes.forEach(function (n) {
+    var g = n.gestalt || '';
+    var w = weights[g];
+    if (w === undefined) return;
+    var lastAmount = (last.token_map && last.token_map[g]) || 0;
+    var usable = Math.max(
+      0,
+      (n.instance_data.amount || 0) - (lastP ? lastAmount / (p / lastP) : 0)
+    );
+    sum = _mergeUpgradeShare(sum, (usable * w) / 100, p, pmax);
+  });
+  var old = idata.amount || 0;
+  return _mergeUpgradeShare(old, sum, p, pmax) - old;
+}
+
+// dd_app dd_merger.py UpgradeToken.__add__: dd_calc.py Database.merge of a
+// one-feature set of p profiles at `share` into a p-of-pmax database at
+// `base`; returns the merged share rescaled to p, capped at 100.
+// ponytail: dd_app's per-worker merge counter (mergefactor) is taken as 0; it
+// only adds dupes after ~1e5 merges.
+function _mergeUpgradeShare(base: number, share: number, p: number, pmax: number): number {
+  var u = _rng(); // random.triangular(0, 0.05)
+  var rand = u > 0.5 ? 0.05 - 0.05 * Math.sqrt((1 - u) * 0.5) : 0.05 * Math.sqrt(u * 0.5);
+  var minDupes = Math.min(Math.max(Math.floor((p / pmax) ** 2 * p), 2 * p - pmax), p);
+  var dupes = Math.min(p - 1, minDupes + Math.floor((p - 1) * rand));
+  var number = Math.min(pmax, 2 * p - dupes);
+  var inc = number - p;
+  var mix = Math.max(base, (base + share) / 2);
+  var merged = Math.min(100, (base * (p - dupes) + (p - inc) * mix + share * inc) / number);
+  return Math.min(100, (merged * number) / p);
+}
+
 export function chargePerp(
   path: string
 ): Promise<{ result: { error: number } | Record<string, unknown> }> {
@@ -2396,10 +2523,20 @@ export function chargePerp(
       ? { profiles_value: gv.profiles_value || 0, token_map: _buildTokenMap(nodes) }
       : undefined;
 
-  var chargeResult: { amount: number; last_upgrade_data?: UpgradeValuesShape } = {
-    amount: _getVariatedAmount(baseAmount, now, path),
+  var chargeResult: {
+    amount: number;
+    last_upgrade_data?: UpgradeValuesShape;
+    tokens_map?: Record<string, { amount: number }>;
+  } = {
+    // TokenPerps charge an upgrade increment instead of a collect amount.
+    amount: lastUpgradeData
+      ? _tokenUpgradeIncrement(typeData, instanceData, gv, nodes)
+      : _getVariatedAmount(baseAmount, now, path),
   };
   if (lastUpgradeData) chargeResult.last_upgrade_data = lastUpgradeData;
+  if (node.game_type === 'ContactPerp' || node.game_type === 'ProjectPerp') {
+    chargeResult.tokens_map = _tokensMapFor(node, typeData);
+  }
 
   var durationMs = typeData.charge_time;
   var chargeEntry = {
@@ -2431,11 +2568,6 @@ export function chargePerp(
     ap_snapshot: Math.max(0, (gv.ap_snapshot || 0) - 1),
   });
 
-  var oldLevelNum = gv.xp_level || 1;
-  var newLevelNum = _getLevelByXP(newGv.xp_value || 0);
-  var levelup = newLevelNum > oldLevelNum;
-  if (levelup) newGv = _applyLevelUp(newGv, newLevelNum);
-
   var preMissionStateCharge = Object.assign({}, state, {
     nodes: newNodes,
     nodes_charging: charging.concat([chargeEntry]),
@@ -2443,7 +2575,10 @@ export function chargePerp(
   });
 
   var chargeMissionResult = _advanceChargePerpMissions(preMissionStateCharge, gestalt);
-  newGv = _applyRewardsToGv(newGv, chargeMissionResult.rewards);
+  var rewarded = _applyRewardsAndLevelUp(newGv, chargeMissionResult.rewards);
+  newGv = rewarded.game_values;
+  var newLevelNum = rewarded.levelup;
+  var levelup = newLevelNum > 0;
 
   _persistDelta(
     _mkDelta(state.addr, 'chargePerp', [path], {
@@ -2463,6 +2598,7 @@ export function chargePerp(
   var _cpDisplayName = state.display_name || state.addr;
   if (levelup) {
     triggerAchievement('levelup', _t('achievement_levelup', _cpDisplayName, String(newLevelNum)));
+    _notifyLevelupItems(newLevelNum, newNodes);
   }
   var _cpCompletedMissions =
     (chargeMissionResult.missions && chargeMissionResult.missions.complete_missions) || [];
@@ -2669,7 +2805,14 @@ export function collectPerp(
     return Promise.resolve({ result: { error: 4, ap_snapshot: apSnap } });
   }
 
-  var collectEntry: { path: string; result?: { amount?: number } } | null = null;
+  var collectEntry: {
+    path: string;
+    result?: {
+      amount?: number;
+      last_upgrade_data?: UpgradeValuesShape;
+      tokens_map?: Record<string, { amount: number }>;
+    };
+  } | null = null;
   for (var i = 0; i < ms.nodes_collect.length; i++) {
     var ne = ms.nodes_collect[i];
     if (ne && ne.path === gperpPath) {
@@ -2719,16 +2862,8 @@ export function collectPerp(
 
   if (gameType === 'ContactPerp' || gameType === 'ProjectPerp') {
     var collectId = _generateId();
-    // ContactPerps store yielded token-types under `tokens`; TokenPerps
-    // (super-token decomposition) under `contained_tokens` — accept either.
-    var tokensMap: Record<string, { amount: number }> = {};
-    var contained: TokenSpec[] = (typeData && (typeData.tokens || typeData.contained_tokens)) || [];
-    for (var ct = 0; ct < contained.length; ct++) {
-      var ctEntry = contained[ct];
-      if (ctEntry && ctEntry.gestalt) {
-        tokensMap[ctEntry.gestalt] = { amount: ctEntry.amount || 0 };
-      }
-    }
+    // Fixed when the charge started; charges from older builds carry none.
+    var tokensMap = cr.tokens_map || _tokensMapFor(node, typeData);
     var profileSet = { profiles_value: cr.amount || 0, tokens_map: tokensMap };
     dbEntry = {
       origin: gperpPath,
@@ -2747,7 +2882,12 @@ export function collectPerp(
   } else if (gameType === 'TokenPerp') {
     var tpIdata: NodeInstanceData = node.instance_data || {};
     var prevAmount = typeof tpIdata.amount === 'number' ? tpIdata.amount : 0;
-    var newAmount = prevAmount + (cr.amount || 0);
+    // dd_app collectPerp: rescale by charge-time / current profiles_value
+    // (the DB may have grown meanwhile), capped at 100.
+    var chargeP = (cr.last_upgrade_data && cr.last_upgrade_data.profiles_value) || 0;
+    var nowP = ms.game_values.profiles_value || 0;
+    var tokenInc = chargeP > 0 && nowP > 0 ? (cr.amount || 0) / (nowP / chargeP) : cr.amount || 0;
+    var newAmount = prevAmount + Math.min(100 - prevAmount, tokenInc);
     tokenUpdate = { path: gperpPath, amount: newAmount };
     newNodes = ms.nodes.map(function (n) {
       if (n.full_path !== gperpPath) return n;
@@ -2790,11 +2930,6 @@ export function collectPerp(
     });
   }
 
-  var oldLevel = (ms.game_values && ms.game_values.xp_level) || 1;
-  var newLevel = _getLevelByXP(newGv.xp_value || 0);
-  var levelup = newLevel > oldLevel;
-  if (levelup) newGv = _applyLevelUp(newGv, newLevel);
-
   var preMissionState = Object.assign({}, ms, {
     nodes: newNodes,
     nodes_collect: newCollect,
@@ -2822,7 +2957,10 @@ export function collectPerp(
       active_missions: preMissionState.active_missions,
     };
   }
-  newGv = _applyRewardsToGv(newGv, collectMissionResult.rewards);
+  var rewarded = _applyRewardsAndLevelUp(newGv, collectMissionResult.rewards);
+  newGv = rewarded.game_values;
+  var newLevel = rewarded.levelup;
+  var levelup = newLevel > 0;
   var newState = Object.assign({}, preMissionState, {
     game_values: newGv,
     mission_goals: collectMissionResult.mission_goals,
@@ -2854,6 +2992,7 @@ export function collectPerp(
   var _clpDisplayName = state.display_name || state.addr;
   if (levelup) {
     triggerAchievement('levelup', _t('achievement_levelup', _clpDisplayName, String(newLevel)));
+    _notifyLevelupItems(newLevel, newNodes);
   }
   var _clpCompletedMissions =
     (collectMissionResult.missions && collectMissionResult.missions.complete_missions) || [];
@@ -2871,22 +3010,17 @@ export function collectPerp(
   var _clpOldKarma = (ms.game_values && ms.game_values.karma_value) || 0;
   var _clpNewKarma = newGv.karma_value || 0;
   if (incident) {
-    if (_clpOldKarma !== -100 && _clpNewKarma === -100) {
+    if (_clpOldKarma > -100 && _clpNewKarma === -100) {
       triggerAchievement('karma_devil', _t('achievement_karma_devil', _clpDisplayName));
     }
   }
 
-  // Emit materializer events + optional levelup new_items after the caller's
-  // microtask resolves (mirrors dd_app's deferred Celery notifyLevelupItems).
+  // Emit materializer events after the caller's microtask resolves.
   var matEvents = mat.events;
-  var emitLevel = levelup ? newLevel : 0;
   queueMicrotask(function () {
     for (var ei = 0; ei < matEvents.length; ei++) {
       var ev = matEvents[ei];
       if (ev) _emit(ev.ev, ev.pl);
-    }
-    if (emitLevel) {
-      _emit('new_items', { perps: [], powerups: {}, trigger: 'levelup', level: emitLevel });
     }
   });
 
@@ -2955,7 +3089,7 @@ export function integrateCollected(
   var newIntegratedIds = Object.assign({}, integratedIds, { [collectId]: true });
 
   // Production integrate rewards (xp / cash / karma) come from mission rewards,
-  // applied via _applyRewardsToGv on missionResult.rewards below — this mirrors
+  // applied via _applyRewardsAndLevelUp on missionResult.rewards below — this mirrors
   // dd_app views.py:320, where integrate karma is `rewards.get('karma_value')`
   // from MissionHandler.compute_rewards (currently no ruleset mission grants
   // karma, only xp_value/cash_value — original-faithful).  The profile_set's
@@ -3041,11 +3175,6 @@ export function integrateCollected(
       updatedNodes.push(newNode);
     });
 
-  var oldLevel = (state.game_values && state.game_values.xp_level) || 1;
-  var newLevel = _getLevelByXP(newGv.xp_value || 0);
-  var levelup = newLevel > oldLevel;
-  if (levelup) newGv = _applyLevelUp(newGv, newLevel);
-
   var preMissionState = Object.assign({}, state, {
     db_queue: newQueue,
     nodes: newNodes,
@@ -3060,7 +3189,10 @@ export function integrateCollected(
     newGv.profiles_value || 0,
     newNodes
   );
-  newGv = _applyRewardsToGv(newGv, missionResult.rewards);
+  var rewarded = _applyRewardsAndLevelUp(newGv, missionResult.rewards);
+  newGv = rewarded.game_values;
+  var newLevel = rewarded.levelup;
+  var levelup = newLevel > 0;
   var newState = Object.assign({}, preMissionState, {
     game_values: newGv,
     mission_goals: missionResult.mission_goals,
@@ -3085,16 +3217,11 @@ export function integrateCollected(
     missions: missionResult.missions || { complete_missions: [], updated_missions: [] },
   };
 
-  if (levelup) {
-    queueMicrotask(function () {
-      _emit('new_items', { perps: [], powerups: {}, trigger: 'levelup', level: newLevel });
-    });
-  }
-
   // Achievements
   var _icDisplayName = state.display_name || state.addr;
   if (levelup) {
     triggerAchievement('levelup', _t('achievement_levelup', _icDisplayName, String(newLevel)));
+    _notifyLevelupItems(newLevel, newNodes);
   }
   var _icCompletedMissions =
     (missionResult.missions && missionResult.missions.complete_missions) || [];
@@ -3118,10 +3245,10 @@ export function integrateCollected(
   }
   var _icOldKarma = (state.game_values && state.game_values.karma_value) || 0;
   var _icNewKarma = newGv.karma_value || 0;
-  if (_icOldKarma !== 100 && _icNewKarma === 100) {
+  if (_icOldKarma < 100 && _icNewKarma === 100) {
     triggerAchievement('karma_saint', _t('achievement_karma_saint', _icDisplayName));
   }
-  if (_icOldKarma !== -100 && _icNewKarma === -100) {
+  if (_icOldKarma > -100 && _icNewKarma === -100) {
     triggerAchievement('karma_devil', _t('achievement_karma_devil', _icDisplayName));
   }
 
@@ -3174,11 +3301,12 @@ export function recheckMissions(): Promise<{
   if (!repair || !repair.missions) {
     return Promise.resolve({ result: { repaired: false } });
   }
-  // Reward XP may push the player into a new level — _applyRepairRewards
+  // Reward XP may push the player into a new level — _applyRewardsAndLevelUp
   // applies the energy refill if so.
-  var rewardResult = _applyRepairRewards(state.game_values || {}, repair.rewards);
+  var rewardResult = _applyRewardsAndLevelUp(state.game_values || {}, repair.rewards);
   var newGv = rewardResult.game_values;
   var rewardLevelup = rewardResult.levelup > 0;
+  if (rewardLevelup) _notifyLevelupItems(rewardResult.levelup, state.nodes);
   // `levelup` is intentionally not included in the persisted delta payload:
   // game_values (which already carries the updated ap_max/ap_snapshot/xp_level)
   // is the authoritative source for replay. Callers that need to show a

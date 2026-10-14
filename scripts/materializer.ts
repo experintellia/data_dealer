@@ -163,9 +163,10 @@ export function materialize(state: LocalState, now: number): MaterializeResult {
 
   // ── notifyLevelupItems / notifyBuyperpItems (docs/async-map.md §2–3) ────
   // Both tasks are purely cosmetic (2 s delay so animation completes) with no
-  // DB write and no persistent duration.  In the port they run synchronously
-  // inside the RPC handler at the moment the level-up or buyPerp is
-  // processed.  No materialization rule is needed here.
+  // DB write and no persistent duration.  In the port the RPC handler that
+  // processes the level-up or buyPerp computes the payload and emits it 2 s
+  // later via setTimeout (LocalEngine _emitNewItems).  No materialization
+  // rule is needed here.
 
   // ── logAction (docs/async-map.md §4) ────────────────────────────────────
   // Analytics-only sink; no gameplay state; drop on port (v1).
