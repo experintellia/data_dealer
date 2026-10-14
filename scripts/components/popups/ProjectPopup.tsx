@@ -12,6 +12,7 @@
 
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { toKSNum } from '../../dd-helpers.js';
 import type {
   BuySlotsVM,
   PowerupCategoryVM,
@@ -373,7 +374,7 @@ function BuySlotsSubpop({
         <div class="ButtonDecorator Cash">
           <div class="RenderSprite Tobi" />
           <span class="SlotCost" data-slot-cost={bs.slotCost}>
-            {numToK(bs.slotCost * num)}
+            {toKSNum(bs.slotCost * num)}
           </span>
         </div>
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
@@ -492,7 +493,7 @@ function BuySlotsSubpopDialog({
           <div class="ButtonDecorator Cash">
             <div class="RenderSprite Tobi" />
             <span class="SlotCost" data-slot-cost={bs.slotCost}>
-              {numToK(bs.slotCost * num)}
+              {toKSNum(bs.slotCost * num)}
             </span>
           </div>
           {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
@@ -572,15 +573,6 @@ function BuySelectorSubpopDialog({
       </div>
     </div>
   );
-}
-
-// Local KS formatter for the live slot-cost*num (mirrors dd-helpers
-// toKSNum's k/M rounding without importing the game helper into a
-// component — the cost values here are already integers).
-function numToK(n: number): string {
-  if (n >= 1_000_000) return `${Math.round(n / 100_000) / 10}M`;
-  if (n >= 1_000) return `${Math.round(n / 100) / 10}k`;
-  return String(n);
 }
 
 export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectPopupProps) {

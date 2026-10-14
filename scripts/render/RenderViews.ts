@@ -65,6 +65,7 @@ interface ScrollerLike {
   __isDecelerating: boolean;
   __isDragging: boolean;
   __isAnimating: boolean;
+  __isTracking: boolean;
   __zoomLevel?: number;
   setDimensions(stageW: number, stageH: number, contentW: number, contentH: number): void;
   setPosition(x: number, y: number): void;
@@ -655,6 +656,10 @@ export class RenderViewMap extends RenderNode {
         dragDom,
         'touchmove',
         (e) => {
+          // Window-wide listener: only swallow gestures the map's
+          // touchstart handed to the scroller, so swipes on a ViewTab or
+          // popup content (`overflow:auto`) still scroll natively.
+          if (!scroller.__isTracking) return;
           const touchEvt = e as TouchEvent & { scale?: number };
           let scale = touchEvt.scale;
           if (scale == null && touchEvt.touches.length === 2) {
@@ -678,13 +683,16 @@ export class RenderViewMap extends RenderNode {
         },
         { passive: false }
       );
+      // Capture phase: ZoomControls / .mm-tab touchend handlers
+      // stopPropagation, which used to leave the scroller tracking (so
+      // the touchmove guard above kept swallowing the next swipe).
       addNative(
         dragDom,
         'touchend',
         (e) => {
           scroller.doTouchEnd((e as TouchEvent).timeStamp);
         },
-        false
+        true
       );
       addNative(
         dragDom,
@@ -692,7 +700,7 @@ export class RenderViewMap extends RenderNode {
         (e) => {
           scroller.doTouchEnd((e as TouchEvent).timeStamp);
         },
-        false
+        true
       );
     }
 

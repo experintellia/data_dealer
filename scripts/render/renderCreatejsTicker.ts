@@ -19,7 +19,8 @@ interface CreateJSTickerLike {
   removeEventListener(event: 'tick', fn: () => void): void;
   setFPS?(fps: number): void;
   framerate: number;
-  useRAF: boolean;
+  timingMode: string | null;
+  RAF_SYNCHED: string;
 }
 
 interface CreateJSTweenLike {
@@ -96,6 +97,10 @@ export function resolveTween(): CreateJSTweenLike | undefined {
   return cj?.Tween;
 }
 
-export function tickerSetUseRAF(useRAF: boolean): void {
-  resolveTicker().useRAF = useRAF;
+// The bundled Ticker dropped the legacy `useRAF` flag and only reads
+// `timingMode`; RAF_SYNCHED is what `useRAF = true` used to map to
+// (RAF, still capped at the `tickerSetFPS` rate).
+export function tickerSetUseRAF(): void {
+  const ticker = resolveTicker();
+  ticker.timingMode = ticker.RAF_SYNCHED;
 }

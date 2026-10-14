@@ -122,7 +122,7 @@ function Render(): RenderApi {
   // listener-array shim onto the CreateJS Ticker singleton, so
   // RenderNodeFX's `Ticker.addListener` calls find a function.
   tickerSetFPS(60);
-  tickerSetUseRAF(true);
+  tickerSetUseRAF();
 
   // ── seam wirings ─────────────────────────────────────────────────────────
   //
