@@ -5,7 +5,7 @@
 // per-perp views resolve the subtitle / selector title / tile kind /
 // button-disabled / empty-state copy into one `ProvidedPopupVM`.
 
-import { useCallback, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import type { ProvidedPopupVM } from '../../game/providedView.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
@@ -33,17 +33,14 @@ export function ProvidedPerpPopup({ vm, onClose, popup }: ProvidedPerpPopupProps
   // dissolves the whole card cleanly on close (no transparent-bg hack).
   const closeSubpop = (): void => setOpenKey(null);
 
-  const handleOpenKey = useCallback(
-    (key: number) => {
-      if (isMobileWidth()) {
-        const subpop = vm.subpops.find((s) => s.key === key);
-        if (subpop) openSubpopDialog(PerpProvidedSubpopDialog, { subpop, parentPopup: popup });
-      } else {
-        setOpenKey(key);
-      }
-    },
-    [vm.subpops, popup]
-  );
+  const handleOpenKey = (key: number): void => {
+    if (isMobileWidth()) {
+      const subpop = vm.subpops.find((s) => s.key === key);
+      if (subpop) openSubpopDialog(PerpProvidedSubpopDialog, { subpop, parentPopup: popup });
+    } else {
+      setOpenKey(key);
+    }
+  };
 
   return (
     <div class="PopupBody ProvidedPerp">

@@ -53,10 +53,6 @@ export interface TokenVM {
 
 const SPRITE_BOX = 38;
 
-function spriteOf(v: unknown): SpriteHelperConfig | undefined {
-  return v as SpriteHelperConfig | undefined;
-}
-
 /** Background config + the absolute `.PopupTokenPerp` style — the
  *  pivot math is identical in `token.html` and `token_consumed.html`. */
 function perpBg(data: Record<string, unknown>): {
@@ -64,7 +60,9 @@ function perpBg(data: Record<string, unknown>): {
   perpStyle: string;
 } {
   const isSuper = data.is_supertoken === true;
-  const bgCfg = spriteOf(isSuper ? data.perp_background2 : data.perp_background);
+  const bgCfg = (isSuper ? data.perp_background2 : data.perp_background) as
+    | SpriteHelperConfig
+    | undefined;
   const fm = (bgCfg as { frameMap?: { normal?: Record<string, number> } } | undefined)?.frameMap
     ?.normal;
   let offsetX = 0;
@@ -104,7 +102,7 @@ function buildSubpop(token: TokenEntry, ctx: TokenContext): TokenVM['subpop'] {
     );
   }
   return {
-    logoHtml: renderSpriteHtml(spriteOf(data.popup_sprite)),
+    logoHtml: renderSpriteHtml(data.popup_sprite as SpriteHelperConfig | undefined),
     title: (data.title as string | undefined) ?? '',
     subTitleHtml,
     description: (data.description as string | undefined) ?? '',
@@ -121,7 +119,7 @@ export function buildToken(token: TokenEntry, ctx: TokenContext): TokenVM {
       ? `<div class="new">${i18n.gettext('New!')}</div>`
       : '';
   spriteHtml += renderSpriteHtml(bgCfg);
-  spriteHtml += renderSpriteHtml(spriteOf(data.perp_sprite));
+  spriteHtml += renderSpriteHtml(data.perp_sprite as SpriteHelperConfig | undefined);
   if (token.database_amount && !token.locked && token.diffAmount === undefined) {
     spriteHtml += renderAmountHtml(token.database_amount);
   } else if (token.diffAmount !== undefined) {
@@ -151,7 +149,7 @@ export function buildConsumedToken(token: TokenEntry, ctx: TokenContext): TokenV
   const data = token.data ?? {};
   const { bgCfg, perpStyle } = perpBg(data);
   let spriteHtml = renderSpriteHtml(bgCfg, 'consumed');
-  spriteHtml += renderSpriteHtml(spriteOf(data.perp_sprite));
+  spriteHtml += renderSpriteHtml(data.perp_sprite as SpriteHelperConfig | undefined);
   if (token.database_amount && !token.locked) {
     spriteHtml += renderAmountHtml(token.database_amount, 'consumed');
   }

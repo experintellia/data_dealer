@@ -8,10 +8,10 @@
 //
 // The Data tab (profileset + Charge/Collect) is structurally identical
 // to popup_contact, so it reuses the shared tokenView VM + the
-// perpShared TokenTile/TokenSubpop/fireAction pieces.
+// perpShared TokenTab / ChargeCollectButtons pieces.
 
 import type { JSX } from 'preact';
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type {
   BuySlotsVM,
   PowerupCategoryVM,
@@ -25,10 +25,9 @@ import { PopupHeader } from './PopupHeader.js';
 import { PopupMenu } from './PopupMenu.js';
 import { type PreactDialogHandle, stopAndClose } from './dialogManager.js';
 import {
+  ChargeCollectButtons,
   ProvidedPowerupSubpopDialog,
-  TokenSubpop,
-  TokenSubpopDialog,
-  TokenTile,
+  TokenTab,
   fireAction,
   isMobileWidth,
   openSubpopDialog,
@@ -105,10 +104,7 @@ function SellSubpop({
   onClose: () => void;
   popup: PreactDialogHandle;
 }) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   // Short local keeps the dangerouslySetInnerHTML line single-line so
   // the biome-ignore attaches (codebase convention, see perpShared).
   // Short locals keep the dangerouslySetInnerHTML lines single-line so
@@ -168,10 +164,7 @@ function ProvidedSubpop({
   onClose: () => void;
   popup: PreactDialogHandle;
 }) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   // Short locals keep the dangerouslySetInnerHTML lines single-line so
   // the biome-ignore attaches. Legacy subpop_powerup_provided.html
   // emits title / description with `<%= … %>` (raw ruleset HTML).
@@ -267,10 +260,7 @@ function BuySelectorSubpop({
   onProvidedOpen: (gestalt: string) => void;
   onClose: () => void;
 }) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   let cls = 'Subpop Selector';
   if (isOpen) cls += ' open';
   if (hasPopup) cls += ' hasPopup';
@@ -318,10 +308,7 @@ function BuySlotsSubpop({
   popup: PreactDialogHandle;
 }) {
   const [num, setNum] = useState(1);
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   // Legacy BuySlotsInc: num+1 > slots_left ? num : num+1; Dec: max(1).
   const dec = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
     e.stopPropagation();
@@ -586,19 +573,6 @@ function numToK(n: number): string {
 export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectPopupProps) {
   const [vm, setVm] = useState(initialVm);
   const [activeTab, setActiveTab] = useState(initialVm.initialTab);
-  // Data-tab profileset token subpop (Contact-shaped).
-  const [openToken, setOpenToken] = useState<string | null>(null);
-  const handleOpenToken = useCallback(
-    (gestalt: string) => {
-      if (isMobileWidth()) {
-        const token = vm.tokens.find((t) => t.gestalt === gestalt);
-        if (token) openSubpopDialog(TokenSubpopDialog, { token });
-      } else {
-        setOpenToken(gestalt);
-      }
-    },
-    [vm.tokens]
-  );
   // Powerup-tab subpop state. `selPkey` = which category's buy Selector
   // is open; `subId` = a card open on top (sell `<pkey><slot>`,
   // `buyslots`, or an InSelector `Provided<gestalt>`).
@@ -670,10 +644,7 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
     popup.trigger('tab_change', [tab]);
   };
 
-  const closeX = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const closeX = stopAndClose(onClose);
 
   // SubpopClose / OKButton: close the topmost (InSelector/sell/buyslots
   // first, then the Selector) — mirrors the legacy delegated handler.
@@ -730,44 +701,14 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
         />
       </div>
       <div class="PopupContent">
-        <div
-          class={`PopupTab data${dataActive ? '' : ' hidden'}${openToken ? ' hasPopup' : ''}`}
-          data-tab="data"
-        >
-          <div class={openToken ? 'SubpopContainer open' : 'SubpopContainer'}>
-            {vm.tokens.map((t) => (
-              <TokenSubpop
-                key={t.gestalt}
-                token={t}
-                isOpen={openToken === t.gestalt}
-                onClose={() => setOpenToken(null)}
-              />
-            ))}
-          </div>
-          {/* The profiles/risk summary renders before the grid so it
-              sits *above* it.  Desktop pins the chips absolute
-              (`.PopupSummary { top:192px }`, held on top of the grid by
-              `z-index:1`); mobile flows them static, where this earlier
-              DOM position is what stacks them above the grid — parity
-              with the desktop layout. */}
-          <div class="PopupSummary">
-            <div class="PopupSummaryItem Profiles">
-              <div class="RenderSprite Tobi" />
-              {vm.summaryProfiles}
-            </div>
-            <div class={`PopupSummaryItem Risk ${vm.summaryRiskUp ? 'Up' : 'Down'}`}>
-              <div class="RenderSprite Tobi" />
-              {vm.summaryRisk}
-            </div>
-          </div>
-          <div class="Pagination">
-            <div class="PopupTokens">
-              {vm.tokens.map((t) => (
-                <TokenTile key={t.gestalt} token={t} onOpen={handleOpenToken} />
-              ))}
-            </div>
-          </div>
-        </div>
+        <TokenTab
+          tokens={vm.tokens}
+          summaryProfiles={vm.summaryProfiles}
+          summaryRisk={vm.summaryRisk}
+          summaryRiskUp={vm.summaryRiskUp}
+          tabClass={`PopupTab data${dataActive ? '' : ' hidden'}`}
+          dataTab="data"
+        />
 
         {!vm.cached ? (
           <div class="PopupContentLoading">
@@ -898,43 +839,16 @@ export function ProjectPopup({ vm: initialVm, bridge, onClose, popup }: ProjectP
           overhang to `.PopupContent`'s border-radius.  Guarded by the active
           tab so it only shows on the data tab (the powerup tabs have no
           charge/collect action — they buy/sell through their own subpops). */}
-      {dataActive &&
-        (vm.collectMode ? (
-          <div class="PopupButtons">
-            <div class="ButtonDecorator AP">
-              <div class="RenderSprite Tobi" />1
-            </div>
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-            <div
-              class="Button"
-              data-button-id="CollectButton"
-              data-testid="dd-collect-button"
-              onClick={(e) => fireAction(popup, e, 'CollectButton')}
-            >
-              {i18n.gettext('Collect')}
-            </div>
-          </div>
-        ) : (
-          <div class="PopupButtons">
-            <div class="ButtonDecorator Cash">
-              <div class="RenderSprite Tobi" />
-              {vm.chargeCostText}
-            </div>
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
-            <div
-              class={vm.chargeDisabled ? 'Button disabled' : 'Button'}
-              data-button-id="ChargeButton"
-              data-testid="dd-charge-button"
-              onClick={(e) => fireAction(popup, e, 'ChargeButton')}
-            >
-              {vm.chargeButtonText}
-            </div>
-            <div class="ButtonDecorator Time">
-              <div class="RenderSprite Tobi" />
-              {vm.chargeTimeText}
-            </div>
-          </div>
-        ))}
+      {dataActive && (
+        <ChargeCollectButtons
+          popup={popup}
+          collectMode={vm.collectMode}
+          chargeDisabled={vm.chargeDisabled}
+          chargeText={vm.chargeButtonText}
+          chargeTimeText={vm.chargeTimeText}
+          chargeCostText={vm.chargeCostText}
+        />
+      )}
     </div>
   );
 }

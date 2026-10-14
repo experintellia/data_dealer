@@ -6,6 +6,7 @@
 // these live once here instead of being duplicated per perp component.
 
 import { type ComponentType, type JSX } from 'preact';
+import { useState } from 'preact/hooks';
 import type { ProvidedPowerupSubpopVM } from '../../game/powerupView.js';
 import type { ProvidedSubpopVM, ProvidedTileVM } from '../../game/providedView.js';
 import type { TokenUpgradeSubpopVM } from '../../game/tokenPopupView.js';
@@ -131,6 +132,149 @@ export function TokenGrid({
         {tokens.map((t) => (
           <TokenTile key={t.gestalt} token={t} onOpen={onOpen} />
         ))}
+      </div>
+    </div>
+  );
+}
+
+/** The `profileset.html` data tab of the Contact / ProfileSet / Project
+ *  popups: token subpops, the Profiles (+ Risk) summary, the token grid.
+ *  Owns the open-subpop state; on mobile a tile opens the stacked
+ *  `TokenSubpopDialog` instead.  `tabClass` gets ` hasPopup` appended
+ *  while a subpop is open. */
+export function TokenTab({
+  tokens,
+  summaryProfiles,
+  summaryRisk,
+  summaryRiskUp,
+  tabClass = 'PopupTab',
+  dataTab,
+}: {
+  tokens: TokenVM[];
+  summaryProfiles: string;
+  /** Unset → no Risk chip (ProfileSet). */
+  summaryRisk?: string;
+  summaryRiskUp?: boolean;
+  tabClass?: string;
+  dataTab?: string;
+}) {
+  const [openToken, setOpenToken] = useState<string | null>(null);
+  const handleOpenToken = (gestalt: string): void => {
+    if (isMobileWidth()) {
+      const token = tokens.find((t) => t.gestalt === gestalt);
+      if (token) openSubpopDialog(TokenSubpopDialog, { token });
+    } else {
+      setOpenToken(gestalt);
+    }
+  };
+  return (
+    <div class={openToken ? `${tabClass} hasPopup` : tabClass} data-tab={dataTab}>
+      {/* All token subpops stay mounted (matches legacy
+          profileset.html); only `.open` toggles, so the CSS
+          scale/opacity transition plays and the grid underneath
+          is never re-rendered (no white flash). */}
+      <div class={openToken ? 'SubpopContainer open' : 'SubpopContainer'}>
+        {tokens.map((t) => (
+          <TokenSubpop
+            key={t.gestalt}
+            token={t}
+            isOpen={openToken === t.gestalt}
+            onClose={() => setOpenToken(null)}
+          />
+        ))}
+      </div>
+      {/* The profiles/risk summary renders before the grid so it
+          sits *above* it.  Desktop pins the chips absolute
+          (`.PopupSummary { top:192px }`, held on top of the grid by
+          `z-index:1`); mobile flows them static, where this earlier
+          DOM position is what stacks them above the grid — parity
+          with the desktop layout. */}
+      <div class="PopupSummary">
+        <div class="PopupSummaryItem Profiles">
+          <div class="RenderSprite Tobi" />
+          {summaryProfiles}
+        </div>
+        {summaryRisk === undefined ? null : (
+          <div class={`PopupSummaryItem Risk ${summaryRiskUp ? 'Up' : 'Down'}`}>
+            <div class="RenderSprite Tobi" />
+            {summaryRisk}
+          </div>
+        )}
+      </div>
+      <TokenGrid
+        tokens={tokens}
+        paginationClass="Pagination"
+        tokensClass="PopupTokens"
+        onOpen={handleOpenToken}
+      />
+    </div>
+  );
+}
+
+/** The Charge / Collect `.PopupButtons` bar of the Contact / Client /
+ *  Project / SuperToken popups.  `chargeCostText` set → a Cash cost
+ *  decorator before the Charge button (Contact / Project); unset → the
+ *  1-AP decorator (Client / Token).  Placement stays with the caller. */
+export function ChargeCollectButtons({
+  popup,
+  collectMode,
+  chargeDisabled,
+  chargeText,
+  chargeTimeText,
+  chargeCostText,
+  collectText = i18n.gettext('Collect'),
+}: {
+  popup: PreactDialogHandle;
+  collectMode: boolean;
+  chargeDisabled: boolean;
+  chargeText: string;
+  chargeTimeText: string;
+  chargeCostText?: string;
+  collectText?: string;
+}) {
+  const ap = (
+    <div class="ButtonDecorator AP">
+      <div class="RenderSprite Tobi" />1
+    </div>
+  );
+  if (collectMode) {
+    return (
+      <div class="PopupButtons">
+        {ap}
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+        <div
+          class="Button"
+          data-button-id="CollectButton"
+          data-testid="dd-collect-button"
+          onClick={(e) => fireAction(popup, e, 'CollectButton')}
+        >
+          {collectText}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div class="PopupButtons">
+      {chargeCostText === undefined ? (
+        ap
+      ) : (
+        <div class="ButtonDecorator Cash">
+          <div class="RenderSprite Tobi" />
+          {chargeCostText}
+        </div>
+      )}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: legacy DOM structure, keyboard support is a separate a11y pass */}
+      <div
+        class={chargeDisabled ? 'Button disabled' : 'Button'}
+        data-button-id="ChargeButton"
+        data-testid="dd-charge-button"
+        onClick={(e) => fireAction(popup, e, 'ChargeButton')}
+      >
+        {chargeText}
+      </div>
+      <div class="ButtonDecorator Time">
+        <div class="RenderSprite Tobi" />
+        {chargeTimeText}
       </div>
     </div>
   );

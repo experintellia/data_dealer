@@ -21,6 +21,7 @@ import i18n from '../i18n.js';
 import { GameNode, getAllByGestalt, getByFirstId, getFirstId } from './GameNode.js';
 import { mergeData } from './mergeData.js';
 import { lookupPerpClass } from './perpRegistry.js';
+import { type ProvidedContext, buildProvidedContext } from './providedView.js';
 import { computeBuyPerpSpawnPos } from './spawnPosition.js';
 
 // ---------------------------------------------------------------------------
@@ -339,6 +340,27 @@ export class GamePerp extends GameNode {
     // perp-node FXNoCash spawns on the board layer, occluded by the
     // popup overlay, so it can't be reused for Preact dialogs.
     return handle;
+  }
+
+  /** `ProvidedContext` for the provided-perp buy grids (Agent / Pusher /
+   *  Proxy / City popups). */
+  protected providedCtx(): ProvidedContext {
+    return buildProvidedContext(
+      this.groot as unknown as Parameters<typeof buildProvidedContext>[0]
+    );
+  }
+
+  /** Provided-perp vclick: refetch the buyable list (re-mounting the
+   *  popup with it once it lands — Path A `updatePopup`), then open the
+   *  popup with what's cached now. */
+  protected openPopupAndRefetchProvided(): void {
+    this.fetchProvided?.(() => {
+      this.compileProvided();
+      if (this.renderPopup) {
+        this.updatePopup();
+      }
+    });
+    this.openPopup();
   }
 
   // -------------------------------------------------------------------

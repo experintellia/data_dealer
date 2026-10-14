@@ -5,10 +5,10 @@
 // `mission_goal.html` template carried a "MOVE THIS TO GAME" FIXME;
 // the logic now lives in TS, the component just renders).
 
-import type { JSX } from 'preact';
 import i18n from '../../i18n.js';
 import { MarcoSpeech } from '../MarcoSpeech.js';
 import { MissionGoalRow, type MissionGoalVM, type MissionRewardVM } from '../MissionGoal.js';
+import { stopAndClose } from './dialogManager.js';
 
 export interface MissionPopupProps {
   /** `complete` renders the `.Complete` body modifier + the
@@ -37,10 +37,7 @@ export function MissionPopup({
   rewards,
   onClose,
 }: MissionPopupProps) {
-  const close = (e: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
-    e.stopPropagation();
-    onClose();
-  };
+  const close = stopAndClose(onClose);
   return (
     <div
       class={variant === 'complete' ? 'PopupBody MissionBody Complete' : 'PopupBody MissionBody'}

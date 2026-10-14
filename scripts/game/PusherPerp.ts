@@ -9,28 +9,12 @@ import { ProvidedPerpPopup } from '../components/popups/ProvidedPerpPopup.js';
 import i18n from '../i18n.js';
 import { type GameNodeConfig } from './GameNode.js';
 import { GamePerp, type RenderPopupLike } from './GamePerp.js';
-import type { ProvidedContext } from './providedView.js';
 import { buildPusherPopupVM } from './pusherView.js';
-
-interface GameRootForProvided {
-  xp_level: { number: number };
-  DBTokens: Record<string, number>;
-  getTypeFromGestalt(gestalt?: string): string;
-}
 
 export class PusherPerp extends GamePerp {
   override renderType = 'Perp';
   override cableType = 'out' as const;
   override labelClass = 'client';
-
-  private providedCtx(): ProvidedContext {
-    const g = this.groot as unknown as GameRootForProvided;
-    return {
-      xpLevel: g.xp_level.number,
-      dbTokens: g.DBTokens,
-      typeOf: (gestalt: string) => g.getTypeFromGestalt(gestalt),
-    };
-  }
 
   override openPopup(): RenderPopupLike {
     const vm = buildPusherPopupVM(
@@ -66,13 +50,7 @@ export class PusherPerp extends GamePerp {
 
     gnode.on('vclick', function (e: unknown) {
       PusherPerp._stopProp(e);
-      gnode.fetchProvided?.(function () {
-        gnode.compileProvided();
-        if (gnode.renderPopup) {
-          gnode.updatePopup();
-        }
-      });
-      gnode.openPopup();
+      gnode.openPopupAndRefetchProvided();
     });
   }
 }

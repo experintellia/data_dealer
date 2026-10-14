@@ -5,18 +5,10 @@
 // summary and one Import MainButton (routed through the same
 // `fireAction` seam, wired to `Database.mergeCued`).
 
-import { useCallback, useState } from 'preact/hooks';
 import type { ProfileSetPopupVM } from '../../game/profilesetView.js';
 import { PopupHeader } from './PopupHeader.js';
 import type { PreactDialogHandle } from './dialogManager.js';
-import {
-  TokenGrid,
-  TokenSubpop,
-  TokenSubpopDialog,
-  fireAction,
-  isMobileWidth,
-  openSubpopDialog,
-} from './perpShared.js';
+import { TokenTab, fireAction } from './perpShared.js';
 
 export interface ProfileSetPopupProps {
   vm: ProfileSetPopupVM;
@@ -27,20 +19,6 @@ export interface ProfileSetPopupProps {
 }
 
 export function ProfileSetPopup({ vm, onClose, popup }: ProfileSetPopupProps) {
-  const [openToken, setOpenToken] = useState<string | null>(null);
-
-  const handleOpenToken = useCallback(
-    (gestalt: string) => {
-      if (isMobileWidth()) {
-        const token = vm.tokens.find((t) => t.gestalt === gestalt);
-        if (token) openSubpopDialog(TokenSubpopDialog, { token });
-      } else {
-        setOpenToken(gestalt);
-      }
-    },
-    [vm.tokens]
-  );
-
   return (
     <div class="PopupBody">
       <PopupHeader
@@ -51,36 +29,7 @@ export function ProfileSetPopup({ vm, onClose, popup }: ProfileSetPopupProps) {
         description={vm.description}
       />
       <div class="PopupContent">
-        <div class={openToken ? 'PopupTab hasPopup' : 'PopupTab'}>
-          <div class={openToken ? 'SubpopContainer open' : 'SubpopContainer'}>
-            {vm.tokens.map((t) => (
-              <TokenSubpop
-                key={t.gestalt}
-                token={t}
-                isOpen={openToken === t.gestalt}
-                onClose={() => setOpenToken(null)}
-              />
-            ))}
-          </div>
-          {/* The profiles summary renders before the grid so it sits
-              *above* it.  Desktop pins the chip absolute
-              (`.PopupSummary { top:192px }`, held on top of the grid by
-              `z-index:1`); mobile flows it static, where this earlier
-              DOM position is what stacks it above the grid — parity with
-              the desktop layout. */}
-          <div class="PopupSummary">
-            <div class="PopupSummaryItem Profiles">
-              <div class="RenderSprite Tobi" />
-              {vm.summaryProfiles}
-            </div>
-          </div>
-          <TokenGrid
-            tokens={vm.tokens}
-            paginationClass="Pagination"
-            tokensClass="PopupTokens"
-            onOpen={handleOpenToken}
-          />
-        </div>
+        <TokenTab tokens={vm.tokens} summaryProfiles={vm.summaryProfiles} />
       </div>
       {/* The button bar renders as a direct child of `.PopupBody`, outside
           the scrolling, rounded `.PopupContent`, so it straddles the

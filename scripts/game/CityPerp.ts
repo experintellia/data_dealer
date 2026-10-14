@@ -14,7 +14,6 @@ import {
   type RenderPopupLike,
 } from './GamePerp.js';
 import { buildCityPopupVM } from './cityView.js';
-import { type ProvidedContext, buildProvidedContext } from './providedView.js';
 
 type TabKey = 'AgentPerp' | 'PusherPerp' | 'ProxyPerp' | 'CityPerp';
 
@@ -34,12 +33,6 @@ export class CityPerp extends GamePerp {
 
   protected override get groot(): GameRootForCityPerp {
     return this.GameRoot as unknown as GameRootForCityPerp;
-  }
-
-  private providedCtx(): ProvidedContext {
-    return buildProvidedContext(
-      this.groot as unknown as Parameters<typeof buildProvidedContext>[0]
-    );
   }
 
   override openPopup(): RenderPopupLike {
@@ -185,13 +178,7 @@ export class CityPerp extends GamePerp {
       };
       dataRec.providedTabs = { agents: [], pusher: [], proxies: [] };
 
-      gnode.fetchProvided?.(function () {
-        gnode.compileProvided();
-        if (gnode.renderPopup) {
-          gnode.updatePopup();
-        }
-      });
-      gnode.openPopup();
+      gnode.openPopupAndRefetchProvided();
     });
   }
 }
