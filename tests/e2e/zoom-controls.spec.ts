@@ -11,6 +11,7 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { bootGame } from './_helpers';
 
 interface DDHook {
   __dd?: {
@@ -73,4 +74,70 @@ test('zoom-controls: Fullscreen button resets zoom to 1.0 from any zoom level', 
 
   // Scroller animation duration is 300 ms; allow some headroom.
   await expect.poll(getZoom, { timeout: 3_000 }).toBeCloseTo(1, 2);
+});
+
+test('zoom-controls: zoom buttons still animate after a camera scrollTo', async ({ page }) => {
+  // RenderViewMap.scrollTo() used to leave `scroller.options.animating`
+  // false, and Zynga only tweens zooms / flick-decelerates while it is
+  // true — so after the first camera move every zoom jumped instantly.
+  await bootGame(page);
+  const r = await page.evaluate(() => {
+    const vm = (window as any).__dd._app.game.activeView.renderNode;
+    vm.scroller.zoomTo(1, false);
+    vm.scrollTo({ x: 1024, y: 840 }, 0);
+    const instantScroll = !vm.scroller.__isAnimating;
+    const animatingAfterScrollTo = vm.scroller.options.animating;
+    document
+      .querySelector<HTMLElement>('#Imperium .ZoomControls .ZoomOut')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    return { instantScroll, animatingAfterScrollTo, tweening: !!vm.scroller.__isAnimating };
+  });
+  expect(r.instantScroll, 'scrollTo(pos, 0) moves without a tween').toBe(true);
+  expect(r.animatingAfterScrollTo).toBe(true);
+  expect(r.tweening, 'ZoomOut starts a tween instead of jumping').toBe(true);
+});
+
+test('zoom-controls: a zoom tween survives refits, camera moves and a second click', async ({
+  page,
+}) => {
+  // A refit (window resize / MainMenu ResizeObserver → fitToWindow →
+  // updateScroller), a tab switch, a tutorial camera move or the debounced
+  // re-centre all re-publish "the current zoom".  Mid-tween that is a
+  // transient value, and Zynga stopped the reset tween right there.
+  await bootGame(page);
+  for (const followUp of ['fitToWindow', 'switchView', 'cameraMove', 'center']) {
+    const zoom = await page.evaluate(async (followUp) => {
+      const game = (window as any).__dd._app.game;
+      const vm = game.activeView.renderNode;
+      vm.scroller.zoomTo(0.6, false);
+      document
+        .querySelector<HTMLElement>('#Imperium .ZoomControls .Fullscreen')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      if (followUp === 'fitToWindow') game.fitToWindow();
+      if (followUp === 'switchView') game.trigger('switch_view', ['Imperium']);
+      if (followUp === 'cameraMove') vm.scrollTo({ x: 1024, y: 840 }, 300);
+      if (followUp === 'center') game._centerActiveView(false);
+      await new Promise((r) => setTimeout(r, 1000));
+      return vm.scroller.__zoomLevel;
+    }, followUp);
+    expect(zoom, `zoom after a ${followUp} during the reset tween`).toBeCloseTo(1, 2);
+  }
+
+  // A quick double-click steps twice: 0.625 → 0.875 → 1, not 0.625 → ~0.875
+  // twice because the second step started from the first tween's frame.
+  const doubleZoomIn = await page.evaluate(async () => {
+    const vm = (window as any).__dd._app.game.activeView.renderNode;
+    vm.scroller.zoomTo(0.6, false);
+    const zoomIn = () =>
+      document
+        .querySelector<HTMLElement>('#Imperium .ZoomControls .ZoomIn')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    zoomIn();
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    zoomIn();
+    await new Promise((r) => setTimeout(r, 1000));
+    return vm.scroller.__zoomLevel;
+  });
+  expect(doubleZoomIn, 'zoom after a quick ZoomIn double-click').toBeCloseTo(1, 2);
 });

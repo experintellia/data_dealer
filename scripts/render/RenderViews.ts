@@ -66,6 +66,10 @@ interface ScrollerLike {
   __isDragging: boolean;
   __isAnimating: boolean;
   __zoomLevel?: number;
+  __scheduledLeft: number;
+  __scheduledTop: number;
+  __scheduledZoom: number;
+  __publish(left: number, top: number, zoom: number, animate: boolean): void;
   setDimensions(stageW: number, stageH: number, contentW: number, contentH: number): void;
   setPosition(x: number, y: number): void;
   scrollTo(x: number, y: number, animate?: boolean): void;
@@ -461,9 +465,19 @@ export class RenderViewMap extends RenderNode {
     this.setTransform({ transX: pos.x + this.offsetX, transY: pos.y + this.offsetY });
   }
 
+  /** Jump an in-flight zoom/scroll tween to its end.  Refits, camera
+   *  moves and re-centres re-publish "the current zoom"; mid-tween that
+   *  is a transient value and Zynga would stop the tween right there. */
+  _finishTween(): void {
+    const s = this.scroller;
+    if (s?.__isAnimating)
+      s.__publish(s.__scheduledLeft, s.__scheduledTop, s.__scheduledZoom, false);
+  }
+
   updateScroller(): void {
     const stage = this.parentNode;
     if (!stage || !this.scroller) return;
+    this._finishTween();
     const scaleW = stage.width / this.width;
     const scaleH = stage.height / this.height;
     let minZoom = scaleW > scaleH ? scaleW : scaleH;
@@ -567,9 +581,15 @@ export class RenderViewMap extends RenderNode {
 
     if (this.useDragHandler) {
       this.useDragHandler.on('mousemove', (e) => {
-        if (this.dragging) {
-          scroller.doTouchMove([{ pageX: e.pageX ?? 0, pageY: e.pageY ?? 0 }], e.timeStamp);
+        if (!this.dragging) return;
+        // No button held: the mouseup was missed (blur, tab hide,
+        // release outside the window) — end the pan, don't follow hover.
+        if (e.buttons === 0) {
+          this.dragging = false;
+          scroller.doTouchEnd(e.timeStamp);
+          return;
         }
+        scroller.doTouchMove([{ pageX: e.pageX ?? 0, pageY: e.pageY ?? 0 }], e.timeStamp);
       });
       this.useDragHandler.on('mouseup', (e) => {
         this.dragging = false;
@@ -761,7 +781,7 @@ export class RenderViewMap extends RenderNode {
     const duration = dur !== undefined ? dur : 300;
     const root = this.gameNode?.GameRoot;
     root?._cancelPendingCenter?.();
-    this.scroller.options.animating = duration > 0;
+    this._finishTween();
     this.scroller.options.animationDuration = duration;
     // `pos` is in the ViewMap's unscaled native coordinates (e.g.
     // the Database perp at `viewmapPos: {x: 1024, y: 840}`), but
@@ -776,8 +796,7 @@ export class RenderViewMap extends RenderNode {
     // viewport-pixel centre — the scroller's internal clamp handles
     // the bounds.
     const zoom = this.zoomScale ?? 1;
-    this.scroller.scrollTo(pos.x * zoom - vpCenter.x, pos.y * zoom - vpCenter.y, true);
-    this.scroller.options.animating = false;
+    this.scroller.scrollTo(pos.x * zoom - vpCenter.x, pos.y * zoom - vpCenter.y, duration > 0);
     this.scroller.options.animationDuration = 300;
   }
 
@@ -809,15 +828,24 @@ export class RenderViewMap extends RenderNode {
     this._jFullscreen.toggleClass('disabled', atMin && atMax);
   }
 
+  /** Step from where a running tween is heading, not from its transient
+   *  frame, so a quick double-click still moves two full steps. */
+  _zoomTarget(): number {
+    const s = this.scroller;
+    return s?.__isAnimating ? s.__scheduledZoom : this.zoomScale;
+  }
+
   zoomIn(): void {
-    const zoomTo = this.zoomScale + 0.25 > 1 ? 1 : this.zoomScale + 0.25;
-    if (zoomTo === this.zoomScale) return;
+    const from = this._zoomTarget();
+    const zoomTo = from + 0.25 > 1 ? 1 : from + 0.25;
+    if (zoomTo === from) return;
     this.scroller?.zoomTo(zoomTo, true);
   }
 
   zoomOut(): void {
-    const zoomTo = this.zoomScale - 0.25 < 0.5 ? 0.5 : this.zoomScale - 0.25;
-    if (zoomTo === this.zoomScale) return;
+    const from = this._zoomTarget();
+    const zoomTo = from - 0.25 < 0.5 ? 0.5 : from - 0.25;
+    if (zoomTo === from) return;
     this.scroller?.zoomTo(zoomTo, true);
   }
 

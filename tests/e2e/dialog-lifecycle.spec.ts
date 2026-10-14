@@ -1526,8 +1526,10 @@ test.describe('Section M — Subpop close + simple TokenPerp', () => {
 
     // Click the SubpopClose X.  The handler at RenderTopLevelUI.ts:822
     // strips .open from the subpop and clears .hasPopup from the parent
-    // .PopupTab, but the parent popup itself stays mounted.
-    await subpop.locator('.SubpopClose').first().click({ force: true });
+    // .PopupTab, but the parent popup itself stays mounted.  No `force`:
+    // the subpop scales in over 0.2s, and a forced click mid-transition
+    // lands beside the still-moving X.
+    await subpop.locator('.SubpopClose').first().click();
 
     // Subpop is no longer .open; parent popup still has lockOn.
     await expect(
@@ -1995,5 +1997,88 @@ test.describe('Section Q — touch subpop reopen', () => {
       const groot = (window as any).__dd?._app?.game;
       groot.renderPopup?.trigger('popup_close');
     });
+  });
+});
+
+// ── Section R — stacked subpop teardown ──────────────────────────────────
+//
+// On mobile a token subpop stacks on top of its perp popup (keepParent).
+// Opening an unrelated dialog used to close only the top of that stack, so
+// the perp popup stayed mounted but untracked: once the new dialog closed,
+// the orphan was still on screen while the MainMenu DialogLock was gone.
+
+test.describe('Section R — stacked subpop teardown', () => {
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  test('a new dialog closes the whole stacked subpop chain', async ({ page }) => {
+    await bootGame(page);
+    await page.evaluate(async () => {
+      const eng = await new Promise<any>((res, rej) =>
+        (window as any).require(['LocalEngine'], res, rej)
+      );
+      await eng.buyPerp('Imperium', 'contact035');
+    });
+    await page.reload();
+    await bootGame(page);
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      const gnode = groot.getById('contact035');
+      gnode.data.ProfileSet = {
+        tokens_set: (gnode.data.tokens ?? []).map((t: { gestalt?: string }) => ({
+          ...t,
+          data: t.gestalt ? groot.getTypeData(t.gestalt) : undefined,
+        })),
+      };
+      gnode.openPopup();
+    });
+    const overlays = page.locator('.PopupFullViewport');
+    await page.locator('.PopupContainer.lockOn .PopupToken:not(.locked)').first().click();
+    await expect(overlays).toHaveCount(2);
+
+    await page.evaluate(() => {
+      const groot = (window as any).__dd?._app?.game;
+      groot.makeNotifications({ simplemessage: { text: 'Stacked teardown.' } });
+    });
+    await expect(page.locator('.PopupContainer.lockOn.Tutorial')).toBeVisible({ timeout: 5_000 });
+    await expect(overlays).toHaveCount(1);
+
+    await page.evaluate(() => {
+      (window as any).__dd?._app?.game?.notificationPopup?.trigger('popup_close');
+    });
+    await expect(overlays).toHaveCount(0);
+    await expect(page.locator('.MainMenu.DialogLock')).toHaveCount(0);
+  });
+
+  test('closing the root popup closes every subpop stacked above it', async ({ page }) => {
+    await bootGame(page);
+    await buyAndOpenPerp(page, {
+      name: 'ProjectPerp',
+      gestalt: 'project001',
+      parentPath: 'Imperium',
+      bodySelector: '.PopupContainer.lockOn .PopupMenu',
+      boost: { cash: 5_000, xp_level: 2, xp_value: 20 },
+    });
+    await page.evaluate(() => {
+      const gnode = (window as any).__dd?._app?.game.getById('project001');
+      gnode.fetchPowerups(() => {
+        gnode.compilePowerups();
+        gnode.compileProfileSet?.();
+        if (gnode.renderPopup) gnode.updatePopup();
+      });
+    });
+    const overlays = page.locator('.PopupFullViewport');
+    await page.locator('.PopupMenuButton[data-tab="AdPowerup"]').first().click();
+    // Project popup → buy-selector subpop → provided-powerup subpop.
+    await page
+      .locator('.PopupTab[data-tab="AdPowerup"] .Powerup.free[data-subpop-id="ProvidedAdPowerup"]')
+      .first()
+      .click();
+    await overlays.nth(1).locator('.Powerup.provided:not(.locked)').first().click();
+    await expect(overlays).toHaveCount(3);
+
+    await page.evaluate(() => {
+      (window as any).__dd?._app?.game.getById('project001').renderPopup.trigger('popup_close');
+    });
+    await expect(overlays).toHaveCount(0);
   });
 });
